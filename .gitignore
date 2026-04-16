@@ -1,0 +1,28 @@
+# Runtime data
+dumped_tables/
+preload_dumps/
+debug/
+
+# Upstream-Cache (auto-cloned by compare_offsets.py)
+.upstream_cache/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDE / Editor
+.vscode/
+
+# Logs & temp files
+*.error.log
+*.error.log.*
+
+# Runtime-generated (user-specific)
+offset_history.json
+last_known_patch.txt
+gamehelper_config.ini
+
+# Dev notes (not for repo)
+NEXT_STEPS.md
+QUICKSTART.md
+STAT_EXTRACTION_README.md

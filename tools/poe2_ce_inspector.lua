@@ -1,0 +1,790 @@
+-- ============================================================
+-- PoE2 Memory Inspector for Cheat Engine
+-- Based on GameHelper: PoE2Offsets.ahk + StaticOffsetsPatterns.ahk
+-- ============================================================
+--
+-- SETUP:
+--   1. Attach CE to PathOfExile.exe (or PathOfExileSteam.exe)
+--   2. Be fully in-game (in an area, not login screen)
+--   3. Open Table -> Show Cheat Table Lua Script, paste this file and Execute
+--      OR: Ctrl+Alt+L -> Lua Engine, File -> Open, then Execute Script
+--
+-- COMMANDS (run in Lua Engine or from table script):
+--   poe2_scan()              -- scan byte patterns  (once per game launch)
+--   poe2_refresh()           -- resolve chain + populate address list
+--   poe2_dump_entity(addr)   -- dump all components for entity at addr (hex string or number)
+--   poe2_list_entities(N)    -- walk awake entity map, print first N paths
+--   poe2_find_comp(addr, name) -- find one component by name in an entity
+-- ============================================================
+
+-- ── Offsets (PoE2Offsets.ahk) ────────────────────────────────────────────────
+local OFF = {
+    -- GameState struct
+    GS_States       = 0x48,
+    GS_EntrySize    = 0x10,   -- sizeof each States[] entry
+    GS_InGameIdx    = 4,      -- 0-based index for InGameState
+
+    -- InGameState
+    IGS_AreaData    = 0x290,
+    IGS_WorldData   = 0x308,
+    IGS_UiRootStr   = 0x340,
+
+    -- UiRootStruct
+    UI_GameUiPtr    = 0xBE0,
+    UI_GameUiCtrl   = 0xBE8,
+
+    -- AreaInstance
+    AI_AreaLevel    = 0xC4,
+    AI_AreaHash     = 0x11C,
+    AI_PlayerInfo   = 0xA20,
+    AI_AwakeEnts    = 0xB68,
+    AI_SleepEnts    = 0xB78,
+    AI_TerrainMeta  = 0xD50,
+
+    -- LocalPlayerStruct
+    LP_ServerData   = 0x00,
+    LP_LocalPlayer  = 0x20,
+
+    -- Entity
+    ENT_DetailsPtr  = 0x08,
+    ENT_CompVec     = 0x10,
+    ENT_CompVecLast = 0x18,
+    ENT_Id          = 0x80,
+    ENT_Flags       = 0x84,
+
+    -- EntityDetails
+    ED_Path         = 0x08,
+    ED_CompLookup   = 0x28,
+
+    -- ComponentLookup (hash table)
+    CL_Bucket       = 0x28,   -- pointer to bucket array
+
+    -- ComponentLookupEntry (18 bytes per slot)
+    CLE_NamePtr     = 0x00,
+    CLE_Index       = 0x08,   -- index into component vector
+    CLE_Size        = 0x10,
+
+    -- ComponentHeader (first 0x10 bytes before component data)
+    CH_StaticPtr    = 0x00,
+    CH_EntityPtr    = 0x08,
+
+    -- Render component
+    REND_PosX       = 0x138,
+    REND_PosY       = 0x13C,
+    REND_PosZ       = 0x140,
+    REND_Terrain    = 0x1B0,
+
+    -- Life component base offsets
+    LIFE_Health     = 0x1A8,
+    LIFE_Mana       = 0x1F8,
+    LIFE_ES         = 0x230,
+
+    -- Vital sub-struct offsets (relative to vital base)
+    VIT_ResFlat     = 0x10,
+    VIT_ResFrac     = 0x14,
+    VIT_Regen       = 0x28,
+    VIT_Max         = 0x2C,
+    VIT_Current     = 0x30,
+
+    -- Player component
+    PLR_Name        = 0x1B0,
+    PLR_XP          = 0x1D8,
+    PLR_Level       = 0x204,
+
+    -- Positioned component
+    POS_Reaction    = 0x1E0,   -- 0=Hostile 1/2=Friendly
+
+    -- Mods / ObjectMagicProperties
+    MODS_Rarity     = 0x94,
+    OMP_Rarity      = 0x144,
+
+    -- Chest
+    CHEST_DataPtr   = 0x160,
+    CHEST_IsOpened  = 0x168,
+
+    -- Targetable
+    TARG_IsTarget   = 0x51,
+
+    -- StdMap header
+    SMAP_Head       = 0x00,
+    SMAP_Size       = 0x08,
+
+    -- StdMapNode
+    NODE_Left       = 0x00,
+    NODE_Parent     = 0x08,
+    NODE_Right      = 0x10,
+    NODE_IsNil      = 0x19,
+    NODE_KeyId      = 0x20,
+    NODE_EntPtr     = 0x28,
+
+    -- WorldAreaDat row
+    WAD_IdPtr       = 0x00,
+    WAD_NamePtr     = 0x08,
+    WAD_Act         = 0x10,
+    WAD_IsTown      = 0x14,
+    WAD_Waypoint    = 0x15,
+
+    -- UiElementBase
+    UIE_Children    = 0x010,
+    UIE_Parent      = 0x0B8,
+    UIE_RelPos      = 0x118,
+    UIE_Flags       = 0x180,
+    UIE_ScaleIdx    = 0x18A,
+    UIE_Size        = 0x288,
+
+    -- MapUiElement extra
+    MAP_Shift       = 0x340,
+    MAP_DefShift    = 0x348,
+    MAP_Zoom        = 0x380,
+
+    -- ImportantUiElements (relative to uiRootStructPtr)
+    IUI_Chat        = 0x5C0,
+    IUI_MapParent   = 0x748,
+    IUI_MapCtrl     = 0xAA8,
+
+    -- MapParentStruct children (cache offsets)
+    MAP_LargeMap    = 0x28,
+    MAP_MiniMap     = 0x30,
+}
+
+-- ── Memory helpers ───────────────────────────────────────────────────────────
+
+-- IsProbablyValidPointer: mirrors the AHK implementation exactly
+local function isPtr(v)
+    return v ~= nil and v > 0x10000 and v < 0x7FFFFFFFFFFF
+end
+
+local function rPtr(a)
+    if not isPtr(a) then return 0 end
+    local ok, v = pcall(readPointer, a)
+    return (ok and v ~= nil) and v or 0
+end
+
+local function rInt(a)
+    if not isPtr(a) then return 0 end
+    local ok, v = pcall(readInteger, a)
+    return (ok and v ~= nil) and v or 0
+end
+
+local function rUInt(a)
+    local v = rInt(a)
+    return v < 0 and (v + 0x100000000) or v
+end
+
+local function rByte(a)
+    if not isPtr(a) then return 0 end
+    -- readByte returns a single number directly (not a table)
+    local ok, v = pcall(readByte, a)
+    return (ok and v ~= nil) and v or 0
+end
+
+local function rFloat(a)
+    if not isPtr(a) then return 0.0 end
+    local ok, v = pcall(readFloat, a)
+    return (ok and v ~= nil) and v or 0.0
+end
+
+-- Read null-terminated UTF-16LE string (up to maxChars wide chars)
+local function rWStr(addr, maxChars)
+    maxChars = maxChars or 128
+    if not isPtr(addr) then return "" end
+    -- returnAsTable=true is required; without it readBytes returns a single number
+    local ok, bytes = pcall(readBytes, addr, maxChars * 2, true)
+    if not ok or not bytes or type(bytes) ~= "table" then return "" end
+    local r = ""
+    for i = 1, #bytes - 1, 2 do
+        local lo, hi = bytes[i], bytes[i + 1]
+        if lo == 0 and hi == 0 then break end
+        local cp = lo + hi * 256
+        if cp >= 32 and cp < 128 then
+            r = r .. string.char(cp)
+        else
+            r = r .. string.format("[U+%04X]", cp)
+        end
+    end
+    return r
+end
+
+-- Read PoE2 StdWString  (ptr @ +0x00, length @ +0x10; inline if len <= 7 chars)
+local function rStdWStr(base, maxChars)
+    if not isPtr(base) then return "" end
+    local len = rUInt(base + 0x10)
+    if len == 0 or len > 512 then return "" end
+    local buf = rPtr(base + 0x00)
+    local src = isPtr(buf) and buf or (base + 0x00)
+    return rWStr(src, math.min(len + 1, maxChars or 80))
+end
+
+-- ── RIP-relative pattern resolver ────────────────────────────────────────────
+-- Each entry: { name, scan = "hex bytes (no ^)", rel = offset of 4-byte rel operand }
+local PATTERNS = {
+    { name = "Game States",
+      scan = "48 39 2D ?? ?? ?? ?? 0F 85 16 01 00 00", rel = 3 },
+    { name = "File Root",
+      scan = "48 8B 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? E8", rel = 3 },
+    { name = "AreaChangeCounter",
+      scan = "FF 05 ?? ?? ?? ?? 4C 8B 06", rel = 2 },
+    { name = "Terrain Rotator Helper",
+      scan = "48 8D 05 ?? ?? ?? ?? 4F 8D 04 40", rel = 3 },
+    { name = "Terrain Rotation Selector",
+      scan = "48 8D 0D ?? ?? ?? ?? 44 0F B6 04 08", rel = 3 },
+    { name = "GameCullSize",
+      scan = "2B 05 ?? ?? ?? ?? 45 0F 57 C9", rel = 2 },
+}
+
+local function resolveRip(p)
+    -- AOBScan returns a StringList object (not a plain string).
+    -- Scan executable (non-writable) pages only — game code is in .text sections.
+    local results
+    local ok, err = pcall(function()
+        results = AOBScan(p.scan, false, true)  -- writable=false, executable=true
+    end)
+    if not ok or not results then
+        print(string.format("[PoE2] MISS  %-26s  (scan error: %s)", p.name, tostring(err)))
+        return 0
+    end
+    if results.Count == 0 then
+        results.destroy()
+        -- Retry without memory-protection filter (some CE builds ignore the flags)
+        ok, err = pcall(function() results = AOBScan(p.scan) end)
+        if not ok or not results or results.Count == 0 then
+            if results then results.destroy() end
+            print(string.format("[PoE2] MISS  %-26s  (no match)", p.name))
+            return 0
+        end
+    end
+    local hitStr = results[0]          -- first result as hex string, e.g. "7FF4A3B00100"
+    results.destroy()
+    local hit = tonumber(hitStr, 16) or 0
+    if hit == 0 then
+        print(string.format("[PoE2] MISS  %-26s  (tonumber failed on '%s')", p.name, tostring(hitStr)))
+        return 0
+    end
+    -- readBytes with returnAsTable=true returns a table {b1,b2,b3,b4}
+    local b = readBytes(hit + p.rel, 4, true)
+    if not b or type(b) ~= "table" or #b < 4 then
+        print(string.format("[PoE2] MISS  %-26s  (readBytes failed at 0x%X+%d)", p.name, hit, p.rel))
+        return 0
+    end
+    local rel = b[1] + b[2]*0x100 + b[3]*0x10000 + b[4]*0x1000000
+    if rel >= 0x80000000 then rel = rel - 0x100000000 end
+    local resolved = hit + p.rel + 4 + rel
+    print(string.format("[PoE2] FOUND %-26s  scan=0x%X  resolved=0x%X", p.name, hit, resolved))
+    return resolved
+end
+
+-- ── Global state ─────────────────────────────────────────────────────────────
+local G = {}
+
+-- ── ResolveEntityPointer  (port of PoE2EntityReader.ahk:ResolveEntityPointer) ─
+local function plausibleEntity(ptr)
+    if not isPtr(ptr) then return false end
+    local id = rUInt(ptr + OFF.ENT_Id)
+    return id > 0 and id < 0xFFFFFFFF
+end
+
+local function resolveEnt(rawPtr)
+    if not isPtr(rawPtr) then return 0 end
+    local candidates = { rawPtr, rawPtr - 0x08 }
+    for _, offset in ipairs({0, 0x08, -0x08}) do
+        local p = rPtr(rawPtr + offset)
+        if isPtr(p) then table.insert(candidates, p) end
+    end
+    local seen = {}
+    for _, c in ipairs(candidates) do
+        if isPtr(c) and not seen[c] then
+            seen[c] = true
+            if plausibleEntity(c) then return c end
+        end
+    end
+    return rawPtr
+end
+
+-- ── Walk component hash bucket, return component address by name ──────────────
+function poe2_find_comp(entityPtr, targetName)
+    entityPtr = tonumber(entityPtr) or entityPtr
+    if not isPtr(entityPtr) then return 0 end
+    local detPtr = rPtr(entityPtr + OFF.ENT_DetailsPtr)
+    if not isPtr(detPtr) then return 0 end
+    local lookupPtr = rPtr(detPtr + OFF.ED_CompLookup)
+    if not isPtr(lookupPtr) then return 0 end
+
+    -- StdBucket is inline at lookupPtr+CL_Bucket (not a pointer)
+    local buckData    = rPtr(lookupPtr + OFF.CL_Bucket)           -- StdBucket.Data
+    local buckDataEnd = rPtr(lookupPtr + OFF.CL_Bucket + 0x08)    -- StdBucket.DataLast
+    if not isPtr(buckData) or not isPtr(buckDataEnd) then return 0 end
+    if buckDataEnd <= buckData then return 0 end
+
+    local ENTRY_SZ = OFF.CLE_Size    -- 0x10 bytes per entry (NamePtr 8B + Index 4B + pad 4B)
+    local rawCount = math.floor((buckDataEnd - buckData) / ENTRY_SZ)
+    if rawCount <= 0 or rawCount > 512 then return 0 end
+
+    local compVecFirst = rPtr(entityPtr + OFF.ENT_CompVec)
+    local compVecLast  = rPtr(entityPtr + OFF.ENT_CompVecLast)
+    if not isPtr(compVecFirst) then return 0 end
+    local componentCount = math.floor((compVecLast - compVecFirst) / 8)
+    if componentCount <= 0 or componentCount > 512 then return 0 end
+
+    local tgtLower = targetName:lower()
+
+    for i = 0, rawCount - 1 do
+        local ea      = buckData + i * ENTRY_SZ
+        local namePtr = rPtr(ea + OFF.CLE_NamePtr)
+        local idx     = rInt(ea + OFF.CLE_Index)
+        if isPtr(namePtr) and idx >= 0 and idx < componentCount then
+            local name = readString(namePtr, 64, false) or ""
+            -- Match exact or suffix after "." (e.g. "Render.Render" matches "Render")
+            local nameLower = name:lower()
+            local dotPos = nameLower:find("%.[^.]+$")
+            local suffix = dotPos and nameLower:sub(dotPos + 1) or nameLower
+            if suffix == tgtLower or nameLower == tgtLower then
+                local cPtr = rPtr(compVecFirst + idx * 8)
+                if isPtr(cPtr) then return cPtr end
+            end
+        end
+    end
+    return 0
+end
+
+-- ── Pattern scan ─────────────────────────────────────────────────────────────
+function poe2_scan()
+    print("\n=== PoE2 Inspector: Pattern Scan ===")
+    for _, p in ipairs(PATTERNS) do
+        local addr = resolveRip(p)
+        if     p.name == "Game States"        then G.gameStates = addr
+        elseif p.name == "File Root"          then G.fileRoot   = addr
+        elseif p.name == "AreaChangeCounter"  then G.areaChange = addr
+        end
+    end
+end
+
+-- ── Pointer chain resolver ───────────────────────────────────────────────────
+function poe2_chain()
+    print("\n=== PoE2 Inspector: Pointer Chain ===")
+    if not isPtr(G.gameStates) then
+        print("[PoE2] Run poe2_scan() first"); return false
+    end
+
+    G.staticGSPtr = rPtr(G.gameStates)
+    if not isPtr(G.staticGSPtr) then
+        print("[PoE2] staticGameStatePtr invalid — is the game running?"); return false
+    end
+
+    -- InGameState is at index 4 (0-based) in the States[] array
+    G.inGameState = rPtr(G.staticGSPtr + OFF.GS_States + OFF.GS_InGameIdx * OFF.GS_EntrySize)
+    if not isPtr(G.inGameState) then
+        print("[PoE2] InGameState invalid — not in game?"); return false
+    end
+
+    G.areaData = rPtr(G.inGameState + OFF.IGS_AreaData)
+    if not isPtr(G.areaData) then
+        print("[PoE2] AreaInstanceData invalid"); return false
+    end
+
+    G.playerInfoAddr = G.areaData + OFF.AI_PlayerInfo
+    local rawPP      = rPtr(G.playerInfoAddr + OFF.LP_LocalPlayer)
+    G.playerPtr      = resolveEnt(rawPP)
+
+    G.awakeMap  = G.areaData + OFF.AI_AwakeEnts
+    G.sleepMap  = G.areaData + OFF.AI_SleepEnts
+
+    local lvl   = rByte(G.areaData + OFF.AI_AreaLevel)
+    local hash  = rUInt(G.areaData + OFF.AI_AreaHash)
+    local aCnt  = rInt(G.awakeMap  + OFF.SMAP_Size)
+    local sCnt  = rInt(G.sleepMap  + OFF.SMAP_Size)
+
+    print(string.format("  staticGSPtr  0x%X", G.staticGSPtr))
+    print(string.format("  InGameState  0x%X", G.inGameState))
+    print(string.format("  AreaData     0x%X   Level=%d   Hash=0x%08X", G.areaData, lvl, hash))
+    print(string.format("  AwakeMap     0x%X   size=%d", G.awakeMap, aCnt))
+    print(string.format("  SleepMap     0x%X   size=%d", G.sleepMap, sCnt))
+    print(string.format("  PlayerPtr    0x%X   EntityId=%d", G.playerPtr, rUInt(G.playerPtr + OFF.ENT_Id)))
+
+    if isPtr(G.playerPtr) then
+        local det = rPtr(G.playerPtr + OFF.ENT_DetailsPtr)
+        if isPtr(det) then
+            local pp = rPtr(det + OFF.ED_Path)
+            if isPtr(pp) then print("  PlayerPath   " .. rWStr(pp, 80)) end
+        end
+    end
+    return true
+end
+
+-- ── Populate CE address list ─────────────────────────────────────────────────
+function poe2_populate_list()
+    print("\n=== PoE2 Inspector: Populate Address List ===")
+    local al = getAddressList()
+    for i = al.Count - 1, 0, -1 do
+        pcall(function() al[i]:delete() end)
+    end
+
+    -- group header; optional parentMr to nest under
+    local function mkGrp(desc, parentMr)
+        local mr = al:createMemoryRecord()
+        mr.Description = desc
+        mr.IsGroupHeader = true
+        if parentMr then mr.Parent = parentMr end
+        return mr
+    end
+
+    -- entry with absolute address; optional parentMr
+    local function mkAbs(desc, addr, typ, parentMr)
+        local mr = al:createMemoryRecord()
+        mr.Description = desc
+        mr.Address = string.format("%X", addr)
+        mr.Type = typ or vtQword
+        if typ == vtQword then mr.ShowAsHex = true end
+        if parentMr then mr.Parent = parentMr end
+        return mr
+    end
+
+    -- entry with relative offset (+0xNN); must have parentMr
+    local function mkRel(desc, relOffset, typ, parentMr)
+        local mr = al:createMemoryRecord()
+        mr.Description = desc
+        mr.Address = string.format("+0x%X", relOffset)
+        mr.Type = typ or vtFloat
+        mr.Parent = parentMr
+        return mr
+    end
+
+    -- separator nested under parentMr
+    local function mkSep(parentMr)
+        local mr = al:createMemoryRecord()
+        mr.Description = "---------------------------------"
+        mr.IsGroupHeader = true
+        mr.Parent = parentMr
+        return mr
+    end
+
+    -- ── Static Addresses ──────────────────────────────────────────────────
+    local sgStatic = mkGrp("[Static Addresses]")
+    mkAbs("GameStates ptr",     G.gameStates, vtQword, sgStatic)
+    mkAbs("FileRoot ptr",       G.fileRoot,   vtQword, sgStatic)
+    mkAbs("AreaChangeCounter",  G.areaChange, vtDword, sgStatic)
+
+    -- ── Pointer Chain ─────────────────────────────────────────────────────
+    local sgChain = mkGrp("[Pointer Chain]")
+    mkAbs("staticGameStatePtr",     G.staticGSPtr,    vtQword, sgChain)
+    mkAbs("InGameState",            G.inGameState,    vtQword, sgChain)
+    mkAbs("AreaInstanceData",       G.areaData,       vtQword, sgChain)
+    mkAbs("PlayerInfo struct base", G.playerInfoAddr, vtQword, sgChain)
+
+    -- ── Area Info ─────────────────────────────────────────────────────────
+    local sgArea = mkGrp("[Area]")
+    mkAbs("AreaLevel",             G.areaData + OFF.AI_AreaLevel, vtByte,  sgArea)
+    mkAbs("AreaHash",              G.areaData + OFF.AI_AreaHash,  vtDword, sgArea)
+    mkAbs("AwakeEntities size",    G.awakeMap + OFF.SMAP_Size,    vtDword, sgArea)
+    mkAbs("SleepingEntities size", G.sleepMap + OFF.SMAP_Size,    vtDword, sgArea)
+    mkAbs("AwakeMap head ptr",     G.awakeMap,                    vtQword, sgArea)
+    mkAbs("SleepingMap head ptr",  G.sleepMap,                    vtQword, sgArea)
+
+    -- ── Player Entity (fully nested, all sub-addresses relative) ────────────
+    if isPtr(G.playerPtr) then
+        local lp = G.playerPtr
+        local sgPlayer = mkGrp("[Player Entity]")
+
+        -- entity base is the only absolute anchor in this section
+        local pBase = mkAbs("Player entity base", lp, vtQword, sgPlayer)
+        mkRel("EntityId",   OFF.ENT_Id,         vtDword, pBase)
+        mkRel("Flags",      OFF.ENT_Flags,      vtByte,  pBase)
+        mkRel("DetailsPtr", OFF.ENT_DetailsPtr, vtQword, pBase)
+
+        -- helper: create comp base as relative child of pBase, then return it
+        local function compBase(name, compAddr)
+            local mr = mkRel(name, compAddr - lp, vtQword, pBase)
+            mr.ShowAsHex = true
+            return mr
+        end
+
+        -- Render
+        mkSep(pBase)
+        local rComp = poe2_find_comp(lp, "Render")
+        if isPtr(rComp) then
+            local rb = compBase("Render comp base", rComp)
+            mkRel("CurrentWorldPositionX", OFF.REND_PosX,        vtFloat, rb)
+            mkRel("CurrentWorldPositionY", OFF.REND_PosY,        vtFloat, rb)
+            mkRel("CurrentWorldPositionZ", OFF.REND_PosZ,        vtFloat, rb)
+            mkSep(rb)
+            mkRel("CharacterModelBoundsX", OFF.REND_PosZ + 0x04, vtFloat, rb)
+            mkRel("CharacterModelBoundsY", OFF.REND_PosZ + 0x08, vtFloat, rb)
+            mkRel("CharacterModelBoundsZ", OFF.REND_PosZ + 0x0C, vtFloat, rb)
+            mkSep(rb)
+            mkRel("Terrain Height",        OFF.REND_Terrain,     vtFloat, rb)
+            print(string.format("  Render @ 0x%X  X=%.1f  Y=%.1f  Z=%.1f",
+                rComp, rFloat(rComp+OFF.REND_PosX), rFloat(rComp+OFF.REND_PosY), rFloat(rComp+OFF.REND_PosZ)))
+        else
+            mkRel("Render: NOT FOUND", 0, vtByte, pBase)
+        end
+
+        -- Life
+        mkSep(pBase)
+        local liComp = poe2_find_comp(lp, "Life")
+        if isPtr(liComp) then
+            local lb = compBase("Life comp base", liComp)
+            mkRel("HP Current",   OFF.LIFE_Health + OFF.VIT_Current, vtDword, lb)
+            mkRel("HP Max",       OFF.LIFE_Health + OFF.VIT_Max,     vtDword, lb)
+            mkRel("HP Regen",     OFF.LIFE_Health + OFF.VIT_Regen,   vtFloat, lb)
+            mkSep(lb)
+            mkRel("Mana Current", OFF.LIFE_Mana   + OFF.VIT_Current, vtDword, lb)
+            mkRel("Mana Max",     OFF.LIFE_Mana   + OFF.VIT_Max,     vtDword, lb)
+            mkSep(lb)
+            mkRel("ES Current",   OFF.LIFE_ES     + OFF.VIT_Current, vtDword, lb)
+            mkRel("ES Max",       OFF.LIFE_ES     + OFF.VIT_Max,     vtDword, lb)
+            print(string.format("  Life  @ 0x%X  HP=%d/%d  Mana=%d/%d  ES=%d/%d",
+                liComp,
+                rInt(liComp+OFF.LIFE_Health+OFF.VIT_Current), rInt(liComp+OFF.LIFE_Health+OFF.VIT_Max),
+                rInt(liComp+OFF.LIFE_Mana  +OFF.VIT_Current), rInt(liComp+OFF.LIFE_Mana  +OFF.VIT_Max),
+                rInt(liComp+OFF.LIFE_ES    +OFF.VIT_Current), rInt(liComp+OFF.LIFE_ES    +OFF.VIT_Max)))
+        else
+            mkRel("Life: NOT FOUND", 0, vtByte, pBase)
+        end
+
+        -- Player comp (Level=vtByte, XP=vtQword)
+        mkSep(pBase)
+        local plComp = poe2_find_comp(lp, "Player")
+        if isPtr(plComp) then
+            local pb = compBase("Player comp base", plComp)
+            mkRel("Level", OFF.PLR_Level, vtByte,  pb)
+            mkRel("XP",    OFF.PLR_XP,   vtQword, pb)
+            print(string.format("  Player @ 0x%X  Level=%d  XP=%d",
+                plComp, rByte(plComp+OFF.PLR_Level), rInt(plComp+OFF.PLR_XP)))
+        end
+
+        -- Actor
+        mkSep(pBase)
+        local acComp = poe2_find_comp(lp, "Actor")
+        if isPtr(acComp) then
+            local ab = compBase("Actor comp base", acComp)
+            mkRel("AnimationId", 0x8A0, vtDword, ab)
+        end
+    else
+        mkGrp("[Player not found - must be in-game]")
+    end
+
+    -- ── UI Pointers ───────────────────────────────────────────────────────
+    local sgUI = mkGrp("[UI Elements]")
+    if isPtr(G.inGameState) then
+        local uiRoot = rPtr(G.inGameState + OFF.IGS_UiRootStr)
+        if isPtr(uiRoot) then
+            -- uiRoot is the single absolute anchor; all UI offsets relative to it
+            local uiBase = mkAbs("UiRoot base", uiRoot, vtQword, sgUI)
+            mkRel("GameUiPtr",    OFF.UI_GameUiPtr,  vtQword, uiBase)
+            mkRel("ChatParentPtr",OFF.IUI_Chat,      vtQword, uiBase)
+            mkRel("MapParentPtr", OFF.IUI_MapParent, vtQword, uiBase)
+
+            local mapPar = rPtr(uiRoot + OFF.IUI_MapParent)
+            if isPtr(mapPar) then
+                local mpb = mkRel("MapParent base", mapPar - uiRoot, vtQword, uiBase)
+                mpb.ShowAsHex = true
+                mkRel("LargeMap ptr", OFF.MAP_LargeMap, vtQword, mpb)
+                mkRel("MiniMap ptr",  OFF.MAP_MiniMap,  vtQword, mpb)
+
+                local largeMap = rPtr(mapPar + OFF.MAP_LargeMap)
+                local miniMap  = rPtr(mapPar + OFF.MAP_MiniMap)
+                if isPtr(largeMap) then
+                    local lmb = mkRel("LargeMap base", largeMap - mapPar, vtQword, mpb)
+                    lmb.ShowAsHex = true
+                    mkRel("Zoom",           OFF.MAP_Zoom,         vtFloat, lmb)
+                    mkRel("Shift X",        OFF.MAP_Shift,        vtFloat, lmb)
+                    mkRel("Shift Y",        OFF.MAP_Shift + 4,    vtFloat, lmb)
+                    mkRel("DefaultShift X", OFF.MAP_DefShift,     vtFloat, lmb)
+                    mkRel("DefaultShift Y", OFF.MAP_DefShift + 4, vtFloat, lmb)
+                    mkRel("Flags",          OFF.UIE_Flags,        vtDword, lmb)
+                    mkRel("RelPos X",       OFF.UIE_RelPos,       vtFloat, lmb)
+                    mkRel("RelPos Y",       OFF.UIE_RelPos + 4,   vtFloat, lmb)
+                    mkRel("Size X",         OFF.UIE_Size,         vtFloat, lmb)
+                    mkRel("Size Y",         OFF.UIE_Size + 4,     vtFloat, lmb)
+                    print(string.format("  LargeMap @ 0x%X  Zoom=%.3f", largeMap, rFloat(largeMap+OFF.MAP_Zoom)))
+                end
+                if isPtr(miniMap) then
+                    local mmb = mkRel("MiniMap base", miniMap - mapPar, vtQword, mpb)
+                    mmb.ShowAsHex = true
+                    mkRel("Zoom",    OFF.MAP_Zoom,      vtFloat, mmb)
+                    mkRel("Shift X", OFF.MAP_Shift,     vtFloat, mmb)
+                    mkRel("Shift Y", OFF.MAP_Shift + 4, vtFloat, mmb)
+                    mkRel("Flags",   OFF.UIE_Flags,     vtDword, mmb)
+                    print(string.format("  MiniMap  @ 0x%X  Zoom=%.3f", miniMap, rFloat(miniMap+OFF.MAP_Zoom)))
+                end
+            end
+        end
+    end
+
+    print("[PoE2] Address list populated. Run poe2_refresh() after zone changes.")
+end
+
+-- ── Dump a single entity (all found components) ──────────────────────────────
+function poe2_dump_entity(addr)
+    addr = tonumber(addr) or tonumber(tostring(addr), 16) or 0
+    if not isPtr(addr) then print("Invalid address: " .. tostring(addr)); return end
+
+    print(string.format("\n=== Entity @ 0x%X ===", addr))
+    print(string.format("  EntityId  : %d",     rUInt(addr + OFF.ENT_Id)))
+    local flags = rByte(addr + OFF.ENT_Flags)
+    print(string.format("  Flags     : 0x%02X   isValid=%s", flags, (flags & 0x01)==0 and "true" or "false"))
+
+    local det = rPtr(addr + OFF.ENT_DetailsPtr)
+    if isPtr(det) then
+        local pathPtr = rPtr(det + OFF.ED_Path)
+        if isPtr(pathPtr) then print("  Path      : " .. rWStr(pathPtr, 120)) end
+    end
+
+    -- Enumerate all component names from the hash bucket
+    if isPtr(det) then
+        local lookupPtr = rPtr(det + OFF.ED_CompLookup)
+        if isPtr(lookupPtr) then
+            local buckFirst = rPtr(lookupPtr + OFF.CL_Bucket)
+            local buckLast  = rPtr(lookupPtr + OFF.CL_Bucket + 0x08)
+            if isPtr(buckFirst) and isPtr(buckLast) and buckLast > buckFirst then
+                local count = math.floor((buckLast - buckFirst) / OFF.CLE_Size)
+                if count > 0 and count <= 256 then
+                    print(string.format("  Components (%d slots):", count))
+                    local compVec = rPtr(addr + OFF.ENT_CompVec)
+                    for i = 0, count - 1 do
+                        local ea = buckFirst + i * OFF.CLE_Size
+                        local np = rPtr(ea + OFF.CLE_NamePtr)
+                        if isPtr(np) then
+                            local name = readString(np, 32, false) or ""
+                            if name ~= "" then
+                                local idx  = rInt(ea + OFF.CLE_Index)
+                                local cPtr = isPtr(compVec) and rPtr(compVec + idx * 8) or 0
+                                print(string.format("    [%2d] %-28s @ 0x%X", idx, name, cPtr))
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Key component snapshots
+    local rComp = poe2_find_comp(addr, "Render")
+    if isPtr(rComp) then
+        print(string.format("  >> Render  @ 0x%X  X=%.2f  Y=%.2f  Z=%.2f  Terrain=%.2f",
+            rComp, rFloat(rComp+OFF.REND_PosX), rFloat(rComp+OFF.REND_PosY),
+            rFloat(rComp+OFF.REND_PosZ), rFloat(rComp+OFF.REND_Terrain)))
+    end
+
+    local liComp = poe2_find_comp(addr, "Life")
+    if isPtr(liComp) then
+        print(string.format("  >> Life    @ 0x%X  HP=%d/%d  Mana=%d/%d  ES=%d/%d",
+            liComp,
+            rInt(liComp+OFF.LIFE_Health+OFF.VIT_Current), rInt(liComp+OFF.LIFE_Health+OFF.VIT_Max),
+            rInt(liComp+OFF.LIFE_Mana  +OFF.VIT_Current), rInt(liComp+OFF.LIFE_Mana  +OFF.VIT_Max),
+            rInt(liComp+OFF.LIFE_ES    +OFF.VIT_Current), rInt(liComp+OFF.LIFE_ES    +OFF.VIT_Max)))
+    end
+
+    local posComp = poe2_find_comp(addr, "Positioned")
+    if isPtr(posComp) then
+        local react = rByte(posComp + OFF.POS_Reaction)
+        print(string.format("  >> Positioned @ 0x%X  Reaction=0x%02X (%s)",
+            posComp, react, (react==1 or react==2) and "Friendly" or "Hostile"))
+    end
+
+    local modComp = poe2_find_comp(addr, "Mods")
+    if isPtr(modComp) then
+        local rarity = rInt(modComp + OFF.MODS_Rarity)
+        local rNames = {"Normal","Magic","Rare","Unique/Boss"}
+        print(string.format("  >> Mods       @ 0x%X  Rarity=%d (%s)",
+            modComp, rarity, rNames[rarity+1] or "?"))
+    end
+end
+
+-- ── Walk awake entity map and print first N entities ─────────────────────────
+function poe2_list_entities(maxCount)
+    maxCount = maxCount or 15
+    if not isPtr(G.awakeMap) then print("[PoE2] Run poe2_refresh() first"); return end
+
+    local head  = rPtr(G.awakeMap + OFF.SMAP_Head)
+    local size  = rInt(G.awakeMap + OFF.SMAP_Size)
+    local root  = isPtr(head) and rPtr(head) or 0
+
+    print(string.format("\n=== AwakeEntities (map size=%d, listing up to %d) ===", size, maxCount))
+    if not isPtr(root) then print("[PoE2] Root node invalid"); return end
+
+    local queue, qi, visited, count = {root}, 1, {}, 0
+    while qi <= #queue and count < maxCount do
+        local node = queue[qi]; qi = qi + 1
+        if not isPtr(node) or node == head or visited[node] then goto nxt end
+        visited[node] = true
+        if rByte(node + OFF.NODE_IsNil) ~= 0 then goto nxt end
+
+        local rawPtr = rPtr(node + OFF.NODE_EntPtr)
+        local ent    = resolveEnt(rawPtr)
+        if isPtr(ent) then
+            local id    = rUInt(ent + OFF.ENT_Id)
+            local flags = rByte(ent + OFF.ENT_Flags)
+            local valid = (flags & 0x01) == 0
+            local path  = ""
+            local det   = rPtr(ent + OFF.ENT_DetailsPtr)
+            if isPtr(det) then
+                local pp = rPtr(det + OFF.ED_Path)
+                if isPtr(pp) then path = rWStr(pp, 80) end
+            end
+            print(string.format("  [%2d] 0x%X  id=%-8d  valid=%-5s  %s",
+                count+1, ent, id, tostring(valid), path))
+            count = count + 1
+        end
+
+        local L = rPtr(node + OFF.NODE_Left)
+        local R = rPtr(node + OFF.NODE_Right)
+        if isPtr(L) then table.insert(queue, L) end
+        if isPtr(R) then table.insert(queue, R) end
+        ::nxt::
+    end
+    print(string.format("  listed %d of %d entities", count, size))
+end
+
+-- ── Combined entry point ─────────────────────────────────────────────────────
+function poe2_refresh()
+    if poe2_chain() then poe2_populate_list() end
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- CE Table hooks: auto-run when PathOfExile.exe is attached/detached
+-- ─────────────────────────────────────────────────────────────────────────────
+
+function OnOpenProcess(processID)
+    if not (process and process:lower():find("pathofexile")) then return end
+    local t = createTimer(nil, false)
+    t.Interval = 600
+    t.OnTimer = function()
+        t.Enabled = false
+        t.destroy()
+        print("[PoE2] Prozess erkannt  -- starte Pattern-Scan ...")
+        poe2_scan()
+        poe2_refresh()
+        print("[PoE2] Bereit.")
+    end
+    t.Enabled = true
+end
+
+function OnCloseProcess(processID)
+    print("[PoE2] Prozess getrennt  -- G wird zurueckgesetzt.")
+    G = {}
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Banner + Sofortstart wenn bereits attached
+-- ─────────────────────────────────────────────────────────────────────────────
+print("==========================================================")
+print("  PoE2 Memory Inspector  (GameHelper CE bridge)")
+print("----------------------------------------------------------")
+print("  poe2_scan()                scan byte patterns")
+print("  poe2_refresh()             chain + address list")
+print("  poe2_list_entities(N)      dump N entity paths")
+print("  poe2_dump_entity(0xADDR)   full entity dump")
+print("  poe2_find_comp(ptr,'Name') find one component")
+print("==========================================================")
+print("  Output: Lua Engine -> View -> Output")
+print("==========================================================")
+
+if process and process:lower():find("pathofexile") then
+    print("[PoE2] Bereits attached  -- starte sofort ...")
+    poe2_scan()
+    poe2_refresh()
+    print("[PoE2] Bereit.")
+else
+    print("[PoE2] Warte auf PathOfExile.exe ...")
+    print("[PoE2] Nach 'File > Open Process' wird OnOpenProcess automatisch ausgeloest.")
+end

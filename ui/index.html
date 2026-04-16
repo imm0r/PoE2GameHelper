@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PoE2 GameHelper</title>
+<link rel="icon" href="tray.ico">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d1a;--surface:#111527;--surface2:#1a1f35;--border:#252a45;
+  --accent:#6a8fbf;--text:#d0d6e8;--subtext:#666d88;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+body{display:flex;flex-direction:column}
+
+/* HEADER */
+#header{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;cursor:default;user-select:none}
+#header-logo{height:32px;width:auto;border-radius:3px;flex-shrink:0;margin-right:4px}
+#logo-wrap{display:flex;gap:5px;margin-right:8px;align-items:flex-start}
+#logo-left{display:flex;flex-direction:column;align-items:flex-start}
+#logo-right{display:flex;flex-direction:column;align-items:flex-end}
+.logo-part{font-weight:700;font-size:14px;letter-spacing:.04em;line-height:1.2;white-space:nowrap}
+.logo-poe{color:var(--text)}
+.logo-gh{color:var(--accent)}
+.ver-game,.ver-gh{font-size:9px;color:var(--subtext);letter-spacing:.03em;line-height:1.2}
+.pill{display:flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.04em;background:var(--surface2);border:1px solid var(--border)}
+.pill.clickable{cursor:pointer;transition:border-color .15s,background .15s}
+.pill.clickable:hover{background:var(--border)}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:var(--border)}
+.pill.active .dot{background:#4aad4a}
+.pill.inactive .dot{background:#555}
+.pill.disconnected .dot{background:#aa4444}
+.pill.connected .dot{background:#4aad4a}
+#header-right{margin-left:auto;display:flex;gap:4px;align-items:center}
+.hbtn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 10px;font-size:11px;cursor:pointer}
+.hbtn:hover{background:var(--border)}
+.hbtn.active{border-color:var(--accent);color:var(--accent)}
+#wm-btns{display:flex;gap:2px;align-items:center;margin-left:8px;flex-shrink:0}
+.wm-btn{background:transparent;border:none;color:var(--subtext);width:28px;height:22px;font-size:13px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background .12s,color .12s;line-height:1}
+.wm-btn:hover{background:var(--border);color:var(--text)}
+.wm-close:hover{background:#c42b1c!important;color:#fff!important}
+
+/* TAB BAR */
+#tab-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.tab{padding:7px 16px;cursor:pointer;font-size:11px;font-weight:500;color:var(--subtext);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* CONTENT */
+#content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.tab-panel{display:none;flex:1;overflow-y:auto;flex-direction:column}
+.tab-panel.active{display:flex}
+
+/* OVERVIEW / TREE */
+#tab-overview-content{flex:1;overflow-y:auto;padding:8px}
+.tree-toolbar{display:flex;gap:6px;padding:4px 8px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.tree-tbtn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 10px;font-size:11px;cursor:pointer}
+.tree-tbtn:hover{background:var(--border)}
+.tree-filter{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:2px 8px;font-size:11px;outline:none;flex:1;max-width:200px}
+.tree-node{font-size:11px;font-family:'Consolas','Courier New',monospace;line-height:1.6}
+.tree-node-row{display:flex;align-items:center;gap:4px;padding:1px 4px;border-radius:3px;cursor:pointer}
+.tree-node-row:hover{background:var(--surface2)}
+.tree-node-row.selected{background:var(--surface2);outline:1px solid var(--border)}
+.tree-toggle{color:var(--subtext);font-size:10px;width:14px;text-align:center;flex-shrink:0}
+.tree-label{color:var(--text);word-break:break-all}
+.tree-children{margin-left:16px}
+.tree-empty{color:var(--subtext);padding:24px;text-align:center}
+.no-data-msg{color:var(--subtext);padding:24px;text-align:center;font-size:13px}
+
+/* BUFFS */
+#tab-buffs-content{padding:12px}
+.buff-section-title{color:var(--accent);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.buff-grid{display:flex;flex-wrap:wrap;gap:6px}
+.buff-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;min-width:110px;transition:border-color .15s;cursor:pointer}
+.buff-card:hover{border-color:var(--accent);opacity:.85}
+.buff-name{color:var(--text);font-size:11px;font-weight:500;word-break:break-all;line-height:1.3}
+.buff-meta{display:flex;gap:6px;align-items:center;margin-top:4px}
+.buff-stacks{background:var(--accent);color:#0a0d1a;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px}
+.buff-timer{color:var(--subtext);font-size:10px}
+.buff-bar-wrap{margin-top:4px}
+.buff-bar{width:100%;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.buff-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#2d7a9f,#5ab4d8);transition:width .4s linear}
+.buff-bar-fill.low{background:linear-gradient(90deg,#8b4a1a,#cc7733)}
+.buff-empty{color:var(--subtext);padding:32px;text-align:center;font-size:13px}
+
+/* ENTITIES */
+#tab-entities-content{padding:0}
+/* SKILLS */
+#tab-skills-content{padding:0;overflow-y:auto}
+.skill-header{display:flex;gap:8px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.skill-count{color:var(--subtext);font-size:11px}
+.skill-table{width:100%;border-collapse:collapse;font-size:12px}
+.skill-table th{color:var(--accent);text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.skill-table td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;height:28px}
+.skill-table tbody tr:nth-child(even) td{background:rgba(255,255,255,0.03)}
+.skill-table tr:hover td{background:var(--surface)}
+.skill-usable{color:#4aad4a;font-weight:600}
+.skill-blocked{color:#aa4444;font-weight:600}
+.skill-idle{color:#888;font-weight:600}
+.skill-cd-bar{width:60px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:4px}
+.skill-cd-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+.entity-header{display:flex;gap:8px;align-items:center;padding:6px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.entity-count{color:var(--subtext);font-size:11px}
+.entity-table{width:100%;border-collapse:collapse;font-size:12px}
+.entity-table th{color:var(--accent);text-align:left;padding:5px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
+.entity-table th.track-th{width:22px;padding:5px 4px;text-align:center}
+.entity-table td{padding:4px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle}
+.entity-table td.track-td{padding:4px;text-align:center;width:22px}
+.entity-table tbody tr{cursor:pointer}
+.entity-table tr:hover td{background:var(--surface)}
+.entity-table tr.dead td{opacity:.35}
+.entity-table tr.e-selected td{background:var(--surface2)!important;outline:1px solid var(--accent);outline-offset:-1px}
+.rarity-normal{color:#b0b0b0}.rarity-magic{color:#8888ff}.rarity-rare{color:#ffdd44}.rarity-unique,.rarity-boss{color:#ff8800}
+/* Entity context menu */
+#entity-ctx{position:fixed;z-index:9999;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 0;min-width:160px;box-shadow:0 4px 16px rgba(0,0,0,.5);display:none}
+#entity-ctx .ctx-item{padding:6px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap}
+#entity-ctx .ctx-item:hover{background:var(--border)}
+#entity-ctx .ctx-sep{height:1px;background:var(--border);margin:3px 0}
+#entity-ctx .ctx-path{padding:4px 14px;font-size:10px;color:var(--subtext);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etype-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:3px;text-transform:uppercase;line-height:1.5;vertical-align:middle;margin-right:4px}
+.etype-Player{background:#1a3a5c;color:#6ab0f5}.etype-Minion{background:#1a3a33;color:#4fd1b0}
+.etype-Enemy{background:#3a1a1a;color:#f56b6b}.etype-NPC{background:#1a3a1a;color:#6af56b}
+.etype-Boss{background:#5c1a00;color:#ffa040}.etype-AreaTransition{background:#0a2a3a;color:#00bfff}
+.etype-Waypoint{background:#3a3a00;color:#ffd700}.etype-Checkpoint{background:#1a3a10;color:#7fff00}
+.etype-Chest{background:#3a2e1a;color:#f5c16b}.etype-WorldItem{background:#2a1a3a;color:#c06bf5}
+.etype-Projectile{background:#2a2a1a;color:#c8c86b}.etype-Terrain,.etype-Object{background:#252525;color:#888}
+.entity-icon{font-size:14px;margin-right:3px;vertical-align:middle}
+.entity-sleep{opacity:0.6;font-style:italic}
+.life-bar-wrap{display:flex;align-items:center;gap:5px}
+.life-bar{display:inline-block;width:42px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;vertical-align:middle;flex-shrink:0}
+.life-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#2d7a2d,#4aad4a)}
+.life-bar-fill.low{background:linear-gradient(90deg,#8b1a1a,#cc3333)}
+.life-pct{font-size:11px;color:var(--subtext)}
+
+/* JSON VIEWER */
+.json-viewer{padding:10px 12px}
+.json-viewer pre{color:var(--text);font-size:11px;font-family:'Consolas','Courier New',monospace;white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.5}
+.json-key{color:#6a8fbf}.json-str{color:#a8c97a}.json-num{color:#d4a25c}.json-bool{color:#c792ea}.json-hex{color:#f5a06b}
+
+/* CONFIG */
+.cfg-scroll{flex:1;overflow-y:auto;padding:12px}
+.cfg-section{margin-bottom:18px}
+.cfg-header{color:var(--accent);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.cfg-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0}
+.cfg-label{color:var(--text);font-size:12px}
+.toggle{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:20px;transition:.2s}
+.toggle input:checked ~ .toggle-slider{background:var(--accent)}
+.toggle-slider::before{content:"";position:absolute;width:14px;height:14px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked ~ .toggle-slider::before{transform:translateX(16px)}
+.cfg-input{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 8px;width:70px;font-size:12px;outline:none}
+.cfg-btn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 12px;font-size:11px;cursor:pointer;margin:2px}
+.cfg-btn:hover{background:var(--border)}
+.cfg-status{font-size:11px;color:var(--subtext);padding:4px 0}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0}
+.filter-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer}
+.filter-pill input{cursor:pointer}
+.cfg-section details{padding:0}
+.cfg-section details summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.cfg-section details summary::-webkit-details-marker{display:none}
+.cfg-section details summary::after{content:'▶';font-size:9px;color:var(--subtext);transition:transform .15s}
+.cfg-section details[open] summary::after{transform:rotate(90deg)}
+.cfg-section details summary .cfg-header{margin:0}
+.cfg-subsection{padding:4px 0 0 0}
+
+/* WATCHLIST */
+.wl-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0 8px 8px}
+.wl-toolbar{display:flex;gap:6px;align-items:center;padding:6px 0}
+.wl-filter{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;color:var(--text);font-size:12px;flex:1;outline:none}
+.wl-table-wrap{flex:1;overflow-y:auto}
+.wl-table{width:100%;border-collapse:collapse;font-size:12px}
+.wl-table th{color:var(--accent);text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg)}
+.wl-table td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.04)}
+.wl-table tr:hover td{background:var(--surface)}
+.wl-table tr.selected td{background:var(--surface2)}
+
+/* STATUS BAR */
+#status-bar{background:var(--surface);border-top:1px solid var(--border);padding:3px 12px;font-size:10px;color:var(--subtext);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#3a4060}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
+  <img id="header-logo" src="logo.png" alt="">
+  <div id="logo-wrap">
+    <div id="logo-left">
+      <div class="logo-part logo-poe">PoE2</div>
+      <div class="ver-game" id="ver-game">v—</div>
+    </div>
+    <div id="logo-right">
+      <div class="logo-part logo-gh">GameHelper</div>
+      <div class="ver-gh" id="ver-gh">v—</div>
+    </div>
+  </div>
+  <div class="pill disconnected" id="pill-connect"><div class="dot"></div><span id="pill-connect-text">Disconnected</span></div>
+  <div class="pill active"       id="pill-updates" onclick="ahkCall('TogglePause')"  title="Toggle Pause" style="cursor:pointer"><div class="dot"></div><span id="pill-updates-text">Live</span></div>
+  <div class="pill inactive clickable" id="pill-debug"  onclick="ahkCall('ToggleDebug')"     title="Toggle Debug"><div class="dot"></div><span id="pill-debug-text">Debug OFF</span></div>
+  <div class="pill inactive clickable" id="pill-flask"  onclick="ahkCall('ToggleAutoFlask')" title="Toggle AutoFlask"><div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span></div>
+  <div class="pill inactive clickable" id="pill-radar"  onclick="ahkCall('ToggleRadar')"     title="Toggle Radar"><div class="dot"></div><span id="pill-radar-text">Radar ON</span></div>
+  <div class="pill inactive"     id="pill-fps"    ><div class="dot"></div><span id="pill-fps-text">0 fps</span></div>
+  <div id="header-right">
+    <button class="hbtn" id="btn-pause"   onclick="ahkCall('TogglePause')">⏸ Pause</button>
+    <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
+    <button class="hbtn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
+    <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
+  </div>
+  <div id="wm-btns">
+    <button class="wm-btn" onclick="ahkCall('WinMinimize')" title="Minimize">&#x2013;</button>
+    <button class="wm-btn" id="wm-maximize" onclick="ahkCall('WinMaximize')" title="Maximize">&#x25a1;</button>
+    <button class="wm-btn wm-close" onclick="ahkCall('WinClose')" title="Close">&#x2715;</button>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div id="tab-bar">
+  <div class="tab active" data-tab="overview"   onclick="switchTab('overview')">Overview</div>
+  <div class="tab"        data-tab="entities"   onclick="switchTab('entities')">Entities</div>
+  <div class="tab"        data-tab="skills"     onclick="switchTab('skills')">Skills &amp; Buffs</div>
+  <div class="tab"        data-tab="ui"         onclick="switchTab('ui')">UI</div>
+  <div class="tab"        data-tab="gamestate"  onclick="switchTab('gamestate')">gameState</div>
+  <div class="tab"        data-tab="config"     onclick="switchTab('config')">Config</div>
+  <div class="tab"        data-tab="watchlist"  onclick="switchTab('watchlist')">Watchlist <span id="wl-badge"></span></div>
+</div>
+
+<!-- CONTENT -->
+<div id="content">
+
+  <!-- OVERVIEW TAB -->
+  <div class="tab-panel active" id="panel-overview">
+    <div class="tree-toolbar" id="tree-toolbar">
+      <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
+      <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
+      <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
+    </div>
+    <div id="tab-overview-content"><div class="tree-empty">Loading…</div></div>
+  </div>
+
+  <!-- ENTITIES TAB -->
+  <div class="tab-panel" id="panel-entities">
+    <div id="tab-entities-content"><div class="no-data-msg">Waiting for data…</div></div>
+  </div>
+
+  <!-- SKILLS & BUFFS TAB (merged) -->
+  <div class="tab-panel" id="panel-skills">
+    <div id="tab-buffs-content"><div class="buff-empty">Waiting for data…</div></div>
+    <div id="tab-skills-content"><div class="no-data-msg">Waiting for data…</div></div>
+  </div>
+
+  <!-- UI TAB -->
+  <div class="tab-panel" id="panel-ui">
+    <div id="tab-ui-content"><div class="no-data-msg">Waiting for data…</div></div>
+  </div>
+
+  <!-- GAMESTATE TAB -->
+  <div class="tab-panel" id="panel-gamestate">
+    <div id="tab-gamestate-content"><div class="no-data-msg">Waiting for data…</div></div>
+  </div>
+
+  <!-- CONFIG TAB -->
+  <div class="tab-panel" id="panel-config">
+    <div class="cfg-scroll">
+
+      <div class="cfg-section">
+        <div class="cfg-header">Status</div>
+        <div class="cfg-row"><span class="cfg-label">PoE2 Running</span><span id="cfg-poe-status" class="cfg-status">—</span></div>
+        <div class="cfg-row"><span class="cfg-label">Connected</span><span id="cfg-conn-status" class="cfg-status">—</span></div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="cfg-header">Toggles</div>
+        <div class="cfg-row"><span class="cfg-label">Debug Mode</span>
+          <label class="toggle"><input type="checkbox" id="tog-debug" onchange="ahkCall('ToggleDebug')"><span class="toggle-slider"></span></label></div>
+        <div class="cfg-row"><span class="cfg-label">Pause Updates</span>
+          <label class="toggle"><input type="checkbox" id="tog-pause" onchange="ahkCall('TogglePause')"><span class="toggle-slider"></span></label></div>
+        <div class="cfg-row"><span class="cfg-label">NPC Watch Auto-Sync</span>
+          <label class="toggle"><input type="checkbox" id="tog-npcsync" onchange="ahkCall('ToggleNpcSync')"><span class="toggle-slider"></span></label></div>
+      </div>
+
+      <div class="cfg-section">
+        <details open>
+          <summary><div class="cfg-header">Autoflask</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row"><span class="cfg-label">Enable AutoFlask</span>
+              <label class="toggle"><input type="checkbox" id="tog-flask" onchange="ahkCall('ToggleAutoFlask')"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">AF Performance Mode</span>
+              <label class="toggle"><input type="checkbox" id="tog-afperf" onchange="ahkCall('ToggleAutoFlaskPerf')"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row">
+              <span class="cfg-label">Threshold</span>
+              <span style="display:flex;gap:6px;align-items:center">
+                <span class="cfg-label">Life %</span>
+                <input class="cfg-input" id="inp-life" type="number" min="1" max="100" value="50">
+                <span class="cfg-label">Mana %</span>
+                <input class="cfg-input" id="inp-mana" type="number" min="1" max="100" value="30">
+                <button class="cfg-btn" onclick="applyThresholds()">Apply</button>
+              </span>
+            </div>
+            <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-af-reason" class="cfg-status idle">—</span></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details open>
+          <summary><div class="cfg-header">Radar</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
+              <label class="toggle"><input type="checkbox" id="tog-radar" onchange="ahkCall('ToggleRadar')" checked><span class="toggle-slider"></span></label></div>
+            <div id="radar-filters" class="filter-row">
+              <label class="filter-pill"><input type="checkbox" id="rf-normal"  onchange="setRadarFilter('normal',  this.checked)" checked> Normal</label>
+              <label class="filter-pill"><input type="checkbox" id="rf-rare"    onchange="setRadarFilter('rare',    this.checked)" checked> Rare</label>
+              <label class="filter-pill"><input type="checkbox" id="rf-boss"    onchange="setRadarFilter('boss',    this.checked)" checked> Boss</label>
+              <label class="filter-pill"><input type="checkbox" id="rf-minions" onchange="setRadarFilter('minions', this.checked)"> Minions</label>
+              <label class="filter-pill"><input type="checkbox" id="rf-npcs"    onchange="setRadarFilter('npcs',    this.checked)"> NPCs</label>
+              <label class="filter-pill"><input type="checkbox" id="rf-chests"  onchange="setRadarFilter('chests',  this.checked)"> Chests</label>
+            </div>
+            <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Zone Navigation (auto-path to exits)</span>
+              <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')" checked><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Map Hack (reveal terrain on large map)</span>
+              <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')" checked><span class="toggle-slider"></span></label></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details open>
+          <summary><div class="cfg-header">Entities</div></summary>
+          <div class="cfg-subsection">
+            <div class="filter-row">
+              <label class="filter-pill"><input type="checkbox" id="ef-player"    onchange="setEntityFilter('player',    this.checked)" checked> <span class="etype-badge etype-Player">Player</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-minion"    onchange="setEntityFilter('minion',    this.checked)" checked> <span class="etype-badge etype-Minion">Minion</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-enemy"     onchange="setEntityFilter('enemy',     this.checked)" checked> <span class="etype-badge etype-Enemy">Enemy</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-npc"       onchange="setEntityFilter('npc',       this.checked)" checked> <span class="etype-badge etype-NPC">NPC</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-chest"     onchange="setEntityFilter('chest',     this.checked)" checked> <span class="etype-badge etype-Chest">Chest</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-worlditem" onchange="setEntityFilter('worlditem', this.checked)" checked> <span class="etype-badge etype-WorldItem">WorldItem</span></label>
+              <label class="filter-pill"><input type="checkbox" id="ef-other"     onchange="setEntityFilter('other',     this.checked)" checked> <span class="etype-badge etype-Object">Other</span></label>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <div class="cfg-header">Actions</div>
+        <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
+        <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
+        <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+        <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
+      </div>
+
+      <div class="cfg-section">
+        <details>
+          <summary><div class="cfg-header">Skills &amp; Buffs Blacklist</div></summary>
+          <div class="cfg-subsection" id="cfg-blacklist">
+            <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+          </div>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- WATCHLIST TAB -->
+  <div class="tab-panel" id="panel-watchlist">
+    <div class="wl-wrap">
+      <div class="wl-toolbar">
+        <input class="wl-filter" id="wl-filter" placeholder="Filter paths…" oninput="applyWlFilter()">
+        <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
+        <button class="tree-tbtn" onclick="ahkCall('RemovePinnedSelected')">✕ Remove</button>
+        <button class="tree-tbtn" onclick="ahkCall('ClearPins')">🗑 Clear</button>
+      </div>
+      <div class="wl-table-wrap">
+        <table class="wl-table" id="wl-table">
+          <thead><tr><th>Path</th><th>Value</th></tr></thead>
+          <tbody id="wl-body"><tr><td colspan="2" style="color:var(--subtext);padding:16px">No pinned paths</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- STATUS BAR -->
+<div id="status-bar">Initializing…</div>
+
+<script src="animation_names.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+//  BRIDGE
+// ═══════════════════════════════════════════════════════════════════
+function ahkCall(method, ...args) {
+  try { window.chrome.webview.postMessage({method, args}); } catch(e){}
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Notify AHK we are ready
+window.addEventListener('load', () => ahkCall('PageReady'));
+window.onerror = (msg, src, line) => console.error(`[JS] ${msg} @ ${src}:${line}`);
+
+// ═══════════════════════════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════════
+// These tabs notify AHK (to switch the AHK tree context)
+const treeTabs = new Set(['overview']);
+
+let activeTab = 'overview';
+
+function switchTab(key) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === key));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
+  activeTab = key;
+  if (treeTabs.has(key))
+    ahkCall('SwitchTab', key.charAt(0).toUpperCase() + key.slice(1));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  STATUS BAR
+// ═══════════════════════════════════════════════════════════════════
+function updateStatus(text) {
+  const el = document.getElementById('status-bar');
+  if (el) el.textContent = text;
+  // extract FPS from status text for header pill
+  const m = String(text).match(/radar-(\d+)fps/);
+  const fpsPill = document.getElementById('pill-fps-text');
+  if (fpsPill && m) fpsPill.textContent = m[1] + ' fps';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  HEADER UPDATE
+// ═══════════════════════════════════════════════════════════════════
+function updateHeader(json) {
+  let d; try { d = typeof json === 'string' ? JSON.parse(json) : json; } catch(e) { return; }
+
+  // Version tags
+  const verGh   = document.getElementById('ver-gh');
+  const verGame = document.getElementById('ver-game');
+  if (verGh   && d.ghVersion)   verGh.textContent   = 'v' + d.ghVersion;
+  if (verGame && d.gameVersion) verGame.textContent  = 'v' + d.gameVersion;
+
+  // Pills
+  const pillConn = document.getElementById('pill-connect');
+  const pillConnText = document.getElementById('pill-connect-text');
+  if (pillConn && pillConnText) {
+    const conn = d.connected === true || d.connected === 'true';
+    pillConn.className = 'pill ' + (conn ? 'connected' : 'disconnected');
+    pillConnText.textContent = conn ? 'Connected' : 'Disconnected';
+  }
+  const pillDebug = document.getElementById('pill-debug');
+  if (pillDebug) {
+    const on = d.debug === true || d.debug === 'true';
+    pillDebug.className = 'pill clickable ' + (on ? 'active' : 'inactive');
+    document.getElementById('pill-debug-text').textContent = 'Debug ' + (on ? 'ON' : 'OFF');
+  }
+  const pillPause = document.getElementById('pill-updates');
+  if (pillPause) {
+    const paused = d.paused === true || d.paused === 'true';
+    pillPause.className = 'pill ' + (paused ? 'inactive' : 'active');
+    document.getElementById('pill-updates-text').textContent = paused ? 'Paused' : 'Live';
+  }
+  const pillFlask = document.getElementById('pill-flask');
+  if (pillFlask) {
+    const on = d.autoFlask === true || d.autoFlask === 'true';
+    pillFlask.className = 'pill clickable ' + (on ? 'active' : 'inactive');
+    document.getElementById('pill-flask-text').textContent = 'AutoFlask ' + (on ? 'ON' : 'OFF');
+  }
+  const pillRadar = document.getElementById('pill-radar');
+  if (pillRadar) {
+    const on = d.radarEnabled !== false && d.radarEnabled !== 'false';
+    pillRadar.className = 'pill clickable ' + (on ? 'active' : 'inactive');
+    document.getElementById('pill-radar-text').textContent = 'Radar ' + (on ? 'ON' : 'OFF');
+  }
+
+  // Header buttons active state
+  const setBtnActive = (id, val) => { const b = document.getElementById(id); if(b) b.classList.toggle('active', val===true||val==='true'); };
+  setBtnActive('btn-pause',   d.paused);
+
+  // Show ▶ PoE2 only when game not running
+  const btnPoe = document.getElementById('btn-start-poe');
+  if (btnPoe) btnPoe.style.display = (d.poeRunning === true || d.poeRunning === 'true') ? 'none' : '';
+
+  // Watchlist badge
+  const badge = document.getElementById('wl-badge');
+  if (badge && d.pinnedCount > 0) badge.textContent = '(' + d.pinnedCount + ')';
+  else if (badge) badge.textContent = '';
+
+  // Config tab sync
+  const setChk = (id, val) => { const el = document.getElementById(id); if(el) el.checked = val===true||val==='true'; };
+  setChk('tog-debug',   d.debug);
+  setChk('tog-pause',   d.paused);
+  setChk('tog-flask',   d.autoFlask);
+  setChk('tog-afperf',  d.afPerf);
+  setChk('tog-npcsync', d.npcSync);
+  setChk('tog-radar',   d.radarEnabled !== undefined ? d.radarEnabled : true);
+
+  const radarFilters = document.getElementById('radar-filters');
+  if (radarFilters) radarFilters.style.opacity = (d.radarEnabled === false || d.radarEnabled === 'false') ? '0.4' : '1';
+
+  if (d.lifeThreshold !== undefined) { const el=document.getElementById('inp-life'); if(el) el.value=d.lifeThreshold; }
+  if (d.manaThreshold !== undefined) { const el=document.getElementById('inp-mana'); if(el) el.value=d.manaThreshold; }
+
+  const poeStatus  = document.getElementById('cfg-poe-status');
+  const connStatus = document.getElementById('cfg-conn-status');
+  const afReason   = document.getElementById('cfg-af-reason');
+  if (poeStatus) { const on=d.poeRunning===true||d.poeRunning==='true'; poeStatus.textContent=on?'✅ Running':'❌ Not running'; }
+  if (connStatus) { const on=d.connected===true||d.connected==='true'; connStatus.textContent=on?'✅ Connected':'❌ Disconnected'; }
+  if (afReason && d.afReason !== undefined) afReason.textContent = d.afReason || '—';
+
+  if (d.radar) {
+    const setRf = (id, val) => { const el=document.getElementById('rf-'+id); if(el) el.checked=val===true||val==='true'; };
+    setRf('normal',  d.radar.normal);
+    setRf('rare',    d.radar.rare);
+    setRf('boss',    d.radar.boss);
+    setRf('minions', d.radar.minions);
+    setRf('npcs',    d.radar.npcs);
+    setRf('chests',  d.radar.chests);
+  }
+
+  setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
+  setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+
+  if (d.entityFilter) {
+    const setEf = (id, val) => { const el=document.getElementById('ef-'+id); if(el) el.checked=val===true||val==='true'; };
+    setEf('player',    d.entityFilter.player);
+    setEf('minion',    d.entityFilter.minion);
+    setEf('enemy',     d.entityFilter.enemy);
+    setEf('npc',       d.entityFilter.npc);
+    setEf('chest',     d.entityFilter.chest);
+    setEf('worlditem', d.entityFilter.worlditem);
+    setEf('other',     d.entityFilter.other);
+  }
+
+  // Maximize / restore button icon
+  const wmMax = document.getElementById('wm-maximize');
+  if (wmMax) {
+    const isMax = d.isMaximized === true || d.isMaximized === 'true';
+    wmMax.textContent = isMax ? '\u2750' : '\u25a1';
+    wmMax.title = isMax ? 'Restore' : 'Maximize';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  OVERVIEW TREE
+// ═══════════════════════════════════════════════════════════════════
+let _treeData = {};
+let _selectedNodePath = '';
+let _treeFilter = '';
+
+function updateTree(tabKey, nodesJson) {
+  let nodes; try { nodes = typeof nodesJson === 'string' ? JSON.parse(nodesJson) : nodesJson; } catch(e) { return; }
+  _treeData[tabKey] = nodes;
+  if (activeTab === 'overview') _renderTree(nodes);
+}
+
+function _renderTree(nodes) {
+  const el = document.getElementById('tab-overview-content');
+  if (!el) return;
+  if (!Array.isArray(nodes) || nodes.length === 0) { el.innerHTML='<div class="tree-empty">No data</div>'; return; }
+  el.innerHTML = _renderNodes(nodes, _treeFilter.toLowerCase());
+}
+
+function _renderNodes(nodes, filter) {
+  let html = '';
+  for (const n of nodes) {
+    const label  = n.text || '';
+    const path   = n.path || '';
+    const kids   = Array.isArray(n.children) ? n.children : [];
+    const hasKids = kids.length > 0;
+    if (filter) {
+      const matchSelf = label.toLowerCase().includes(filter);
+      const kidHtml   = hasKids ? _renderNodes(kids, filter) : '';
+      if (!matchSelf && !kidHtml) continue;
+      const row = `<div class="tree-node-row${path===_selectedNodePath?' selected':''}" onclick="selectNode('${escHtml(path)}')">
+        <span class="tree-toggle">${hasKids ? '▸' : ' '}</span>
+        <span class="tree-label">${escHtml(label)}</span></div>`;
+      html += `<div class="tree-node">${row}${kidHtml?`<div class="tree-children">${kidHtml}</div>`:''}</div>`;
+    } else {
+      const row = `<div class="tree-node-row${path===_selectedNodePath?' selected':''}" onclick="selectNode('${escHtml(path)}')">
+        <span class="tree-toggle">${hasKids ? '▸' : ' '}</span>
+        <span class="tree-label">${escHtml(label)}</span></div>`;
+      const childHtml = hasKids ? `<div class="tree-children">${_renderNodes(kids, '')}</div>` : '';
+      html += `<div class="tree-node">${row}${childHtml}</div>`;
+    }
+  }
+  return html;
+}
+
+function selectNode(path) {
+  _selectedNodePath = path;
+  ahkCall('SelectNode', path);
+  document.querySelectorAll('.tree-node-row').forEach(r => r.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+
+function applyTreeFilter() {
+  _treeFilter = document.getElementById('tree-filter').value;
+  const tab = activeTab;
+  if (_treeData[tab]) _renderTree(_treeData[tab]);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  BLACKLIST (Skills & Buffs)
+// ═══════════════════════════════════════════════════════════════════
+let _blacklist = new Set();
+
+function blacklistAdd(name) {
+  if (!name) return;
+  _blacklist.add(name);
+  ahkCall('BlacklistAdd', name);
+  _renderBlacklistConfig();
+}
+function blacklistRemove(name) {
+  _blacklist.delete(name);
+  ahkCall('BlacklistRemove', name);
+  _renderBlacklistConfig();
+}
+function updateBlacklist(jsonStr) {
+  try {
+    const arr = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr;
+    _blacklist = new Set(Array.isArray(arr) ? arr : []);
+  } catch(e) {}
+  _renderBlacklistConfig();
+}
+function _renderBlacklistConfig() {
+  const el = document.getElementById('cfg-blacklist'); if(!el) return;
+  if (_blacklist.size === 0) {
+    el.innerHTML = '<div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>';
+    return;
+  }
+  const toTitle = s => s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+  const items = [..._blacklist].sort().map(n =>
+    `<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><button class="cfg-btn" style="padding:1px 6px;font-size:10px" onclick="blacklistRemove('${escAttr(n)}')">✕</button><span style="font-size:11px;color:var(--text)">${escHtml(toTitle(n))}</span></div>`
+  ).join('');
+  el.innerHTML = items;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  SPECIAL TABS (Buffs / Entities / UI / gameState)
+// ═══════════════════════════════════════════════════════════════════
+const _iconUrl = (ic) => {
+  if (!ic) return '';
+  const p = ic.replace(/\\/g,'/').replace(/\.dds$/i,'');
+  return 'https://cdn.poe2db.tw/image/'+p+'.webp';
+};
+const _iconHtml = (ic, size) => {
+  size = size || 24;
+  const url = _iconUrl(ic);
+  return `<span style="display:inline-block;width:${size}px;height:${size}px;border-radius:4px;background:#333;vertical-align:middle;margin-right:4px;overflow:hidden;flex-shrink:0">${url ? `<img src="${url}" width="${size}" height="${size}" style="display:block;border-radius:4px" onerror="this.style.display='none'">` : ''}</span>`;
+};
+
+function updateBuffs(jsonStr) {
+  const el = document.getElementById('tab-buffs-content'); if(!el) return;
+  let data;
+  try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; }
+  catch(e) { el.innerHTML='<div class="buff-empty">⚠ Parse error: '+escHtml(String(e))+'</div>'; return; }
+  if (!Array.isArray(data) || data.length === 0) { el.innerHTML='<div class="buff-empty">No active buffs</div>'; return; }
+  const filtered = data.filter(b => !_blacklist.has(b.n || b.name || ''));
+  if (filtered.length === 0) { el.innerHTML='<div class="buff-empty">All buffs blacklisted</div>'; return; }
+  const toTitle = s => s.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+  const cards = filtered.map(b => {
+    const raw    = b.n || b.name || '?';
+    const nm     = escHtml(toTitle(raw));
+    const stacks = b.s || b.stacks || 1;
+    const timer  = b.t !== undefined ? b.t : 0;
+    const total  = b.tt !== undefined ? b.tt : 0;
+    const isInf  = timer === 'inf' || timer === Infinity || total === 'inf' || total === Infinity;
+    const ic = _iconHtml(b.ic, 20);
+    const st = stacks > 1 ? `<span class="buff-stacks">x${stacks}</span>` : '';
+    const ti = (!isInf && Number(timer) > 0) ? `<span class="buff-timer">${Number(timer).toFixed(1)}s</span>` : '';
+    const meta = (st || ti) ? `<div class="buff-meta">${st}${ti}</div>` : '';
+    let barHtml = '';
+    if (!isInf && Number(total) > 0) {
+      const pct = Math.max(0, Math.min(100, Number(timer) / Number(total) * 100));
+      barHtml = `<div class="buff-bar-wrap"><div class="buff-bar"><div class="buff-bar-fill${pct<25?' low':''}" style="width:${pct.toFixed(1)}%"></div></div></div>`;
+    }
+    return `<div class="buff-card" onclick="blacklistAdd('${escAttr(raw)}')" title="Click to hide"><div class="buff-name" style="display:flex;align-items:center;gap:4px">${ic}<span>${nm}</span></div>${meta}${barHtml}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="buff-section-title">${filtered.length} active buff${filtered.length!==1?'s':''}</div><div class="buff-grid">${cards}</div>`;
+}
+
+// Tracked entity path for checkbox state persistence across table rebuilds
+let _trackedEntityPath = '';
+
+function trackEntity(cb, path) {
+  if (cb.checked) {
+    _trackedEntityPath = path;
+    ahkCall('HighlightEntity', path);
+    // Uncheck any other checked row
+    document.querySelectorAll('#tab-entities-content .track-cb').forEach(c => { if (c !== cb) c.checked = false; });
+  } else {
+    _trackedEntityPath = '';
+    ahkCall('ClearEntityHighlight');
+  }
+}
+
+function updateEntities(jsonStr) {
+  const el = document.getElementById('tab-entities-content'); if(!el) return;
+  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
+  if (!Array.isArray(data) || data.length === 0) { el.innerHTML='<div class="no-data-msg">No entities in range</div>'; return; }
+  const rc = r => { const s=String(r||'').toLowerCase(); return s.includes('boss')||s.includes('unique')?'rarity-boss':s.includes('rare')?'rarity-rare':s.includes('magic')?'rarity-magic':'rarity-normal'; };
+  const _eIcon = t => ({Player:'👤',Minion:'🐾',Enemy:'⚔️',Boss:'💀',NPC:'🧑',Chest:'📦',WorldItem:'💎',AreaTransition:'🚪',Waypoint:'🚩',Checkpoint:'✅',Projectile:'💨',Terrain:'🏔️',Object:'📍'}[t]||'📍');
+  const sorted = [...data].sort((a,b) => {
+    const typeOrder = {Boss:0,AreaTransition:1,Waypoint:2,Checkpoint:3,NPC:4};
+    const ta = typeOrder[a.type] ?? 99, tb = typeOrder[b.type] ?? 99;
+    if (ta !== tb) return ta - tb;
+    return (a.dist>=0?a.dist:9999) - (b.dist>=0?b.dist:9999);
+  });
+  const sleeping = sorted.filter(e => e.sleep === true);
+  const awake    = sorted.filter(e => e.sleep !== true);
+  const alive  = awake.filter(e => e.alive !== false);
+  const dead   = awake.filter(e => e.alive === false);
+  const makeRow = (e, cls) => {
+    const life = e.life >= 0 ? e.life : null;
+    const lifeHtml = life !== null
+      ? `<div class="life-bar-wrap"><div class="life-bar"><div class="life-bar-fill${life<25?' low':''}" style="width:${Math.min(100,life)}%"></div></div><span class="life-pct">${life}%</span></div>`
+      : '<span class="life-pct">—</span>';
+    const rarClass    = rc(e.rarity);
+    const icon        = `<span class="entity-icon">${_eIcon(e.type)}</span>`;
+    const typeBadge   = e.type ? `<span class="etype-badge etype-${escHtml(e.type)}">${escHtml(e.type)}</span>` : '';
+    const displayName = escHtml(e.name || e.path || '?');
+    const isTracked   = e.path && e.path === _trackedEntityPath;
+    const cbHtml = `<td class="track-td" onclick="event.stopPropagation()"><input type="checkbox" class="track-cb" ${isTracked?'checked':''} onchange="trackEntity(this,'${escAttr(e.path||'')}')"></td>`;
+    return `<tr class="${cls}" onclick="entityRowClick(event,'${escAttr(e.path||'')}')">${cbHtml}<td title="${escHtml(e.path||'')}">${icon}${typeBadge}${displayName}</td><td class="${rarClass}">${escHtml(String(e.rarity||'Normal'))}</td><td>${lifeHtml}</td><td>${e.dist>=0?e.dist+'m':'—'}</td></tr>`;
+  };
+  const rows = [...alive.map(e=>makeRow(e,'')), ...dead.map(e=>makeRow(e,'dead')), ...sleeping.map(e=>makeRow(e,'entity-sleep'))].join('');
+  const sleepLabel = sleeping.length > 0 ? ` · ${sleeping.length} sleeping` : '';
+  el.innerHTML = `<div class="entity-header"><span class="entity-count">${alive.length} alive · ${dead.length} dead${sleepLabel}</span></div><table class="entity-table"><thead><tr><th class="track-th">🎯</th><th>Name</th><th>Rarity</th><th>Life</th><th>Dist</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function updateUIState(jsonStr) {
+  const el = document.getElementById('tab-ui-content'); if(!el) return;
+  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
+  el.innerHTML = `<div class="json-viewer"><pre>${syntaxHighlight(JSON.stringify(data,null,2))}</pre></div>`;
+}
+
+function updateSkills(jsonStr) {
+  const el = document.getElementById('tab-skills-content'); if(!el) return;
+  let raw;
+  try { raw = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; }
+  catch(e) { el.innerHTML='<div class="no-data-msg">⚠ Parse error</div>'; return; }
+  const data = Array.isArray(raw) ? raw : (raw && raw.skills ? raw.skills : []);
+  const asOff = raw && raw.asOff ? '0x'+raw.asOff.toString(16).toUpperCase() : '0';
+  const distCh = raw && typeof raw.distCh === 'number' ? raw.distCh : -1;
+  if (!Array.isArray(data) || data.length === 0) {
+    el.innerHTML='<div class="no-data-msg">No skills found (ActiveSkill offset: '+asOff+')</div>'; return;
+  }
+  const filtered = data.filter(s => !_blacklist.has(s.n || ''));
+  const usable = filtered.filter(s => s.ok);
+  const blocked = filtered.filter(s => !s.ok);
+  const rows = filtered.map(s => {
+    const dn = escHtml(s.dn || s.n || '?');
+    const nm = escHtml(s.n || '?');
+    const rawName = s.n || '';
+    const icImg = _iconHtml(s.ic);
+    let statusCls, statusTxt;
+    if (!s.ok) {
+      statusCls = 'skill-blocked'; statusTxt = '✗ Cooldown';
+    } else if (distCh >= 0 && distCh < 100 && /oil.?barr/i.test(s.n || '')) {
+      statusCls = 'skill-blocked'; statusTxt = '✗ Move req.';
+    } else if (s.tu === 0 && s.cd === 0 && s.mu === 0) {
+      statusCls = 'skill-idle'; statusTxt = '○ Inactive';
+    } else {
+      statusCls = 'skill-usable'; statusTxt = '✓ Ready';
+    }
+    const cdText = s.cd > 0 ? (s.cd/1000).toFixed(1)+'s' : '—';
+    const usesText = s.mu > 0 ? `${s.mu - s.ac}/${s.mu}` : '—';
+    const cdPct = (s.mu > 0 && s.ac > 0) ? Math.min(100, s.ac/s.mu*100) : 0;
+    const cdBar = s.mu > 0 ? `<div class="skill-cd-bar"><div class="skill-cd-fill" style="width:${cdPct}%"></div></div>` : '';
+    const ctName = typeof animName==='function' ? animName(s.ct) : s.ct;
+    return `<tr style="cursor:pointer" onclick="blacklistAdd('${escAttr(rawName)}')" title="Click to hide"><td title="${nm}">${icImg}${dn}</td><td class="${statusCls}">${statusTxt}</td><td>${cdText}</td><td>${usesText} ${cdBar}</td><td>${s.tu}</td><td title="ID: ${s.ct} / EquipID: ${escHtml(s.eq)}">${escHtml(ctName)}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<div class="skill-header"><span class="skill-count">${usable.length} usable · ${blocked.length} on cooldown · ${filtered.length} total</span><span class="skill-debug" style="opacity:0.5;font-size:0.85em;margin-left:1em">ActiveSkill offset: ${asOff}</span></div><table class="skill-table"><thead><tr><th>Skill</th><th>Status</th><th>Cooldown</th><th>Uses</th><th>Total Uses</th><th>Cast Type</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function updateGameState(jsonStr) {
+  const el = document.getElementById('tab-gamestate-content'); if(!el) return;
+  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
+  el.innerHTML = `<div class="json-viewer"><pre>${syntaxHighlight(JSON.stringify(data,null,2))}</pre></div>`;
+}
+
+function syntaxHighlight(json) {
+  return escHtml(json)
+    .replace(/(&quot;[^&]*?&quot;)\s*:/g, '<span class="json-key">$1</span>:')
+    .replace(/:\s*(&quot;0x[0-9A-Fa-f]+&quot;)/g, m => m.replace(/(&quot;0x[^&]*?&quot;)/, '<span class="json-hex">$1</span>'))
+    .replace(/:\s*(&quot;[^&]*?&quot;)/g, m => m.replace(/(&quot;.*&quot;)/, '<span class="json-str">$1</span>'))
+    .replace(/:\s*(-?\d+\.?\d*)/g,        m => m.replace(/(-?\d+\.?\d*)$/, '<span class="json-num">$1</span>'))
+    .replace(/:\s*(true|false|null)/g,     m => m.replace(/(true|false|null)$/, '<span class="json-bool">$1</span>'));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  WATCHLIST
+// ═══════════════════════════════════════════════════════════════════
+let _wlData = [];
+let _wlSelectedPath = '';
+
+function updateWatchlist(rowsJson) {
+  let rows; try { rows = typeof rowsJson==='string' ? JSON.parse(rowsJson) : rowsJson; } catch(e) { return; }
+  _wlData = Array.isArray(rows) ? rows : [];
+  _renderWatchlist();
+}
+
+function _renderWatchlist() {
+  const filter = (document.getElementById('wl-filter')?.value || '').toLowerCase();
+  const body   = document.getElementById('wl-body'); if (!body) return;
+  const filtered = _wlData.filter(r => !filter || (r.path||'').toLowerCase().includes(filter));
+  if (filtered.length === 0) {
+    body.innerHTML = '<tr><td colspan="2" style="color:var(--subtext);padding:16px">No pinned paths</td></tr>';
+    return;
+  }
+  body.innerHTML = filtered.map(r => {
+    const sel = r.path === _wlSelectedPath ? ' selected' : '';
+    return `<tr class="${sel}" onclick="wlSelect('${escHtml(r.path)}')"><td title="${escHtml(r.path)}">${escHtml(r.path)}</td><td>${escHtml(String(r.value??''))}</td></tr>`;
+  }).join('');
+}
+
+function wlSelect(path) {
+  _wlSelectedPath = path;
+  ahkCall('SelectNode', path);
+  _renderWatchlist();
+}
+
+function applyWlFilter() { _renderWatchlist(); }
+
+// ═══════════════════════════════════════════════════════════════════
+//  CONFIG HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function applyThresholds() {
+  const life = document.getElementById('inp-life')?.value || '';
+  const mana = document.getElementById('inp-mana')?.value || '';
+  ahkCall('SetThresholds', life, mana);
+}
+
+function setRadarFilter(type, val) {
+  ahkCall('SetRadarFilter', type, val);
+}
+
+function setEntityFilter(type, val) {
+  ahkCall('SetEntityFilter', type, val);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ENTITY CONTEXT MENU
+// ═══════════════════════════════════════════════════════════════════
+let _entityCtxPath = '';
+
+function entityRowClick(evt, path) {
+  evt.stopPropagation();
+  // Highlight row
+  document.querySelectorAll('#tab-entities-content tr').forEach(r => r.classList.remove('e-selected'));
+  evt.currentTarget.classList.add('e-selected');
+
+  _entityCtxPath = path;
+  const menu = document.getElementById('entity-ctx');
+  const pathEl = document.getElementById('entity-ctx-path');
+  if (!menu) return;
+  if (pathEl) pathEl.textContent = path;
+
+  // Position near click, keep inside viewport
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let x = evt.clientX, y = evt.clientY;
+  menu.style.display = 'block';
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  if (x + mw > vw - 4) x = vw - mw - 4;
+  if (y + mh > vh - 4) y = vh - mh - 4;
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+}
+
+function entityCtxPin() {
+  if (_entityCtxPath) ahkCall('PinPath', _entityCtxPath);
+  document.getElementById('entity-ctx').style.display = 'none';
+}
+
+function entityCtxCopy() {
+  if (_entityCtxPath) navigator.clipboard?.writeText(_entityCtxPath).catch(()=>{});
+  document.getElementById('entity-ctx').style.display = 'none';
+}
+
+function entityCtxHighlight() {
+  if (_entityCtxPath) {
+    _trackedEntityPath = _entityCtxPath;
+    ahkCall('HighlightEntity', _entityCtxPath);
+    // Check the matching row's checkbox
+    document.querySelectorAll('#tab-entities-content .track-cb').forEach(c => {
+      c.checked = (c.closest('tr')?.querySelector('[title]')?.title === _entityCtxPath);
+    });
+  }
+  document.getElementById('entity-ctx').style.display = 'none';
+}
+
+function entityCtxClearHighlight() {
+  _trackedEntityPath = '';
+  ahkCall('ClearEntityHighlight');
+  // Uncheck any tracked checkbox
+  document.querySelectorAll('#tab-entities-content .track-cb').forEach(c => c.checked = false);
+  document.getElementById('entity-ctx').style.display = 'none';
+}
+
+// Close context menu on any outside click
+document.addEventListener('click', () => {
+  const m = document.getElementById('entity-ctx');
+  if (m) m.style.display = 'none';
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  FRAMELESS WINDOW — drag / maximize / restore
+// ═══════════════════════════════════════════════════════════════════
+function headerDragStart(e) {
+  if (e.button !== 0) return;
+  if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+  ahkCall('StartDrag');
+}
+
+function headerDblClick(e) {
+  if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+  ahkCall('WinMaximize');
+}
+</script>
+<!-- ENTITY CONTEXT MENU -->
+<div id="entity-ctx">
+  <div class="ctx-path" id="entity-ctx-path"></div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="entityCtxHighlight()">🎯 Track on Radar</div>
+  <div class="ctx-item" onclick="entityCtxClearHighlight()">✖ Clear Radar Track</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="entityCtxPin()">📌 Add to Watchlist</div>
+  <div class="ctx-item" onclick="entityCtxCopy()">📋 Copy Path</div>
+</div>
+</body>
+</html>

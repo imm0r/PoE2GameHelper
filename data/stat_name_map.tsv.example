@@ -1,0 +1,7 @@
+; stat_name_map.tsv
+; Format: <statId><TAB><displayName>
+; Beispiel:
+; 101	Maximum Life
+; 102	Maximum Mana
+; 103	Movement Speed %
+
