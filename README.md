@@ -1,4 +1,4 @@
-# PoE2 GameHelper v0.4.0.0
+# PoE2 GameHelper v0.4.11.2
 
 AHK v2.0 Port der Path of Exile 2 Memory-Reading-Engine mit Radar/Maphack-Overlay, Zone-Navigation, AutoFlask und WebView-basierter UI.
 
