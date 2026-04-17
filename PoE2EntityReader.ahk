@@ -87,7 +87,7 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         bfsFloor := this._radarMode ? 64 : 512
         if (maxVisited < bfsFloor)
             maxVisited := bfsFloor
-        radarVisitedCap := this._radarMode ? 800 : 6000
+        radarVisitedCap := this._radarMode ? 400 : 6000
         if (maxVisited > radarVisitedCap)
             maxVisited := radarVisitedCap
 
@@ -559,17 +559,24 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(entityPtr)
             return 0
 
-        entityId := this.Mem.ReadUInt(entityPtr + PoE2Offsets.Entity["Id"])
-        flags := this.Mem.ReadUChar(entityPtr + PoE2Offsets.Entity["Flags"])
-        entityDetailsPtr := this.Mem.ReadPtr(entityPtr + PoE2Offsets.Entity["EntityDetailsPtr"])
+        ; Batch-read entity header: 0x08..0x1F → EntityDetailsPtr(0x08), ComponentsVec(0x10), ComponentsVecLast(0x18)
+        ; and 0x80..0x87 → Id(0x80), Flags(0x84) — two reads instead of five
+        hdrBuf := this.Mem.ReadBytes(entityPtr + 0x08, 0x18)
+        if !hdrBuf
+            return 0
+        entityDetailsPtr := NumGet(hdrBuf.Ptr, 0x00, "Ptr")   ; offset 0x08 in entity struct
+        compVecFirst     := NumGet(hdrBuf.Ptr, 0x08, "Int64")  ; offset 0x10
+        compVecLast      := NumGet(hdrBuf.Ptr, 0x10, "Int64")  ; offset 0x18
+
+        idBuf := this.Mem.ReadBytes(entityPtr + 0x80, 8)
+        entityId := idBuf ? NumGet(idBuf.Ptr, 0, "UInt") : 0
+        flags    := idBuf ? NumGet(idBuf.Ptr, 4, "UChar") : 0
 
         path := ""
         if this.IsProbablyValidPointer(entityDetailsPtr)
             path := this.ReadStdWStringAt(entityDetailsPtr + PoE2Offsets.EntityDetails["Path"], 260)
 
         componentCount := -1
-        compVecFirst := this.Mem.ReadInt64(entityPtr + PoE2Offsets.Entity["ComponentsVec"])
-        compVecLast := this.Mem.ReadInt64(entityPtr + PoE2Offsets.Entity["ComponentsVecLast"])
         if (compVecFirst > 0 && compVecLast >= compVecFirst)
         {
             totalBytes := compVecLast - compVecFirst
@@ -584,8 +591,6 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         {
             decodedComponents := this.DecodeSampleEntityComponentsRadar(components)
             ; Fallback: if lookup-based decode found no render component, try the vector scan
-            ; (same as non-radar fallback path — ensures Render is always found even when
-            ; the named-component bucket fails)
             if (!(decodedComponents && Type(decodedComponents) = "Map" && decodedComponents.Has("render")))
             {
                 fallback := this.DecodeEntityComponentsFromVectorBasic(entityPtr, 64)
@@ -1102,6 +1107,11 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(root) || root = head
             return result
 
+        nodeReadSize := 0x30
+        offLeft  := 0x00
+        offRight := 0x10
+        offValue := 0x28
+
         queue    := [root]
         qi       := 1
         visited  := Map()
@@ -1115,9 +1125,13 @@ class PoE2EntityReader extends PoE2ComponentDecoders
                 continue
             visited[node] := true
 
-            left   := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Left"])
-            right  := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Right"])
-            rawPtr := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["ValueEntityPtr"])
+            nodeBuf := this.Mem.ReadBytes(node, nodeReadSize)
+            if !nodeBuf
+                continue
+
+            left   := NumGet(nodeBuf.Ptr, offLeft, "Ptr")
+            right  := NumGet(nodeBuf.Ptr, offRight, "Ptr")
+            rawPtr := NumGet(nodeBuf.Ptr, offValue, "Ptr")
 
             if this.IsProbablyValidPointer(rawPtr)
                 result[rawPtr] := true
@@ -1151,6 +1165,13 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(root) || root = head
             return result
 
+        ; Pre-resolve offsets for batch node read (0x30 bytes covers Left..ValueEntityPtr)
+        nodeReadSize := 0x30
+        offLeft  := 0x00   ; StdMapNode.Left
+        offRight := 0x10   ; StdMapNode.Right
+        offKeyId := 0x20   ; StdMapNode.KeyId
+        offValue := 0x28   ; StdMapNode.ValueEntityPtr
+
         queue    := [root]
         qi       := 1
         visited  := Map()
@@ -1164,10 +1185,15 @@ class PoE2EntityReader extends PoE2ComponentDecoders
                 continue
             visited[node] := true
 
-            left   := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Left"])
-            right  := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Right"])
-            entityId := this.Mem.ReadUInt(node + PoE2Offsets.StdMapNode["KeyId"])
-            rawPtr   := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["ValueEntityPtr"])
+            ; Batch-read entire node struct in one RPM call (was 4 separate calls)
+            nodeBuf := this.Mem.ReadBytes(node, nodeReadSize)
+            if !nodeBuf
+                continue
+
+            left     := NumGet(nodeBuf.Ptr, offLeft, "Ptr")
+            right    := NumGet(nodeBuf.Ptr, offRight, "Ptr")
+            entityId := NumGet(nodeBuf.Ptr, offKeyId, "UInt")
+            rawPtr   := NumGet(nodeBuf.Ptr, offValue, "Ptr")
 
             ; C# EntityFilter.IgnoreVisualsAndDecorations: skip id >= 0x40000000
             if (entityId > 0 && entityId < 0x40000000 && this.IsProbablyValidPointer(rawPtr))
@@ -1202,11 +1228,13 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             return results
 
         ; BFS with generous limits (scan the full tree)
+        ; Batch-read node structs (0x30 bytes each) to minimize RPM calls.
         queue    := [root]
         qi       := 1
         visited  := Map()
-        maxVisit := Min(size * 2 + 100, 50000)
+        maxVisit := Min(size * 2 + 100, 10000)
         worldToGridRatio := 250.0 / 0x17
+        nodeReadSize := 0x30
 
         while (qi <= queue.Length && visited.Count < maxVisit)
         {
@@ -1216,9 +1244,13 @@ class PoE2EntityReader extends PoE2ComponentDecoders
                 continue
             visited[node] := true
 
-            left   := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Left"])
-            right  := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Right"])
-            rawPtr := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["ValueEntityPtr"])
+            nodeBuf := this.Mem.ReadBytes(node, nodeReadSize)
+            if !nodeBuf
+                continue
+
+            left   := NumGet(nodeBuf.Ptr, 0x00, "Ptr")
+            right  := NumGet(nodeBuf.Ptr, 0x10, "Ptr")
+            rawPtr := NumGet(nodeBuf.Ptr, 0x28, "Ptr")
 
             if (this.IsProbablyValidPointer(left) && left != head)
                 queue.Push(left)
@@ -1334,52 +1366,73 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         return 0
     }
 
-    ; Reads TgtTilesLocations from terrain tile metadata — covers the ENTIRE zone.
-    ; Iterates all tiles in the terrain, reads each tile's TGT file path, and filters for
-    ; important entity types (AreaTransition, Waypoint, Checkpoint, Boss, NPC).
-    ; Returns: Map of path → Map("path", "type", "gridX", "gridY") with zone-wide coverage.
-    ; This is the same approach as the C# GameHelper's GetTgtFileData() used by Wraedar.
-    ReadTgtTilesLocations(areaInstanceData)
+    ; Sets up incremental TGT tile scanning — validates terrain metadata and caches scan parameters.
+    ; Returns true if setup succeeded and incremental scanning can begin.
+    _SetupTgtScan(areaInstanceData)
     {
-        results := Map()
         terrainBase := areaInstanceData + PoE2Offsets.AreaInstance["TerrainMetadata"]
 
-        ; Read total tiles dimensions
         totalTilesX := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesX"])
         totalTilesY := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesY"])
         if (totalTilesX < 1 || totalTilesX > 1000 || totalTilesY < 1 || totalTilesY > 1000)
-            return results
+            return false
 
-        ; Read TileDetailsPtr vector (StdVector of TileStructure, each 0x38 bytes)
         tileVecFirst := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"])
         tileVecLast  := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"] + 8)
         if !this.IsProbablyValidPointer(tileVecFirst) || tileVecLast <= tileVecFirst
-            return results
+            return false
 
         tileStructSize := 0x38
         totalTiles := Floor((tileVecLast - tileVecFirst) / tileStructSize)
         if (totalTiles < 1 || totalTiles > 100000)
-            return results
+            return false
 
-        tileToGrid := 0x17  ; TileToGridConversion = 23
+        this._tgtScanTileIdx := 0
+        this._tgtScanTotalTiles := totalTiles
+        this._tgtScanTileVecFirst := tileVecFirst
+        this._tgtScanTotalTilesX := totalTilesX
+        this._tgtScanPartialResults := Map()
+        return true
+    }
 
-        ; Iterate all tiles — read TGT path and classify
-        Loop totalTiles
+    ; Processes a batch of tiles from the incremental TGT scan.
+    ; Reads tile structs in bulk (one RPM call per batch) and only does individual reads for path strings.
+    ; Returns true when all tiles have been processed.
+    _ProcessTgtScanBatch(batchSize)
+    {
+        tileStructSize := 0x38
+        tileToGrid := 0x17
+        startIdx := this._tgtScanTileIdx
+        endIdx := Min(startIdx + batchSize, this._tgtScanTotalTiles)
+        results := this._tgtScanPartialResults
+
+        ; Batch-read contiguous tile structs in one RPM call
+        batchBytes := (endIdx - startIdx) * tileStructSize
+        tileBatchBuf := this.Mem.ReadBytes(this._tgtScanTileVecFirst + startIdx * tileStructSize, batchBytes)
+        if !tileBatchBuf
         {
-            tileIdx := A_Index - 1
-            tileAddr := tileVecFirst + (tileIdx * tileStructSize)
+            this._tgtScanTileIdx := endIdx
+            return (endIdx >= this._tgtScanTotalTiles)
+        }
 
-            tgtFilePtr := this.Mem.ReadPtr(tileAddr + PoE2Offsets.TileStruct["TgtFilePtr"])
+        offTgtFilePtr := PoE2Offsets.TileStruct["TgtFilePtr"]
+        offTileIdX    := PoE2Offsets.TileStruct["TileIdX"]
+        offTileIdY    := PoE2Offsets.TileStruct["TileIdY"]
+        offRotSel     := PoE2Offsets.TileStruct["RotationSelector"]
+
+        Loop endIdx - startIdx
+        {
+            tileIdx := startIdx + A_Index - 1
+            bufOff := (A_Index - 1) * tileStructSize
+
+            tgtFilePtr := NumGet(tileBatchBuf.Ptr, bufOff + offTgtFilePtr, "Ptr")
             if !this.IsProbablyValidPointer(tgtFilePtr)
                 continue
 
-            ; Read TGT path string
             tgtPath := this.ReadStdWStringAt(tgtFilePtr + PoE2Offsets.TgtFile["TgtPath"], 260)
             if (tgtPath = "")
                 continue
 
-            ; Classify by path — only navigation-relevant types from tile paths
-            ; Boss/NPC detection is too noisy from terrain tiles; those come from entity scanning
             pathLower := StrLower(tgtPath)
             entType := ""
             if InStr(pathLower, "areatransition")
@@ -1391,18 +1444,16 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             if (entType = "")
                 continue
 
-            ; Build unique key with tile coordinates (like C# version)
-            rotSel := this.Mem.ReadUChar(tileAddr + PoE2Offsets.TileStruct["RotationSelector"])
-            tileIdX := this.Mem.ReadUChar(tileAddr + PoE2Offsets.TileStruct["TileIdX"])
-            tileIdY := this.Mem.ReadUChar(tileAddr + PoE2Offsets.TileStruct["TileIdY"])
+            rotSel  := NumGet(tileBatchBuf.Ptr, bufOff + offRotSel, "UChar")
+            tileIdX := NumGet(tileBatchBuf.Ptr, bufOff + offTileIdX, "UChar")
+            tileIdY := NumGet(tileBatchBuf.Ptr, bufOff + offTileIdY, "UChar")
             if (Mod(rotSel, 2) = 0)
                 tileKey := tgtPath "x:" tileIdX "-y:" tileIdY
             else
                 tileKey := tgtPath "x:" tileIdY "-y:" tileIdX
 
-            ; Compute grid position from tile index
-            gridX := Mod(tileIdx, totalTilesX) * tileToGrid
-            gridY := Floor(tileIdx / totalTilesX) * tileToGrid
+            gridX := Mod(tileIdx, this._tgtScanTotalTilesX) * tileToGrid
+            gridY := Floor(tileIdx / this._tgtScanTotalTilesX) * tileToGrid
 
             if !results.Has(tileKey)
             {
@@ -1416,6 +1467,103 @@ class PoE2EntityReader extends PoE2ComponentDecoders
                     "worldZ", 0
                 )
             }
+        }
+
+        this._tgtScanTileIdx := endIdx
+        return (endIdx >= this._tgtScanTotalTiles)
+    }
+
+    ; Legacy synchronous tile scan — kept for compatibility but prefer incremental _SetupTgtScan/_ProcessTgtScanBatch.
+    ReadTgtTilesLocations(areaInstanceData)
+    {
+        results := Map()
+        terrainBase := areaInstanceData + PoE2Offsets.AreaInstance["TerrainMetadata"]
+
+        totalTilesX := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesX"])
+        totalTilesY := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesY"])
+        if (totalTilesX < 1 || totalTilesX > 1000 || totalTilesY < 1 || totalTilesY > 1000)
+            return results
+
+        tileVecFirst := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"])
+        tileVecLast  := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"] + 8)
+        if !this.IsProbablyValidPointer(tileVecFirst) || tileVecLast <= tileVecFirst
+            return results
+
+        tileStructSize := 0x38
+        totalTiles := Floor((tileVecLast - tileVecFirst) / tileStructSize)
+        if (totalTiles < 1 || totalTiles > 100000)
+            return results
+
+        tileToGrid := 0x17
+
+        offTgtFilePtr := PoE2Offsets.TileStruct["TgtFilePtr"]
+        offTileIdX    := PoE2Offsets.TileStruct["TileIdX"]
+        offTileIdY    := PoE2Offsets.TileStruct["TileIdY"]
+        offRotSel     := PoE2Offsets.TileStruct["RotationSelector"]
+
+        ; Process in chunks to use batch reads
+        chunkSize := 2000
+        tileIdx := 0
+        while (tileIdx < totalTiles)
+        {
+            chunkEnd := Min(tileIdx + chunkSize, totalTiles)
+            chunkBytes := (chunkEnd - tileIdx) * tileStructSize
+            chunkBuf := this.Mem.ReadBytes(tileVecFirst + tileIdx * tileStructSize, chunkBytes)
+            if !chunkBuf
+            {
+                tileIdx := chunkEnd
+                continue
+            }
+
+            Loop chunkEnd - tileIdx
+            {
+                curIdx := tileIdx + A_Index - 1
+                bufOff := (A_Index - 1) * tileStructSize
+
+                tgtFilePtr := NumGet(chunkBuf.Ptr, bufOff + offTgtFilePtr, "Ptr")
+                if !this.IsProbablyValidPointer(tgtFilePtr)
+                    continue
+
+                tgtPath := this.ReadStdWStringAt(tgtFilePtr + PoE2Offsets.TgtFile["TgtPath"], 260)
+                if (tgtPath = "")
+                    continue
+
+                pathLower := StrLower(tgtPath)
+                entType := ""
+                if InStr(pathLower, "areatransition")
+                    entType := "AreaTransition"
+                else if InStr(pathLower, "waypoint")
+                    entType := "Waypoint"
+                else if InStr(pathLower, "checkpoint")
+                    entType := "Checkpoint"
+                if (entType = "")
+                    continue
+
+                rotSel  := NumGet(chunkBuf.Ptr, bufOff + offRotSel, "UChar")
+                tileIdX := NumGet(chunkBuf.Ptr, bufOff + offTileIdX, "UChar")
+                tileIdY := NumGet(chunkBuf.Ptr, bufOff + offTileIdY, "UChar")
+                if (Mod(rotSel, 2) = 0)
+                    tileKey := tgtPath "x:" tileIdX "-y:" tileIdY
+                else
+                    tileKey := tgtPath "x:" tileIdY "-y:" tileIdX
+
+                gridX := Mod(curIdx, totalTilesX) * tileToGrid
+                gridY := Floor(curIdx / totalTilesX) * tileToGrid
+
+                if !results.Has(tileKey)
+                {
+                    results[tileKey] := Map(
+                        "path", tgtPath,
+                        "type", entType,
+                        "gridX", gridX,
+                        "gridY", gridY,
+                        "worldX", gridX * (250.0 / 0x17),
+                        "worldY", gridY * (250.0 / 0x17),
+                        "worldZ", 0
+                    )
+                }
+            }
+            tileIdx := chunkEnd
         }
         return results
     }
@@ -1446,38 +1594,47 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !(dc && Type(dc) = "Map")
             return false
 
-        ; Update render position using cached component address
+        ; Update render position + terrain height — single RPM call for the range 0x138..0x1B4
         renderComp := dc.Has("render") ? dc["render"] : 0
         if (renderComp && Type(renderComp) = "Map" && renderComp.Has("address"))
         {
             compAddr := renderComp["address"]
             if this.IsProbablyValidPointer(compAddr)
             {
-                worldX := this.Mem.ReadFloat(compAddr + PoE2Offsets.Render["CurrentWorldPosition"])
-                worldY := this.Mem.ReadFloat(compAddr + PoE2Offsets.Render["CurrentWorldPositionY"])
-                worldZ := this.Mem.ReadFloat(compAddr + PoE2Offsets.Render["CurrentWorldPositionZ"])
-                terrainHeight := this.Mem.ReadFloat(compAddr + PoE2Offsets.Render["TerrainHeight"])
+                static renderBaseOff := PoE2Offsets.Render["CurrentWorldPosition"]
+                static terrainOff    := PoE2Offsets.Render["TerrainHeight"]
+                static renderSpan    := terrainOff - renderBaseOff + 4  ; 0x1B0 - 0x138 + 4 = 0x7C
+                static terrainLocal  := terrainOff - renderBaseOff      ; 0x78
 
-                if (Abs(worldX) <= 200000 && Abs(worldY) <= 200000 && Abs(worldZ) <= 200000
-                    && !(Abs(worldX) < 0.01 && Abs(worldY) < 0.01 && Abs(worldZ) < 0.01))
+                renderBuf := this.Mem.ReadBytes(compAddr + renderBaseOff, renderSpan)
+                if renderBuf
                 {
-                    wp := renderComp.Has("worldPosition") ? renderComp["worldPosition"] : Map()
-                    wp["x"] := worldX
-                    wp["y"] := worldY
-                    wp["z"] := worldZ
-                    renderComp["worldPosition"] := wp
-                    renderComp["terrainHeight"] := terrainHeight
+                    worldX := NumGet(renderBuf.Ptr, 0, "Float")
+                    worldY := NumGet(renderBuf.Ptr, 4, "Float")
+                    worldZ := NumGet(renderBuf.Ptr, 8, "Float")
+                    terrainHeight := NumGet(renderBuf.Ptr, terrainLocal, "Float")
 
-                    worldToGridRatio := 250.0 / 0x17
-                    gp := renderComp.Has("gridPosition") ? renderComp["gridPosition"] : Map()
-                    gp["x"] := worldX / worldToGridRatio
-                    gp["y"] := worldY / worldToGridRatio
-                    renderComp["gridPosition"] := gp
+                    if (Abs(worldX) <= 200000 && Abs(worldY) <= 200000 && Abs(worldZ) <= 200000
+                        && !(Abs(worldX) < 0.01 && Abs(worldY) < 0.01 && Abs(worldZ) < 0.01))
+                    {
+                        wp := renderComp.Has("worldPosition") ? renderComp["worldPosition"] : Map()
+                        wp["x"] := worldX
+                        wp["y"] := worldY
+                        wp["z"] := worldZ
+                        renderComp["worldPosition"] := wp
+                        renderComp["terrainHeight"] := terrainHeight
+
+                        worldToGridRatio := 250.0 / 0x17
+                        gp := renderComp.Has("gridPosition") ? renderComp["gridPosition"] : Map()
+                        gp["x"] := worldX / worldToGridRatio
+                        gp["y"] := worldY / worldToGridRatio
+                        renderComp["gridPosition"] := gp
+                    }
                 }
             }
         }
 
-        ; Update life component
+        ; Update life — batch-read Max+Current (8 bytes) in one RPM call
         lifeComp := dc.Has("life") ? dc["life"] : 0
         if (lifeComp && Type(lifeComp) = "Map" && lifeComp.Has("address"))
         {
@@ -1485,32 +1642,40 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             if this.IsProbablyValidPointer(lifeAddr)
             {
                 healthBase := lifeAddr + PoE2Offsets.Life["Health"]
-                curHP := this.Mem.ReadInt(healthBase + PoE2Offsets.Vital["Current"])
-                maxHP := this.Mem.ReadInt(healthBase + PoE2Offsets.Vital["Max"])
-                lifeComp["curHP"] := curHP
-                lifeComp["maxHP"] := maxHP
-                lifeComp["isAlive"] := (curHP > 0 && maxHP > 0)
+                lifeBuf := this.Mem.ReadBytes(healthBase + PoE2Offsets.Vital["Max"], 8)
+                if lifeBuf
+                {
+                    maxHP := NumGet(lifeBuf.Ptr, 0, "Int")
+                    curHP := NumGet(lifeBuf.Ptr, 4, "Int")
+                    lifeComp["curHP"] := curHP
+                    lifeComp["maxHP"] := maxHP
+                    lifeComp["isAlive"] := (curHP > 0 && maxHP > 0)
+                }
             }
         }
 
-        ; Update targetable using cached component list
-        comps := entity.Has("components") ? entity["components"] : 0
-        if (comps && Type(comps) = "Array")
+        ; Update targetable only for monsters (non-monsters don't change targetability; saves 1 RPM)
+        isMonster := entity.Has("path") && InStr(StrLower(entity["path"]), "metadata/monsters/")
+        if isMonster
         {
-            for _, comp in comps
+            comps := entity.Has("components") ? entity["components"] : 0
+            if (comps && Type(comps) = "Array")
             {
-                if !(comp && Type(comp) = "Map" && comp.Has("name") && comp.Has("address"))
-                    continue
-                cName := comp["name"]
-                if (InStr(cName, "Targetable") || cName = "Targetable")
+                for _, comp in comps
                 {
-                    tgtAddr := comp["address"]
-                    if (tgtAddr && this.IsProbablyValidPointer(tgtAddr))
+                    if !(comp && Type(comp) = "Map" && comp.Has("name") && comp.Has("address"))
+                        continue
+                    cName := comp["name"]
+                    if (InStr(cName, "Targetable") || cName = "Targetable")
                     {
-                        raw := this.Mem.ReadUChar(tgtAddr + PoE2Offsets.Targetable["IsTargetable"])
-                        dc["targetable"] := (raw = 1)
+                        tgtAddr := comp["address"]
+                        if (tgtAddr && this.IsProbablyValidPointer(tgtAddr))
+                        {
+                            raw := this.Mem.ReadUChar(tgtAddr + PoE2Offsets.Targetable["IsTargetable"])
+                            dc["targetable"] := (raw = 1)
+                        }
+                        break
                     }
-                    break
                 }
             }
         }

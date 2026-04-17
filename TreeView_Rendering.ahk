@@ -572,19 +572,19 @@ ShortEntityPath(path)
 ; Builds the Important UI Elements tab tree node (chat activity, passive tree panel, map pointers).
 AddImportantUiElementsNode(parentId, snapshot, expandedPaths)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     inGame := (snapshot && snapshot.Has("inGameState")) ? snapshot["inGameState"] : 0
     uiElems := (inGame && inGame.Has("importantUiElements")) ? inGame["importantUiElements"] : 0
 
     basePath := "snapshot/inGameState/importantUiElements"
-    rootNode := valueTree.Add("Important UI Elements", parentId)
-    nodePaths[rootNode] := basePath
+    rootNode := g_valueTree.Add("Important UI Elements", parentId)
+    g_nodePaths[rootNode] := basePath
 
     if !uiElems
     {
-        valueTree.Add("(keine Daten)", rootNode)
-        valueTree.Modify(rootNode, "Expand")
+        g_valueTree.Add("(keine Daten)", rootNode)
+        g_valueTree.Modify(rootNode, "Expand")
         return
     }
 
@@ -594,22 +594,22 @@ AddImportantUiElementsNode(parentId, snapshot, expandedPaths)
     isChatActive  := uiElems.Has("isChatActive")   ? uiElems["isChatActive"]   : false
     chatPath      := basePath "/chat"
     chatLabel     := isChatActive ? "YES" : "no"
-    chatNode      := valueTree.Add("Chat (active: " chatLabel ")", rootNode)
-    nodePaths[chatNode] := chatPath
-    valueTree.Add("ChatParentPtr: " PoE2GameStateReader.Hex(chatPtr), chatNode)
-    valueTree.Add("BackgroundColor alpha: 0x" Format("{:02X}", chatAlpha) " (" chatAlpha "/255)  — threshold 0x8C", chatNode)
-    valueTree.Add("IsChatActive: " (isChatActive ? "true" : "false"), chatNode)
-    valueTree.Modify(chatNode, "Expand")
+    chatNode      := g_valueTree.Add("Chat (active: " chatLabel ")", rootNode)
+    g_nodePaths[chatNode] := chatPath
+    g_valueTree.Add("ChatParentPtr: " PoE2GameStateReader.Hex(chatPtr), chatNode)
+    g_valueTree.Add("BackgroundColor alpha: 0x" Format("{:02X}", chatAlpha) " (" chatAlpha "/255)  — threshold 0x8C", chatNode)
+    g_valueTree.Add("IsChatActive: " (isChatActive ? "true" : "false"), chatNode)
+    g_valueTree.Modify(chatNode, "Expand")
 
     ; --- Passive Skill Tree Panel ---
     passivePtr := uiElems.Has("passiveSkillTreePanel") ? uiElems["passiveSkillTreePanel"] : 0
-    passiveNode := valueTree.Add("PassiveSkillTreePanel: " PoE2GameStateReader.Hex(passivePtr), rootNode)
-    nodePaths[passiveNode] := basePath "/passiveSkillTreePanel"
+    passiveNode := g_valueTree.Add("PassiveSkillTreePanel: " PoE2GameStateReader.Hex(passivePtr), rootNode)
+    g_nodePaths[passiveNode] := basePath "/passiveSkillTreePanel"
 
     ; --- Map ---
     mapPath := basePath "/map"
-    mapNode := valueTree.Add("Map", rootNode)
-    nodePaths[mapNode] := mapPath
+    mapNode := g_valueTree.Add("Map", rootNode)
+    g_nodePaths[mapNode] := mapPath
 
     mapParentPtr     := uiElems.Has("mapParentPtr") ? uiElems["mapParentPtr"] : 0
     ctrlMapParentPtr := uiElems.Has("controllerModeMapParentPtr") ? uiElems["controllerModeMapParentPtr"] : 0
@@ -620,26 +620,26 @@ AddImportantUiElementsNode(parentId, snapshot, expandedPaths)
     isController := (inGame && inGame.Has("isControllerMode") && inGame["isControllerMode"])
     modeText := isController ? "controller" : "mouse+keyboard"
 
-    valueTree.Add("MapParentPtr: " PoE2GameStateReader.Hex(mapParentPtr), mapNode)
-    valueTree.Add("ControllerModeMapParentPtr: " PoE2GameStateReader.Hex(ctrlMapParentPtr), mapNode)
-    valueTree.Add("activeMapParentPtr (" modeText "): " PoE2GameStateReader.Hex(activeMapPtr), mapNode)
-    valueTree.Add("LargeMapPtr: " PoE2GameStateReader.Hex(largeMapPtr), mapNode)
-    valueTree.Add("MiniMapPtr: " PoE2GameStateReader.Hex(miniMapPtr), mapNode)
+    g_valueTree.Add("MapParentPtr: " PoE2GameStateReader.Hex(mapParentPtr), mapNode)
+    g_valueTree.Add("ControllerModeMapParentPtr: " PoE2GameStateReader.Hex(ctrlMapParentPtr), mapNode)
+    g_valueTree.Add("activeMapParentPtr (" modeText "): " PoE2GameStateReader.Hex(activeMapPtr), mapNode)
+    g_valueTree.Add("LargeMapPtr: " PoE2GameStateReader.Hex(largeMapPtr), mapNode)
+    g_valueTree.Add("MiniMapPtr: " PoE2GameStateReader.Hex(miniMapPtr), mapNode)
     if (expandedPaths.Has(mapPath))
-        valueTree.Modify(mapNode, "Expand")
+        g_valueTree.Modify(mapNode, "Expand")
     else
-        valueTree.Modify(mapNode, "Expand")   ; immer aufgeklappt, da wenig Einträge
+        g_valueTree.Modify(mapNode, "Expand")   ; immer aufgeklappt, da wenig Einträge
 
     if (expandedPaths.Has(basePath))
-        valueTree.Modify(rootNode, "Expand")
+        g_valueTree.Modify(rootNode, "Expand")
     else
-        valueTree.Modify(rootNode, "Expand")
+        g_valueTree.Modify(rootNode, "Expand")
 }
 
 ; Builds the Active Effects tab tree node, separating buffs into positive and negative groups.
 AddActiveBuffsNode(parentId, snapshot, expandedPaths)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     inGame := (snapshot && snapshot.Has("inGameState")) ? snapshot["inGameState"] : 0
     areaInst := (inGame && inGame.Has("areaInstance")) ? inGame["areaInstance"] : 0
@@ -670,33 +670,33 @@ AddActiveBuffsNode(parentId, snapshot, expandedPaths)
 
     basePath := "snapshot/activeBuffs"
     totalCount := positiveItems.Length + negativeItems.Length
-    buffsNode := valueTree.Add("Active Effects (" totalCount ")", parentId)
-    nodePaths[buffsNode] := basePath
+    buffsNode := g_valueTree.Add("Active Effects (" totalCount ")", parentId)
+    g_nodePaths[buffsNode] := basePath
 
     positivePath := basePath "/positive"
     negativePath := basePath "/negative"
 
-    positiveNode := valueTree.Add("Positive Buffs (" positiveItems.Length ")", buffsNode)
-    nodePaths[positiveNode] := positivePath
+    positiveNode := g_valueTree.Add("Positive Buffs (" positiveItems.Length ")", buffsNode)
+    g_nodePaths[positiveNode] := positivePath
     AddBuffGroupNodes(positiveNode, positivePath, positiveItems, expandedPaths)
 
-    negativeNode := valueTree.Add("Negative Buffs (" negativeItems.Length ")", buffsNode)
-    nodePaths[negativeNode] := negativePath
+    negativeNode := g_valueTree.Add("Negative Buffs (" negativeItems.Length ")", buffsNode)
+    g_nodePaths[negativeNode] := negativePath
     AddBuffGroupNodes(negativeNode, negativePath, negativeItems, expandedPaths)
 
     if (expandedPaths.Has(positivePath) || positiveItems.Length <= 6)
-        valueTree.Modify(positiveNode, "Expand")
+        g_valueTree.Modify(positiveNode, "Expand")
     if (expandedPaths.Has(negativePath) || negativeItems.Length <= 6)
-        valueTree.Modify(negativeNode, "Expand")
+        g_valueTree.Modify(negativeNode, "Expand")
 
     if (expandedPaths.Has(basePath) || totalCount <= 8)
-        valueTree.Modify(buffsNode, "Expand")
+        g_valueTree.Modify(buffsNode, "Expand")
 }
 
 ; Adds a set of buff effect nodes under a parent group node, including per-buff detail lines.
 AddBuffGroupNodes(parentNode, basePath, items, expandedPaths)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     idx := 0
     for effect in items
@@ -711,8 +711,8 @@ AddBuffGroupNodes(parentNode, basePath, items, expandedPaths)
 
         safeName := RegExReplace(buffName, "[/\\]", "_")
         itemPath := basePath "/" idx "-" safeName
-        buffNode := valueTree.Add(buffLabel, parentNode)
-        nodePaths[buffNode] := itemPath
+        buffNode := g_valueTree.Add(buffLabel, parentNode)
+        g_nodePaths[buffNode] := itemPath
 
         AddBuffStatLine(buffNode, "name", buffName)
         AddBuffStatLine(buffNode, "internalName", rawBuffName)
@@ -725,7 +725,7 @@ AddBuffGroupNodes(parentNode, basePath, items, expandedPaths)
         AddBuffStatLine(buffNode, "totalTime", Format("{:.3f}", totalTime))
 
         if (expandedPaths.Has(itemPath))
-            valueTree.Modify(buffNode, "Expand")
+            g_valueTree.Modify(buffNode, "Expand")
     }
 }
 
@@ -820,20 +820,20 @@ TitleCaseWords(text)
 ; Adds a single "key: value" child node to a buff tree node.
 AddBuffStatLine(parentId, key, value)
 {
-    global valueTree
-    valueTree.Add(key ": " value, parentId)
+    global g_valueTree
+    g_valueTree.Add(key ": " value, parentId)
 }
 
 ; Recursively builds a tree node hierarchy from a snapshot value (Map, Array, or scalar).
 ; Handles special cases for stats arrays, flask slots, mods info, and state machine components.
 BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
 {
-    global valueTree, nodePaths, debugMode, autoFlaskPerformanceMode
+    global g_valueTree, g_nodePaths, g_debugMode, g_autoFlaskPerformanceMode
 
-    if (autoFlaskPerformanceMode && !IsAutoFlaskRelevantPath(nodePath))
+    if (g_autoFlaskPerformanceMode && !IsAutoFlaskRelevantPath(nodePath))
         return
 
-    if (!debugMode && ShouldHideNode(nodePath, name))
+    if (!g_debugMode && ShouldHideNode(nodePath, name))
         return
 
     maxDepth := 15
@@ -844,8 +844,8 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
 
     if (depth > maxDepth)
     {
-        nodeId := valueTree.Add(name ": <max depth reached>", parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(name ": <max depth reached>", parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
         return
     }
@@ -855,13 +855,13 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
         ; Empty flask slot: show "Slot N - (empty)" instead of "N: 0"
         if (RegExMatch(StrLower(nodePath), "/flaskslots/(\d+)$", &m) && value = 0)
         {
-            nodeId := valueTree.Add("Slot " m[1] " - (empty)", parentId)
-            nodePaths[nodeId] := nodePath
+            nodeId := g_valueTree.Add("Slot " m[1] " - (empty)", parentId)
+            g_nodePaths[nodeId] := nodePath
             counters["nodes"] += 1
             return
         }
-        nodeId := valueTree.Add(name ": " FormatScalar(value, name, nodePath), parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(name ": " FormatScalar(value, name, nodePath), parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
         return
     }
@@ -884,8 +884,8 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             displayLabel := "Slot " slotNum " - " value["itemDetails"]["displayName"]
         else if (value = 0 || !IsObject(value))
             displayLabel := "Slot " slotNum " - (empty)"
-        nodeId := valueTree.Add(displayLabel " {Map, count=" value.Count "}", parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(displayLabel " {Map, count=" value.Count "}", parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
         for key, val in value
         {
@@ -896,7 +896,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
         }
         autoExpand := expandedPaths.Has(nodePath)
         if autoExpand
-            valueTree.Modify(nodeId, "Expand")
+            g_valueTree.Modify(nodeId, "Expand")
         return
     }
 
@@ -915,8 +915,8 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
         label := FormatStatEntry(value["key"], value["value"])
         if (label = "")
             return  ; suppressed — already rendered as part of a multi-stat group by sibling
-        nodeId := valueTree.Add(name ": " label, parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(name ": " label, parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
         return
     }
@@ -941,8 +941,8 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             }
         }
 
-        nodeId := valueTree.Add(name " {Map, count=" value.Count "}", parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(name " {Map, count=" value.Count "}", parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
         if (StrLower(nodePath) = "snapshot/ingamestate")
         {
@@ -988,7 +988,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
 
             autoExpand := (depth <= 1 || expandedPaths.Has(nodePath))
             if autoExpand
-                valueTree.Modify(nodeId, "Expand")
+                g_valueTree.Modify(nodeId, "Expand")
             return
         }
         if (StrLower(nodePath) = "snapshot/ingamestate/areainstance")
@@ -1098,14 +1098,14 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             autoExpand := expandedPaths.Has(nodePath)
 
         if autoExpand
-            valueTree.Modify(nodeId, "Expand")
+            g_valueTree.Modify(nodeId, "Expand")
         return
     }
 
     if (typeName = "Array")
     {
-        nodeId := valueTree.Add(name " [Array, len=" value.Length "]", parentId)
-        nodePaths[nodeId] := nodePath
+        nodeId := g_valueTree.Add(name " [Array, len=" value.Length "]", parentId)
+        g_nodePaths[nodeId] := nodePath
         counters["nodes"] += 1
 
         ; Pre-build sibling context for stats arrays so multi-stat groups can be resolved
@@ -1132,7 +1132,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             global _statsFormatted, _statsRaw, _statsSuppressed, _rawStatIds
             total := value.Length
             debugLabel := name " [Array, len=" total " | " _statsFormatted " fmt, " _statsRaw " raw, " _statsSuppressed " hidden]"
-            valueTree.Modify(nodeId, , debugLabel)
+            g_valueTree.Modify(nodeId, , debugLabel)
             ; Write raw stat IDs to debug file for analysis
             if (Type(_rawStatIds) = "Array" && _rawStatIds.Length > 0)
             {
@@ -1154,12 +1154,12 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             autoExpand := expandedPaths.Has(nodePath)
 
         if autoExpand
-            valueTree.Modify(nodeId, "Expand")
+            g_valueTree.Modify(nodeId, "Expand")
         return
     }
 
-    nodeId := valueTree.Add(name " {" typeName "}", parentId)
-    nodePaths[nodeId] := nodePath
+    nodeId := g_valueTree.Add(name " {" typeName "}", parentId)
+    g_nodePaths[nodeId] := nodePath
     counters["nodes"] += 1
     try
     {
@@ -1173,12 +1173,12 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
     }
     catch
     {
-        valueTree.Add("<not enumerable>", nodeId)
+        g_valueTree.Add("<not enumerable>", nodeId)
         counters["nodes"] += 1
     }
 
     if (depth <= 1 || expandedPaths.Has(nodePath))
-        valueTree.Modify(nodeId, "Expand")
+        g_valueTree.Modify(nodeId, "Expand")
 }
 
 ; Returns true if the node path is relevant to AutoFlask mode, used to skip unrelated tree nodes.
@@ -1229,7 +1229,7 @@ IsAutoFlaskRelevantPath(nodePath)
 ; Renders a modsInfo Map as a specialised tree node showing rarity, mod names, and grouped mod lists.
 RenderModsInfoNode(parentId, name, modsInfo, depth, counters, expandedPaths, nodePath)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     if (counters["nodes"] >= 20000)
         return
@@ -1247,20 +1247,20 @@ RenderModsInfoNode(parentId, name, modsInfo, depth, counters, expandedPaths, nod
     }
 
     title := name " {" sourceType ", " rarity "(" rarityId "), total=" totalMods "}"
-    nodeId := valueTree.Add(title, parentId)
-    nodePaths[nodeId] := nodePath
+    nodeId := g_valueTree.Add(title, parentId)
+    g_nodePaths[nodeId] := nodePath
     counters["nodes"] += 1
 
-    valueTree.Add("sourceType: " sourceType, nodeId)
+    g_valueTree.Add("sourceType: " sourceType, nodeId)
     counters["nodes"] += 1
-    valueTree.Add("rarity: " rarity " (" rarityId ")", nodeId)
+    g_valueTree.Add("rarity: " rarity " (" rarityId ")", nodeId)
     counters["nodes"] += 1
 
     if (modsInfo.Has("allModNames") && Type(modsInfo["allModNames"]) = "Array")
     {
         allNames := modsInfo["allModNames"]
         preview := BuildModNamesPreview(allNames, 6)
-        valueTree.Add("modNames: " preview, nodeId)
+        g_valueTree.Add("modNames: " preview, nodeId)
         counters["nodes"] += 1
     }
 
@@ -1271,25 +1271,25 @@ RenderModsInfoNode(parentId, name, modsInfo, depth, counters, expandedPaths, nod
     AddModGroupNode(nodeId, modsInfo, "Crucible", "crucibleMods", counters, expandedPaths, nodePath)
 
     if (depth <= 1 || expandedPaths.Has(nodePath))
-        valueTree.Modify(nodeId, "Expand")
+        g_valueTree.Modify(nodeId, "Expand")
 }
 
 ; Adds a collapsible group node for one mod category (implicit/explicit/enchant/hellscape/crucible).
 AddModGroupNode(parentId, modsInfo, label, modsKey, counters, expandedPaths, basePath)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     mods := (modsInfo.Has(modsKey) ? modsInfo[modsKey] : 0)
     if !(mods && Type(mods) = "Array")
     {
-        valueTree.Add(label ": 0", parentId)
+        g_valueTree.Add(label ": 0", parentId)
         counters["nodes"] += 1
         return
     }
 
     groupPath := basePath "/" modsKey
-    groupNode := valueTree.Add(label " (" mods.Length ")", parentId)
-    nodePaths[groupNode] := groupPath
+    groupNode := g_valueTree.Add(label " (" mods.Length ")", parentId)
+    g_nodePaths[groupNode] := groupPath
     counters["nodes"] += 1
 
     maxShown := 20
@@ -1301,7 +1301,7 @@ AddModGroupNode(parentId, modsInfo, label, modsKey, counters, expandedPaths, bas
         mod := mods[idx]
         if !(mod && Type(mod) = "Map")
         {
-            valueTree.Add(idx ". <invalid>", groupNode)
+            g_valueTree.Add(idx ". <invalid>", groupNode)
             counters["nodes"] += 1
             continue
         }
@@ -1317,8 +1317,8 @@ AddModGroupNode(parentId, modsInfo, label, modsKey, counters, expandedPaths, bas
         else
             line := idx ". " modName displayName " | v0=" value0 ", v1=" value1
 
-        modNode := valueTree.Add(line, groupNode)
-        nodePaths[modNode] := groupPath "/mod" idx
+        modNode := g_valueTree.Add(line, groupNode)
+        g_nodePaths[modNode] := groupPath "/mod" idx
         counters["nodes"] += 1
 
         if (counters["nodes"] >= 20000)
@@ -1327,12 +1327,12 @@ AddModGroupNode(parentId, modsInfo, label, modsKey, counters, expandedPaths, bas
 
     if (mods.Length > shown && counters["nodes"] < 20000)
     {
-        valueTree.Add("... +" (mods.Length - shown) " more", groupNode)
+        g_valueTree.Add("... +" (mods.Length - shown) " more", groupNode)
         counters["nodes"] += 1
     }
 
     if (expandedPaths.Has(groupPath) || mods.Length <= 6)
-        valueTree.Modify(groupNode, "Expand")
+        g_valueTree.Modify(groupNode, "Expand")
 }
 
 ; Builds a comma-separated preview string of the first maxNames mod names from the names array.
@@ -1361,7 +1361,7 @@ BuildModNamesPreview(names, maxNames := 6)
 ; Renders a player state machine component as a tree node listing all named states and their values.
 RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expandedPaths, nodePath)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     if (counters["nodes"] >= 20000)
         return
@@ -1370,19 +1370,19 @@ RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expa
     score := stateComp.Has("score") ? stateComp["score"] : ""
     title := name " {states=" stateCount ", named=" resolvedNamesCount (score = "" ? "" : ", score=" score) "}"
 
-    nodeId := valueTree.Add(title, parentId)
-    nodePaths[nodeId] := nodePath
+    nodeId := g_valueTree.Add(title, parentId)
+    g_nodePaths[nodeId] := nodePath
     counters["nodes"] += 1
 
     if (stateComp.Has("address"))
     {
-        valueTree.Add("address: " FormatScalar(stateComp["address"], "address", nodePath "/address"), nodeId)
+        g_valueTree.Add("address: " FormatScalar(stateComp["address"], "address", nodePath "/address"), nodeId)
         counters["nodes"] += 1
     }
 
     if (stateComp.Has("statesPtr"))
     {
-        valueTree.Add("statesPtr: " FormatScalar(stateComp["statesPtr"], "statesPtr", nodePath "/statesPtr"), nodeId)
+        g_valueTree.Add("statesPtr: " FormatScalar(stateComp["statesPtr"], "statesPtr", nodePath "/statesPtr"), nodeId)
         counters["nodes"] += 1
     }
 
@@ -1390,8 +1390,8 @@ RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expa
     if (states && Type(states) = "Array")
     {
         statesPath := nodePath "/states"
-        statesNode := valueTree.Add("States (" states.Length ")", nodeId)
-        nodePaths[statesNode] := statesPath
+        statesNode := g_valueTree.Add("States (" states.Length ")", nodeId)
+        g_nodePaths[statesNode] := statesPath
         counters["nodes"] += 1
 
         shown := Min(states.Length, 40)
@@ -1402,7 +1402,7 @@ RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expa
             entry := states[idx]
             if !(entry && Type(entry) = "Map")
             {
-                valueTree.Add(idx ". <invalid>", statesNode)
+                g_valueTree.Add(idx ". <invalid>", statesNode)
                 counters["nodes"] += 1
                 continue
             }
@@ -1414,7 +1414,7 @@ RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expa
             else
                 line := idx ". " stateName " = " stateValue
 
-            valueTree.Add(line, statesNode)
+            g_valueTree.Add(line, statesNode)
             counters["nodes"] += 1
 
             if (counters["nodes"] >= 20000)
@@ -1423,14 +1423,14 @@ RenderStateMachineComponentNode(parentId, name, stateComp, depth, counters, expa
 
         if (states.Length > shown && counters["nodes"] < 20000)
         {
-            valueTree.Add("... +" (states.Length - shown) " more", statesNode)
+            g_valueTree.Add("... +" (states.Length - shown) " more", statesNode)
             counters["nodes"] += 1
         }
 
         if (expandedPaths.Has(statesPath) || states.Length <= 12)
-            valueTree.Modify(statesNode, "Expand")
+            g_valueTree.Modify(statesNode, "Expand")
     }
 
     if (depth <= 1 || expandedPaths.Has(nodePath))
-        valueTree.Modify(nodeId, "Expand")
+        g_valueTree.Modify(nodeId, "Expand")
 }

@@ -26,3 +26,10 @@ gamehelper_config.ini
 NEXT_STEPS.md
 QUICKSTART.md
 STAT_EXTRACTION_README.md
+
+# Built binaries
+tools/poe_data_tools.exe
+
+# Raw extraction output (regenerated from game files)
+data/raw_csv/
+data/raw_extracted/

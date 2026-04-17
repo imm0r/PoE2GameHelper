@@ -57,7 +57,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; Sleeping entities carry stale world positions, but are scanned with a small limit
         ; so the Entities tab can display important types (Boss, NPC, Waypoint, AreaTransition, Checkpoint).
         this.RadarAwakeEntityLimit := 40
-        this.RadarSleepingEntityLimit := 24
+        this.RadarSleepingEntityLimit := 8
 
         ; Stale-entity cleanup (port of upstream commit 75d48872).
         ; Tracks entities seen as dead/invalid for consecutive ticks.
@@ -94,15 +94,37 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._radarUiCache := 0
         this._radarUiCacheTick := 0
 
+        ; Panel visibility: visibility-differential approach.
+        ; _heapUiElems stores [{off, ptr}, ...] for all valid heap UiElements in the struct.
+        ; _visBaseline stores Map(structOffset → isVisible) taken at discovery time.
+        ; Real-time: compare current visibility to baseline; new visible = panel open.
+        this._radarPanelVisCache := 0
+        this._radarPanelVisCacheTick := 0
+        this._radarPanelDiscoveryDone := false
+        this._radarPanelDiscoveryResult := 0
+        this._heapUiElems := []
+        this._visBaseline := Map()
+        this._visBaselineTaken := false
+        this._diffSnapshot := 0
+        this._diffSnapshotTaken := false
+        this._lastActiveGameUiPtr := 0
+        this._structBaselineRaw := 0
+        this._baselineDelayTick := 0
+
         ; Cached InGameState address for radar (re-resolved every 800ms instead of every 100ms).
         this._radarInGameStateCache := 0
         this._radarInGameStateTick := 0
+        this._radarCurrentStateName := "GameNotLoaded"
 
         ; Cached terrain walkability data — re-read only when area hash changes.
         this._radarTerrainCache     := 0
         this._radarTerrainAreaHash  := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
         this._radarTerrainRetryTick := 0            ; tick of last failed-read retry attempt
         this._terrainLastError      := ""           ; last ReadTerrainData failure reason
+
+        ; World area data cache (town/hideout flags) — re-read on zone change.
+        this._radarWorldAreaCache   := 0
+        this._radarWorldAreaHash    := 0xFFFFFFFF
 
         ; Persistent entity cache (mirrors C# AreaInstance.AwakeEntities ConcurrentDictionary).
         ; entityId → sampleEntry Map (same format as CollectEntityMapCandidates output).
@@ -120,6 +142,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._zoneScanTimingMs    := 0       ; how long the last deep scan took
         this._zoneScanScheduledAt := 0       ; tick when deep scan should run
         this._zoneScanRetries     := 0       ; retry count if deep scan finds 0 results
+        this._tgtScanInProgress   := false   ; true while incremental tile scan is running
+
+        ; BFS throttle: reuse tree scan results for 200ms to reduce per-tick RPM calls.
+        this._radarLastBfsTick           := 0
+        this._radarLastCurrentEntities   := 0
+        this._radarLastFullAwakeRawPtrs  := 0
+
+        ; Round-robin cursor for time-budgeted cheap entity updates.
+        this._cheapUpdateOffset := 0
+
+        ; Player vitals cache (refreshed every 200ms in radar snapshot)
+        this._radarPlayerVitalsCache := 0
+        this._radarPlayerVitalsTick  := 0
 
         ; Cached StaticPtr for the Charges component type (populated on first named-lookup hit)
         this._chargesStaticPtr := 0
@@ -1175,23 +1210,78 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 largeMapData := this.ReadMapUiElementData(largeMapPtr)
         }
 
-        ; ChatParentUiElement — IsChatActive: backgroundColor.W * 255 >= 0x8C
-        chatBgColor   := 0
-        chatAlpha     := 0
-        isChatActive  := false
+        ; ChatParentUiElement — IsChatActive detection.
+        ; Strategy: check background alpha on chatParent and its first children (float4 .W and uint approach).
+        ; Also check visibility flags as a secondary signal.
+        chatAlphaFloat := 0.0
+        chatAlpha      := 0
+        isChatActive   := false
+        chatDebugInfo  := ""
         if this.IsProbablyValidPointer(chatParentPtr)
         {
-            chatBgColor  := this.Mem.ReadUInt(chatParentPtr + PoE2Offsets.UiElementBase["BackgroundColor"])
-            chatAlpha    := (chatBgColor >> 24) & 0xFF
-            isChatActive := chatAlpha >= 0x8C
+            bgColorOffset := PoE2Offsets.UiElementBase["BackgroundColor"]
+            childrenFirstOffset := PoE2Offsets.UiElementBase["ChildrenFirst"]
+            flagsOffset := PoE2Offsets.UiElementBase["Flags"]
+
+            ; Read raw values at BackgroundColor offset from parent for diagnostics
+            parentFloatW := this.Mem.ReadFloat(chatParentPtr + bgColorOffset + 12)
+            parentUint   := this.Mem.ReadUInt(chatParentPtr + bgColorOffset)
+            parentFlags  := this.Mem.ReadUInt(chatParentPtr + flagsOffset)
+            parentVisible := (parentFlags >> 11) & 1
+
+            bestAlpha := parentFloatW
+            bestSource := "parent-float"
+            chatDebugInfo := "pF=" Round(parentFloatW, 3) " pU=" Format("0x{:08X}", parentUint) " pVis=" parentVisible
+
+            ; Check children
+            childrenFirst := this.Mem.ReadPtr(chatParentPtr + childrenFirstOffset)
+            childrenLast  := this.Mem.ReadPtr(chatParentPtr + childrenFirstOffset + A_PtrSize)
+            childCount := 0
+            if (this.IsProbablyValidPointer(childrenFirst) && this.IsProbablyValidPointer(childrenLast) && childrenLast > childrenFirst)
+                childCount := Min(Floor((childrenLast - childrenFirst) / A_PtrSize), 8)
+
+            chatDebugInfo .= " ch=" childCount
+            idx := 0
+            while (idx < childCount && idx < 5)
+            {
+                childPtr := this.Mem.ReadPtr(childrenFirst + idx * A_PtrSize)
+                if this.IsProbablyValidPointer(childPtr)
+                {
+                    cFloatW := this.Mem.ReadFloat(childPtr + bgColorOffset + 12)
+                    cUint   := this.Mem.ReadUInt(childPtr + bgColorOffset)
+                    cFlags  := this.Mem.ReadUInt(childPtr + flagsOffset)
+                    cVis    := (cFlags >> 11) & 1
+                    chatDebugInfo .= " c" idx "F=" Round(cFloatW, 3) "/U=" Format("0x{:X}", cUint) "/V=" cVis
+
+                    if (cFloatW > bestAlpha)
+                    {
+                        bestAlpha := cFloatW
+                        bestSource := "child" idx "-float"
+                    }
+                    cUintAlpha := (cUint >> 24) & 0xFF
+                    if (cUintAlpha / 255.0 > bestAlpha)
+                    {
+                        bestAlpha := cUintAlpha / 255.0
+                        bestSource := "child" idx "-uint"
+                    }
+                }
+                idx += 1
+            }
+
+            chatAlphaFloat := bestAlpha
+            chatAlpha      := Round(chatAlphaFloat * 255)
+            isChatActive   := chatAlpha >= 0x8C
         }
 
         return Map(
             "chatParentPtr",              chatParentPtr,
-            "chatBgColor",                chatBgColor,
+            "chatAlphaFloat",             chatAlphaFloat,
             "chatAlpha",                  chatAlpha,
             "isChatActive",               isChatActive,
+            "chatDebugInfo",              chatDebugInfo,
             "passiveSkillTreePanel",      passiveTreePanel,
+            "passiveTreeVisible",         (this.IsProbablyValidPointer(passiveTreePanel)
+                                           && (this.Mem.ReadUInt(passiveTreePanel + PoE2Offsets.UiElementBase["Flags"]) >> 11) & 1) ? true : false,
             "mapParentPtr",               mapParentPtr,
             "controllerModeMapParentPtr", ctrlMapParentPtr,
             "activeMapParentPtr",         activeMapParentPtr,
@@ -1200,6 +1290,438 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "miniMapData",                miniMapData,
             "largeMapData",               largeMapData
         )
+    }
+
+    ; ── Panel discovery ──────────────────────────────────────────────────
+    ; Scans the ImportantUiElements struct memory (0x400..0xC00) at 8-byte intervals.
+    ; Scans the ImportantUiElements struct for heap UiElement pointers and records
+    ; their initial IS_VISIBLE state as a baseline. The real-time check
+    ; (ReadAllPanelVisibility) compares current visibility to this baseline —
+    ; any element that was invisible at baseline but is now visible = panel open.
+    ;
+    ; This is an expensive one-time operation. Call once at startup or on zone change,
+    ; then use ReadAllPanelVisibility() for cheap per-tick checks.
+    DiscoverPanelOffsets(gameUiPtr)
+    {
+        result := Map()
+
+        if !this.IsProbablyValidPointer(gameUiPtr)
+            return result
+
+        parentPtrOff := PoE2Offsets.UiElementBase["ParentPtr"]
+
+        ; ── Phase 1: scan struct for heap UiElement pointers ──
+        scanStart := 0x400
+        scanEnd := 0xC00
+        scanSize := scanEnd - scanStart
+        structBuf := this.Mem.ReadBytes(gameUiPtr + scanStart, scanSize)
+        if !structBuf
+            return result
+
+        scannedPtrCount := 0
+        heapPtrCount := 0
+        uiElemCount := 0
+
+        heapElements := []
+        off := 0
+        while (off < scanSize)
+        {
+            candidatePtr := NumGet(structBuf.Ptr, off, "Int64")
+            structOffset := scanStart + off
+            off += 8
+            scannedPtrCount += 1
+
+            if !this.IsProbablyValidPointer(candidatePtr)
+                continue
+            if (candidatePtr >= 0x7FF000000000)
+                continue
+
+            heapPtrCount += 1
+            parentPtr := this.Mem.ReadPtr(candidatePtr + parentPtrOff)
+            if !this.IsProbablyValidPointer(parentPtr)
+                continue
+
+            uiElemCount += 1
+            heapElements.Push(Map("off", structOffset, "ptr", candidatePtr))
+        }
+
+        ; ── Phase 2: visibility baseline scan ──
+        flagsOffset := PoE2Offsets.UiElementBase["Flags"]
+        knownOffsets := Map(0x5C0, "ChatParent", 0x6B0, "PassiveTree", 0x748, "MapParent", 0xAA8, "CtrlMapParent")
+        visBaseline := Map()
+        visibleCount := 0
+        invisibleCount := 0
+        diagSamples := []
+
+        for _, elem in heapElements
+        {
+            elemPtr := elem["ptr"]
+            structOffset := elem["off"]
+
+            flags := this.Mem.ReadUInt(elemPtr + flagsOffset)
+            isVis := ((flags >> 11) & 1) ? true : false
+            visBaseline[structOffset] := {ptr: elemPtr, vis: isVis, flags: flags}
+
+            if isVis
+                visibleCount += 1
+            else
+                invisibleCount += 1
+
+            if (diagSamples.Length < 60)
+            {
+                label := knownOffsets.Has(structOffset) ? knownOffsets[structOffset] : ""
+                diagSamples.Push(Map(
+                    "idx", Format("0x{:X}", structOffset),
+                    "ptr", Format("0x{:X}", elemPtr),
+                    "stringId", label,
+                    "rawHex", Format("0x{:08X}", flags),
+                    "childInfo", isVis ? "👁 VISIBLE" : "· hidden"
+                ))
+            }
+        }
+
+        ; Store for real-time differential checks
+        this._heapUiElems := heapElements
+        this._visBaseline := visBaseline
+        this._visBaselineTaken := true
+
+        result["_totalChildren"] := scannedPtrCount
+        result["_heapPtrCount"] := heapPtrCount
+        result["_uiElemCount"] := uiElemCount
+        result["_diagSamples"] := diagSamples
+        result["_visibleCount"] := visibleCount
+        result["_invisibleCount"] := invisibleCount
+        return result
+    }
+
+    ; Helper: try both UTF-16 and UTF-8 string readers at an address
+    _TryReadStringId(addr)
+    {
+        try
+        {
+            s := this.ReadStdWStringAt(addr, 128)
+            if (s != "")
+                return s
+        }
+        try
+        {
+            s := this.ReadStdStringAt(addr, 128)
+            if (s != "")
+                return s
+        }
+        return ""
+    }
+
+    ; Helper: hex dump a Buffer (or return "" if null)
+    _HexDump(buf, maxBytes)
+    {
+        if !buf
+            return ""
+        hexStr := ""
+        i := 0
+        while (i < maxBytes && i < buf.Size)
+        {
+            hexStr .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
+            i += 1
+        }
+        return hexStr
+    }
+
+    ; Refreshes the visibility baseline using the already-discovered heap UiElements.
+    ; Call this when you KNOW all panels are closed (e.g. after zone load or user action).
+    ; Much cheaper than full DiscoverPanelOffsets — no struct scan, just re-reads flags.
+    RefreshVisibilityBaseline()
+    {
+        if (this._heapUiElems.Length = 0)
+            return false
+
+        flagsOffset := PoE2Offsets.UiElementBase["Flags"]
+        visBaseline := Map()
+
+        for _, elem in this._heapUiElems
+        {
+            elemPtr := elem["ptr"]
+            structOff := elem["off"]
+            flags := this.Mem.ReadUInt(elemPtr + flagsOffset)
+            isVis := ((flags >> 11) & 1) ? true : false
+            visBaseline[structOff] := {ptr: elemPtr, vis: isVis, flags: flags}
+        }
+
+        this._visBaseline := visBaseline
+        this._visBaselineTaken := true
+
+        ; Also snapshot the raw struct bytes for pointer-level change detection
+        if this.IsProbablyValidPointer(this._lastActiveGameUiPtr)
+        {
+            structBuf := this.Mem.ReadBytes(this._lastActiveGameUiPtr + 0x400, 0x800)
+            if structBuf
+            {
+                rawCopy := Buffer(0x800)
+                DllCall("RtlMoveMemory", "Ptr", rawCopy.Ptr, "Ptr", structBuf.Ptr, "UInt", 0x800)
+                this._structBaselineRaw := rawCopy
+            }
+        }
+        return true
+    }
+
+    ; Reads visibility (Flags bit 11) for all heap UiElements discovered in Phase 1.
+    ; Uses visibility-differential: compares current state to baseline.
+    ; Detects BOTH newly visible AND newly hidden elements as panel state changes.
+    ; Also performs raw struct pointer-level change detection (1 RPM call).
+    ; Returns: Map with "anyPanelOpen" → bool, "newlyVisible" → count,
+    ;          "newlyHidden" → count, "totalChanged" → count,
+    ;          "currentVisible" → count, "baselineVisible" → count
+    ReadAllPanelVisibility(gameUiPtr)
+    {
+        vis := Map()
+        vis["anyPanelOpen"] := false
+        vis["newlyVisible"] := 0
+        vis["newlyHidden"] := 0
+        vis["totalChanged"] := 0
+        vis["currentVisible"] := 0
+        vis["baselineVisible"] := 0
+        vis["ptrChanges"] := 0
+        vis["_changedOffsets"] := []
+
+        if (!this._visBaselineTaken || this._heapUiElems.Length = 0)
+            return vis
+
+        flagsOffset := PoE2Offsets.UiElementBase["Flags"]
+        ; Skip containers that always have visibility and fluctuate for other reasons
+        knownAlwaysVisible := Map(0x5C0, true, 0x6B0, true, 0x748, true, 0xAA8, true)
+        newlyVisCount := 0
+        newlyHidCount := 0
+        currentVisCount := 0
+        baselineVisCount := 0
+
+        for _, elem in this._heapUiElems
+        {
+            structOff := elem["off"]
+            elemPtr := elem["ptr"]
+
+            flags := this.Mem.ReadUInt(elemPtr + flagsOffset)
+            isVisNow := ((flags >> 11) & 1) ? true : false
+
+            if isVisNow
+                currentVisCount += 1
+
+            if this._visBaseline.Has(structOff)
+            {
+                wasVis := this._visBaseline[structOff].vis
+                if wasVis
+                    baselineVisCount += 1
+
+                if (knownAlwaysVisible.Has(structOff))
+                    continue
+
+                ; Newly visible = was hidden → now visible (panel opened)
+                if (isVisNow && !wasVis)
+                {
+                    newlyVisCount += 1
+                    if (vis["_changedOffsets"].Length < 20)
+                        vis["_changedOffsets"].Push(Format("+0x{:X}", structOff))
+                }
+                ; Newly hidden = was visible → now hidden (panel state change)
+                else if (!isVisNow && wasVis)
+                {
+                    newlyHidCount += 1
+                    if (vis["_changedOffsets"].Length < 20)
+                        vis["_changedOffsets"].Push(Format("-0x{:X}", structOff))
+                }
+            }
+        }
+
+        ; ── Raw struct pointer-level change detection (1 RPM call for 2KB) ──
+        ptrsAppeared := 0
+        ptrsDisappeared := 0
+        if (this.HasOwnProp("_structBaselineRaw") && IsObject(this._structBaselineRaw)
+            && this.IsProbablyValidPointer(gameUiPtr))
+        {
+            newBuf := this.Mem.ReadBytes(gameUiPtr + 0x400, 0x800)
+            if newBuf
+            {
+                off := 0
+                while (off < 0x800)
+                {
+                    oldVal := NumGet(this._structBaselineRaw.Ptr, off, "Int64")
+                    newVal := NumGet(newBuf.Ptr, off, "Int64")
+                    structOff := 0x400 + off
+                    if (oldVal != newVal && !knownAlwaysVisible.Has(structOff))
+                    {
+                        oldIsPtr := (oldVal > 0x10000 && oldVal < 0x7FF000000000)
+                        newIsPtr := (newVal > 0x10000 && newVal < 0x7FF000000000)
+                        oldIsNull := (oldVal = 0 || !oldIsPtr)
+                        newIsNull := (newVal = 0 || !newIsPtr)
+
+                        if (oldIsNull && newIsPtr)
+                            ptrsAppeared += 1
+                        else if (oldIsPtr && newIsNull)
+                            ptrsDisappeared += 1
+                    }
+                    off += 8
+                }
+            }
+        }
+
+        ; Panel is open = new elements became visible OR new pointers appeared
+        ; (closing a panel reverts these — newlyHidden/ptrsDisappeared don't count as "open")
+        vis["anyPanelOpen"] := (newlyVisCount > 0 || ptrsAppeared > 0)
+        vis["newlyVisible"] := newlyVisCount
+        vis["newlyHidden"] := newlyHidCount
+        vis["totalChanged"] := newlyVisCount + newlyHidCount
+        vis["ptrsAppeared"] := ptrsAppeared
+        vis["ptrsDisappeared"] := ptrsDisappeared
+        vis["currentVisible"] := currentVisCount
+        vis["baselineVisible"] := baselineVisCount
+        return vis
+    }
+
+    ; Returns true if ANY panel is detected as open (newly visible vs baseline).
+    IsAnyPanelOpen(panelVisMap)
+    {
+        if !IsObject(panelVisMap)
+            return false
+        return panelVisMap.Has("anyPanelOpen") ? panelVisMap["anyPanelOpen"] : false
+    }
+
+    ; ── Struct Diff Diagnostic ──────────────────────────────────────────
+    ; Snapshots raw struct bytes (0x400-0xC00) and per-element fields.
+    ; User takes snapshot with panels closed, then compares with panel open.
+    TakeStructDiffSnapshot(gameUiPtr)
+    {
+        if !this.IsProbablyValidPointer(gameUiPtr)
+            return false
+
+        ; Raw struct bytes (2KB, single RPM call)
+        scanStart := 0x400
+        scanSize := 0x800
+        structBuf := this.Mem.ReadBytes(gameUiPtr + scanStart, scanSize)
+        if !structBuf
+            return false
+
+        rawCopy := Buffer(scanSize)
+        DllCall("RtlMoveMemory", "Ptr", rawCopy.Ptr, "Ptr", structBuf.Ptr, "UInt", scanSize)
+
+        snap := Map()
+        snap["rawBuf"] := rawCopy
+        snap["scanStart"] := scanStart
+        snap["scanSize"] := scanSize
+
+        ; Per-element key fields
+        elemSnaps := Map()
+        for _, elem in this._heapUiElems
+        {
+            off := elem["off"]
+            ptr := elem["ptr"]
+
+            flags := this.Mem.ReadUInt(ptr + 0x180)
+            sizeX := this.Mem.ReadFloat(ptr + 0x288)
+            sizeY := this.Mem.ReadFloat(ptr + 0x28C)
+            childFirst := this.Mem.ReadPtr(ptr + 0x010)
+            childEnd := this.Mem.ReadPtr(ptr + 0x018)
+            childCount := (childFirst && childEnd && childEnd > childFirst)
+                ? ((childEnd - childFirst) // 8) : 0
+
+            elemSnaps[off] := Map(
+                "flags", flags,
+                "sizeX", sizeX, "sizeY", sizeY,
+                "childCount", childCount,
+                "ptr", ptr
+            )
+        }
+        snap["elemSnaps"] := elemSnaps
+
+        this._diffSnapshot := snap
+        this._diffSnapshotTaken := true
+        return true
+    }
+
+    ; Compares current struct + element fields against snapshot.
+    ; Returns Map with structChanges[] and elemChanges[].
+    CompareStructDiffSnapshot(gameUiPtr)
+    {
+        result := Map()
+        result["structChanges"] := []
+        result["elemChanges"] := []
+        result["success"] := false
+
+        if (!this._diffSnapshotTaken || !IsObject(this._diffSnapshot))
+            return result
+        if !this.IsProbablyValidPointer(gameUiPtr)
+            return result
+
+        snap := this._diffSnapshot
+
+        ; ── Raw struct byte-by-byte comparison ──
+        scanStart := snap["scanStart"]
+        scanSize := snap["scanSize"]
+        newBuf := this.Mem.ReadBytes(gameUiPtr + scanStart, scanSize)
+        if !newBuf
+            return result
+
+        oldBuf := snap["rawBuf"]
+        structChanges := []
+        i := 0
+        while (i < scanSize)
+        {
+            oldByte := NumGet(oldBuf.Ptr, i, "UChar")
+            newByte := NumGet(newBuf.Ptr, i, "UChar")
+            if (oldByte != newByte && structChanges.Length < 100)
+            {
+                structChanges.Push(Map(
+                    "off", Format("0x{:03X}", scanStart + i),
+                    "old", Format("0x{:02X}", oldByte),
+                    "new", Format("0x{:02X}", newByte)
+                ))
+            }
+            i += 1
+        }
+        result["structChanges"] := structChanges
+
+        ; ── Per-element field comparison ──
+        oldElems := snap["elemSnaps"]
+        elemChanges := []
+        knownNames := Map(0x5C0, "ChatParent", 0x6B0, "PassiveTree",
+            0x748, "MapParent", 0xAA8, "CtrlMapParent")
+
+        for _, elem in this._heapUiElems
+        {
+            off := elem["off"]
+            ptr := elem["ptr"]
+            if !oldElems.Has(off)
+                continue
+
+            old := oldElems[off]
+            flags := this.Mem.ReadUInt(ptr + 0x180)
+            sizeX := this.Mem.ReadFloat(ptr + 0x288)
+            sizeY := this.Mem.ReadFloat(ptr + 0x28C)
+            childFirst := this.Mem.ReadPtr(ptr + 0x010)
+            childEnd := this.Mem.ReadPtr(ptr + 0x018)
+            childCount := (childFirst && childEnd && childEnd > childFirst)
+                ? ((childEnd - childFirst) // 8) : 0
+
+            changes := []
+            if (flags != old["flags"])
+                changes.Push("flags:" Format("0x{:08X}", old["flags"]) "→" Format("0x{:08X}", flags))
+            if (Round(sizeX, 0) != Round(old["sizeX"], 0) || Round(sizeY, 0) != Round(old["sizeY"], 0))
+                changes.Push("size:" Round(old["sizeX"], 0) "×" Round(old["sizeY"], 0) "→" Round(sizeX, 0) "×" Round(sizeY, 0))
+            if (childCount != old["childCount"])
+                changes.Push("children:" old["childCount"] "→" childCount)
+
+            if (changes.Length > 0)
+            {
+                label := knownNames.Has(off) ? knownNames[off] : ""
+                elemChanges.Push(Map(
+                    "off", Format("0x{:X}", off),
+                    "ptr", Format("0x{:X}", ptr),
+                    "label", label,
+                    "changes", changes
+                ))
+            }
+        }
+        result["elemChanges"] := elemChanges
+        result["success"] := true
+        return result
     }
 
     ; Reads position, size, shift and zoom from a MapUiElement pointer.
@@ -1889,10 +2411,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
                     currentStateAddress := 0
             }
 
+            currentStateName := "GameNotLoaded"
+            if (currentStateAddress && statesByAddress.Has(currentStateAddress))
+                currentStateName := statesByAddress[currentStateAddress]
+
             resolved := this.ResolveInGameStateAddress(statesByIndex, currentStateAddress)
             if !resolved
                 return 0
             this._radarInGameStateCache := resolved
+            this._radarCurrentStateName := currentStateName
             this._radarInGameStateTick := nowTick
         }
         t1 := A_TickCount  ; after state resolution
@@ -1919,11 +2446,39 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 this._radarTerrainAreaHash := currentAreaHash
         }
 
+        ; World area data (town/hideout flags) — re-read only on zone change (area hash).
+        if (currentAreaHash != this._radarWorldAreaHash)
+        {
+            this._radarWorldAreaCache := 0
+            try {
+                worldData := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["WorldData"])
+                if this.IsProbablyValidPointer(worldData)
+                {
+                    wdp := this.Mem.ReadPtr(worldData + PoE2Offsets.WorldData["WorldAreaDetailsPtr"])
+                    if this.IsProbablyValidPointer(wdp)
+                    {
+                        rowPtr := this.Mem.ReadPtr(wdp + PoE2Offsets.WorldData["WorldAreaDetailsRowPtr"])
+                        this._radarWorldAreaCache := this.ReadWorldAreaDat(rowPtr)
+                    }
+                }
+            }
+            this._radarWorldAreaHash := currentAreaHash
+        }
+
         ; Player world position
         playerInfoPtr     := areaInstanceData + PoE2Offsets.AreaInstance["PlayerInfo"]
         localPlayerRawPtr := this.Mem.ReadPtr(playerInfoPtr + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
         localPlayerPtr    := this.ResolveEntityPointer(localPlayerRawPtr)
         playerRenderComponent := this.ReadPlayerRenderComponent(localPlayerPtr)
+
+        ; Player vitals — cached, re-read every 200ms (cheap: ~3 RPM)
+        if (!this._radarPlayerVitalsCache || (nowTick - this._radarPlayerVitalsTick) > 200)
+        {
+            try this._radarPlayerVitalsCache := this.ReadPlayerVitals(localPlayerPtr)
+            catch
+                this._radarPlayerVitalsCache := 0
+            this._radarPlayerVitalsTick := nowTick
+        }
         t2 := A_TickCount  ; after player read
 
         ; Map UI element data — re-read only every 400ms to avoid expensive UI tree walk at 100ms.
@@ -1943,6 +2498,43 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarUiCache := importantUiElements
             this._radarUiCacheTick := nowTick
         }
+
+        ; Panel visibility — re-read every 200ms (cheap: 1 ReadPtr + 1 ReadUInt per panel).
+        ; Also triggers one-time discovery if panel offsets haven't been discovered yet.
+        if (!this._radarPanelVisCache || (nowTick - this._radarPanelVisCacheTick) > 200)
+        {
+            if !IsSet(uiRootStructPtr)
+                uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
+            if this.IsProbablyValidPointer(uiRootStructPtr)
+            {
+                if !IsSet(activeGameUiPtr)
+                {
+                    gameUiPtr           := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
+                    gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
+                    activeGameUiPtr     := (!gameUiPtr && gameUiControllerPtr) ? gameUiControllerPtr : gameUiPtr
+                }
+                this._lastActiveGameUiPtr := activeGameUiPtr
+                ; One-time discovery (or re-discovery after zone change)
+                if (!this._radarPanelDiscoveryDone)
+                {
+                    this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
+                    this._radarPanelDiscoveryDone := true
+                    ; After zone change, schedule a clean baseline 3s later
+                    ; (all panels are guaranteed closed right after zone load)
+                    if (this._baselineDelayTick > 0)
+                        this._baselineDelayTick := A_TickCount + 3000
+                }
+                ; Delayed baseline refresh: re-read flags 3s after zone change
+                if (this._baselineDelayTick > 0 && nowTick >= this._baselineDelayTick)
+                {
+                    this.RefreshVisibilityBaseline()
+                    this._baselineDelayTick := 0
+                }
+                this._radarPanelVisCache := this.ReadAllPanelVisibility(activeGameUiPtr)
+            }
+            this._radarPanelVisCacheTick := nowTick
+        }
+
         t3 := A_TickCount  ; after UI cache
 
         ; ── Persistent entity cache (mirrors C# AreaInstance.UpdateEntities) ──────────────
@@ -1967,135 +2559,236 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._zoneScanRetries := 0
             this._zoneScanAccumulated := Map()
             this._zoneScanTimingMs := 0
+            this._tgtScanInProgress := false
+            ; Force fresh BFS on zone change
+            this._radarLastBfsTick := 0
+            this._radarLastCurrentEntities := 0
+            this._radarLastFullAwakeRawPtrs := 0
+            this._cheapUpdateOffset := 0
+            ; Re-discover panels on zone change (runtime pointers are stale)
+            this._radarPanelDiscoveryDone := false
+            PoE2Offsets.DiscoveredPanelOffsets := Map()
+            this._radarPanelDiscoveryResult := 0
+            this._heapUiElems := []
+            this._visBaseline := Map()
+            this._visBaselineTaken := false
+            this._diffSnapshot := 0
+            this._diffSnapshotTaken := false
+            this._structBaselineRaw := 0
+            this._baselineDelayTick := A_TickCount + 3000
+            ; Clear component name cache (lives on PoE2ComponentDecoders via inheritance)
+            if this.HasOwnProp("_compNameCache")
+                this._compNameCache := Map()
         }
 
-        ; Zone scanner: read TgtTilesLocations from terrain metadata (covers entire zone)
+        ; Zone scanner: incremental TGT tile scan (processes batch per tick instead of all-at-once)
         if (this._zoneScanEnabled && !this._zoneScanDone
             && this._zoneScanScheduledAt > 0 && A_TickCount >= this._zoneScanScheduledAt)
         {
             scanStart := A_TickCount
-            try tgtResults := this.ReadTgtTilesLocations(areaInstanceData)
-            catch
-                tgtResults := Map()
-            this._zoneScanTimingMs := A_TickCount - scanStart
 
-            if (tgtResults.Count > 0 || this._zoneScanRetries >= 3)
+            if (!this._tgtScanInProgress)
             {
-                ; Merge TGT tile results into accumulator
-                for key, ent in tgtResults
+                try this._tgtScanInProgress := this._SetupTgtScan(areaInstanceData)
+                catch
+                    this._tgtScanInProgress := false
+
+                if (!this._tgtScanInProgress)
                 {
-                    if !this._zoneScanAccumulated.Has(key)
-                        this._zoneScanAccumulated[key] := ent
+                    this._zoneScanRetries += 1
+                    if (this._zoneScanRetries >= 3)
+                    {
+                        this._zoneScanDone := true
+                        this._zoneScanScheduledAt := 0
+                    }
+                    else
+                        this._zoneScanScheduledAt := A_TickCount + 2000
                 }
-                this._zoneScanAreaHash := currentAreaHash
-                this._zoneScanDone := true
-                this._zoneScanScheduledAt := 0
             }
-            else
+
+            if (this._tgtScanInProgress)
             {
-                ; Retry after 2 seconds
-                this._zoneScanRetries += 1
-                this._zoneScanScheduledAt := A_TickCount + 2000
+                try batchDone := this._ProcessTgtScanBatch(2000)
+                catch
+                    batchDone := true
+                this._zoneScanTimingMs += A_TickCount - scanStart
+
+                if (batchDone)
+                {
+                    this._tgtScanInProgress := false
+                    tgtResults := this._tgtScanPartialResults
+                    if (tgtResults.Count > 0)
+                    {
+                        for key, ent in tgtResults
+                        {
+                            if !this._zoneScanAccumulated.Has(key)
+                                this._zoneScanAccumulated[key] := ent
+                        }
+                    }
+                    this._zoneScanAreaHash := currentAreaHash
+                    this._zoneScanDone := true
+                    this._zoneScanScheduledAt := 0
+                }
             }
         }
 
         ; Step 1: Full tree scan — get all entityId → rawPtr
-        currentEntities := 0
-        try currentEntities := this.ScanEntityMapIdsAndPtrs(awakeMapAddress)
-        catch
-            currentEntities := Map()
-        if !currentEntities
-            currentEntities := Map()
+        ; Throttle BFS to every 200ms; reuse cached results on intermediate ticks.
+        bfsInterval := 200
+        doFullBfs := !this._radarLastBfsTick
+            || (nowTick - this._radarLastBfsTick) >= bfsInterval
+            || !this._radarLastCurrentEntities
+        if (doFullBfs)
+        {
+            currentEntities := 0
+            try currentEntities := this.ScanEntityMapIdsAndPtrs(awakeMapAddress)
+            catch
+                currentEntities := Map()
+            if !currentEntities
+                currentEntities := Map()
+
+            ; Build rawPtr set for the stale filter
+            fullAwakeRawPtrs := Map()
+            for _, rawPtr in currentEntities
+            {
+                if (rawPtr > 0)
+                    fullAwakeRawPtrs[rawPtr] := true
+            }
+
+            this._radarLastCurrentEntities := currentEntities
+            this._radarLastFullAwakeRawPtrs := fullAwakeRawPtrs
+            this._radarLastBfsTick := nowTick
+        }
+        else
+        {
+            currentEntities := this._radarLastCurrentEntities
+            fullAwakeRawPtrs := this._radarLastFullAwakeRawPtrs
+        }
         mapSize := currentEntities.Count
 
-        ; Also build rawPtr set for the stale filter (same as old fullAwakeRawPtrs)
-        fullAwakeRawPtrs := Map()
-        for _, rawPtr in currentEntities
-        {
-            if (rawPtr > 0)
-                fullAwakeRawPtrs[rawPtr] := true
-        }
-
         ; Step 2+3: Update cache — new entities get full decode, existing get cheap update
-        ;   - Same rawPtr as cached  → cheap update (component addresses still valid)
-        ;   - Different rawPtr       → full re-decode (entity pointer moved, all offsets stale)
-        ;   - Not in cache           → full decode (new entity)
-        ; Mirrors C# AreaInstance.UpdateEntities: entity.Address = value.EntityPtr per tick.
+        ;   Phase 1: Collect new/changed entity IDs (pure CPU, no RPM calls)
+        ;   Phase 2: Decode new + changed entities FIRST (priority time budget)
+        ;   Phase 3: Cheap-update existing cached entities (separate budget, round-robin)
         cache := this._radarEntityCache
         newDecodeCount := 0
         cheapUpdateCount := 0
         cacheErrors := 0
-        newDecodeBudgetMs := 50
-        newDecodeDeadline := A_TickCount + newDecodeBudgetMs
 
-        this._radarMode := true
+        ; How full is the cache vs the tree? During zone load, prioritize decodes heavily.
+        cacheFillRatio := mapSize > 0 ? (cache.Count / mapSize) : 1.0
+        isZoneLoading := (cacheFillRatio < 0.90)
+        decodeBudgetMs := isZoneLoading ? 45 : 30
+        cheapBudgetMs  := isZoneLoading ? 10 : 30
+
+        ; ── Phase 1: Classify entities (no RPM) ──────────────────────────
+        newEntityList := []       ; [{id, rawPtr}, ...]
+        changedEntityList := []   ; [{id, rawPtr, cached}, ...]
         for entityId, rawPtr in currentEntities
         {
+            if cache.Has(entityId)
+            {
+                cached := cache[entityId]
+                cachedRawPtr := cached.Has("entityRawPtr") ? cached["entityRawPtr"] : 0
+                if (cachedRawPtr != rawPtr)
+                    changedEntityList.Push(Map("id", entityId, "rawPtr", rawPtr, "cached", cached))
+            }
+            else
+                newEntityList.Push(Map("id", entityId, "rawPtr", rawPtr))
+        }
+
+        ; ── Phase 2: Decode new + changed entities (priority budget) ─────
+        decodeDeadline := A_TickCount + decodeBudgetMs
+        this._radarMode := true
+
+        for _, item in newEntityList
+        {
+            if (A_TickCount >= decodeDeadline)
+                break
             try
             {
-                if cache.Has(entityId)
+                entityPtr := this.ResolveEntityPointer(item["rawPtr"])
+                if !this.IsProbablyValidPointer(entityPtr)
+                    continue
+                entityBasic := this.ReadEntityBasic(entityPtr, item["id"])
+                if (entityBasic && Type(entityBasic) = "Map")
                 {
-                    cached := cache[entityId]
-                    cachedRawPtr := cached.Has("entityRawPtr") ? cached["entityRawPtr"] : 0
-
-                    if (cachedRawPtr = rawPtr)
-                    {
-                        ; Same rawPtr → cheap update (position, life, targetable, flags)
-                        this.UpdateCachedEntityRadar(cached, playerOrigin)
-                        cheapUpdateCount += 1
-                    }
-                    else
-                    {
-                        ; rawPtr changed → entity pointer moved, need full re-decode
-                        if (A_TickCount < newDecodeDeadline)
-                        {
-                            entityPtr := this.ResolveEntityPointer(rawPtr)
-                            if !this.IsProbablyValidPointer(entityPtr)
-                                continue
-                            entityBasic := this.ReadEntityBasic(entityPtr, entityId)
-                            if (entityBasic && Type(entityBasic) = "Map")
-                            {
-                                entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
-                                cached["entity"]       := entityBasic
-                                cached["entityPtr"]    := entityPtr
-                                cached["entityRawPtr"] := rawPtr
-                                cached["distance"]     := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
-                                cached["priority"]     := this.ComputeSampleEntryPriority(entityBasic, 0)
-                                newDecodeCount += 1
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    ; New entity — resolve pointer + full decode (time-budgeted)
-                    if (A_TickCount < newDecodeDeadline)
-                    {
-                        entityPtr := this.ResolveEntityPointer(rawPtr)
-                        if !this.IsProbablyValidPointer(entityPtr)
-                            continue
-                        entityBasic := this.ReadEntityBasic(entityPtr, entityId)
-                        if (entityBasic && Type(entityBasic) = "Map")
-                        {
-                            entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
-                            sampleEntry := Map(
-                                "id",           entityId,
-                                "entityPtr",    entityPtr,
-                                "entityRawPtr", rawPtr,
-                                "entity",       entityBasic,
-                                "distance",     this.ComputeDistance3DFromMaps(playerOrigin, entityPos),
-                                "priority",     this.ComputeSampleEntryPriority(entityBasic, 0)
-                            )
-                            cache[entityId] := sampleEntry
-                            newDecodeCount += 1
-                        }
-                    }
+                    entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
+                    sampleEntry := Map(
+                        "id",           item["id"],
+                        "entityPtr",    entityPtr,
+                        "entityRawPtr", item["rawPtr"],
+                        "entity",       entityBasic,
+                        "distance",     this.ComputeDistance3DFromMaps(playerOrigin, entityPos),
+                        "priority",     this.ComputeSampleEntryPriority(entityBasic, 0)
+                    )
+                    cache[item["id"]] := sampleEntry
+                    newDecodeCount += 1
                 }
             }
             catch as err
-            {
                 cacheErrors += 1
+        }
+
+        for _, item in changedEntityList
+        {
+            if (A_TickCount >= decodeDeadline)
+                break
+            try
+            {
+                entityPtr := this.ResolveEntityPointer(item["rawPtr"])
+                if !this.IsProbablyValidPointer(entityPtr)
+                    continue
+                entityBasic := this.ReadEntityBasic(entityPtr, item["id"])
+                if (entityBasic && Type(entityBasic) = "Map")
+                {
+                    entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
+                    cached := item["cached"]
+                    cached["entity"]       := entityBasic
+                    cached["entityPtr"]    := entityPtr
+                    cached["entityRawPtr"] := item["rawPtr"]
+                    cached["distance"]     := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
+                    cached["priority"]     := this.ComputeSampleEntryPriority(entityBasic, 0)
+                    newDecodeCount += 1
+                }
             }
+            catch as err
+                cacheErrors += 1
+        }
+
+        ; ── Phase 3: Cheap updates (time-budgeted, round-robin) ──────────
+        ; Build array of cached entity IDs for round-robin traversal.
+        ; Start from where we left off last tick so every entity gets updated eventually.
+        cachedIds := []
+        for entityId, _ in cache
+        {
+            if currentEntities.Has(entityId)
+                cachedIds.Push(entityId)
+        }
+        cachedCount := cachedIds.Length
+        if (cachedCount > 0)
+        {
+            cheapDeadline := A_TickCount + cheapBudgetMs
+            offset := this._cheapUpdateOffset
+            if (offset >= cachedCount)
+                offset := 0
+            Loop cachedCount
+            {
+                if (A_TickCount >= cheapDeadline)
+                    break
+                idx := Mod(offset + A_Index - 1, cachedCount) + 1
+                entityId := cachedIds[idx]
+                if !cache.Has(entityId)
+                    continue
+                try
+                {
+                    this.UpdateCachedEntityRadar(cache[entityId], playerOrigin)
+                    cheapUpdateCount += 1
+                }
+                catch as err
+                    cacheErrors += 1
+            }
+            this._cheapUpdateOffset := Mod(offset + cheapUpdateCount, Max(cachedCount, 1))
         }
         this._radarMode := false
 
@@ -2122,20 +2815,28 @@ class PoE2GameStateReader extends PoE2InventoryReader
         )
         t4 := A_TickCount  ; after entity cache update
 
-        ; Sleeping entities — still use old approach (limit=0 by default, so usually skipped)
-        sleepingLimit      := this.RadarSleepingEntityLimit
+        ; Sleeping entities — skip during zone loading to preserve RPM budget for awake decodes.
+        ; Once the cache is >90% full (steady state), scan sleeping entities with a small limit.
         sleepingMapAddress := awakeMapAddress + 0x10
         emptyEntitySummary := Map("address", 0, "size", 0, "sample", [], "sampleCount", 0)
-        try
-        {
-            if (sleepingLimit > 0)
-                sleepingEntities := this.ReadAreaEntityMapSummaryForRadar(sleepingMapAddress, sleepingLimit, playerOrigin)
-            else
-                sleepingEntities := emptyEntitySummary
-        }
-        catch
+        if (isZoneLoading)
         {
             sleepingEntities := emptyEntitySummary
+        }
+        else
+        {
+            sleepingLimit := this.RadarSleepingEntityLimit
+            try
+            {
+                if (sleepingLimit > 0)
+                    sleepingEntities := this.ReadAreaEntityMapSummaryForRadar(sleepingMapAddress, sleepingLimit, playerOrigin)
+                else
+                    sleepingEntities := emptyEntitySummary
+            }
+            catch
+            {
+                sleepingEntities := emptyEntitySummary
+            }
         }
         t5 := A_TickCount  ; after sleeping entity read
 
@@ -2289,9 +2990,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         )
 
         return Map(
+            "currentStateName", this._radarCurrentStateName,
+            "areaLevel", (this.LastAreaLevel > 0) ? this.LastAreaLevel : 0,
+            "playerVitals", this._radarPlayerVitalsCache,
+            "worldAreaDat", this._radarWorldAreaCache,
+            "panelVisibility", this._radarPanelVisCache,
+            "panelDiscovery", this._radarPanelDiscoveryResult,
             "inGameState", Map(
                 "address",             inGameStateAddress,
-                "importantUiElements", importantUiElements,
+                "importantUiElements", this._radarUiCache,
                 "areaInstance", Map(
                     "address",               areaInstanceData,
                     "playerRenderComponent", playerRenderComponent,

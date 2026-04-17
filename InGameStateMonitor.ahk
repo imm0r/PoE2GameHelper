@@ -6,27 +6,32 @@ SetWorkingDir(A_ScriptDir)
 #Include PoE2MemoryReader.ahk
 #Include PatchChecker.ahk
 #Include RadarOverlay.ahk
+#Include PlayerHUD.ahk
 
-GAMEHELPER_VERSION := "0.3.0.0"
+GAMEHELPER_VERSION := "0.4.11.2"
 
 ; Tray icon
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
 
-reader := PoE2GameStateReader("PathOfExileSteam.exe")
-debugMode := false
-updatesPaused := false
-autoFlaskEnabled := false
-lifeThresholdPercent := 55
-manaThresholdPercent := 35
-flaskUseCooldownMs := 450
-lastFlaskUseBySlot := Map(1, 0, 2, 0)
-pendingFlaskVerifyBySlot := Map()
-autoFlaskLastReason := "idle"
-autoFlaskPerformanceMode := false
-pinnedNodePaths := []
-lastSnapshotForUi := 0
+g_reader := PoE2GameStateReader("PathOfExileSteam.exe")
+g_debugMode := false
+g_updatesPaused := false
+g_autoFlaskEnabled := false
+g_lifeThresholdPercent := 55
+g_manaThresholdPercent := 35
+g_flaskUseCooldownMs := 450
+g_lastFlaskUseBySlot := Map(1, 0, 2, 0)
+g_pendingFlaskVerifyBySlot := Map()
+g_autoFlaskLastReason := "idle"
+g_autoFlaskPerformanceMode := false
+g_pinnedNodePaths := []
+g_lastSnapshotForUi := 0
 g_radarEnabled  := true   ; whether radar overlay is active
+g_radarAlpha    := 255    ; overlay opacity (0=transparent, 255=opaque)
+g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions"  ; comma-separated open detail sections
 g_radarOverlay  := 0   ; lazy-init beim ersten Render-Aufruf
+g_playerHudEnabled := true   ; whether the player HUD overlay is active
+g_playerHud     := 0   ; lazy-init on first render
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
 g_radarReadMs   := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
@@ -35,45 +40,45 @@ g_profReadLastMs  := 0
 g_profReadAvgMs   := 0
 g_profTreeLastMs  := 0
 g_profTotalLastMs := 0
-offsetTableRowPathByRow := Map()
-offsetPreviousValueByPath := Map()
-offsetTableSortCol := 1
-offsetTableSortDesc := false
-npcWatchRadius := 1200
-npcWatchAutoSync := false
-npcWatchIgnoredKeys := Map()
-treeRefreshRequested := true
-readAndShowRunning := false
-showTreePane := true
-treeTabKeys := ["Overview", "Buffs", "Entities", "UI", "gameState"]
-activeTreeTabKey := "Overview"
-activeTreeTabIdx := 1
+g_offsetTableRowPathByRow := Map()
+g_offsetPreviousValueByPath := Map()
+g_offsetTableSortCol := 1
+g_offsetTableSortDesc := false
+g_npcWatchRadius := 1200
+g_npcWatchAutoSync := false
+g_npcWatchIgnoredKeys := Map()
+g_treeRefreshRequested := true
+g_readAndShowRunning := false
+g_showTreePane := true
+g_treeTabKeys := ["Overview", "Buffs", "Entities", "UI", "gameState"]
+g_activeTreeTabKey := "Overview"
+g_activeTreeTabIdx := 1
 g_webViewReady   := false
 g_bridge         := 0
-webGui           := 0
+g_webGui           := 0
 g_selectedNodePath := ""
-flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
-flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
+g_flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
+g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
 
 ; Radar Entity-Filter
-radarShowEnemyNormal := true
-radarShowEnemyRare   := true
-radarShowEnemyBoss   := true
-radarShowMinions := true
-radarShowNpcs    := true
-radarShowChests  := true
+g_radarShowEnemyNormal := true
+g_radarShowEnemyRare   := true
+g_radarShowEnemyBoss   := true
+g_radarShowMinions := true
+g_radarShowNpcs    := true
+g_radarShowChests  := true
 
 ; Entity selected in the Entities tab — radar draws a line to it
 g_highlightedEntityPath := ""
 
 ; Entities-Tab Type-Filter
-entityShowPlayer    := true
-entityShowMinion    := true
-entityShowEnemy     := true
-entityShowNPC       := true
-entityShowChest     := true
-entityShowWorldItem := true
-entityShowOther     := true
+g_entityShowPlayer    := true
+g_entityShowMinion    := true
+g_entityShowEnemy     := true
+g_entityShowNPC       := true
+g_entityShowChest     := true
+g_entityShowWorldItem := true
+g_entityShowOther     := true
 
 ; Skills & Buffs blacklist
 g_skillBuffBlacklist := []
@@ -82,39 +87,54 @@ g_skillBuffBlacklist := []
 g_zoneNavEnabled := true
 g_mapHackEnabled := true
 
-flaskKeyLoadStatus := "default"
-errorLogPath := A_ScriptDir "\InGameStateMonitor.error.log"
-errorLogMaxBytes := 1024 * 512
+; Window geometry (restored from INI by LoadConfig)
+g_winX := 20
+g_winY := 20
+g_winW := 1080
+g_winH := 850
+g_winMaximized := false
+
+g_flaskKeyLoadStatus := "default"
+g_errorLogPath := A_ScriptDir "\InGameStateMonitor.error.log"
+g_errorLogMaxBytes := 1024 * 512
 
 ; ── Hidden data GUI: holds the 5 TreeView controls for data building ────────
-dataGui := Gui()
-treeControlsByTab := Map()
-treeNodePathsByTab := Map()
-loop treeTabKeys.Length
+g_dataGui := Gui()
+g_treeControlsByTab := Map()
+g_treeNodePathsByTab := Map()
+loop g_treeTabKeys.Length
 {
-    key := treeTabKeys[A_Index]
-    treeCtrl := dataGui.AddTreeView("w400 h400")
-    treeControlsByTab[key] := treeCtrl
-    treeNodePathsByTab[key] := Map()
+    key := g_treeTabKeys[A_Index]
+    treeCtrl := g_dataGui.AddTreeView("w400 h400")
+    g_treeControlsByTab[key] := treeCtrl
+    g_treeNodePathsByTab[key] := Map()
 }
-valueTree := treeControlsByTab["Overview"]
-nodePaths := treeNodePathsByTab["Overview"]
+g_valueTree := g_treeControlsByTab["Overview"]
+g_nodePaths := g_treeNodePathsByTab["Overview"]
 ; Stubs for legacy code that references removed native controls
-offsetTable := 0
-offsetSearchEdit := 0   ; stub — no native search control in WebView-based UI
-offsetTableRowPathByRow := Map()
-offsetPreviousValueByPath := Map()
-offsetTableSortCol := 1
-offsetTableSortDesc := false
+g_offsetTable := 0
+g_offsetSearchEdit := 0   ; stub — no native search control in WebView-based UI
+g_offsetTableRowPathByRow := Map()
+g_offsetPreviousValueByPath := Map()
+g_offsetTableSortCol := 1
+g_offsetTableSortDesc := false
 
 ; Load persisted settings before showing the window
 LoadConfig()
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
-webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , {DefaultWidth: 1080, DefaultHeight: 850})
-webGui.OnEvent("Close", (*) => ExitApp())
-webGui.OnEvent("Size",  OnWebGuiSize)
-webGui.Show("x20 y20 w1080 h850")
+g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , {DefaultWidth: g_winW, DefaultHeight: g_winH})
+g_webGui.OnEvent("Close", (*) => ExitApp())
+g_webGui.OnEvent("Size",  OnWebGuiSize)
+g_webGui.Show()
+; Restore saved outer-rect geometry (WinMove uses window rect, not client area)
+WinMove(g_winX, g_winY, g_winW, g_winH, "ahk_id " g_webGui.Hwnd)
+if g_winMaximized
+    g_webGui.Maximize()
+
+; Save window geometry on exit and after move/resize
+OnExit((*) => (_CaptureWindowGeometry(), SaveConfig()))
+OnMessage(0x0232, _OnExitSizeMove)  ; WM_EXITSIZEMOVE
 
 ; Set window icon (title bar + taskbar) using LoadImage for reliable HICON
 try
@@ -123,9 +143,9 @@ try
     hIconSm := DllCall("LoadImage", "Ptr", 0, "Str", iconPath, "UInt", 1, "Int", 16, "Int", 16, "UInt", 0x10, "Ptr")
     hIconBig := DllCall("LoadImage", "Ptr", 0, "Str", iconPath, "UInt", 1, "Int", 32, "Int", 32, "UInt", 0x10, "Ptr")
     if hIconSm
-        SendMessage(0x0080, 0, hIconSm,  , "ahk_id " webGui.Hwnd)
+        SendMessage(0x0080, 0, hIconSm,  , "ahk_id " g_webGui.Hwnd)
     if hIconBig
-        SendMessage(0x0080, 1, hIconBig, , "ahk_id " webGui.Hwnd)
+        SendMessage(0x0080, 1, hIconBig, , "ahk_id " g_webGui.Hwnd)
 }
 
 ; Dark DWM title bar
@@ -133,28 +153,28 @@ try
 {
     DwmVal := Buffer(4, 0)
     NumPut("Int", 1, DwmVal)
-    DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", webGui.Hwnd, "Int", 20, "Ptr", DwmVal, "Int", 4)
+    DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", g_webGui.Hwnd, "Int", 20, "Ptr", DwmVal, "Int", 4)
 }
 
 ; JS→AHK: page posts JSON {method, args} via window.chrome.webview.postMessage(...)
 ; AHK→JS: WebViewExec() calls ExecuteScriptAsync()
 ; NavigationCompleted fires when the page finishes loading → trigger initial data push.
-webGui.Control.WebMessageReceived(OnWebMessage)
-webGui.Control.NavigationCompleted(OnNavigationCompleted)
+g_webGui.Control.WebMessageReceived(OnWebMessage)
+g_webGui.Control.NavigationCompleted(OnNavigationCompleted)
 
-webGui.Navigate("ui/index.html")
+g_webGui.Navigate("ui/index.html")
 
-LoadFlaskHotkeysFromConfig(flaskConfigPath)
+LoadFlaskHotkeysFromConfig(g_flaskConfigPath)
 
 ; Check for PoE2 patch updates (async-like: runs PowerShell hidden, max ~5s)
 CheckPoePatchVersion()
 UpdateStatusBar()
 
-if !reader.Connect()
+if !g_reader.Connect()
 {
-    valueTree.Delete()
-    valueTree.Add("Konnte PathOfExileSteam.exe oder GameStates-Adresse nicht auflösen.")
-    valueTree.Add("Starte das Skript als Admin, falls nötig.")
+    g_valueTree.Delete()
+    g_valueTree.Add("Konnte PathOfExileSteam.exe oder GameStates-Adresse nicht auflösen.")
+    g_valueTree.Add("Starte das Skript als Admin, falls nötig.")
     return
 }
 
@@ -168,113 +188,44 @@ return
 ; Updates the status bar text and pushes it to the WebView.
 UpdateStatusBar()
 {
-    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs, reader
+    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs, g_reader
+    global GAMEHELPER_VERSION
+
     patch := GetLastKnownPoeVersion()
     now   := FormatTime(A_Now, "HH:mm:ss")
 
-    radarDetail := ""
-    try
-    {
-        rt := reader.RadarTimings
-        if IsObject(rt)
-        {
-            cacheInfo := ""
-            try cacheInfo := " map=" rt["mapSize"] " cache=" rt["cacheSize"] " new=" rt["newDecode"] " upd=" rt["cheapUpdate"] " err=" rt["cacheErrors"] " filt=" rt["filterPost"] "/" rt["filterPre"] " bl=" rt["filterBL"]
-            radarDetail := "  radar-detail: state=" rt["state"] " player=" rt["player"] " ui=" rt["ui"] " awake=" rt["awake"] " sleep=" rt["sleep"] " filter=" rt["filter"] cacheInfo
-        }
-    }
+    leftText := "GameHelper v" GAMEHELPER_VERSION " for PoE2 v" (patch != "" ? patch : "—")
+    rightText := "Last Updated: " now
 
-    text := "PoE2 v" (patch != "" ? patch : "unknown") "   |   Last update: " now
-           . "   |   Profiling(ms): read=" g_profReadLastMs "(avg=" g_profReadAvgMs ")"
-           . "  tree=" g_profTreeLastMs "  total=" g_profTotalLastMs
-           . "  radar=" g_radarFps "fps r" g_radarReadMs "+d" g_radarRenderMs
-           . radarDetail
+    ; Performance details for the FPS pill: total iteration ms + radar fps
+    perfText := g_profTotalLastMs "ms"
+    if (g_radarFps > 0)
+        perfText .= " | " g_radarFps " fps"
 
-    WebViewExec("updateStatus(" _JsStr(text) ")")
+    WebViewExec("updateStatus(" _JsStr(leftText) "," _JsStr(rightText) "," _JsStr(perfText) ")")
 }
 
-; Creates or appends a session-start header to the error log file on script launch.
-InitializeErrorLog()
-{
-    global errorLogPath
-    try
-    {
-        header := "`n===== Start " FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") " | PID=" DllCall("GetCurrentProcessId", "UInt") " =====`n"
-        FileAppend(header, errorLogPath, "UTF-8")
-    }
-    catch
-    {
-    }
-}
 
-; Appends a timestamped error entry to the log file; rotates the log to a .1 backup if it exceeds 512 KB.
-; Params: context - label identifying the call site; err - optional AHK Error object with message/stack
-LogError(context, err := "")
-{
-    global errorLogPath, errorLogMaxBytes
-    static _logging := false
-
-    if _logging
-        return
-    _logging := true
-    try
-    {
-        try
-        {
-            if FileExist(errorLogPath)
-            {
-                size := FileGetSize(errorLogPath)
-                if (size >= errorLogMaxBytes)
-                {
-                    backupPath := errorLogPath ".1"
-                    try FileDelete(backupPath)
-                    FileMove(errorLogPath, backupPath, true)
-                }
-            }
-        }
-        catch
-        {
-        }
-
-        msg := ""
-        try msg := err.Message
-        what := ""
-        try what := err.What
-        line := ""
-        try line := err.Line
-        extra := ""
-        try extra := err.Extra
-        stack := ""
-        try stack := err.Stack
-
-        text := "[" FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") "] " context
-        if (msg != "")
-            text .= " | msg=" msg
-        if (what != "")
-            text .= " | what=" what
-        if (line != "")
-            text .= " | line=" line
-        if (extra != "")
-            text .= " | extra=" extra
-        if (stack != "")
-            text .= "`n" stack
-        text .= "`n"
-
-        FileAppend(text, errorLogPath, "UTF-8")
-    }
-    catch
-    {
-    }
-    finally
-        _logging := false
-}
-
-; WebGui Size event handler — WebView resizes itself; just update status.
+; ── WebGui event handlers ────────────────────────────────────────────────────
 OnWebGuiSize(guiObj, minMax, width, height)
 {
     if (minMax = -1)
         return
     UpdateStatusBar()
+}
+
+; Debounced save after the user finishes moving or resizing the window.
+_OnExitSizeMove(wParam, lParam, msg, hwnd)
+{
+    global g_webGui
+    if (hwnd = g_webGui.Hwnd)
+        SetTimer(_DebouncedGeometrySave, -500)
+}
+
+_DebouncedGeometrySave()
+{
+    _CaptureWindowGeometry()
+    SaveConfig()
 }
 
 ; Fires when the WebView finishes loading a page — triggers the first data push.
@@ -304,279 +255,10 @@ OnWebMessage(wv, args, *)
     }
 }
 
-; Dispatches a JS→AHK bridge call by method name.
-_DispatchBridgeCall(method, args)
-{
-    global radarShowEnemyNormal, radarShowEnemyRare, radarShowEnemyBoss
-    global radarShowMinions, radarShowNpcs, radarShowChests
-    global pinnedNodePaths, g_selectedNodePath, g_radarEnabled, g_highlightedEntityPath
-    global g_skillBuffBlacklist
-
-    switch method
-    {
-        case "PageReady":
-            ; No-op: NavigationCompleted already handles initial push
-        case "ToggleRadar":
-            SetTimer(ToggleRadar, -1)
-        case "ToggleDebug":
-            SetTimer(ToggleDebugMode, -1)
-        case "TogglePause":
-            SetTimer(ToggleUpdatesPause, -1)
-        case "ToggleAutoFlask":
-            SetTimer(ToggleAutoFlaskMode, -1)
-        case "ToggleAutoFlaskPerf":
-            SetTimer(ToggleAutoFlaskPerformanceMode, -1)
-        case "SwitchTab":
-            key := (args.Length >= 1) ? args[1] : ""
-            if (key != "")
-                SetTimer(() => SwitchTreeTab(key), -1)
-        case "SetThresholds":
-            life := (args.Length >= 1) ? args[1] : ""
-            mana := (args.Length >= 2) ? args[2] : ""
-            SetTimer(() => ApplyThresholdsFromUI(life, mana), -1)
-        case "SetEntityFilter":
-            etype := (args.Length >= 1) ? args[1] : ""
-            val   := (args.Length >= 2) ? args[2] : 0
-            bval  := (val = "true" || val = true || val = 1) ? true : false
-            SetTimer(() => _ApplyEntityFilter(etype, bval), -1)
-        case "SetRadarFilter":
-            type := (args.Length >= 1) ? args[1] : ""
-            val  := (args.Length >= 2) ? args[2] : 0
-            bval := (val = "true" || val = true || val = 1) ? true : false
-            switch type
-            {
-                case "normal":  radarShowEnemyNormal := bval
-                case "rare":    radarShowEnemyRare   := bval
-                case "boss":    radarShowEnemyBoss   := bval
-                case "minions": radarShowMinions     := bval
-                case "npcs":    radarShowNpcs        := bval
-                case "chests":  radarShowChests      := bval
-            }
-            SetTimer(SaveConfig, -100)
-        case "PinPath":
-            path := (args.Length >= 1) ? args[1] : ""
-            if (path != "")
-            {
-                for _, p in pinnedNodePaths
-                    if (p = path)
-                        return
-                pinnedNodePaths.Push(path)
-                SetTimer(PushWatchlistToWebView, -1)
-                SetTimer(PushHeaderToWebView, -50)
-            }
-        case "PinSelected":
-            if (g_selectedNodePath != "")
-                _DispatchBridgeCall("PinPath", [g_selectedNodePath])
-        case "SelectNode":
-            g_selectedNodePath := (args.Length >= 1) ? args[1] : ""
-        case "ClearPins":
-            pinnedNodePaths := []
-            SetTimer(PushWatchlistToWebView, -1)
-            SetTimer(PushHeaderToWebView, -50)
-        case "RemovePinnedSelected":
-            newList := []
-            for _, p in pinnedNodePaths
-                if (p != g_selectedNodePath)
-                    newList.Push(p)
-            pinnedNodePaths := newList
-            SetTimer(PushWatchlistToWebView, -1)
-            SetTimer(PushHeaderToWebView, -50)
-        case "DumpEntities":
-            SetTimer(OnDumpEntitiesClicked, -1)
-        case "HighlightEntity":
-            g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
-        case "ClearEntityHighlight":
-            g_highlightedEntityPath := ""
-        case "ToggleZoneNav":
-            global g_zoneNavEnabled
-            g_zoneNavEnabled := !g_zoneNavEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._navEnabled := g_zoneNavEnabled
-            SetTimer(SaveConfig, -100)
-        case "ToggleMapHack":
-            global g_mapHackEnabled
-            g_mapHackEnabled := !g_mapHackEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._mapHackEnabled := g_mapHackEnabled
-            SetTimer(SaveConfig, -100)
-        case "WatchNpc":
-            SetTimer(AddNearbyNpcScannerToWatchlist, -1)
-        case "TreeRefresh":
-            SetTimer(ForceRefreshActiveTree, -1)
-        case "F3Dump":
-            SetTimer(OnF3DebugDump, -1)
-        case "ToggleTreePane":
-            SetTimer(ToggleTreePaneVisibility, -1)
-        case "StartGame":
-            try Run("steam://rungameid/2694490")
-        case "StartDrag":
-            DllCall("ReleaseCapture")
-            PostMessage(0xA1, 2, , , "ahk_id " webGui.Hwnd)
-        case "WinMinimize":
-            webGui.Minimize()
-        case "WinMaximize":
-            state := WinGetMinMax("ahk_id " webGui.Hwnd)
-            if (state = 1)
-                webGui.Restore()
-            else
-                webGui.Maximize()
-            SetTimer(PushHeaderToWebView, -50)
-        case "WinClose":
-            ExitApp()
-        case "BlacklistAdd":
-            name := (args.Length >= 1) ? args[1] : ""
-            if (name != "")
-            {
-                for _, n in g_skillBuffBlacklist
-                    if (n = name)
-                        return
-                g_skillBuffBlacklist.Push(name)
-                SetTimer(SaveConfig, -100)
-            }
-        case "BlacklistRemove":
-            name := (args.Length >= 1) ? args[1] : ""
-            if (name != "")
-            {
-                newList := []
-                for _, n in g_skillBuffBlacklist
-                    if (n != name)
-                        newList.Push(n)
-                g_skillBuffBlacklist := newList
-                SetTimer(SaveConfig, -100)
-                SetTimer(_PushBlacklistToWebView, -1)
-            }
-    }
-}
-
-; Minimal JSON parser: handles flat {key:value} objects and arrays of strings/numbers.
-; Only used for parsing bridge messages — not a general-purpose parser.
-_JsonParseSimple(json)
-{
-    json := Trim(json)
-    if (SubStr(json, 1, 1) = "{")
-    {
-        result := Map()
-        inner := SubStr(json, 2, StrLen(json) - 2)
-        pos := 1
-        while (pos <= StrLen(inner))
-        {
-            ; Skip whitespace/comma
-            while (pos <= StrLen(inner) && InStr(", `t`r`n", SubStr(inner, pos, 1)))
-                pos++
-            if (pos > StrLen(inner))
-                break
-            ; Read key
-            if (SubStr(inner, pos, 1) != '"')
-                break
-            pos++
-            keyEnd := InStr(inner, '"', true, pos)
-            if !keyEnd
-                break
-            key := SubStr(inner, pos, keyEnd - pos)
-            pos := keyEnd + 1
-            ; Skip :
-            while (pos <= StrLen(inner) && InStr(": `t", SubStr(inner, pos, 1)))
-                pos++
-            ; Read value
-            valResult := _JsonReadValue(inner, pos)
-            result[key] := valResult[1]
-            pos := valResult[2]
-        }
-        return result
-    }
-    if (SubStr(json, 1, 1) = "[")
-        return _JsonReadArray(json, 1)[1]
-    return json
-}
-
-_JsonReadValue(s, pos)
-{
-    ch := SubStr(s, pos, 1)
-    if (ch = '"')
-    {
-        pos++
-        start := pos
-        while (pos <= StrLen(s))
-        {
-            c := SubStr(s, pos, 1)
-            if (c = "\" )
-            {
-                pos += 2
-                continue
-            }
-            if (c = '"')
-                break
-            pos++
-        }
-        val := SubStr(s, start, pos - start)
-        val := StrReplace(val, "\n", "`n")
-        val := StrReplace(val, "\t", "`t")
-        val := StrReplace(val, '\"', '"')
-        val := StrReplace(val, "\\", "\")
-        return [val, pos + 1]
-    }
-    if (ch = "[")
-        return _JsonReadArray(s, pos)
-    if (ch = "{")
-    {
-        ; Nested object: skip it, return empty map
-        depth := 0
-        start := pos
-        while (pos <= StrLen(s))
-        {
-            c := SubStr(s, pos, 1)
-            if (c = "{")
-                depth++
-            else if (c = "}")
-            {
-                depth--
-                if (depth = 0)
-                {
-                    pos++
-                    break
-                }
-            }
-            pos++
-        }
-        return [Map(), pos]
-    }
-    ; Number / bool / null
-    end := pos
-    while (end <= StrLen(s) && !InStr(",]}", SubStr(s, end, 1)))
-        end++
-    raw := Trim(SubStr(s, pos, end - pos))
-    if (raw = "true")
-        return [true,  end]
-    if (raw = "false")
-        return [false, end]
-    if (raw = "null")
-        return ["",    end]
-    return [IsNumber(raw) ? raw + 0 : raw, end]
-}
-
-_JsonReadArray(s, pos)
-{
-    result := []
-    pos++  ; skip [
-    while (pos <= StrLen(s))
-    {
-        while (pos <= StrLen(s) && InStr(", `t`r`n", SubStr(s, pos, 1)))
-            pos++
-        if (SubStr(s, pos, 1) = "]")
-        {
-            pos++
-            break
-        }
-        valResult := _JsonReadValue(s, pos)
-        result.Push(valResult[1])
-        pos := valResult[2]
-    }
-    return [result, pos]
-}
 
 ; Main update loop: reads a game snapshot, runs auto-flask logic, renders the radar overlay, and rebuilds the TreeView.
-; Uses a reentrancy guard (readAndShowRunning) to prevent overlapping executions from timer calls.
-; Params: forceTreeRefresh - when true, rebuilds the tree regardless of treeRefreshRequested
+; Uses a reentrancy guard (g_readAndShowRunning) to prevent overlapping executions from timer calls.
+; Params: forceTreeRefresh - when true, rebuilds the tree regardless of g_treeRefreshRequested
 ReadAndShow(forceTreeRefresh := false)
 {
     static _readCycles := 0
@@ -584,56 +266,56 @@ ReadAndShow(forceTreeRefresh := false)
     static _readLastMs := 0
     static _treeLastMs := 0
     static _totalLastMs := 0
-    global readAndShowRunning
-    if readAndShowRunning
+    global g_readAndShowRunning
+    if g_readAndShowRunning
         return
-    readAndShowRunning := true
+    g_readAndShowRunning := true
     totalStart := A_TickCount
     try
         {
-        global reader, valueTree, nodePaths, debugMode, updatesPaused, autoFlaskEnabled, flaskKeyLoadStatus, flaskKeyBySlot, showTreePane
-        global lifeThresholdPercent, manaThresholdPercent, autoFlaskLastReason, autoFlaskStatusText, hotkeyLegendText, autoFlaskPerformanceMode, lastSnapshotForUi
-        global treeRefreshRequested, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs
+        global g_reader, g_valueTree, g_nodePaths, g_debugMode, g_updatesPaused, g_autoFlaskEnabled, g_flaskKeyLoadStatus, g_flaskKeyBySlot, g_showTreePane
+        global g_lifeThresholdPercent, g_manaThresholdPercent, g_autoFlaskLastReason, autoFlaskStatusText, hotkeyLegendText, g_autoFlaskPerformanceMode, g_lastSnapshotForUi
+        global g_treeRefreshRequested, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs
 
-        if (updatesPaused && !forceTreeRefresh)
+        if (g_updatesPaused && !forceTreeRefresh)
             return
 
         SetActiveTreeContextFromTab()
 
         readStart := A_TickCount
-        snapshot := autoFlaskPerformanceMode ? reader.ReadAutoFlaskSnapshot() : reader.ReadSnapshot()
+        snapshot := g_autoFlaskPerformanceMode ? g_reader.ReadAutoFlaskSnapshot() : g_reader.ReadSnapshot()
         _readLastMs := A_TickCount - readStart
         _readCycles += 1
         _readTotalMs += _readLastMs
         readAvgMs := (_readCycles > 0) ? Round(_readTotalMs / _readCycles, 1) : 0
         entityModeText := "-"
-        try entityModeText := reader.LastEntityReadMode
+        try entityModeText := g_reader.LastEntityReadMode
         entityOffsetText := "-"
-        try entityOffsetText := PoE2GameStateReader.Hex(reader.LastEntityReadOffset)
+        try entityOffsetText := PoE2GameStateReader.Hex(g_reader.LastEntityReadOffset)
         entityFallbackAgeText := "-"
         try
         {
-            lastFbTick := reader.LastEntityFallbackTick
+            lastFbTick := g_reader.LastEntityFallbackTick
             if (lastFbTick > 0)
                 entityFallbackAgeText := Round((A_TickCount - lastFbTick) / 1000.0, 1) "s"
         }
 
         if !snapshot
         {
-            valueTree.Delete()
-            nodePaths := Map()
-            StoreNodePathMapForActiveTab(nodePaths)
-            valueTree.Add("Lesefehler: Snapshot leer")
+            g_valueTree.Delete()
+            g_nodePaths := Map()
+            StoreNodePathMapForActiveTab(g_nodePaths)
+            g_valueTree.Add("Lesefehler: Snapshot leer")
             return
         }
 
         TryAutoFlask(snapshot)
-        lastSnapshotForUi := snapshot
+        g_lastSnapshotForUi := snapshot
 
         UpdateActionButtonLabels()
 
         nowTick := A_TickCount
-        doTreeRefresh := treeRefreshRequested || forceTreeRefresh || !updatesPaused
+        doTreeRefresh := g_treeRefreshRequested || forceTreeRefresh || !g_updatesPaused
 
         expandedPaths := Map()
         treeFocus := 0
@@ -650,16 +332,16 @@ ReadAndShow(forceTreeRefresh := false)
         if doTreeRefresh
         {
             treeStart := A_TickCount
-            valueTree.Opt("-Redraw")
-            valueTree.Delete()
-            nodePaths := Map()
-            StoreNodePathMapForActiveTab(nodePaths)
+            g_valueTree.Opt("-Redraw")
+            g_valueTree.Delete()
+            g_nodePaths := Map()
+            StoreNodePathMapForActiveTab(g_nodePaths)
 
             RenderActiveTreeTab(snapshot, snapshotModeText, readAvgMs, _readLastMs, _treeLastMs, _totalLastMs, entityModeText, entityOffsetText, entityFallbackAgeText, expandedPaths)
             RestoreTreeFocusState(treeFocus)
-            valueTree.Opt("+Redraw")
+            g_valueTree.Opt("+Redraw")
             _treeLastMs := A_TickCount - treeStart
-            treeRefreshRequested := false
+            g_treeRefreshRequested := false
         }
         _totalLastMs := A_TickCount - totalStart
         g_profReadLastMs  := _readLastMs
@@ -680,7 +362,7 @@ ReadAndShow(forceTreeRefresh := false)
     }
     finally
     {
-        readAndShowRunning := false
+        g_readAndShowRunning := false
         UpdateStatusBar()
     }
 }
@@ -688,85 +370,85 @@ ReadAndShow(forceTreeRefresh := false)
 ; Marks a tree refresh as requested and triggers an immediate ReadAndShow call if one is not already running.
 ForceRefreshActiveTree()
 {
-    global treeRefreshRequested, readAndShowRunning
+    global g_treeRefreshRequested, g_readAndShowRunning
 
-    treeRefreshRequested := true
+    g_treeRefreshRequested := true
 
-    if readAndShowRunning
+    if g_readAndShowRunning
         return
 
     ReadAndShow(true)
 }
 
-; Synchronises the valueTree and nodePaths globals with the currently-selected tab.
+; Synchronises the g_valueTree and g_nodePaths globals with the currently-selected tab.
 SetActiveTreeContextFromTab()
 {
-    global activeTreeTabIdx, treeTabKeys, treeControlsByTab, treeNodePathsByTab, activeTreeTabKey, valueTree, nodePaths
+    global g_activeTreeTabIdx, g_treeTabKeys, g_treeControlsByTab, g_treeNodePathsByTab, g_activeTreeTabKey, g_valueTree, g_nodePaths
 
-    idx := activeTreeTabIdx
-    if (idx < 1 || idx > treeTabKeys.Length)
+    idx := g_activeTreeTabIdx
+    if (idx < 1 || idx > g_treeTabKeys.Length)
         idx := 1
 
-    key := treeTabKeys[idx]
-    activeTreeTabKey := key
-    valueTree := treeControlsByTab[key]
-    nodePaths := treeNodePathsByTab.Has(key) ? treeNodePathsByTab[key] : Map()
-    treeNodePathsByTab[key] := nodePaths
+    key := g_treeTabKeys[idx]
+    g_activeTreeTabKey := key
+    g_valueTree := g_treeControlsByTab[key]
+    g_nodePaths := g_treeNodePathsByTab.Has(key) ? g_treeNodePathsByTab[key] : Map()
+    g_treeNodePathsByTab[key] := g_nodePaths
 }
 
-; Writes the supplied node-path Map back into treeNodePathsByTab for the active tab.
-; Called after nodePaths is reset to a fresh Map() so the lookup stays in sync.
+; Writes the supplied node-path Map back into g_treeNodePathsByTab for the active tab.
+; Called after g_nodePaths is reset to a fresh Map() so the lookup stays in sync.
 StoreNodePathMapForActiveTab(nodePathMap)
 {
-    global activeTreeTabKey, treeNodePathsByTab
-    treeNodePathsByTab[activeTreeTabKey] := nodePathMap
+    global g_activeTreeTabKey, g_treeNodePathsByTab
+    g_treeNodePathsByTab[g_activeTreeTabKey] := nodePathMap
 }
 
 ; Rebuilds the active TreeView tab with snapshot data, per-read timing, and entity debug info.
 ; Delegates to tab-specific helpers (AddActiveBuffsNode, AddEntityScannerNode, BuildTreeNode, etc.).
 RenderActiveTreeTab(snapshot, snapshotModeText, readAvgMs, readLastMs, treeLastMs, totalLastMs, entityModeText, entityOffsetText, entityFallbackAgeText, expandedPaths)
 {
-    global valueTree, nodePaths, reader, debugMode, updatesPaused, autoFlaskEnabled, autoFlaskPerformanceMode
-    global lifeThresholdPercent, manaThresholdPercent, flaskKeyLoadStatus, autoFlaskLastReason, flaskKeyBySlot, activeTreeTabKey
+    global g_valueTree, g_nodePaths, g_reader, g_debugMode, g_updatesPaused, g_autoFlaskEnabled, g_autoFlaskPerformanceMode
+    global g_lifeThresholdPercent, g_manaThresholdPercent, g_flaskKeyLoadStatus, g_autoFlaskLastReason, g_flaskKeyBySlot, g_activeTreeTabKey
     global g_radarReadMs, g_radarRenderMs
 
     title := "Updated: " FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-       . " | PID: " reader.Mem.Pid
-        " | Debug: " (debugMode ? "ON" : "OFF")
-        " | Updates: " (updatesPaused ? "PAUSED" : "LIVE")
-        " | AutoFlask: " (autoFlaskEnabled ? "ON" : "OFF")
-        " | AFPerf: " (autoFlaskPerformanceMode ? "ON" : "OFF")
+       . " | PID: " g_reader.Mem.Pid
+        " | Debug: " (g_debugMode ? "ON" : "OFF")
+        " | Updates: " (g_updatesPaused ? "PAUSED" : "LIVE")
+        " | AutoFlask: " (g_autoFlaskEnabled ? "ON" : "OFF")
+        " | AFPerf: " (g_autoFlaskPerformanceMode ? "ON" : "OFF")
       . " | Snap: " snapshotModeText
       . " | Profiling(ms): read=" readLastMs "(avg=" readAvgMs ") tree=" treeLastMs " total=" totalLastMs " radar=r" g_radarReadMs "+d" g_radarRenderMs
       . " | EntityMode: " StrUpper(entityModeText)
       . " | EntityOff: " entityOffsetText
       . " | FallbackAgo: " entityFallbackAgeText
-      . " | L/M %: " lifeThresholdPercent "/" manaThresholdPercent
-      . " | Keys: " flaskKeyLoadStatus
-      . " | AF: " autoFlaskLastReason
+      . " | L/M %: " g_lifeThresholdPercent "/" g_manaThresholdPercent
+      . " | Keys: " g_flaskKeyLoadStatus
+      . " | AF: " g_autoFlaskLastReason
 
-    header := valueTree.Add(title)
-    nodePaths[header] := "snapshot"
+    header := g_valueTree.Add(title)
+    g_nodePaths[header] := "snapshot"
 
     EnsureLegacyGameStateAliases(snapshot)
 
-    switch activeTreeTabKey
+    switch g_activeTreeTabKey
     {
         case "Overview":
             inGame := (snapshot && snapshot.Has("inGameState")) ? snapshot["inGameState"] : 0
             areaInst := (inGame && inGame.Has("areaInstance")) ? inGame["areaInstance"] : 0
             playerPosText := BuildPlayerPositionText(areaInst)
             if (playerPosText != "-")
-                valueTree.Add("Player Position: " playerPosText, header)
+                g_valueTree.Add("Player Position: " playerPosText, header)
 
-            keyNode := valueTree.Add("Flask Hotkeys (active mapping)", header)
+            keyNode := g_valueTree.Add("Flask Hotkeys (active mapping)", header)
             loop 5
             {
                 slot := A_Index
-                key := flaskKeyBySlot.Has(slot) ? flaskKeyBySlot[slot] : "?"
-                valueTree.Add("Slot " slot " -> " key, keyNode)
+                key := g_flaskKeyBySlot.Has(slot) ? g_flaskKeyBySlot[slot] : "?"
+                g_valueTree.Add("Slot " slot " -> " key, keyNode)
             }
-            valueTree.Modify(keyNode, "Expand")
+            g_valueTree.Modify(keyNode, "Expand")
 
         case "Buffs":
             AddActiveBuffsNode(header, snapshot, expandedPaths)
@@ -774,8 +456,8 @@ RenderActiveTreeTab(snapshot, snapshotModeText, readAvgMs, readLastMs, treeLastM
         case "Entities":
             if (snapshotModeText = "autoflask-performance")
             {
-                perfNode := valueTree.Add("Performance Mode: Entity Highlights/Scanner deaktiviert", header)
-                nodePaths[perfNode] := "snapshot/performanceMode"
+                perfNode := g_valueTree.Add("Performance Mode: Entity Highlights/Scanner deaktiviert", header)
+                g_nodePaths[perfNode] := "snapshot/performanceMode"
             }
             else
             {
@@ -791,7 +473,7 @@ RenderActiveTreeTab(snapshot, snapshotModeText, readAvgMs, readLastMs, treeLastM
             BuildTreeNode(header, "snapshot", snapshot, 0, counters, expandedPaths, "snapshot")
     }
 
-    valueTree.Modify(header, "Expand")
+    g_valueTree.Modify(header, "Expand")
 }
 
 ; Injects compatibility keys (vitalStruct, playerStruct) into the snapshot Map for older TreeView code.
@@ -834,15 +516,24 @@ EnsureLegacyGameStateAliases(snapshot)
 ; Tab Change event handler; switches the active tree context and requests a full tree refresh.
 OnTreeTabChanged(*)
 {
-    global treeRefreshRequested
+    global g_treeRefreshRequested
 
     SetActiveTreeContextFromTab()
-    treeRefreshRequested := true
+    g_treeRefreshRequested := true
     ReadAndShow()
 }
 
 #Include TreeViewWatchlistPanel.ahk
 
+; ── Extracted single-responsibility modules ──────────────────────────────────
+#Include JsonParser.ahk
+#Include ErrorLogger.ahk
+#Include ConfigManager.ahk
+#Include SnapshotSerializers.ahk
+#Include WebViewBridge.ahk
+#Include DebugDump.ahk
+#Include ToggleHandlers.ahk
+#Include BridgeDispatch.ahk
 
 #Include AutoFlask.ahk
 #Include UIHelpers.ahk

@@ -405,11 +405,38 @@ class PoE2Offsets
         "PositionModifier",     0x0F0,  ; StdTuple2D<float> — added to parent pos when child's ShouldModifyPos (bit10) is set
         "RelativePosition",     0x118,  ; StdTuple2D<float> — position relative to parent (UI coords, base 2560×1600)
         "LocalScaleMultiplier", 0x130,  ; float — scale factor applied to children
+        "StringIdPtr",          0x140,  ; StdWString — UI element identifier (e.g. "LeftPanel", "InventoryPanel")
         "Flags",                0x180,  ; uint — bit 10 = SHOULD_MODIFY_POS, bit 11 = IS_VISIBLE
         "ScaleIndex",           0x18A,  ; byte — 1/2/3 for GameWindowScale lookup
-        "UnscaledSize",         0x288,  ; StdTuple2D<float> — element size in UI coords
-        "BackgroundColor",      0x25C   ; packed RGBA uint — alpha = (value >> 24) & 0xFF
+        "BackgroundColor",      0x25C,  ; float4 RGBA — .W (alpha, +12) is used for chat-active check
+        "UnscaledSize",         0x288   ; StdTuple2D<float> — element size in UI coords
     )
+
+    ; Panels we want to detect for overlay visibility gating.
+    ; Each name corresponds to a UiElement StringId discoverable under GameUiPtr.
+    ; The offset is discovered at runtime by DiscoverPanelOffsets() and cached per patch.
+    static PanelNames := [
+        "LeftPanel",                ; Inventory / character sheet container
+        "RightPanel",               ; Skill tree / social / other right-side panels
+        "InventoryPanel",           ; Inventory grid
+        "NpcDialogPanel",           ; NPC / vendor dialog
+        "SellWindow",               ; Vendor sell window
+        "TradeWindow",              ; Player-to-player trade
+        "StashPanel",               ; Stash tab
+        "SkillPanel",               ; Skill gem panel
+        "SocialPanel",              ; Social / party / friends
+        "WorldPanel",               ; Atlas / world map
+        "CharacterPanel",           ; Character stats (C screen)
+        "QuestPanel",               ; Quest tracker panel
+        "MarketPanel",              ; Trade market
+        "ChallengesPanel",          ; Challenges / achievements
+        "RitualWindow",             ; Ritual encounter UI
+        "EscapeMenu"                ; Escape / settings menu
+    ]
+
+    ; Runtime-populated: panelName → byte offset from GameUiPtr.
+    ; Filled by DiscoverPanelOffsets(), persisted to INI under [PanelOffsets].
+    static DiscoveredPanelOffsets := Map()
 
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)

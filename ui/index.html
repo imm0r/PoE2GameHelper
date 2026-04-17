@@ -41,15 +41,52 @@ body{display:flex;flex-direction:column}
 .wm-close:hover{background:#c42b1c!important;color:#fff!important}
 
 /* TAB BAR */
-#tab-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
-.tab{padding:7px 16px;cursor:pointer;font-size:11px;font-weight:500;color:var(--subtext);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s}
+#tab-bar{display:flex;background:#131d2a;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+#tab-bar-left{display:flex}
+#tab-bar-right{margin-left:auto;display:flex}
+.tab{padding:7px 16px;cursor:pointer;font-size:11px;font-weight:500;color:var(--subtext);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s;display:flex;align-items:center;gap:5px}
 .tab:hover{color:var(--text)}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab.active{color:#e8c44a;border-bottom-color:#e8c44a}
+.tab svg{width:13px;height:13px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* CONTENT */
 #content{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .tab-panel{display:none;flex:1;overflow-y:auto;flex-direction:column}
 .tab-panel.active{display:flex}
+
+/* TSV VIEWER */
+.tsv-toolbar{display:flex;gap:8px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;align-items:center}
+#tsv-file-select{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font-size:11px;min-width:200px;cursor:pointer}
+#tsv-file-select:focus{outline:none;border-color:var(--accent)}
+#tsv-search{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font-size:11px;flex:1;min-width:120px}
+#tsv-search:focus{outline:none;border-color:var(--accent)}
+#tsv-search:disabled{opacity:.4}
+.tsv-info{font-size:10px;color:var(--subtext);white-space:nowrap;margin-left:auto}
+.tsv-pager{display:flex;align-items:center;gap:4px}
+.tsv-pg-btn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 10px;font-size:12px;cursor:pointer;transition:background .12s,border-color .12s}
+.tsv-pg-btn:hover:not(:disabled){background:var(--border);border-color:var(--accent)}
+.tsv-pg-btn:disabled{opacity:.3;cursor:default}
+.tsv-page-info{font-size:10px;color:var(--subtext);white-space:nowrap;min-width:80px;text-align:center}
+.tsv-table-wrap{flex:1;overflow:auto;padding:0}
+.tsv-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'Cascadia Mono','Consolas',monospace}
+.tsv-table thead{position:sticky;top:0;z-index:1}
+.tsv-table th{background:var(--surface2);color:var(--accent);font-weight:600;text-align:left;padding:5px 10px;border-bottom:2px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.tsv-table th:hover{background:var(--border)}
+.tsv-table th .sort-ind{font-size:9px;margin-left:3px;opacity:.6}
+.tsv-table td{padding:3px 10px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap;max-width:600px;overflow:hidden;text-overflow:ellipsis}
+.tsv-table tr:hover td{background:var(--surface2)}
+.tsv-gen-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;width:100%}
+.tsv-gen-btn{font-weight:600;padding:2px 14px !important}
+.tsv-gen-status{font-size:11px;color:var(--subtext);flex:1}
+.tsv-gen-status.running{color:#e8c44a}
+.tsv-gen-status.done{color:#4aad4a}
+.tsv-gen-status.error{color:#d94444}
+.tsv-log-toggle{font-size:10px !important;padding:2px 8px !important;color:var(--subtext) !important;margin-left:auto}
+.tsv-gen-log{max-height:140px;overflow-y:auto;padding:6px 10px;font-size:10px;font-family:'Cascadia Mono','Consolas',monospace;color:var(--subtext);background:var(--bg);border-bottom:1px solid var(--border);white-space:pre-wrap;flex-shrink:0}
+.tsv-gen-log .log-ok{color:#4aad4a}
+.tsv-gen-log .log-err{color:#d94444}
+.tsv-gen-log .log-step{color:#e8c44a}
+.tsv-table tr.tsv-hidden{display:none}
 
 /* OVERVIEW / TREE */
 #tab-overview-content{flex:1;overflow-y:auto;padding:8px}
@@ -137,10 +174,56 @@ body{display:flex;flex-direction:column}
 .json-viewer pre{color:var(--text);font-size:11px;font-family:'Consolas','Courier New',monospace;white-space:pre-wrap;word-break:break-all;margin:0;line-height:1.5}
 .json-key{color:#6a8fbf}.json-str{color:#a8c97a}.json-num{color:#d4a25c}.json-bool{color:#c792ea}.json-hex{color:#f5a06b}
 
+/* PROPERTY INSPECTOR (UI & gameState tabs) */
+.prop-inspector{padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.prop-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.prop-card-hdr{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;user-select:none;font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;background:rgba(255,255,255,0.02)}
+.prop-card-hdr:hover{background:rgba(255,255,255,0.04)}
+.prop-card-hdr .arrow{font-size:9px;transition:transform .15s;color:var(--subtext)}
+.prop-card.collapsed .prop-card-body{display:none}
+.prop-card.collapsed .arrow{transform:rotate(-90deg)}
+.prop-card-body{border-top:1px solid var(--border)}
+.prop-row{display:flex;align-items:baseline;padding:2px 10px;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.03)}
+.prop-row:last-child{border-bottom:none}
+.prop-row:hover{background:rgba(255,255,255,0.025)}
+.prop-key{color:var(--subtext);min-width:180px;flex-shrink:0;font-family:'Consolas',monospace;padding-right:12px}
+.prop-val{font-family:'Consolas',monospace;word-break:break-all}
+.prop-val.v-num{color:#d4a25c}
+.prop-val.v-hex{color:#f5a06b}
+.prop-val.v-str{color:#a8c97a}
+.prop-val.v-bool{color:#c792ea}
+.prop-val.v-true::before{content:'● ';color:#4aad4a;font-size:8px}
+.prop-val.v-false::before{content:'● ';color:#aa4444;font-size:8px}
+.prop-val.v-null{color:var(--subtext);font-style:italic}
+.prop-sub{margin-left:14px;border-left:2px solid var(--border);padding-left:0}
+.prop-sub-label{color:var(--accent);font-size:10px;font-weight:600;padding:3px 10px;cursor:pointer;user-select:none;opacity:0.7}
+.prop-sub-label:hover{opacity:1}
+.prop-sub-label .arrow{font-size:8px;margin-right:4px;display:inline-block;transition:transform .15s}
+.prop-sub.collapsed .prop-sub-body{display:none}
+.prop-sub.collapsed .arrow{transform:rotate(-90deg)}
+
+/* DEBUG TAB — panel grid */
+.dbg-panel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;padding:8px 0}
+.dbg-panel-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px}
+.dbg-panel-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dbg-panel-dot.open{background:#e04040;box-shadow:0 0 6px #e04040aa}
+.dbg-panel-dot.closed{background:#3a3a55}
+.dbg-panel-name{color:var(--text);font-weight:500;flex:1}
+.dbg-panel-offset{color:var(--subtext);font-size:10px;font-family:'Cascadia Mono',monospace}
+.dbg-discovery-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'Cascadia Mono','Consolas',monospace}
+.dbg-discovery-table th{background:var(--surface2);color:var(--accent);font-weight:600;text-align:left;padding:4px 10px;border-bottom:2px solid var(--border)}
+.dbg-discovery-table td{padding:3px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+.dbg-discovery-table tr.tracked td{color:#e8c44a}
+.dbg-overlay-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+.dbg-overlay-label{color:var(--subtext);min-width:120px}
+.dbg-overlay-val{color:var(--text);font-weight:500}
+.dbg-overlay-val.allowed{color:#4aad4a}
+.dbg-overlay-val.blocked{color:#e04040}
+
 /* CONFIG */
 .cfg-scroll{flex:1;overflow-y:auto;padding:12px}
-.cfg-section{margin-bottom:18px}
-.cfg-header{color:var(--accent);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.cfg-section{margin-bottom:14px}
+.cfg-header{color:var(--accent);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px;border-bottom:1px solid var(--border);flex:1}
 .cfg-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0}
 .cfg-label{color:var(--text);font-size:12px}
 .toggle{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
@@ -157,12 +240,16 @@ body{display:flex;flex-direction:column}
 .filter-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer}
 .filter-pill input{cursor:pointer}
 .cfg-section details{padding:0}
-.cfg-section details summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;padding:4px 0}
+.cfg-section details summary{cursor:pointer;list-style:none;display:flex;align-items:center;padding:0;position:relative}
 .cfg-section details summary::-webkit-details-marker{display:none}
-.cfg-section details summary::after{content:'▶';font-size:9px;color:var(--subtext);transition:transform .15s}
-.cfg-section details[open] summary::after{transform:rotate(90deg)}
+.cfg-section details summary::after{content:'▾';font-size:16px;color:var(--subtext);position:absolute;right:0;bottom:1px;line-height:1;transition:transform .15s}
+.cfg-section details:not([open]) summary::after{content:'▸'}
 .cfg-section details summary .cfg-header{margin:0}
 .cfg-subsection{padding:4px 0 0 0}
+.cfg-slider-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.cfg-slider-row .cfg-label{min-width:52px;flex-shrink:0}
+.cfg-slider-row input[type="range"]{flex:1;min-width:80px}
+.cfg-slider-row .cfg-slider-val{min-width:32px;text-align:right;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums}
 
 /* WATCHLIST */
 .wl-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0 8px 8px}
@@ -176,7 +263,7 @@ body{display:flex;flex-direction:column}
 .wl-table tr.selected td{background:var(--surface2)}
 
 /* STATUS BAR */
-#status-bar{background:var(--surface);border-top:1px solid var(--border);padding:3px 12px;font-size:10px;color:var(--subtext);flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#status-bar{background:var(--surface);border-top:1px solid var(--border);padding:3px 12px;font-size:10px;color:var(--subtext);flex-shrink:0;display:flex;justify-content:space-between;white-space:nowrap;overflow:hidden}
 
 /* SCROLLBAR */
 ::-webkit-scrollbar{width:6px;height:6px}
@@ -205,11 +292,10 @@ body{display:flex;flex-direction:column}
   <div class="pill inactive clickable" id="pill-debug"  onclick="ahkCall('ToggleDebug')"     title="Toggle Debug"><div class="dot"></div><span id="pill-debug-text">Debug OFF</span></div>
   <div class="pill inactive clickable" id="pill-flask"  onclick="ahkCall('ToggleAutoFlask')" title="Toggle AutoFlask"><div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span></div>
   <div class="pill inactive clickable" id="pill-radar"  onclick="ahkCall('ToggleRadar')"     title="Toggle Radar"><div class="dot"></div><span id="pill-radar-text">Radar ON</span></div>
+  <div class="pill inactive clickable" id="pill-hud"    onclick="ahkCall('TogglePlayerHud')" title="Toggle Player HUD"><div class="dot"></div><span id="pill-hud-text">HUD ON</span></div>
   <div class="pill inactive"     id="pill-fps"    ><div class="dot"></div><span id="pill-fps-text">0 fps</span></div>
   <div id="header-right">
-    <button class="hbtn" id="btn-pause"   onclick="ahkCall('TogglePause')">⏸ Pause</button>
     <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
-    <button class="hbtn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
     <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
   </div>
   <div id="wm-btns">
@@ -221,30 +307,25 @@ body{display:flex;flex-direction:column}
 
 <!-- TAB BAR -->
 <div id="tab-bar">
-  <div class="tab active" data-tab="overview"   onclick="switchTab('overview')">Overview</div>
-  <div class="tab"        data-tab="entities"   onclick="switchTab('entities')">Entities</div>
-  <div class="tab"        data-tab="skills"     onclick="switchTab('skills')">Skills &amp; Buffs</div>
-  <div class="tab"        data-tab="ui"         onclick="switchTab('ui')">UI</div>
-  <div class="tab"        data-tab="gamestate"  onclick="switchTab('gamestate')">gameState</div>
-  <div class="tab"        data-tab="config"     onclick="switchTab('config')">Config</div>
-  <div class="tab"        data-tab="watchlist"  onclick="switchTab('watchlist')">Watchlist <span id="wl-badge"></span></div>
+  <div id="tab-bar-left">
+    <div class="tab active" data-tab="entities"   onclick="switchTab('entities')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-1a4 4 0 0 0-3-3.85"/></svg>Entities</div>
+    <div class="tab"        data-tab="skills"     onclick="switchTab('skills')"><svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/></svg>Skills &amp; Buffs</div>
+    <div class="tab"        data-tab="ui"         onclick="switchTab('ui')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>UI</div>
+    <div class="tab"        data-tab="gamestate"  onclick="switchTab('gamestate')"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>gameState</div>
+    <div class="tab"        data-tab="watchlist"  onclick="switchTab('watchlist')"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Watchlist <span id="wl-badge"></span></div>
+    <div class="tab"        data-tab="tsvs"       onclick="switchTab('tsvs')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>TSVs</div>
+    <div class="tab"        data-tab="debug"      onclick="switchTab('debug')"><svg viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v1h2"/><path d="M18 10h2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4"/><path d="M4 14h2"/><path d="M18 14h2"/><path d="M4 18h2"/><path d="M18 18h2"/><rect x="8" y="9" width="8" height="12" rx="2"/><path d="M12 9v12"/></svg>Debug</div>
+  </div>
+  <div id="tab-bar-right">
+    <div class="tab"        data-tab="config"     onclick="switchTab('config')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>Config</div>
+  </div>
 </div>
 
 <!-- CONTENT -->
 <div id="content">
 
-  <!-- OVERVIEW TAB -->
-  <div class="tab-panel active" id="panel-overview">
-    <div class="tree-toolbar" id="tree-toolbar">
-      <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
-      <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
-      <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
-    </div>
-    <div id="tab-overview-content"><div class="tree-empty">Loading…</div></div>
-  </div>
-
-  <!-- ENTITIES TAB -->
-  <div class="tab-panel" id="panel-entities">
+  <!-- ENTITIES TAB (now default active) -->
+  <div class="tab-panel active" id="panel-entities">
     <div id="tab-entities-content"><div class="no-data-msg">Waiting for data…</div></div>
   </div>
 
@@ -264,43 +345,99 @@ body{display:flex;flex-direction:column}
     <div id="tab-gamestate-content"><div class="no-data-msg">Waiting for data…</div></div>
   </div>
 
+  <!-- TSVs TAB -->
+  <div class="tab-panel" id="panel-tsvs">
+    <div class="tsv-gen-bar">
+      <button class="cfg-btn tsv-gen-btn" id="tsv-gen-btn" onclick="startTsvGeneration()">⚙ Generate TSVs from Game Data</button>
+      <span id="tsv-gen-status" class="tsv-gen-status"></span>
+      <button class="cfg-btn tsv-log-toggle" id="tsv-log-toggle" onclick="toggleTsvLog()" style="display:none">▾ Log</button>
+    </div>
+    <div id="tsv-gen-log" class="tsv-gen-log" style="display:none"></div>
+    <div class="tsv-toolbar">
+      <select id="tsv-file-select" onchange="onTsvFileSelected(this.value)">
+        <option value="">— Select a TSV file —</option>
+      </select>
+      <input id="tsv-search" type="text" placeholder="Filter rows…" oninput="filterTsvRows(this.value)" disabled>
+      <div id="tsv-pager" class="tsv-pager" style="display:none">
+        <button class="tsv-pg-btn" onclick="tsvPageNav(-1)" id="tsv-prev" title="Previous page">◀</button>
+        <span id="tsv-page-info" class="tsv-page-info"></span>
+        <button class="tsv-pg-btn" onclick="tsvPageNav(1)" id="tsv-next" title="Next page">▶</button>
+      </div>
+      <span id="tsv-info" class="tsv-info"></span>
+    </div>
+    <div id="tsv-table-wrap" class="tsv-table-wrap">
+      <div class="no-data-msg">Select a TSV file above to view its contents.</div>
+    </div>
+  </div>
+
   <!-- CONFIG TAB -->
   <div class="tab-panel" id="panel-config">
     <div class="cfg-scroll">
 
       <div class="cfg-section">
-        <div class="cfg-header">Status</div>
-        <div class="cfg-row"><span class="cfg-label">PoE2 Running</span><span id="cfg-poe-status" class="cfg-status">—</span></div>
-        <div class="cfg-row"><span class="cfg-label">Connected</span><span id="cfg-conn-status" class="cfg-status">—</span></div>
+        <details id="det-status" open ontoggle="syncCfgSections()">
+          <summary><div class="cfg-header">Status</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row">
+              <span style="display:flex;align-items:center;gap:6px">
+                <span class="cfg-label">PoE2</span>
+                <span id="cfg-poe-status" class="cfg-status">—</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:6px">
+                <span id="cfg-conn-status" class="cfg-status">—</span>
+              </span>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div class="cfg-section">
-        <div class="cfg-header">Toggles</div>
-        <div class="cfg-row"><span class="cfg-label">Debug Mode</span>
-          <label class="toggle"><input type="checkbox" id="tog-debug" onchange="ahkCall('ToggleDebug')"><span class="toggle-slider"></span></label></div>
-        <div class="cfg-row"><span class="cfg-label">Pause Updates</span>
-          <label class="toggle"><input type="checkbox" id="tog-pause" onchange="ahkCall('TogglePause')"><span class="toggle-slider"></span></label></div>
-        <div class="cfg-row"><span class="cfg-label">NPC Watch Auto-Sync</span>
-          <label class="toggle"><input type="checkbox" id="tog-npcsync" onchange="ahkCall('ToggleNpcSync')"><span class="toggle-slider"></span></label></div>
+        <details id="det-overview" open ontoggle="syncCfgSections()">
+          <summary><div class="cfg-header">Overview</div></summary>
+          <div class="cfg-subsection" style="padding:0">
+            <div class="tree-toolbar" id="tree-toolbar">
+              <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
+              <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
+              <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
+            </div>
+            <div id="tab-overview-content" style="max-height:300px;overflow-y:auto;padding:8px"><div class="tree-empty">Loading…</div></div>
+          </div>
+        </details>
       </div>
 
       <div class="cfg-section">
-        <details open>
+        <details id="det-toggles" open ontoggle="syncCfgSections()">
+          <summary><div class="cfg-header">Toggles</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row"><span class="cfg-label">Debug Mode</span>
+              <label class="toggle"><input type="checkbox" id="tog-debug" onchange="ahkCall('ToggleDebug')"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Pause Updates</span>
+              <label class="toggle"><input type="checkbox" id="tog-pause" onchange="ahkCall('TogglePause')"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">NPC Watch Auto-Sync</span>
+              <label class="toggle"><input type="checkbox" id="tog-npcsync" onchange="ahkCall('ToggleNpcSync')"><span class="toggle-slider"></span></label></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details id="det-autoflask" open ontoggle="syncCfgSections()">
           <summary><div class="cfg-header">Autoflask</div></summary>
           <div class="cfg-subsection">
             <div class="cfg-row"><span class="cfg-label">Enable AutoFlask</span>
               <label class="toggle"><input type="checkbox" id="tog-flask" onchange="ahkCall('ToggleAutoFlask')"><span class="toggle-slider"></span></label></div>
             <div class="cfg-row"><span class="cfg-label">AF Performance Mode</span>
               <label class="toggle"><input type="checkbox" id="tog-afperf" onchange="ahkCall('ToggleAutoFlaskPerf')"><span class="toggle-slider"></span></label></div>
-            <div class="cfg-row">
-              <span class="cfg-label">Threshold</span>
-              <span style="display:flex;gap:6px;align-items:center">
-                <span class="cfg-label">Life %</span>
-                <input class="cfg-input" id="inp-life" type="number" min="1" max="100" value="50">
-                <span class="cfg-label">Mana %</span>
-                <input class="cfg-input" id="inp-mana" type="number" min="1" max="100" value="30">
-                <button class="cfg-btn" onclick="applyThresholds()">Apply</button>
-              </span>
+            <div class="cfg-slider-row">
+              <span class="cfg-label">Life %</span>
+              <input type="range" id="inp-life" min="1" max="100" value="50"
+                oninput="document.getElementById('life-val').textContent=this.value; ahkCall('SetThresholds', this.value, document.getElementById('inp-mana').value)">
+              <span class="cfg-slider-val" id="life-val">50</span>
+            </div>
+            <div class="cfg-slider-row">
+              <span class="cfg-label">Mana %</span>
+              <input type="range" id="inp-mana" min="1" max="100" value="30"
+                oninput="document.getElementById('mana-val').textContent=this.value; ahkCall('SetThresholds', document.getElementById('inp-life').value, this.value)">
+              <span class="cfg-slider-val" id="mana-val">30</span>
             </div>
             <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-af-reason" class="cfg-status idle">—</span></div>
           </div>
@@ -308,11 +445,13 @@ body{display:flex;flex-direction:column}
       </div>
 
       <div class="cfg-section">
-        <details open>
+        <details id="det-radar" open ontoggle="syncCfgSections()">
           <summary><div class="cfg-header">Radar</div></summary>
           <div class="cfg-subsection">
             <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
               <label class="toggle"><input type="checkbox" id="tog-radar" onchange="ahkCall('ToggleRadar')" checked><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Player HUD</span>
+              <label class="toggle"><input type="checkbox" id="tog-player-hud" onchange="ahkCall('TogglePlayerHud')" checked><span class="toggle-slider"></span></label></div>
             <div id="radar-filters" class="filter-row">
               <label class="filter-pill"><input type="checkbox" id="rf-normal"  onchange="setRadarFilter('normal',  this.checked)" checked> Normal</label>
               <label class="filter-pill"><input type="checkbox" id="rf-rare"    onchange="setRadarFilter('rare',    this.checked)" checked> Rare</label>
@@ -321,16 +460,31 @@ body{display:flex;flex-direction:column}
               <label class="filter-pill"><input type="checkbox" id="rf-npcs"    onchange="setRadarFilter('npcs',    this.checked)"> NPCs</label>
               <label class="filter-pill"><input type="checkbox" id="rf-chests"  onchange="setRadarFilter('chests',  this.checked)"> Chests</label>
             </div>
-            <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Zone Navigation (auto-path to exits)</span>
+            <div class="cfg-row"><span class="cfg-label">Zone Navigation</span>
               <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')" checked><span class="toggle-slider"></span></label></div>
-            <div class="cfg-row"><span class="cfg-label">Map Hack (reveal terrain on large map)</span>
+            <div class="cfg-row"><span class="cfg-label">Map Hack</span>
               <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')" checked><span class="toggle-slider"></span></label></div>
+            <div class="cfg-slider-row">
+              <span class="cfg-label">Opacity</span>
+              <input type="range" id="radar-alpha" min="20" max="255" value="255"
+                oninput="document.getElementById('radar-alpha-val').textContent=Math.round(this.value/255*100)+'%'; ahkCall('SetRadarAlpha', parseInt(this.value))">
+              <span class="cfg-slider-val" id="radar-alpha-val">100%</span>
+            </div>
           </div>
         </details>
       </div>
 
       <div class="cfg-section">
-        <details open>
+        <details id="det-blacklist" ontoggle="syncCfgSections()">
+          <summary><div class="cfg-header">Skills &amp; Buffs Blacklist</div></summary>
+          <div class="cfg-subsection" id="cfg-blacklist">
+            <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details id="det-entities" open ontoggle="syncCfgSections()">
           <summary><div class="cfg-header">Entities</div></summary>
           <div class="cfg-subsection">
             <div class="filter-row">
@@ -347,18 +501,14 @@ body{display:flex;flex-direction:column}
       </div>
 
       <div class="cfg-section">
-        <div class="cfg-header">Actions</div>
-        <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
-        <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
-        <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
-        <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
-      </div>
-
-      <div class="cfg-section">
-        <details>
-          <summary><div class="cfg-header">Skills &amp; Buffs Blacklist</div></summary>
-          <div class="cfg-subsection" id="cfg-blacklist">
-            <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+        <details id="det-actions" open ontoggle="syncCfgSections()">
+          <summary><div class="cfg-header">Actions</div></summary>
+          <div class="cfg-subsection">
+            <button class="cfg-btn" id="btn-pause" onclick="ahkCall('TogglePause')">⏸ Pause</button>
+            <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
+            <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
+            <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
+            <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
           </div>
         </details>
       </div>
@@ -367,6 +517,48 @@ body{display:flex;flex-direction:column}
   </div>
 
   <!-- WATCHLIST TAB -->
+  <!-- DEBUG TAB -->
+  <div class="tab-panel" id="panel-debug">
+    <div class="cfg-scroll">
+      <div class="cfg-section">
+        <details id="det-debug-panels" open>
+          <summary><div class="cfg-header">🎛 Panel Visibility (Live)</div></summary>
+          <div style="padding:4px 0 6px;display:flex;gap:8px">
+            <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px" title="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels first!)</button>
+          </div>
+          <div class="cfg-body" id="debug-panels-live"><div class="no-data-msg">Waiting for panel discovery…</div></div>
+        </details>
+      </div>
+      <div class="cfg-section">
+        <details id="det-debug-discovery">
+          <summary><div class="cfg-header">🔍 Panel Discovery Results</div></summary>
+          <div style="padding:6px 0"><button class="tree-tbtn" onclick="ahkCall('RediscoverPanels')" style="font-size:11px">🔄 Re-discover Panels</button></div>
+          <div class="cfg-body" id="debug-panels-discovery"><div class="no-data-msg">No discovery data yet</div></div>
+        </details>
+      </div>
+      <div class="cfg-section">
+        <details id="det-debug-diff" open>
+          <summary><div class="cfg-header">🧪 Struct Diff Diagnostic</div></summary>
+          <div style="padding:8px 0;font-size:11px;color:var(--subtext)">
+            Close all panels → <b>📸 Snapshot</b>, then open a panel → <b>🔍 Compare</b> to find what bytes change.
+          </div>
+          <div style="display:flex;gap:8px;padding:0 0 8px">
+            <button class="tree-tbtn" onclick="ahkCall('TakeDiffSnapshot')" style="font-size:11px">📸 Snapshot (panels closed)</button>
+            <button class="tree-tbtn" onclick="ahkCall('CompareDiffSnapshot')" style="font-size:11px">🔍 Compare (panel open)</button>
+          </div>
+          <div id="debug-diff-status" style="font-size:10px;color:var(--subtext);padding:2px 0"></div>
+          <div class="cfg-body" id="debug-diff-results"><div class="no-data-msg">No diff data yet</div></div>
+        </details>
+      </div>
+      <div class="cfg-section">
+        <details id="det-debug-overlay">
+          <summary><div class="cfg-header">🖥 Overlay State</div></summary>
+          <div class="cfg-body" id="debug-overlay-state"><div class="no-data-msg">Waiting for data…</div></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-panel" id="panel-watchlist">
     <div class="wl-wrap">
       <div class="wl-toolbar">
@@ -387,7 +579,7 @@ body{display:flex;flex-direction:column}
 </div><!-- /content -->
 
 <!-- STATUS BAR -->
-<div id="status-bar">Initializing…</div>
+<div id="status-bar"><span id="status-left">Initializing…</span><span id="status-right"></span></div>
 
 <script src="animation_names.js"></script>
 <script>
@@ -413,9 +605,9 @@ window.onerror = (msg, src, line) => console.error(`[JS] ${msg} @ ${src}:${line}
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════════════════════
 // These tabs notify AHK (to switch the AHK tree context)
-const treeTabs = new Set(['overview']);
+const treeTabs = new Set(['config']);
 
-let activeTab = 'overview';
+let activeTab = 'entities';
 
 function switchTab(key) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === key));
@@ -423,18 +615,20 @@ function switchTab(key) {
   activeTab = key;
   if (treeTabs.has(key))
     ahkCall('SwitchTab', key.charAt(0).toUpperCase() + key.slice(1));
+  if (key === 'tsvs' && !_tsvFilesLoaded)
+    ahkCall('ListTsvFiles');
 }
 
 // ═══════════════════════════════════════════════════════════════════
 //  STATUS BAR
 // ═══════════════════════════════════════════════════════════════════
-function updateStatus(text) {
-  const el = document.getElementById('status-bar');
-  if (el) el.textContent = text;
-  // extract FPS from status text for header pill
-  const m = String(text).match(/radar-(\d+)fps/);
+function updateStatus(leftText, rightText, perfText) {
+  const el = document.getElementById('status-left');
+  if (el) el.textContent = leftText || '';
+  const er = document.getElementById('status-right');
+  if (er) er.textContent = rightText || '';
   const fpsPill = document.getElementById('pill-fps-text');
-  if (fpsPill && m) fpsPill.textContent = m[1] + ' fps';
+  if (fpsPill && perfText) fpsPill.textContent = perfText;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -481,6 +675,12 @@ function updateHeader(json) {
     pillRadar.className = 'pill clickable ' + (on ? 'active' : 'inactive');
     document.getElementById('pill-radar-text').textContent = 'Radar ' + (on ? 'ON' : 'OFF');
   }
+  const pillHud = document.getElementById('pill-hud');
+  if (pillHud) {
+    const on = d.playerHud !== false && d.playerHud !== 'false';
+    pillHud.className = 'pill clickable ' + (on ? 'active' : 'inactive');
+    document.getElementById('pill-hud-text').textContent = 'HUD ' + (on ? 'ON' : 'OFF');
+  }
 
   // Header buttons active state
   const setBtnActive = (id, val) => { const b = document.getElementById(id); if(b) b.classList.toggle('active', val===true||val==='true'); };
@@ -503,12 +703,19 @@ function updateHeader(json) {
   setChk('tog-afperf',  d.afPerf);
   setChk('tog-npcsync', d.npcSync);
   setChk('tog-radar',   d.radarEnabled !== undefined ? d.radarEnabled : true);
+  setChk('tog-player-hud', d.playerHud !== undefined ? d.playerHud : true);
 
   const radarFilters = document.getElementById('radar-filters');
   if (radarFilters) radarFilters.style.opacity = (d.radarEnabled === false || d.radarEnabled === 'false') ? '0.4' : '1';
 
-  if (d.lifeThreshold !== undefined) { const el=document.getElementById('inp-life'); if(el) el.value=d.lifeThreshold; }
-  if (d.manaThreshold !== undefined) { const el=document.getElementById('inp-mana'); if(el) el.value=d.manaThreshold; }
+  if (d.lifeThreshold !== undefined) {
+    const el=document.getElementById('inp-life'); if(el) el.value=d.lifeThreshold;
+    const lb=document.getElementById('life-val'); if(lb) lb.textContent=d.lifeThreshold;
+  }
+  if (d.manaThreshold !== undefined) {
+    const el=document.getElementById('inp-mana'); if(el) el.value=d.manaThreshold;
+    const lb=document.getElementById('mana-val'); if(lb) lb.textContent=d.manaThreshold;
+  }
 
   const poeStatus  = document.getElementById('cfg-poe-status');
   const connStatus = document.getElementById('cfg-conn-status');
@@ -530,6 +737,13 @@ function updateHeader(json) {
   setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
   setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
 
+  if (d.radarAlpha !== undefined) {
+    const sl = document.getElementById('radar-alpha');
+    const lb = document.getElementById('radar-alpha-val');
+    if (sl) sl.value = d.radarAlpha;
+    if (lb) lb.textContent = Math.round(d.radarAlpha / 255 * 100) + '%';
+  }
+
   if (d.entityFilter) {
     const setEf = (id, val) => { const el=document.getElementById('ef-'+id); if(el) el.checked=val===true||val==='true'; };
     setEf('player',    d.entityFilter.player);
@@ -539,6 +753,11 @@ function updateHeader(json) {
     setEf('chest',     d.entityFilter.chest);
     setEf('worlditem', d.entityFilter.worlditem);
     setEf('other',     d.entityFilter.other);
+  }
+
+  if (d.cfgSections !== undefined && !_cfgSectionsLoaded) {
+    _cfgSectionsLoaded = true;
+    applyCfgSections(d.cfgSections);
   }
 
   // Maximize / restore button icon
@@ -560,7 +779,7 @@ let _treeFilter = '';
 function updateTree(tabKey, nodesJson) {
   let nodes; try { nodes = typeof nodesJson === 'string' ? JSON.parse(nodesJson) : nodesJson; } catch(e) { return; }
   _treeData[tabKey] = nodes;
-  if (activeTab === 'overview') _renderTree(nodes);
+  if (activeTab === 'config') _renderTree(nodes);
 }
 
 function _renderTree(nodes) {
@@ -741,7 +960,294 @@ function updateEntities(jsonStr) {
 function updateUIState(jsonStr) {
   const el = document.getElementById('tab-ui-content'); if(!el) return;
   let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
-  el.innerHTML = `<div class="json-viewer"><pre>${syntaxHighlight(JSON.stringify(data,null,2))}</pre></div>`;
+
+  // Group UI data into logical sections
+  const groups = [
+    { id:'ui-chat', title:'💬 Chat', icon:'', keys:['isChatActive','chatAlpha','chatBgColor','chatParentPtr'] },
+    { id:'ui-minimap', title:'🗺 Mini Map', icon:'', nested:'miniMapData' },
+    { id:'ui-largemap', title:'🌍 Large Map', icon:'', nested:'largeMapData' },
+    { id:'ui-ptrs', title:'🔗 Pointers', icon:'', keys:['activeMapParentPtr','mapParentPtr','controllerModeMapParentPtr','largeMapPtr','miniMapPtr','passiveSkillTreePanel'] }
+  ];
+  el.innerHTML = '<div class="prop-inspector">' + groups.map(g => {
+    let rows = '';
+    if (g.nested && data[g.nested] && typeof data[g.nested]==='object') {
+      rows = _propRows(data[g.nested]);
+    } else if (g.keys) {
+      rows = g.keys.filter(k => data[k]!==undefined).map(k => _propRow(k, data[k])).join('');
+    }
+    if (!rows) rows = '<div class="prop-row"><span class="prop-val v-null">No data</span></div>';
+    return _propCard(g.id, g.title, rows);
+  }).join('') + '</div>';
+}
+
+function updateGameState(jsonStr) {
+  const el = document.getElementById('tab-gamestate-content'); if(!el) return;
+  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
+
+  // Classify keys into logical groups
+  const areaKeys = ['address','currentAreaLevel','currentAreaHash','entityListOffset','awakeMapAddress','sleepingMapAddress'];
+  const playerKeys = ['localPlayerPtr','localPlayerRawPtr'];
+  const ptrKeys = ['serverDataPtr','serverDataRawPtr'];
+  // Everything else goes into their own nested card or a "Other" group
+  const usedKeys = new Set([...areaKeys, ...playerKeys, ...ptrKeys]);
+  const nestedKeys = [], otherKeys = [];
+  for (const k of Object.keys(data)) {
+    if (usedKeys.has(k)) continue;
+    if (data[k] && typeof data[k]==='object') nestedKeys.push(k);
+    else otherKeys.push(k);
+  }
+
+  const groups = [
+    { id:'gs-area', title:'🗺 Area Instance', keys: areaKeys },
+    { id:'gs-player', title:'👤 Player Pointers', keys: playerKeys },
+    { id:'gs-server', title:'🔗 Server / Memory', keys: [...ptrKeys, ...otherKeys] },
+  ];
+  // Add each nested object as its own card
+  for (const k of nestedKeys) {
+    groups.push({ id:'gs-'+k, title: _friendlyName(k), nested: k });
+  }
+
+  el.innerHTML = '<div class="prop-inspector">' + groups.map(g => {
+    let rows = '';
+    if (g.nested && data[g.nested] && typeof data[g.nested]==='object') {
+      rows = _propRows(data[g.nested]);
+    } else if (g.keys) {
+      rows = g.keys.filter(k => data[k]!==undefined).map(k => _propRow(k, data[k])).join('');
+    }
+    if (!rows) return '';
+    return _propCard(g.id, g.title, rows);
+  }).join('') + '</div>';
+}
+
+// ── Property inspector helpers ──
+const _propCardStates = {};
+function _propCard(id, title, bodyHtml) {
+  const collapsed = _propCardStates[id] === true ? ' collapsed' : '';
+  return `<div class="prop-card${collapsed}" id="pc-${id}">
+    <div class="prop-card-hdr" onclick="_togglePropCard('${id}')"><span class="arrow">▼</span>${escHtml(title)}</div>
+    <div class="prop-card-body">${bodyHtml}</div></div>`;
+}
+function _togglePropCard(id) {
+  const el = document.getElementById('pc-'+id);
+  if (!el) return;
+  const collapsed = el.classList.toggle('collapsed');
+  _propCardStates[id] = collapsed;
+}
+
+function _propRows(obj) {
+  if (!obj || typeof obj !== 'object') return '';
+  return Object.entries(obj).map(([k,v]) => {
+    if (v && typeof v === 'object') return _propSubgroup(k, v);
+    return _propRow(k, v);
+  }).join('');
+}
+
+const _propSubStates = {};
+function _propSubgroup(key, obj) {
+  const sid = 'psub-'+key;
+  const collapsed = _propSubStates[sid] === true ? ' collapsed' : '';
+  const rows = Object.entries(obj).map(([k,v]) => _propRow(k,v)).join('');
+  return `<div class="prop-sub${collapsed}" id="${sid}">
+    <div class="prop-sub-label" onclick="_togglePropSub('${sid}')"><span class="arrow">▼</span>${escHtml(_friendlyName(key))}</div>
+    <div class="prop-sub-body">${rows}</div></div>`;
+}
+function _togglePropSub(sid) {
+  const el = document.getElementById(sid);
+  if (!el) return;
+  const collapsed = el.classList.toggle('collapsed');
+  _propSubStates[sid] = collapsed;
+}
+
+function _propRow(key, val) {
+  let cls = 'v-str', display = escHtml(String(val));
+  if (val === null || val === undefined) { cls = 'v-null'; display = 'null'; }
+  else if (typeof val === 'boolean' || val === 'true' || val === 'false') {
+    const b = val === true || val === 'true';
+    cls = b ? 'v-bool v-true' : 'v-bool v-false';
+    display = String(b);
+  }
+  else if (typeof val === 'number' && (val === 0 || val === 1) && _isBoolKey(key)) {
+    cls = val ? 'v-bool v-true' : 'v-bool v-false';
+    display = val ? 'true' : 'false';
+  }
+  else if (typeof val === 'number') { cls = 'v-num'; display = String(val); }
+  else if (typeof val === 'string' && /^0x[0-9A-Fa-f]+$/.test(val)) { cls = 'v-hex'; }
+  else if (typeof val === 'string' && /^-?\d+\.?\d*$/.test(val)) { cls = 'v-num'; }
+  return `<div class="prop-row"><span class="prop-key">${escHtml(key)}</span><span class="prop-val ${cls}">${display}</span></div>`;
+}
+
+function _isBoolKey(k) {
+  const lk = k.toLowerCase();
+  if (/^(is|has|can|should|show|hide|enable|disable|allow|use)/.test(lk)) return true;
+  if (/(enabled|disabled|active|visible|alive|dead|valid|connected|paused|running|detected|loaded|ready|open|closed)$/i.test(k)) return true;
+  if (lk === 'debug' || lk === 'iscontrollermode') return true;
+  return false;
+}
+
+function _friendlyName(key) {
+  // camelCase / PascalCase → spaced, with leading emoji for known prefixes
+  const icons = {player:'👤',flask:'🧪',server:'🖥',vital:'❤',buff:'✨',charge:'⚡',skill:'🎯',stat:'📊',render:'🎨',positioned:'📍',transition:'🔄',stateMachine:'⚙',targetable:'🎯',actor:'🏃'};
+  for (const [k,ic] of Object.entries(icons)) {
+    if (key.toLowerCase().startsWith(k)) return ic + ' ' + key.replace(/([A-Z])/g, ' $1').trim();
+  }
+  return '📦 ' + key.replace(/([A-Z])/g, ' $1').trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  DEBUG TAB — Panel Visibility & Discovery
+// ═══════════════════════════════════════════════════════════════════
+let _lastPanelDiscovery = null;
+
+function updateDebugPanels(jsonStr) {
+  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
+  if (!data) return;
+
+  const vis = data.panelVisibility || {};
+  const discovery = data.panelDiscovery || {};
+  const overlay = data.overlay || {};
+
+  // ── Live panel visibility status ──
+  const liveEl = document.getElementById('debug-panels-live');
+  if (liveEl) {
+    const anyOpen = vis.anyPanelOpen || false;
+    const newlyVis = vis.newlyVisible || 0;
+    const newlyHid = vis.newlyHidden || 0;
+    const totalChanged = vis.totalChanged || 0;
+    const ptrsApp = vis.ptrsAppeared || 0;
+    const ptrsDis = vis.ptrsDisappeared || 0;
+    const curVis = vis.currentVisible || 0;
+    const baseVis = vis.baselineVisible || 0;
+    const changed = vis._changedOffsets || [];
+
+    let liveHtml = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px">`;
+    liveHtml += `<div style="font-size:20px;font-weight:700;color:${anyOpen ? '#ef4444' : '#4ade80'}">${anyOpen ? '🔴 PANEL OPEN' : '🟢 ALL CLEAR'}</div>`;
+    liveHtml += `<div style="font-size:11px;color:var(--subtext)">Visible: ${curVis} · Baseline: ${baseVis} · Flags: <span style="color:${newlyVis > 0 ? '#ef4444' : '#4ade80'}">+${newlyVis}</span>/<span style="color:${newlyHid > 0 ? '#e8c44a' : '#888'}">−${newlyHid}</span> · Ptrs: <span style="color:${ptrsApp > 0 ? '#ef4444' : '#4ade80'}">+${ptrsApp}</span>/<span style="color:${ptrsDis > 0 ? '#e8c44a' : '#888'}">−${ptrsDis}</span></div>`;
+    liveHtml += `</div>`;
+
+    if (changed.length > 0) {
+      liveHtml += `<div style="font-size:10px;color:#e8c44a;margin-top:4px">Changed offsets: ${changed.map(o => `<span style="font-family:monospace;color:${o.startsWith('+') ? '#4ade80' : '#ef4444'}">${escHtml(o)}</span>`).join(', ')}</div>`;
+    }
+    liveEl.innerHTML = liveHtml;
+  }
+
+  // ── Discovery results (visibility baseline scan) ──
+  const dKey = `${discovery._totalChildren || 0}-${discovery._heapPtrCount || 0}-${discovery._uiElemCount || 0}-${discovery._visibleCount || 0}`;
+  if (discovery && discovery._totalChildren > 0 && dKey !== _lastPanelDiscovery) {
+    _lastPanelDiscovery = dKey;
+    const discEl = document.getElementById('debug-panels-discovery');
+    if (discEl) {
+      let html = `<div style="padding:6px 0;font-size:11px;color:var(--subtext)">Scanned: ${discovery._totalChildren} · Heap ptrs: ${discovery._heapPtrCount || 0} · UiElements: ${discovery._uiElemCount || 0} · Visible at baseline: <span style="color:#4ade80">${discovery._visibleCount || 0}</span> · Hidden: <span style="color:#888">${discovery._invisibleCount || 0}</span></div>`;
+
+      // Visibility baseline table (all elements with flags + vis state)
+      const diag = discovery._diagSamples || [];
+      if (diag.length > 0) {
+        html += `<div style="padding:6px 0"><div style="color:var(--accent);font-size:10px;font-weight:600;margin-bottom:4px">STRUCT ELEMENTS (${diag.length} UiElements — Flags @ 0x180, bit 11 = IS_VISIBLE):</div>`;
+        html += `<div style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:4px">`;
+        diag.forEach(s => {
+          const isVis = (s.childInfo || '').includes('VISIBLE');
+          const label = s.stringId || '';
+          const visIcon = isVis ? '👁' : '·';
+          const color = isVis ? '#4ade80' : '#666';
+          html += `<div style="font-family:monospace;font-size:10px;color:${color};padding:1px 4px;display:flex;gap:8px">`;
+          html += `<span style="min-width:50px">${s.idx}</span>`;
+          html += `<span style="min-width:20px">${visIcon}</span>`;
+          html += `<span style="min-width:90px;color:#888">${s.rawHex}</span>`;
+          html += `<span style="color:var(--subtext);font-size:9px">${s.ptr}</span>`;
+          if (label) html += `<span style="color:#e8c44a;margin-left:4px">${escHtml(label)}</span>`;
+          html += `</div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      discEl.innerHTML = html;
+    }
+  }
+
+  // ── Overlay state ──
+  const ovEl = document.getElementById('debug-overlay-state');
+  if (ovEl && overlay) {
+    const rows = [
+      ['Overlay Allowed', overlay.allowed, overlay.allowed ? 'allowed' : 'blocked'],
+      ['Hide Reason', overlay.hideReason || '—', ''],
+      ['Current State', overlay.currentState || '—', ''],
+      ['Large Map Open', overlay.largeMapOpen, overlay.largeMapOpen ? 'allowed' : 'blocked'],
+      ['Mini Map Open', overlay.miniMapOpen, ''],
+      ['Map Debug', overlay.mapDebug || '—', ''],
+      ['Is Town', overlay.isTown, ''],
+      ['Is Hideout', overlay.isHideout, ''],
+      ['Player Alive', overlay.isAlive, ''],
+    ].map(([label, val, cls]) => {
+      const valCls = cls || (val === true ? 'allowed' : val === false ? 'blocked' : '');
+      const display = val === true ? 'true' : val === false ? 'false' : String(val ?? '—');
+      return `<div class="dbg-overlay-row"><span class="dbg-overlay-label">${escHtml(label)}</span><span class="dbg-overlay-val ${valCls}">${escHtml(display)}</span></div>`;
+    }).join('');
+    ovEl.innerHTML = rows;
+  }
+}
+
+// ── Struct Diff Diagnostic ──
+function updateDiffStatus(msg) {
+  const el = document.getElementById('debug-diff-status');
+  if (el) el.textContent = msg;
+}
+
+function updateDiffResults(data) {
+  const el = document.getElementById('debug-diff-results');
+  if (!el) return;
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) { return; } }
+  if (!data || !data.success) {
+    el.innerHTML = '<div class="no-data-msg">Comparison failed</div>';
+    return;
+  }
+
+  let html = '';
+  const sc = data.structChanges || [];
+  const ec = data.elemChanges || [];
+
+  // Struct byte changes
+  html += `<div style="color:var(--accent);font-size:11px;font-weight:600;margin:6px 0 4px">RAW STRUCT BYTE CHANGES (0x400-0xC00): ${sc.length === 0 ? '<span style="color:#888">none</span>' : `<span style="color:#ef4444">${sc.length} bytes</span>`}</div>`;
+  if (sc.length > 0) {
+    html += `<div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:4px;margin-bottom:8px">`;
+    sc.forEach(c => {
+      html += `<div style="font-family:monospace;font-size:10px;color:#e8c44a;padding:1px 4px">`;
+      html += `<span style="color:var(--subtext)">${escHtml(c.off)}</span>: `;
+      html += `<span style="color:#ef4444">${escHtml(c.old)}</span> → <span style="color:#4ade80">${escHtml(c['new'])}</span>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Element field changes
+  html += `<div style="color:var(--accent);font-size:11px;font-weight:600;margin:6px 0 4px">ELEMENT FIELD CHANGES (Flags/Size/Children): ${ec.length === 0 ? '<span style="color:#888">none</span>' : `<span style="color:#ef4444">${ec.length} elements</span>`}</div>`;
+  if (ec.length > 0) {
+    html += `<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:4px">`;
+    ec.forEach(e => {
+      const label = e.label ? ` <span style="color:#e8c44a">${escHtml(e.label)}</span>` : '';
+      html += `<div style="font-family:monospace;font-size:10px;padding:2px 4px;border-bottom:1px solid var(--border)">`;
+      html += `<span style="color:var(--subtext)">${escHtml(e.off)}</span>${label} <span style="font-size:9px;color:#666">${escHtml(e.ptr)}</span>`;
+      (e.changes || []).forEach(ch => {
+        html += `<div style="padding-left:16px;color:#ef4444;font-size:10px">${escHtml(ch)}</div>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (sc.length === 0 && ec.length === 0) {
+    html += `<div style="color:#888;font-size:11px;padding:8px 0">⚠ No changes detected — the mechanism may be outside the scanned range.</div>`;
+  }
+
+  el.innerHTML = html;
+  updateDiffStatus('Comparison complete — ' + sc.length + ' struct bytes, ' + ec.length + ' elements changed');
+}
+
+function syntaxHighlight(json) {
+  return escHtml(json)
+    .replace(/(&quot;[^&]*?&quot;)\s*:/g, '<span class="json-key">$1</span>:')
+    .replace(/:\s*(&quot;0x[0-9A-Fa-f]+&quot;)/g, m => m.replace(/(&quot;0x[^&]*?&quot;)/, '<span class="json-hex">$1</span>'))
+    .replace(/:\s*(&quot;[^&]*?&quot;)/g, m => m.replace(/(&quot;.*&quot;)/, '<span class="json-str">$1</span>'))
+    .replace(/:\s*(-?\d+\.?\d*)/g,        m => m.replace(/(-?\d+\.?\d*)$/, '<span class="json-num">$1</span>'))
+    .replace(/:\s*(true|false|null)/g,     m => m.replace(/(true|false|null)$/, '<span class="json-bool">$1</span>'));
 }
 
 function updateSkills(jsonStr) {
@@ -783,21 +1289,6 @@ function updateSkills(jsonStr) {
   el.innerHTML = `<div class="skill-header"><span class="skill-count">${usable.length} usable · ${blocked.length} on cooldown · ${filtered.length} total</span><span class="skill-debug" style="opacity:0.5;font-size:0.85em;margin-left:1em">ActiveSkill offset: ${asOff}</span></div><table class="skill-table"><thead><tr><th>Skill</th><th>Status</th><th>Cooldown</th><th>Uses</th><th>Total Uses</th><th>Cast Type</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-function updateGameState(jsonStr) {
-  const el = document.getElementById('tab-gamestate-content'); if(!el) return;
-  let data; try { data = typeof jsonStr==='string' ? JSON.parse(jsonStr) : jsonStr; } catch(e) { return; }
-  el.innerHTML = `<div class="json-viewer"><pre>${syntaxHighlight(JSON.stringify(data,null,2))}</pre></div>`;
-}
-
-function syntaxHighlight(json) {
-  return escHtml(json)
-    .replace(/(&quot;[^&]*?&quot;)\s*:/g, '<span class="json-key">$1</span>:')
-    .replace(/:\s*(&quot;0x[0-9A-Fa-f]+&quot;)/g, m => m.replace(/(&quot;0x[^&]*?&quot;)/, '<span class="json-hex">$1</span>'))
-    .replace(/:\s*(&quot;[^&]*?&quot;)/g, m => m.replace(/(&quot;.*&quot;)/, '<span class="json-str">$1</span>'))
-    .replace(/:\s*(-?\d+\.?\d*)/g,        m => m.replace(/(-?\d+\.?\d*)$/, '<span class="json-num">$1</span>'))
-    .replace(/:\s*(true|false|null)/g,     m => m.replace(/(true|false|null)$/, '<span class="json-bool">$1</span>'));
-}
-
 // ═══════════════════════════════════════════════════════════════════
 //  WATCHLIST
 // ═══════════════════════════════════════════════════════════════════
@@ -835,6 +1326,26 @@ function applyWlFilter() { _renderWatchlist(); }
 // ═══════════════════════════════════════════════════════════════════
 //  CONFIG HELPERS
 // ═══════════════════════════════════════════════════════════════════
+const _cfgSectionIds = ['status','overview','toggles','autoflask','radar','blacklist','entities','actions'];
+let _cfgSectionsGuard = 0;
+let _cfgSectionsLoaded = false;
+
+function syncCfgSections() {
+  if (_cfgSectionsGuard) return;
+  const open = _cfgSectionIds.filter(id => document.getElementById('det-'+id)?.open).join(',');
+  ahkCall('SetCfgSections', open);
+}
+
+function applyCfgSections(csv) {
+  _cfgSectionsGuard++;
+  const open = csv.split(',');
+  _cfgSectionIds.forEach(id => {
+    const el = document.getElementById('det-'+id);
+    if (el) el.open = open.includes(id);
+  });
+  setTimeout(() => { _cfgSectionsGuard--; }, 100);
+}
+
 function applyThresholds() {
   const life = document.getElementById('inp-life')?.value || '';
   const mana = document.getElementById('inp-mana')?.value || '';
@@ -925,6 +1436,216 @@ function headerDragStart(e) {
 function headerDblClick(e) {
   if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
   ahkCall('WinMaximize');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TSV GENERATION
+// ═══════════════════════════════════════════════════════════════════
+let _tsvGenerating = false;
+
+function startTsvGeneration() {
+  if (_tsvGenerating) return;
+  _tsvGenerating = true;
+  const btn = document.getElementById('tsv-gen-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating…';
+  const status = document.getElementById('tsv-gen-status');
+  status.className = 'tsv-gen-status running';
+  status.textContent = 'Starting pipeline…';
+  const log = document.getElementById('tsv-gen-log');
+  log.style.display = 'block';
+  log.innerHTML = '';
+  ahkCall('GenerateTsvs');
+}
+
+function tsvGenLog(msg, cls) {
+  const log = document.getElementById('tsv-gen-log');
+  log.style.display = 'block';
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = msg + '\n';
+  log.appendChild(span);
+  log.scrollTop = log.scrollHeight;
+}
+
+function tsvGenStatus(msg, cls) {
+  const status = document.getElementById('tsv-gen-status');
+  status.className = 'tsv-gen-status ' + (cls || '');
+  status.textContent = msg;
+}
+
+function tsvGenDone(success) {
+  _tsvGenerating = false;
+  const btn = document.getElementById('tsv-gen-btn');
+  btn.disabled = false;
+  btn.textContent = '⚙ Generate TSVs from Game Data';
+  // Show toggle and collapse log
+  const toggle = document.getElementById('tsv-log-toggle');
+  toggle.style.display = '';
+  setTimeout(() => toggleTsvLog(true), 1500);
+  if (success) {
+    _tsvFilesLoaded = false;
+    ahkCall('ListTsvFiles');
+  }
+}
+
+let _tsvLogOpen = true;
+function toggleTsvLog(forceCollapse) {
+  const log = document.getElementById('tsv-gen-log');
+  const toggle = document.getElementById('tsv-log-toggle');
+  if (forceCollapse === true) _tsvLogOpen = true; // will toggle to closed
+  _tsvLogOpen = !_tsvLogOpen;
+  log.style.display = _tsvLogOpen ? 'block' : 'none';
+  toggle.textContent = (_tsvLogOpen ? '▾' : '▸') + ' Log';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TSV VIEWER
+// ═══════════════════════════════════════════════════════════════════
+let _tsvData = [];
+let _tsvFiltered = null;  // null = no filter active
+let _tsvHeaders = [];
+let _tsvSortCol = -1;
+let _tsvSortAsc = true;
+let _tsvFilesLoaded = false;
+const TSV_PAGE_SIZE = 1000;
+let _tsvPage = 0;
+
+function _tsvRows() { return _tsvFiltered || _tsvData; }
+function _tsvTotalPages() { return Math.max(1, Math.ceil(_tsvRows().length / TSV_PAGE_SIZE)); }
+
+function onTsvFileSelected(filename) {
+  if (!filename) return;
+  document.getElementById('tsv-search').value = '';
+  document.getElementById('tsv-search').disabled = true;
+  document.getElementById('tsv-table-wrap').innerHTML = '<div class="no-data-msg">Loading…</div>';
+  document.getElementById('tsv-info').textContent = '';
+  document.getElementById('tsv-pager').style.display = 'none';
+  ahkCall('ReadTsvFile', filename);
+}
+
+function populateTsvFileList(jsonArr) {
+  const sel = document.getElementById('tsv-file-select');
+  const prev = sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  let files; try { files = typeof jsonArr === 'string' ? JSON.parse(jsonArr) : jsonArr; } catch(e){ return; }
+  files.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f;
+    opt.textContent = f;
+    sel.appendChild(opt);
+  });
+  if (prev && files.includes(prev)) sel.value = prev;
+  _tsvFilesLoaded = true;
+}
+
+function renderTsvData(json) {
+  let payload;
+  try { payload = typeof json === 'string' ? JSON.parse(json) : json; } catch(e) {
+    document.getElementById('tsv-table-wrap').innerHTML = '<div class="no-data-msg">Failed to parse TSV data.</div>';
+    return;
+  }
+  _tsvHeaders = payload.headers || [];
+  _tsvData = payload.rows || [];
+  _tsvFiltered = null;
+  _tsvSortCol = -1;
+  _tsvSortAsc = true;
+  _tsvPage = 0;
+
+  const searchEl = document.getElementById('tsv-search');
+  searchEl.disabled = false;
+  searchEl.value = '';
+
+  _tsvRender();
+}
+
+function _tsvRender() {
+  const rows = _tsvRows();
+  const totalPages = _tsvTotalPages();
+  _tsvPage = Math.max(0, Math.min(_tsvPage, totalPages - 1));
+
+  // Info
+  const total = _tsvData.length;
+  const info = document.getElementById('tsv-info');
+  if (_tsvFiltered) {
+    info.textContent = `${rows.length.toLocaleString()} / ${total.toLocaleString()} rows × ${_tsvHeaders.length} cols`;
+  } else {
+    info.textContent = `${total.toLocaleString()} rows × ${_tsvHeaders.length} cols`;
+  }
+
+  // Pager
+  const pager = document.getElementById('tsv-pager');
+  if (totalPages > 1) {
+    pager.style.display = 'flex';
+    document.getElementById('tsv-page-info').textContent = `${_tsvPage + 1} / ${totalPages}`;
+    document.getElementById('tsv-prev').disabled = _tsvPage === 0;
+    document.getElementById('tsv-next').disabled = _tsvPage >= totalPages - 1;
+  } else {
+    pager.style.display = 'none';
+  }
+
+  // Table
+  const wrap = document.getElementById('tsv-table-wrap');
+  if (!_tsvHeaders.length) { wrap.innerHTML = '<div class="no-data-msg">Empty file.</div>'; return; }
+
+  const start = _tsvPage * TSV_PAGE_SIZE;
+  const end = Math.min(start + TSV_PAGE_SIZE, rows.length);
+
+  let html = '<table class="tsv-table"><thead><tr>';
+  html += '<th class="tsv-rownum">#</th>';
+  _tsvHeaders.forEach((h, i) => {
+    const ind = _tsvSortCol === i ? (_tsvSortAsc ? '▲' : '▼') : '';
+    html += `<th onclick="sortTsvBy(${i})">${escHtml(h)}<span class="sort-ind">${ind}</span></th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  for (let r = start; r < end; r++) {
+    html += '<tr>';
+    html += `<td style="color:var(--subtext);font-size:10px">${r + 1}</td>`;
+    const row = rows[r];
+    for (let c = 0; c < _tsvHeaders.length; c++) {
+      html += `<td>${escHtml(row[c] ?? '')}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wrap.scrollTop = 0;
+}
+
+function tsvPageNav(delta) {
+  _tsvPage += delta;
+  _tsvRender();
+}
+
+function sortTsvBy(colIdx) {
+  if (_tsvSortCol === colIdx) _tsvSortAsc = !_tsvSortAsc;
+  else { _tsvSortCol = colIdx; _tsvSortAsc = true; }
+
+  const sortFn = (a, b) => {
+    let va = a[colIdx] ?? '', vb = b[colIdx] ?? '';
+    const na = Number(va), nb = Number(vb);
+    if (!isNaN(na) && !isNaN(nb) && va !== '' && vb !== '') {
+      return _tsvSortAsc ? na - nb : nb - na;
+    }
+    va = String(va).toLowerCase(); vb = String(vb).toLowerCase();
+    return _tsvSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+  };
+  _tsvData.sort(sortFn);
+  if (_tsvFiltered) _tsvFiltered.sort(sortFn);
+  _tsvPage = 0;
+  _tsvRender();
+}
+
+function filterTsvRows(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    _tsvFiltered = null;
+  } else {
+    _tsvFiltered = _tsvData.filter(row => row.some(cell => String(cell).toLowerCase().includes(q)));
+  }
+  _tsvPage = 0;
+  _tsvRender();
 }
 </script>
 <!-- ENTITY CONTEXT MENU -->

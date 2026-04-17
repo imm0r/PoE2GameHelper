@@ -1,7 +1,7 @@
 # PoE2 GameHelper — Projekt Status
 
-**Version:** 0.3.0.0  
-**Zuletzt aktualisiert:** 16. April 2026  
+**Version:** 0.4.0.0  
+**Zuletzt aktualisiert:** 17. Juni 2025  
 **Status:** ✅ **PRODUKTIV**
 
 ## Zusammenfassung
@@ -28,8 +28,8 @@ Das Projekt ist ein **vollständiger AHK v2-Port** der Path of Exile 2 Memory-Re
 
 ```
 GameHelper/
-├── InGameStateMonitor.ahk      — Main Entry Point, UI Layout, Bridge Dispatch
-├── PoE2MemoryReader.ahk        — Core Engine: Pattern-Scan, Memory-Read, Static Addresses
+├── InGameStateMonitor.ahk      — Main Entry Point, UI Layout, Timer Management
+├── PoE2MemoryReader.ahk        — Core Engine: Pattern-Scan, Memory-Read, Panel Detection
 ├── PoE2EntityReader.ahk        — Entity-Dekodierung, TgtTilesLocations, Awake/Sleeping Scan
 ├── PoE2PlayerReader.ahk        — Player-Vitals, Flask-Slots, Player-Specific Reads
 ├── PoE2PlayerComponentsReader.ahk — Player Component Decoding (Stats, Buffs, Charges)
@@ -40,7 +40,16 @@ GameHelper/
 ├── StaticOffsetsPatterns.ahk   — Pattern-Signaturen (IDA-Notation)
 ├── RadarOverlay.ahk            — GDI Radar/Minimap Overlay + Maphack + A* Pathfinder
 ├── AutoFlask.ahk               — AutoFlask-Automation, Render Loop, Radar Sync
-├── UIHelpers.ahk               — WebView Bridge, INI Save/Load, Header JSON Push
+├── PlayerHUD.ahk               — Compact Player Vitals GDI Overlay
+├── WebViewBridge.ahk           — JSON Push, Debug Data, Panel Visibility Serialization
+├── BridgeDispatch.ahk          — WebView→AHK Message Routing
+├── ConfigManager.ahk           — Config Save/Load (INI Persistence)
+├── ToggleHandlers.ahk          — Feature Toggle Logic
+├── SnapshotSerializers.ahk     — Snapshot→JSON Serialization (Entities, Buffs, UI, etc.)
+├── DebugDump.ahk               — Debug Dump (F3, Entity TSV, Screenshots)
+├── ErrorLogger.ahk             — Error Logging with Rotation
+├── JsonParser.ahk              — Bridge Message JSON Parsing
+├── UIHelpers.ahk               — Thresholds, Formatters, UI Helpers
 ├── TreeViewWatchlistPanel.ahk  — TreeView Watchlist & Stat-Formatierung
 ├── TreeView_EntityScanner.ahk  — Entity-Scanner Tab Logic
 ├── TreeView_Rendering.ahk      — TreeView Rendering Helpers
@@ -136,9 +145,53 @@ python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysier
 | Zone Navigation | ✅ | A* Pathfinder to farthest AreaTransition, TgtTilesLocations |
 | Skills & Buffs Tab | ✅ | Live buff/debuff tracking with icons, blacklist, INI persistence |
 | Player-Stats | ✅ | Stat-Description-Enrichment mit CSD-Templates |
-| WebView UI | ✅ | Multi-Tab UI (Entities, Skills & Buffs, Config) via WebView2 |
+| Player HUD | ✅ | Compact GDI overlay — Life, Mana, Shield, ES, Evasion |
+| Panel Detection | ✅ | Visibility-differential + raw struct pointer tracking |
+| Overlay Gating | ✅ | Overlay auto-hide bei Large Map off, Panels offen, Chat aktiv |
+| WebView UI | ✅ | 8-Tab UI with icons, Config right-aligned |
+| Debug Tab | ✅ | Panel Visibility Live, Discovery Results, Struct Diff Diagnostic |
 | Patch-Version-Check | ✅ | TCP-Query beim Start, MsgBox bei neuem Patch |
 | Config Persistence | ✅ | INI-based save/load for all toggles and settings |
+| Codebase Refactoring | ✅ | Single-responsibility file extraction (12 new modules) |
+
+---
+
+## Neue Features (v0.4.0.0)
+
+### Panel Detection (PoE2MemoryReader.ahk)
+- **Heap-Pointer-Scan** — scannt ImportantUiElements Struct (0x400-0xC00) für gültige Heap-Pointer
+- **UiElement-Validierung** — Heap-Filter (< 0x7FF000000000) + ParentPtr-Check
+- **Visibility-Differential** — IS_VISIBLE bit 11 @ Flags-Offset 0x180 gegen Baseline
+- **Raw-Struct-Pointer-Tracking** — single 2KB RPM detektiert Pointer-Erscheinen/Verschwinden
+- **Dual Detection** — nur positive Signale (newlyVisible + ptrsAppeared) = Panel offen
+- **Auto-Baseline** — 3s nach Zone-Change automatisch neu kalibriert
+- **Manual Reset** — Button im Debug-Tab für manuelle Baseline-Neukalibrierung
+- **Struct Diff Diagnostic** — Snapshot/Compare Tool für zukünftige Offset-Recherche
+
+### Player HUD (PlayerHUD.ahk)
+- **GDI Overlay** — Life, Mana, Shield, ES, Evasion mit Prozent-Anzeige
+- **Dynamische Farben** je nach Wert (rot/gelb/grün)
+- **Konfigurierbar** via Config-Tab Toggle
+
+### Overlay Visibility Gating (AutoFlask.ahk)
+- **5 Bedingungen** für Overlay-Sichtbarkeit:
+  1. Radar eingeschaltet
+  2. InGameState aktiv
+  3. Nicht im Ladebildschirm
+  4. Large Map aktiv (nicht nur Minimap)
+  5. Kein Game-Panel offen (Panel Detection)
+- **Chat Detection** — erkannter ChatParent @ 0x5C0
+
+### Codebase Refactoring
+- **12 neue Module** extrahiert aus InGameStateMonitor.ahk und UIHelpers.ahk
+- **Single Responsibility** — jede Datei hat genau eine Aufgabe
+- **Neue Dateien:** JsonParser, ErrorLogger, BridgeDispatch, ConfigManager, WebViewBridge, SnapshotSerializers, DebugDump, ToggleHandlers, PlayerHUD
+
+### WebView UI Enhancements (ui/index.html)
+- **8 Tabs** mit Unicode-Icons: 🔍 Entities, ⚔ Skills & Buffs, 🖥 UI, 📊 gameState, 📋 WatchList, 📁 TSVs, 🐛 Debug, ⚙ Config
+- **Config-Tab rechts ausgerichtet**, alle anderen links
+- **Debug-Tab** mit Panel Visibility Live, Discovery Results, Struct Diff, Overlay State
+- **Overview-Sektion** im Config-Tab direkt unter Status
 
 ---
 
@@ -186,9 +239,8 @@ python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysier
 ```
 ┌─────────────────────────────────────────────────────────┐
 │            InGameStateMonitor.ahk (Main)                │
-│  - WebView UI Host & Bridge Dispatch                    │
-│  - Timer Management (ReadTimer, FastTimer)              │
-│  - Config Save/Load via UIHelpers.ahk                   │
+│  - WebView UI Host & Timer Management                   │
+│  - #Include Orchestration (18 modules)                  │
 └──────────┬──────────────────┬───────────────────────────┘
            │                  │
     ┌──────┴──────┐    ┌──────┴──────────────────┐
@@ -196,14 +248,22 @@ python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysier
     │ .ahk        │    │  - GDI Overlay          │
     │ - Flask     │    │  - Minimap + Large Map   │
     │   Logic     │    │  - Maphack (PlgBlt)      │
-    │ - Render    │    │  - A* Pathfinder         │
-    │   Loop Sync │    │  - Entity Icons          │
+    │ - Overlay   │    │  - A* Pathfinder         │
+    │   Gating    │    │  - Entity Icons          │
+    └──────┬──────┘    └──────┬──────────────────┘
+           │                  │
+    ┌──────┴──────┐    ┌──────┴──────────────────┐
+    │ PlayerHUD   │    │  WebViewBridge.ahk      │
+    │ .ahk        │    │  BridgeDispatch.ahk     │
+    │ - Life/Mana │    │  ConfigManager.ahk      │
+    │ - GDI HUD   │    │  ToggleHandlers.ahk     │
     └──────┬──────┘    └──────┬──────────────────┘
            │                  │
     ┌──────┴──────────────────┴──────────────────┐
     │        PoE2MemoryReader.ahk (Core)         │
     │  - Pattern-Scanning & Static Addresses     │
     │  - GameState Traversal                     │
+    │  - Panel Detection (Visibility Baseline)   │
     ├────────────────────────────────────────────┤
     │ PoE2EntityReader    │ PoE2PlayerReader     │
     │ PoE2ComponentDecod. │ PoE2PlayerComponents │
@@ -244,9 +304,19 @@ python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysier
 - Nibble: 0 = nicht begehbar, 1-5 = begehbar
 
 ### Config/INI System
-- Globals in `InGameStateMonitor.ahk`, Bridge in `_DispatchBridgeCall()`
-- Save/Load in `UIHelpers.ahk`, Header-Push als JSON an WebView
+- Globals in `InGameStateMonitor.ahk`, Bridge in `BridgeDispatch.ahk`
+- Save/Load in `ConfigManager.ahk`, Header-Push als JSON an WebView
 - Sections: `[AutoFlask]`, `[Radar]`, `[SkillsBlacklist]`, `[EntityScanner]`
+
+### Panel Detection (PoE2MemoryReader.ahk)
+- **Struct Layout:** ImportantUiElements at InGameUi + 0x400..0xC00 (2KB, single RPM call)
+- **Pointer Filter:** Only heap pointers < 0x7FF000000000 (excludes module-space false positives)
+- **UiElement Validation:** Valid ParentPtr at +0x0B8 confirms genuine UiElement
+- **Flags:** IS_VISIBLE = bit 11 at Flags offset +0x180 (0x004626F1 → 0x00462EF1)
+- **Baseline:** Captured with all panels closed (auto-refresh 3s post zone-change)
+- **Detection:** newlyVisible (flag flips) + ptrsAppeared (new struct pointers) → anyPanelOpen
+- **Known Containers:** 0x5C0 (ChatParent), 0x6B0 (PassiveTree), 0x748 (MapParent)
+- **StringId Offset 0x140 is WRONG** for current game version — probed all offsets 0x000-0x300 with multiple string encodings, zero strings found
 
 | Thema | Detail |
 |---|---|

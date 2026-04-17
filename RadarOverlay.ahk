@@ -75,6 +75,7 @@ class RadarOverlay
         this.bufferHeight    := 0
         this.isVisible            := false
         this.stylesApplied        := false
+        this._alpha               := 255     ; overlay opacity (0-255), set via SetAlpha()
         this.highlightedEntityPath := ""   ; path of entity selected in the Entities tab — drawn with a line on the radar
         this._lastMiniMapDiagonal := 0   ; cached minimap diagonal used for large-map projection
         this._lastGwX := -1, this._lastGwY := -1, this._lastGwW := 0, this._lastGwH := 0
@@ -156,7 +157,7 @@ class RadarOverlay
             this.isVisible := true
             if !this.stylesApplied
             {
-                WinSetTransColor("010101", this.windowHandle)
+                WinSetTransColor("010101 " this._alpha, this.windowHandle)
                 WinSetExStyle("+0x20", this.windowHandle)   ; WS_EX_TRANSPARENT → click-through
                 this.stylesApplied := true
             }
@@ -198,24 +199,26 @@ class RadarOverlay
         awakeEntityCount    := (areaInstance && areaInstance.Has("awakeEntities") && areaInstance["awakeEntities"].Has("sampleCount"))
                                ? areaInstance["awakeEntities"]["sampleCount"] : "?"
 
-        ; ── Status lines at bottom-center ──────────────────────────────────────────────────
-        miniMapSize    := miniMapData  ? (Round(miniMapData["sizeW"])  "x" Round(miniMapData["sizeH"]))  : "no-mm"
-        largeMapSize   := largeMapData ? (Round(largeMapData["sizeW"]) "x" Round(largeMapData["sizeH"])) : "no-lm"
-        miniMapVisible := miniMapData  ? (miniMapData["isVisible"]  ? "V" : "H") : "-"
-        largeMapVisible := largeMapData ? (largeMapData["isVisible"] ? "V" : "H") : "-"
-        miniMapPos     := miniMapData  ? (Round(miniMapData["unscaledPosX"]) "," Round(miniMapData["unscaledPosY"])) : "-"
-        terrDbg := this._terrain
-            ? ("terr:" this._terrain["dataSize"] " gW=" this._terrain["gridWidth"] " gH=" this._terrain["totalRows"]
-               " bpr=" this._terrain["bytesPerRow"] (terrainError != "" ? " [" terrainError "]" : ""))
-            : ("terr:NIL" (terrainError != "" ? " (" terrainError ")" : ""))
+        ; ── Status lines at bottom-center (debug only) ─────────────────────────────────
         dbgX := gameWindowWidth // 2 - 400
-        this._DrawText(dbgX, gameWindowHeight - 80,
-            "area:" (areaInstance?"OK":"NIL") " pr:" (hasPlayerPosition?"OK":"NIL") " ent:" awakeEntityCount
-            " mm:" miniMapSize "[" miniMapVisible "]" " upos:" miniMapPos " lm:" largeMapSize "[" largeMapVisible "]"
-            " " terrDbg,
-            0x00FFFF)
-
-        this._DrawDot(8, 8, 0xFFFFFF, 5)   ; weißer Punkt = Overlay läuft (top-left, unobtrusive)
+        if this.DebugMode
+        {
+            miniMapSize    := miniMapData  ? (Round(miniMapData["sizeW"])  "x" Round(miniMapData["sizeH"]))  : "no-mm"
+            largeMapSize   := largeMapData ? (Round(largeMapData["sizeW"]) "x" Round(largeMapData["sizeH"])) : "no-lm"
+            miniMapVisible := miniMapData  ? (miniMapData["isVisible"]  ? "V" : "H") : "-"
+            largeMapVisible := largeMapData ? (largeMapData["isVisible"] ? "V" : "H") : "-"
+            miniMapPos     := miniMapData  ? (Round(miniMapData["unscaledPosX"]) "," Round(miniMapData["unscaledPosY"])) : "-"
+            terrDbg := this._terrain
+                ? ("terr:" this._terrain["dataSize"] " gW=" this._terrain["gridWidth"] " gH=" this._terrain["totalRows"]
+                   " bpr=" this._terrain["bytesPerRow"] (terrainError != "" ? " [" terrainError "]" : ""))
+                : ("terr:NIL" (terrainError != "" ? " (" terrainError ")" : ""))
+            this._DrawText(dbgX, gameWindowHeight - 80,
+                "area:" (areaInstance?"OK":"NIL") " pr:" (hasPlayerPosition?"OK":"NIL") " ent:" awakeEntityCount
+                " mm:" miniMapSize "[" miniMapVisible "]" " upos:" miniMapPos " lm:" largeMapSize "[" largeMapVisible "]"
+                " " terrDbg,
+                0x00FFFF)
+            this._DrawDot(8, 8, 0xFFFFFF, 5)   ; weißer Punkt = Overlay läuft
+        }
 
         if !hasPlayerPosition
         {
@@ -1416,6 +1419,15 @@ class RadarOverlay
             this.overlayGui.Hide()
             this.isVisible := false
         }
+    }
+
+    ; Sets the opacity of all drawn content (0=invisible, 255=fully opaque).
+    ; Combined with the color-key so background stays fully transparent.
+    SetAlpha(alpha)
+    {
+        this._alpha := alpha
+        if this.windowHandle
+            WinSetTransColor("010101 " alpha, this.windowHandle)
     }
 
     ; Destructor: hides the overlay and releases all GDI objects (cached pens/brushes + back-buffer).

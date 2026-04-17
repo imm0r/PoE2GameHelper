@@ -9,30 +9,30 @@
 ; Also syncs NPC watch entries and applies column sorting and filter.
 UpdateOffsetTable(snapshot)
 {
-    global offsetTable, pinnedNodePaths, offsetSearchEdit, offsetTableRowPathByRow, offsetPreviousValueByPath, npcWatchRadius
+    global g_offsetTable, g_pinnedNodePaths, g_offsetSearchEdit, g_offsetTableRowPathByRow, g_offsetPreviousValueByPath, g_npcWatchRadius
     static columnsInitialized := false
 
-    if !offsetTable
+    if !g_offsetTable
         return
 
     try
     {
 
     filter := ""
-    try filter := StrLower(Trim(offsetSearchEdit.Value))
+    try filter := StrLower(Trim(g_offsetSearchEdit.Value))
 
-    offsetTable.Opt("-Redraw")
-    offsetTable.Delete()
-    offsetTableRowPathByRow := Map()
+    g_offsetTable.Opt("-Redraw")
+    g_offsetTable.Delete()
+    g_offsetTableRowPathByRow := Map()
 
-    npcWatch := BuildNpcWatchIndex(snapshot, npcWatchRadius)
+    npcWatch := BuildNpcWatchIndex(snapshot, g_npcWatchRadius)
     npcLookup := npcWatch["lookup"]
 
     SyncNpcWatchEntries(snapshot, npcLookup)
 
     stamp := FormatTime(A_Now, "HH:mm:ss")
     added := 0
-    for _, watchKey in pinnedNodePaths
+    for _, watchKey in g_pinnedNodePaths
     {
         nodeName := BuildWatchNodeName(watchKey)
         pathText := BuildWatchParentPath(watchKey)
@@ -54,28 +54,28 @@ UpdateOffsetTable(snapshot)
         if (filter != "" && !InStr(haystack, filter))
             continue
 
-        row := offsetTable.Add(, stamp, nodeName, valueText, delta["text"], pathText, delta["state"])
-        offsetTableRowPathByRow[row] := watchKey
+        row := g_offsetTable.Add(, stamp, nodeName, valueText, delta["text"], pathText, delta["state"])
+        g_offsetTableRowPathByRow[row] := watchKey
         added += 1
     }
 
     if !columnsInitialized
     {
-        offsetTable.ModifyCol(1, 88)
-        offsetTable.ModifyCol(2, 130)
-        offsetTable.ModifyCol(3, 250)
-        offsetTable.ModifyCol(4, 80)
-        offsetTable.ModifyCol(5, 360)
-        offsetTable.ModifyCol(6, 0)
+        g_offsetTable.ModifyCol(1, 88)
+        g_offsetTable.ModifyCol(2, 130)
+        g_offsetTable.ModifyCol(3, 250)
+        g_offsetTable.ModifyCol(4, 80)
+        g_offsetTable.ModifyCol(5, 360)
+        g_offsetTable.ModifyCol(6, 0)
         columnsInitialized := true
     }
 
     ApplyOffsetTableSort()
-    offsetTable.Opt("+Redraw")
+    g_offsetTable.Opt("+Redraw")
     }
     catch as ex
     {
-        try offsetTable.Opt("+Redraw")
+        try g_offsetTable.Opt("+Redraw")
         LogError("UpdateOffsetTable", ex)
     }
 }
@@ -84,16 +84,16 @@ UpdateOffsetTable(snapshot)
 ; Returns: Map with "text" (delta label) and "state" (NEW/UP/DOWN/CHANGED/NONE).
 BuildOffsetDelta(path, valueText)
 {
-    global offsetPreviousValueByPath
+    global g_offsetPreviousValueByPath
 
-    if !offsetPreviousValueByPath.Has(path)
+    if !g_offsetPreviousValueByPath.Has(path)
     {
-        offsetPreviousValueByPath[path] := valueText
+        g_offsetPreviousValueByPath[path] := valueText
         return Map("text", "NEW", "state", "NEW")
     }
 
-    prevText := offsetPreviousValueByPath[path]
-    offsetPreviousValueByPath[path] := valueText
+    prevText := g_offsetPreviousValueByPath[path]
+    g_offsetPreviousValueByPath[path] := valueText
 
     if (prevText = valueText)
         return Map("text", "=", "state", "NONE")
@@ -279,17 +279,17 @@ FormatNumberDelta(value)
 ; Handles a column header click to toggle sort direction for the offset table.
 OnOffsetTableColClick(ctrl, colIndex)
 {
-    global offsetTableSortCol, offsetTableSortDesc
+    global g_offsetTableSortCol, g_offsetTableSortDesc
 
     if (colIndex < 1 || colIndex > 5)
         return
 
-    if (offsetTableSortCol = colIndex)
-        offsetTableSortDesc := !offsetTableSortDesc
+    if (g_offsetTableSortCol = colIndex)
+        g_offsetTableSortDesc := !g_offsetTableSortDesc
     else
     {
-        offsetTableSortCol := colIndex
-        offsetTableSortDesc := false
+        g_offsetTableSortCol := colIndex
+        g_offsetTableSortDesc := false
     }
 
     ApplyOffsetTableSort()
@@ -298,19 +298,19 @@ OnOffsetTableColClick(ctrl, colIndex)
 ; Applies the current sort column and direction to the offset table ListView.
 ApplyOffsetTableSort()
 {
-    global offsetTable, offsetTableSortCol, offsetTableSortDesc
+    global g_offsetTable, g_offsetTableSortCol, g_offsetTableSortDesc
 
-    if !offsetTable
+    if !g_offsetTable
         return
 
-    opt := offsetTableSortDesc ? "SortDesc" : "Sort"
-    offsetTable.ModifyCol(offsetTableSortCol, opt)
+    opt := g_offsetTableSortDesc ? "SortDesc" : "Sort"
+    g_offsetTable.ModifyCol(g_offsetTableSortCol, opt)
 }
 
 ; WM_NOTIFY custom-draw handler for the offset table; colours rows by their delta state (UP/DOWN/CHANGED/NEW).
 OnOffsetTableWmNotify(wParam, lParam, msg, hwnd)
 {
-    global offsetTable
+    global g_offsetTable
 
     static NM_CUSTOMDRAW := -12
     static CDDS_PREPAINT := 0x00000001
@@ -320,13 +320,13 @@ OnOffsetTableWmNotify(wParam, lParam, msg, hwnd)
 
     try
     {
-        if !offsetTable
+        if !g_offsetTable
             return
         if !lParam
             return
 
         hwndFrom := NumGet(lParam, 0, "UPtr")
-        if (hwndFrom != offsetTable.Hwnd)
+        if (hwndFrom != g_offsetTable.Hwnd)
             return
 
         code := NumGet(lParam, A_PtrSize * 2, "Int")
@@ -347,7 +347,7 @@ OnOffsetTableWmNotify(wParam, lParam, msg, hwnd)
         rowIndexZeroBased := NumGet(lParam, itemSpecOffset, "UPtr")
         row := rowIndexZeroBased + 1
         state := ""
-        try state := offsetTable.GetText(row, 6)
+        try state := g_offsetTable.GetText(row, 6)
 
         color := 0x00202020
         if (state = "UP")
@@ -370,17 +370,17 @@ OnOffsetTableWmNotify(wParam, lParam, msg, hwnd)
 ; Builds the Pinned Watch section of the TreeView, listing each watched path with its current value.
 AddPinnedWatchNode(parentId, snapshot, expandedPaths)
 {
-    global valueTree, nodePaths, pinnedNodePaths
+    global g_valueTree, g_nodePaths, g_pinnedNodePaths
 
     basePath := "snapshot/pinnedWatch"
-    node := valueTree.Add("Pinned Watch: " pinnedNodePaths.Length, parentId)
-    nodePaths[node] := basePath
+    node := g_valueTree.Add("Pinned Watch: " g_pinnedNodePaths.Length, parentId)
+    g_nodePaths[node] := basePath
 
-    if (pinnedNodePaths.Length = 0)
+    if (g_pinnedNodePaths.Length = 0)
     {
-        valueTree.Add("Nutze 'PinSel', um den aktuell selektierten Tree-Knoten live zu verfolgen", node)
+        g_valueTree.Add("Nutze 'PinSel', um den aktuell selektierten Tree-Knoten live zu verfolgen", node)
         if (expandedPaths.Has(basePath))
-            valueTree.Modify(node, "Expand")
+            g_valueTree.Modify(node, "Expand")
         return
     }
 
@@ -389,7 +389,7 @@ AddPinnedWatchNode(parentId, snapshot, expandedPaths)
     npcDisplay := npcWatch["display"]
 
     idx := 0
-    for _, path in pinnedNodePaths
+    for _, path in g_pinnedNodePaths
     {
         idx += 1
         if IsNpcWatchKey(path)
@@ -405,12 +405,12 @@ AddPinnedWatchNode(parentId, snapshot, expandedPaths)
         }
 
         childPath := basePath "/" idx
-        childId := valueTree.Add(line, node)
-        nodePaths[childId] := childPath
+        childId := g_valueTree.Add(line, node)
+        g_nodePaths[childId] := childPath
     }
 
-    if (expandedPaths.Has(basePath) || pinnedNodePaths.Length <= 6)
-        valueTree.Modify(node, "Expand")
+    if (expandedPaths.Has(basePath) || g_pinnedNodePaths.Length <= 6)
+        g_valueTree.Modify(node, "Expand")
 }
 
 ; Resolves a slash-delimited node path against the snapshot Map and returns the value at that location.
@@ -468,7 +468,7 @@ FormatPinnedValue(value)
 ; Builds the Entity Highlights tab tree node from awake and sleeping entity samples, sorted by distance.
 AddDecodedEntityHighlightsNode(parentId, snapshot, expandedPaths)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     inGame := (snapshot && snapshot.Has("inGameState")) ? snapshot["inGameState"] : 0
     areaInst := (inGame && inGame.Has("areaInstance")) ? inGame["areaInstance"] : 0
@@ -489,22 +489,22 @@ AddDecodedEntityHighlightsNode(parentId, snapshot, expandedPaths)
     SortEntityHighlightsByDistance(items)
 
     basePath := "snapshot/entityHighlights"
-    highlightsNode := valueTree.Add("Entity Highlights (dist sorted): " items.Length, parentId)
-    nodePaths[highlightsNode] := basePath
+    highlightsNode := g_valueTree.Add("Entity Highlights (dist sorted): " items.Length, parentId)
+    g_nodePaths[highlightsNode] := basePath
 
     awakeStats := CollectSampleStats(awakeSample)
     sleepStats := CollectSampleStats(sleepingSample)
     diagText := "Diag A[s=" awakeStats["samples"] ",e=" awakeStats["withEntity"] ",c=" awakeStats["withComponents"] ",d=" awakeStats["withDecoded"] "]"
         . " S[s=" sleepStats["samples"] ",e=" sleepStats["withEntity"] ",c=" sleepStats["withComponents"] ",d=" sleepStats["withDecoded"] "]"
-    valueTree.Add(diagText, highlightsNode)
+    g_valueTree.Add(diagText, highlightsNode)
 
     probeText := BuildSampleProbeText(awakeSample, sleepingSample)
     if (probeText != "")
-        valueTree.Add(probeText, highlightsNode)
+        g_valueTree.Add(probeText, highlightsNode)
 
     if (items.Length = 0)
     {
-        valueTree.Add("Keine passenden Entities in den aktuellen Samples", highlightsNode)
+        g_valueTree.Add("Keine passenden Entities in den aktuellen Samples", highlightsNode)
     }
     else
     {
@@ -515,28 +515,28 @@ AddDecodedEntityHighlightsNode(parentId, snapshot, expandedPaths)
             distText := info.Has("distanceText") ? info["distanceText"] : "d=-"
             label := idx ". [" info["source"] "] " distText " | id=" info["id"] " | " info["pathShort"] " | " info["componentLabel"]
             itemPath := basePath "/" idx
-            itemNode := valueTree.Add(label, highlightsNode)
-            nodePaths[itemNode] := itemPath
+            itemNode := g_valueTree.Add(label, highlightsNode)
+            g_nodePaths[itemNode] := itemPath
 
-            valueTree.Add("entityPtr: " FormatScalar(info["entityPtr"], "entityPtr"), itemNode)
-            valueTree.Add("path: " info["path"], itemNode)
-            valueTree.Add("status: " info["statusText"], itemNode)
+            g_valueTree.Add("entityPtr: " FormatScalar(info["entityPtr"], "entityPtr"), itemNode)
+            g_valueTree.Add("path: " info["path"], itemNode)
+            g_valueTree.Add("status: " info["statusText"], itemNode)
             if (info.Has("renderText") && info["renderText"] != "-")
-                valueTree.Add("position: " info["renderText"], itemNode)
+                g_valueTree.Add("position: " info["renderText"], itemNode)
 
             if (expandedPaths.Has(itemPath))
-                valueTree.Modify(itemNode, "Expand")
+                g_valueTree.Modify(itemNode, "Expand")
         }
     }
 
     if (expandedPaths.Has(basePath) || items.Length <= 8)
-        valueTree.Modify(highlightsNode, "Expand")
+        g_valueTree.Modify(highlightsNode, "Expand")
 }
 
 ; Builds the Entity Scanner tab tree node listing NPCs, rares, uniques, and blocked entities.
 AddEntityScannerNode(parentId, snapshot, expandedPaths)
 {
-    global valueTree, nodePaths
+    global g_valueTree, g_nodePaths
 
     inGame := (snapshot && snapshot.Has("inGameState")) ? snapshot["inGameState"] : 0
     areaInst := (inGame && inGame.Has("areaInstance")) ? inGame["areaInstance"] : 0
@@ -557,26 +557,26 @@ AddEntityScannerNode(parentId, snapshot, expandedPaths)
     SortEntityHighlightsByDistance(scannerItems)
 
     basePath := "snapshot/entityScanner"
-    node := valueTree.Add("Entity Scanner (NPC/Rare+Unique/Blocked): " scannerItems.Length, parentId)
-    nodePaths[node] := basePath
+    node := g_valueTree.Add("Entity Scanner (NPC/Rare+Unique/Blocked): " scannerItems.Length, parentId)
+    g_nodePaths[node] := basePath
 
     awakeStats := CollectSampleStats(awakeSample)
     sleepStats := CollectSampleStats(sleepingSample)
     diagText := "Diag A[s=" awakeStats["samples"] ",e=" awakeStats["withEntity"] ",c=" awakeStats["withComponents"] ",d=" awakeStats["withDecoded"] "]"
         . " S[s=" sleepStats["samples"] ",e=" sleepStats["withEntity"] ",c=" sleepStats["withComponents"] ",d=" sleepStats["withDecoded"] "]"
-    valueTree.Add(diagText, node)
+    g_valueTree.Add(diagText, node)
 
     probeText := BuildSampleProbeText(awakeSample, sleepingSample)
     if (probeText != "")
-        valueTree.Add(probeText, node)
+        g_valueTree.Add(probeText, node)
 
     nearbyInfo := BuildNearbyMonsterInfo(awakeSample, playerPos)
     nearbySummary := BuildNearbyMonsterInfoSummaryText(nearbyInfo)
-    valueTree.Add(nearbySummary, node)
+    g_valueTree.Add(nearbySummary, node)
 
     if (scannerItems.Length = 0)
     {
-        valueTree.Add("Keine Scanner-Treffer in den aktuellen Samples", node)
+        g_valueTree.Add("Keine Scanner-Treffer in den aktuellen Samples", node)
     }
     else
     {
@@ -586,22 +586,22 @@ AddEntityScannerNode(parentId, snapshot, expandedPaths)
             idx += 1
             label := idx ". [" info["source"] "] " info["distanceText"] " | id=" info["id"] " | " info["pathShort"] " | " info["tags"]
             itemPath := basePath "/" idx
-            itemNode := valueTree.Add(label, node)
-            nodePaths[itemNode] := itemPath
+            itemNode := g_valueTree.Add(label, node)
+            g_nodePaths[itemNode] := itemPath
 
-            valueTree.Add("entityPtr: " FormatScalar(info["entityPtr"], "entityPtr"), itemNode)
-            valueTree.Add("path: " info["path"], itemNode)
-            valueTree.Add("details: " info["details"], itemNode)
+            g_valueTree.Add("entityPtr: " FormatScalar(info["entityPtr"], "entityPtr"), itemNode)
+            g_valueTree.Add("path: " info["path"], itemNode)
+            g_valueTree.Add("details: " info["details"], itemNode)
             if (info.Has("renderText") && info["renderText"] != "-")
-                valueTree.Add("position: " info["renderText"], itemNode)
+                g_valueTree.Add("position: " info["renderText"], itemNode)
 
             if (expandedPaths.Has(itemPath))
-                valueTree.Modify(itemNode, "Expand")
+                g_valueTree.Modify(itemNode, "Expand")
         }
     }
 
     if (expandedPaths.Has(basePath) || scannerItems.Length <= 10)
-        valueTree.Modify(node, "Expand")
+        g_valueTree.Modify(node, "Expand")
 }
 
 ; Collects entity scanner items from a sample array, filtering to entities that have notable tags.

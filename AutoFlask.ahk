@@ -17,76 +17,211 @@ UpdateRadarFast()
     _running := true
     try
     {
-        global reader, g_radarOverlay, g_radarLastSnap, updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled
-        if updatesPaused
-            return
-        if !g_radarEnabled
+        global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
+        global g_playerHudEnabled, g_playerHud
+        if g_updatesPaused
         {
             if g_radarOverlay
                 g_radarOverlay.Hide()
+            if g_playerHud
+                g_playerHud.Hide()
             return
         }
-        if !IsObject(reader)
+        if !IsObject(g_reader)
             return
 
         radarReadStart := A_TickCount
-        radarSnap := reader.ReadRadarSnapshot()
+        radarSnap := g_reader.ReadRadarSnapshot()
         g_radarReadMs := A_TickCount - radarReadStart
         if !radarSnap
         {
             if g_radarOverlay
                 g_radarOverlay.Hide()
+            if g_playerHud
+                g_playerHud.Hide()
             return
         }
         g_radarLastSnap := radarSnap  ; cache for Dump Entities button
 
-        ; Only show overlay when player render component is present (= truly in-game)
+        currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
+
+        ; ── Determine overlay visibility ──────────────────────────────────────
+        ; Overlays should only show when ALL conditions are met:
+        ;   1. InGameState   2. Not town/hideout   3. Player alive
+        ;   4. Large map visible   5. No panel/chat open   6. Player render component
+        overlayAllowed := true
+        hideReason := ""
+
+        ; Condition 1: Must be in InGameState
+        if (currentState != "InGameState")
+        {
+            overlayAllowed := false
+            hideReason := "not-ingame"
+        }
+
+        ; Condition 2: Not town or hideout
+        if overlayAllowed
+        {
+            wad := radarSnap.Has("worldAreaDat") ? radarSnap["worldAreaDat"] : 0
+            if (wad && IsObject(wad))
+            {
+                if ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))
+                {
+                    overlayAllowed := false
+                    hideReason := "town-hideout"
+                }
+            }
+        }
+
+        ; Condition 3: Player must be alive
+        if overlayAllowed
+        {
+            pv := radarSnap.Has("playerVitals") ? radarSnap["playerVitals"] : 0
+            if (pv && IsObject(pv) && pv.Has("stats"))
+            {
+                stats := pv["stats"]
+                if (stats.Has("isAlive") && !stats["isAlive"])
+                {
+                    overlayAllowed := false
+                    hideReason := "dead"
+                }
+            }
+        }
+
+        ; Condition 4: Large map must be visible (overlay draws on the large map)
+        if overlayAllowed
+        {
+            inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
+            uiElems := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
+            largeMapOpen := false
+            if (uiElems && IsObject(uiElems))
+            {
+                lm := uiElems.Has("largeMapData") ? uiElems["largeMapData"] : 0
+                if (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"])
+                    largeMapOpen := true
+            }
+            if !largeMapOpen
+            {
+                overlayAllowed := false
+                hideReason := "no-largemap"
+            }
+        }
+
+        ; Condition 5: No game panel open + chat not active
+        if overlayAllowed
+        {
+            ; Visibility-differential check: any newly visible elements = panel open
+            panelVis := radarSnap.Has("panelVisibility") ? radarSnap["panelVisibility"] : 0
+            if (panelVis && IsObject(panelVis))
+            {
+                if (panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
+                {
+                    overlayAllowed := false
+                    newlyVis := panelVis.Has("newlyVisible") ? panelVis["newlyVisible"] : 0
+                    hideReason := "panel-open(" newlyVis " new)"
+                }
+            }
+
+            ; Chat check (ImportantUiElements)
+            if overlayAllowed
+            {
+                if !IsSet(uiElems)
+                {
+                    inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
+                    uiElems := (inGs && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
+                }
+                if (uiElems && IsObject(uiElems) && uiElems.Has("isChatActive") && uiElems["isChatActive"])
+                {
+                    overlayAllowed := false
+                    hideReason := "chat-active"
+                }
+            }
+        }
+
+        ; Condition 6: Player render component present (truly in-game)
         inGs         := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
         area         := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
         playerRender := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        if !playerRender
+        if (overlayAllowed && !playerRender)
+        {
+            overlayAllowed := false
+            hideReason := "no-player"
+        }
+
+        ; ── Push debug panel data periodically (every 500ms) ────────────────
+        static _debugPanelPushTick := 0
+        if (A_TickCount - _debugPanelPushTick > 500)
+        {
+            PushDebugPanelsToWebView(radarSnap, overlayAllowed, hideReason)
+            _debugPanelPushTick := A_TickCount
+        }
+
+        ; ── Hide overlays if conditions not met ──────────────────────────────
+        if !overlayAllowed
         {
             if g_radarOverlay
                 g_radarOverlay.Hide()
+            if g_playerHud
+                g_playerHud.Hide()
             return
         }
 
+        ; ── Game window checks ────────────────────────────────────────────────
         gameHwnd := ResolvePoEWindow()
         if !gameHwnd
         {
             if g_radarOverlay
                 g_radarOverlay.Hide()
+            if g_playerHud
+                g_playerHud.Hide()
             return
         }
 
-        ; Hide overlay when the game window is not the active (foreground) window
         if !WinActive("ahk_id " gameHwnd)
         {
             if g_radarOverlay
                 g_radarOverlay.Hide()
+            if g_playerHud
+                g_playerHud.Hide()
             return
         }
 
-        if !g_radarOverlay
+        ; ── Render overlays ───────────────────────────────────────────────────
+        if (!g_radarOverlay && g_radarEnabled)
+        {
             g_radarOverlay := RadarOverlay()
+            g_radarOverlay._alpha := g_radarAlpha
+        }
 
-        global radarShowEnemyNormal, radarShowEnemyRare, radarShowEnemyBoss, radarShowMinions, radarShowNpcs, radarShowChests
-        global debugMode, g_highlightedEntityPath, g_zoneNavEnabled, g_mapHackEnabled
-        g_radarOverlay.ShowEnemyNormal := radarShowEnemyNormal
-        g_radarOverlay.ShowEnemyRare   := radarShowEnemyRare
-        g_radarOverlay.ShowEnemyBoss   := radarShowEnemyBoss
-        g_radarOverlay.ShowMinions := radarShowMinions
-        g_radarOverlay.ShowNpcs    := radarShowNpcs
-        g_radarOverlay.ShowChests  := radarShowChests
-        g_radarOverlay.DebugMode   := debugMode
-        g_radarOverlay._navEnabled := g_zoneNavEnabled
-        g_radarOverlay._mapHackEnabled := g_mapHackEnabled
-        g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
+        global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss, g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
+        global g_debugMode, g_highlightedEntityPath, g_zoneNavEnabled, g_mapHackEnabled
 
         WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
-        radarRenderStart := A_TickCount
-        g_radarOverlay.Render(radarSnap, gwX, gwY, gwW, gwH)
-        g_radarRenderMs := A_TickCount - radarRenderStart
+
+        if (g_radarEnabled && g_radarOverlay)
+        {
+            g_radarOverlay.ShowEnemyNormal := g_radarShowEnemyNormal
+            g_radarOverlay.ShowEnemyRare   := g_radarShowEnemyRare
+            g_radarOverlay.ShowEnemyBoss   := g_radarShowEnemyBoss
+            g_radarOverlay.ShowMinions := g_radarShowMinions
+            g_radarOverlay.ShowNpcs    := g_radarShowNpcs
+            g_radarOverlay.ShowChests  := g_radarShowChests
+            g_radarOverlay.DebugMode   := g_debugMode
+            g_radarOverlay._navEnabled := g_zoneNavEnabled
+            g_radarOverlay._mapHackEnabled := g_mapHackEnabled
+            g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
+
+            radarRenderStart := A_TickCount
+            g_radarOverlay.Render(radarSnap, gwX, gwY, gwW, gwH)
+            g_radarRenderMs := A_TickCount - radarRenderStart
+        }
+        else if (!g_radarEnabled && g_radarOverlay)
+        {
+            g_radarOverlay.Hide()
+        }
+
+        ; Player HUD
+        _UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
     }
     catch as ex
     {
@@ -99,6 +234,74 @@ UpdateRadarFast()
     }
 }
 
+; Extracts player vitals from the radar snapshot and feeds them to the PlayerHUD overlay.
+_UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
+{
+    global g_playerHudEnabled, g_playerHud
+    if !g_playerHudEnabled
+    {
+        if g_playerHud
+            g_playerHud.Hide()
+        return
+    }
+
+    if !gameHwnd
+    {
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+        {
+            if g_playerHud
+                g_playerHud.Hide()
+            return
+        }
+        if !WinActive("ahk_id " gameHwnd)
+        {
+            if g_playerHud
+                g_playerHud.Hide()
+            return
+        }
+    }
+
+    if !g_playerHud
+        g_playerHud := PlayerHUD()
+
+    ; Build data Map for the HUD
+    hudData := Map()
+    hudData["stateName"] := currentState
+    hudData["areaLevel"] := radarSnap.Has("areaLevel") ? radarSnap["areaLevel"] : 0
+
+    pv := radarSnap.Has("playerVitals") ? radarSnap["playerVitals"] : 0
+    if (pv && IsObject(pv) && pv.Has("stats"))
+    {
+        stats := pv["stats"]
+        lifeCur := stats.Has("lifeCurrent")  ? stats["lifeCurrent"]  : 0
+        lifeMax := stats.Has("lifeMax")      ? stats["lifeMax"]      : 1
+        manaCur := stats.Has("manaCurrent")  ? stats["manaCurrent"]  : 0
+        manaMax := stats.Has("manaMax")      ? stats["manaMax"]      : 1
+        esCur   := stats.Has("esCurrent")    ? stats["esCurrent"]    : 0
+        esMax   := stats.Has("esMax")        ? stats["esMax"]        : 0
+
+        hudData["lifeCur"] := lifeCur
+        hudData["lifeMax"] := lifeMax
+        hudData["lifePct"] := lifeMax > 0 ? (lifeCur / lifeMax) * 100 : 0
+        hudData["manaCur"] := manaCur
+        hudData["manaMax"] := manaMax
+        hudData["manaPct"] := manaMax > 0 ? (manaCur / manaMax) * 100 : 0
+        hudData["esCur"]   := esCur
+        hudData["esMax"]   := esMax
+        hudData["esPct"]   := esMax > 0 ? (esCur / esMax) * 100 : 0
+    }
+    else
+    {
+        hudData["lifeCur"] := 0, hudData["lifeMax"] := 0, hudData["lifePct"] := 0
+        hudData["manaCur"] := 0, hudData["manaMax"] := 0, hudData["manaPct"] := 0
+        hudData["esCur"]   := 0, hudData["esMax"]   := 0, hudData["esPct"]   := 0
+    }
+
+    WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
+    g_playerHud.Update(hudData, gwX, gwY, gwW, gwH)
+}
+
 ; Timer callback fired every 150 ms; reads a minimal flask/vitals snapshot and delegates to TryAutoFlask.
 ; Uses a reentrancy guard to prevent overlapping calls from stacking up.
 TryAutoFlaskFast()
@@ -109,10 +312,10 @@ TryAutoFlaskFast()
     _running := true
     try
     {
-        global reader, autoFlaskEnabled, updatesPaused
-        if (updatesPaused || !autoFlaskEnabled)
+        global g_reader, g_autoFlaskEnabled, g_updatesPaused
+        if (g_updatesPaused || !g_autoFlaskEnabled)
             return
-        flask_snap := reader.ReadAutoFlaskSnapshot()
+        flask_snap := g_reader.ReadAutoFlaskSnapshot()
         if flask_snap
             TryAutoFlask(flask_snap)
     }
@@ -132,33 +335,33 @@ TryAutoFlaskFast()
 ; Params: snapshot - full or autoflask-mode snapshot Map from ReadSnapshot/ReadAutoFlaskSnapshot
 TryAutoFlask(snapshot)
 {
-    global autoFlaskEnabled, lifeThresholdPercent, manaThresholdPercent, autoFlaskLastReason, pendingFlaskVerifyBySlot
+    global g_autoFlaskEnabled, g_lifeThresholdPercent, g_manaThresholdPercent, g_autoFlaskLastReason, g_pendingFlaskVerifyBySlot
 
-    if !autoFlaskEnabled
+    if !g_autoFlaskEnabled
     {
-        autoFlaskLastReason := "disabled"
+        g_autoFlaskLastReason := "disabled"
         return
     }
 
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
     {
-        autoFlaskLastReason := "game-window-missing"
+        g_autoFlaskLastReason := "game-window-missing"
         return
     }
 
     stateName := (snapshot && snapshot.Has("currentStateName")) ? snapshot["currentStateName"] : ""
     if !IsStrictInGameState(snapshot)
     {
-        try pendingFlaskVerifyBySlot.Clear()
-        autoFlaskLastReason := "state-blocked(" (stateName = "" ? "unknown" : stateName) ")"
+        try g_pendingFlaskVerifyBySlot.Clear()
+        g_autoFlaskLastReason := "state-blocked(" (stateName = "" ? "unknown" : stateName) ")"
         return
     }
 
     inGame := snapshot.Has("inGameState") ? snapshot["inGameState"] : 0
     if !inGame
     {
-        autoFlaskLastReason := "ingame-null"
+        g_autoFlaskLastReason := "ingame-null"
         return
     }
 
@@ -168,7 +371,7 @@ TryAutoFlask(snapshot)
     {
         if ((worldArea.Has("isTown") && worldArea["isTown"]) || (worldArea.Has("isHideout") && worldArea["isHideout"]))
         {
-            autoFlaskLastReason := "town-hideout"
+            g_autoFlaskLastReason := "town-hideout"
             return
         }
     }
@@ -176,14 +379,14 @@ TryAutoFlask(snapshot)
     areaInst := inGame.Has("areaInstance") ? inGame["areaInstance"] : 0
     if !areaInst
     {
-        autoFlaskLastReason := "area-null"
+        g_autoFlaskLastReason := "area-null"
         return
     }
 
     playerVitals := areaInst.Has("playerVitals") ? areaInst["playerVitals"] : 0
     if !playerVitals || !playerVitals.Has("stats")
     {
-        autoFlaskLastReason := "vitals-missing"
+        g_autoFlaskLastReason := "vitals-missing"
         return
     }
 
@@ -196,7 +399,7 @@ TryAutoFlask(snapshot)
     slots := (flaskInv && flaskInv.Has("flaskSlots")) ? flaskInv["flaskSlots"] : 0
     if !slots
     {
-        autoFlaskLastReason := "flask-slots-missing"
+        g_autoFlaskLastReason := "flask-slots-missing"
         return
     }
 
@@ -206,7 +409,7 @@ TryAutoFlask(snapshot)
     attempted := false
     failDetails := []
 
-    if (lifePct >= 0 && lifePct <= lifeThresholdPercent)
+    if (lifePct >= 0 && lifePct <= g_lifeThresholdPercent)
     {
         attempted := true
         slotReason := ""
@@ -219,7 +422,7 @@ TryAutoFlask(snapshot)
             failDetails.Push(slotReason)
     }
 
-    if (manaPct >= 0 && manaPct <= manaThresholdPercent)
+    if (manaPct >= 0 && manaPct <= g_manaThresholdPercent)
     {
         attempted := true
         slotReason := ""
@@ -239,7 +442,7 @@ TryAutoFlask(snapshot)
             detail .= (detail = "" ? "" : "|") reason
         if (verifyReason != "")
             detail := (detail = "" ? verifyReason : verifyReason "|" detail)
-        autoFlaskLastReason := (detail = "" ? "triggered" : "triggered|" detail)
+        g_autoFlaskLastReason := (detail = "" ? "triggered" : "triggered|" detail)
     }
     else if (attempted)
     {
@@ -248,12 +451,12 @@ TryAutoFlask(snapshot)
             detail .= (detail = "" ? "" : "|") reason
         if (verifyReason != "")
             detail := (detail = "" ? verifyReason : verifyReason "|" detail)
-        autoFlaskLastReason := (detail = "" ? "attempted-no-use" : detail)
+        g_autoFlaskLastReason := (detail = "" ? "attempted-no-use" : detail)
     }
     else
     {
         base := "no-threshold(lp=" Round(lifePct) " mp=" Round(manaPct) ")"
-        autoFlaskLastReason := (verifyReason = "" ? base : verifyReason "|" base)
+        g_autoFlaskLastReason := (verifyReason = "" ? base : verifyReason "|" base)
     }
 }
 
@@ -283,10 +486,10 @@ IsStrictInGameState(snapshot)
 ; Returns: true if the key press was successfully sent to the game
 TryUseFlaskSlot(slots, slotNumber, gameHwnd, &slotReason := "")
 {
-    global flaskUseCooldownMs, lastFlaskUseBySlot, flaskKeyBySlot, autoFlaskLastReason, pendingFlaskVerifyBySlot
+    global g_flaskUseCooldownMs, g_lastFlaskUseBySlot, g_flaskKeyBySlot, g_autoFlaskLastReason, g_pendingFlaskVerifyBySlot
     slotReason := ""
 
-    if (pendingFlaskVerifyBySlot.Has(slotNumber))
+    if (g_pendingFlaskVerifyBySlot.Has(slotNumber))
     {
         slotReason := "slot" slotNumber "-awaiting-confirm"
         return false
@@ -317,7 +520,7 @@ TryUseFlaskSlot(slots, slotNumber, gameHwnd, &slotReason := "")
         iep := slot.Has("itemEntityPtr") ? slot["itemEntityPtr"] : 0
         src := slot.Has("source") ? slot["source"] : "?"
         slotReason := "slot" slotNumber "-no-stats(src=" src ",iep=" Format("0x{:X}", iep) ")"
-        autoFlaskLastReason := slotReason
+        g_autoFlaskLastReason := slotReason
         return false
     }
 
@@ -326,26 +529,26 @@ TryUseFlaskSlot(slots, slotNumber, gameHwnd, &slotReason := "")
     if (perUse <= 0 || current < perUse)
     {
         slotReason := "slot" slotNumber "-no-charges(cur=" current "/use=" perUse ")"
-        autoFlaskLastReason := slotReason
+        g_autoFlaskLastReason := slotReason
         return false
     }
 
     now := A_TickCount
-    last := lastFlaskUseBySlot.Has(slotNumber) ? lastFlaskUseBySlot[slotNumber] : 0
-    if (now - last < flaskUseCooldownMs)
+    last := g_lastFlaskUseBySlot.Has(slotNumber) ? g_lastFlaskUseBySlot[slotNumber] : 0
+    if (now - last < g_flaskUseCooldownMs)
     {
         slotReason := "slot" slotNumber "-cooldown"
-        autoFlaskLastReason := slotReason
+        g_autoFlaskLastReason := slotReason
         return false
     }
 
-    if !flaskKeyBySlot.Has(slotNumber)
+    if !g_flaskKeyBySlot.Has(slotNumber)
     {
         slotReason := "slot" slotNumber "-key-missing"
         return false
     }
 
-    sendKey := flaskKeyBySlot[slotNumber]
+    sendKey := g_flaskKeyBySlot[slotNumber]
     if (sendKey = "")
     {
         slotReason := "slot" slotNumber "-key-empty"
@@ -355,12 +558,12 @@ TryUseFlaskSlot(slots, slotNumber, gameHwnd, &slotReason := "")
     if !SendFlaskKeyToGame(sendKey, gameHwnd)
     {
         slotReason := "slot" slotNumber "-send-failed(key=" sendKey ")"
-        autoFlaskLastReason := slotReason
+        g_autoFlaskLastReason := slotReason
         return false
     }
 
-    lastFlaskUseBySlot[slotNumber] := now
-    pendingFlaskVerifyBySlot[slotNumber] := Map(
+    g_lastFlaskUseBySlot[slotNumber] := now
+    g_pendingFlaskVerifyBySlot[slotNumber] := Map(
         "sentAt", now,
         "preCurrent", current,
         "perUse", perUse,
@@ -374,16 +577,16 @@ TryUseFlaskSlot(slots, slotNumber, gameHwnd, &slotReason := "")
 ; Returns: pipe-separated status string describing each slot outcome (e.g. "slot1-confirm(cur:5->4)")
 ProcessPendingFlaskVerification(slots)
 {
-    global pendingFlaskVerifyBySlot, lastFlaskUseBySlot
+    global g_pendingFlaskVerifyBySlot, g_lastFlaskUseBySlot
 
-    if !pendingFlaskVerifyBySlot || (pendingFlaskVerifyBySlot.Count = 0)
+    if !g_pendingFlaskVerifyBySlot || (g_pendingFlaskVerifyBySlot.Count = 0)
         return ""
 
     now := A_TickCount
     parts := []
     timeoutMs := 650
 
-    for slotNumber, info in pendingFlaskVerifyBySlot.Clone()
+    for slotNumber, info in g_pendingFlaskVerifyBySlot.Clone()
     {
         if !slots || !slots.Has(slotNumber)
             continue
@@ -399,7 +602,7 @@ ProcessPendingFlaskVerification(slots)
 
         if (cur < pre || activeByBuff)
         {
-            pendingFlaskVerifyBySlot.Delete(slotNumber)
+            g_pendingFlaskVerifyBySlot.Delete(slotNumber)
             parts.Push("slot" slotNumber "-confirm(cur:" pre "->" cur ")")
             continue
         }
@@ -407,8 +610,8 @@ ProcessPendingFlaskVerification(slots)
         sentAt := info.Has("sentAt") ? info["sentAt"] : now
         if (now - sentAt > timeoutMs)
         {
-            pendingFlaskVerifyBySlot.Delete(slotNumber)
-            lastFlaskUseBySlot[slotNumber] := 0
+            g_pendingFlaskVerifyBySlot.Delete(slotNumber)
+            g_lastFlaskUseBySlot[slotNumber] := 0
             parts.Push("slot" slotNumber "-unconfirmed-retry")
         }
     }
@@ -462,7 +665,7 @@ SendFlaskKeyToGame(sendKey, gameHwnd)
 ; Returns: true if the command was sent successfully
 SendChatSlashCommand(cmd)
 {
-    global lastSnapshotForUi
+    global g_lastSnapshotForUi
 
     if (cmd = "" || SubStr(cmd, 1, 1) != "/")
         return false
@@ -477,7 +680,7 @@ SendChatSlashCommand(cmd)
     isChatActive := false
     try
     {
-        inGame  := (lastSnapshotForUi && lastSnapshotForUi.Has("inGameState")) ? lastSnapshotForUi["inGameState"] : 0
+        inGame  := (g_lastSnapshotForUi && g_lastSnapshotForUi.Has("inGameState")) ? g_lastSnapshotForUi["inGameState"] : 0
         uiElems := (inGame && inGame.Has("importantUiElements")) ? inGame["importantUiElements"] : 0
         if (uiElems && uiElems.Has("isChatActive"))
             isChatActive := uiElems["isChatActive"]
@@ -512,19 +715,19 @@ SendChatSlashCommand(cmd)
     }
 }
 
-; Loads flask key bindings from a PoE2 config INI file and populates flaskKeyBySlot.
+; Loads flask key bindings from a PoE2 config INI file and populates g_flaskKeyBySlot.
 ; Falls back to default keys (1–5) if the file is missing, empty, or contains no matching entries.
 ; Params: configPath - full path to the poe2_production_Config.ini file
 LoadFlaskHotkeysFromConfig(configPath)
 {
-    global flaskKeyBySlot, flaskKeyLoadStatus
+    global g_flaskKeyBySlot, g_flaskKeyLoadStatus
 
-    flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
-    flaskKeyLoadStatus := "default"
+    g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
+    g_flaskKeyLoadStatus := "default"
 
     if !FileExist(configPath)
     {
-        flaskKeyLoadStatus := "missing"
+        g_flaskKeyLoadStatus := "missing"
         return false
     }
 
@@ -537,14 +740,14 @@ LoadFlaskHotkeysFromConfig(configPath)
         try raw := FileRead(configPath)
         catch
         {
-            flaskKeyLoadStatus := "read-error"
+            g_flaskKeyLoadStatus := "read-error"
             return false
         }
     }
 
     if (StrLen(raw) < 5)
     {
-        flaskKeyLoadStatus := "empty"
+        g_flaskKeyLoadStatus := "empty"
         return false
     }
 
@@ -559,7 +762,7 @@ LoadFlaskHotkeysFromConfig(configPath)
             normalized := NormalizeConfigKeyToSend(keyValue)
             if (slot >= 1 && slot <= 5 && normalized != "")
             {
-                flaskKeyBySlot[slot] := normalized
+                g_flaskKeyBySlot[slot] := normalized
                 found += 1
             }
         }
@@ -567,11 +770,11 @@ LoadFlaskHotkeysFromConfig(configPath)
 
     if (found > 0)
     {
-        flaskKeyLoadStatus := "config"
+        g_flaskKeyLoadStatus := "config"
         return true
     }
 
-    flaskKeyLoadStatus := "default(no-match)"
+    g_flaskKeyLoadStatus := "default(no-match)"
     return false
 }
 

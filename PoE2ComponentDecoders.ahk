@@ -89,10 +89,15 @@ class PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(stdWStringAddress)
             return ""
 
-        bufferOrInline := this.Mem.ReadInt64(stdWStringAddress + PoE2Offsets.StdWString["Buffer"])
-        reservedInline := this.Mem.ReadInt64(stdWStringAddress + PoE2Offsets.StdWString["ReservedBytes"])
-        length := this.Mem.ReadInt(stdWStringAddress + PoE2Offsets.StdWString["Length"])
-        capacity := this.Mem.ReadInt(stdWStringAddress + PoE2Offsets.StdWString["Capacity"])
+        ; Batch-read the entire StdWString header (0x20 bytes) in one RPM call
+        hdr := this.Mem.ReadBytes(stdWStringAddress, 0x20)
+        if !hdr
+            return ""
+
+        bufferOrInline := NumGet(hdr.Ptr, 0x00, "Int64")
+        reservedInline := NumGet(hdr.Ptr, 0x08, "Int64")
+        length         := NumGet(hdr.Ptr, 0x10, "Int")
+        capacity       := NumGet(hdr.Ptr, 0x18, "Int")
 
         if (length <= 0 || length > maxChars || capacity <= 0 || capacity > maxChars)
             return ""
@@ -113,6 +118,42 @@ class PoE2ComponentDecoders
             return ""
 
         return StrGet(raw.Ptr, length, "UTF-16")
+    }
+
+    ; Reads a MSVC std::string (UTF-8) at the given address (inline SSO layout).
+    ; MSVC x64 layout: 0x00-0x0F = union{char buf[16]; char* ptr}, 0x10 = size, 0x18 = capacity.
+    ; SSO threshold: capacity < 16 → inline in buf[16].
+    ReadStdStringAt(stdStringAddress, maxChars := 1000)
+    {
+        if !this.IsProbablyValidPointer(stdStringAddress)
+            return ""
+
+        hdr := this.Mem.ReadBytes(stdStringAddress, 0x20)
+        if !hdr
+            return ""
+
+        bufferOrInline := NumGet(hdr.Ptr, 0x00, "Int64")
+        length         := NumGet(hdr.Ptr, 0x10, "Int")
+        capacity       := NumGet(hdr.Ptr, 0x18, "Int")
+
+        if (length <= 0 || length > maxChars || capacity <= 0 || capacity > maxChars)
+            return ""
+
+        if (capacity < 16)
+        {
+            ; SSO: string data is inline in first 16 bytes of header
+            return StrGet(hdr.Ptr, length, "UTF-8")
+        }
+
+        ; Heap-allocated
+        if !this.IsProbablyValidPointer(bufferOrInline)
+            return ""
+
+        raw := this.Mem.ReadBytes(bufferOrInline, length + 1, true)
+        if (!raw || Type(raw) != "Buffer" || raw.Size < length)
+            return ""
+
+        return StrGet(raw.Ptr, length, "UTF-8")
     }
 
     ; ── VitalStruct (Life/Mana/ES) reader ───────────────────────────────────
@@ -168,6 +209,56 @@ class PoE2ComponentDecoders
         )
     }
 
+    ; Parses a single Vital struct from a pre-read buffer at the given local offset.
+    ; Same logic as ReadVitalStructSnapshot but zero RPM calls.
+    _ParseVitalFromBuffer(buf, localOff)
+    {
+        reservedFlat       := NumGet(buf.Ptr, localOff + 0x00, "Int")   ; Vital.ReservedFlat   0x10
+        reservedFraction   := NumGet(buf.Ptr, localOff + 0x04, "Int")   ; Vital.ReservedFraction 0x14
+        regenPerMinuteStat := NumGet(buf.Ptr, localOff + 0x0C, "Int")   ; Vital.RegenPerMinuteStat 0x1C
+        regen              := NumGet(buf.Ptr, localOff + 0x18, "Float") ; Vital.Regen 0x28
+        maxValue           := NumGet(buf.Ptr, localOff + 0x1C, "Int")   ; Vital.Max 0x2C
+        currentValue       := NumGet(buf.Ptr, localOff + 0x20, "Int")   ; Vital.Current 0x30
+
+        reservedTotal := 0
+        unreserved := maxValue
+        currentPercentUnreserved := 0
+        currentPercentMax := 0
+        reservedPercentMax := 0
+
+        if (maxValue > 0)
+        {
+            reservedTotal := Ceil((reservedFraction / 10000.0) * maxValue) + reservedFlat
+            if (reservedTotal < 0)
+                reservedTotal := 0
+            if (reservedTotal > maxValue)
+                reservedTotal := maxValue
+
+            unreserved := maxValue - reservedTotal
+            if (unreserved < 0)
+                unreserved := 0
+
+            currentPercentUnreserved := (unreserved > 0) ? ((currentValue * 100.0) / unreserved) : 0
+            currentPercentMax := (currentValue * 100.0) / maxValue
+            reservedPercentMax := (reservedTotal * 100.0) / maxValue
+        }
+
+        return Map(
+            "reservedFlat", reservedFlat,
+            "reservedFraction", reservedFraction,
+            "regenPerMinuteStat", regenPerMinuteStat,
+            "noRegenStat", regenPerMinuteStat,
+            "regen", regen,
+            "max", maxValue,
+            "current", currentValue,
+            "reservedTotal", reservedTotal,
+            "unreserved", unreserved,
+            "currentPercentUnreserved", currentPercentUnreserved,
+            "currentPercentMax", currentPercentMax,
+            "reservedPercentMax", reservedPercentMax
+        )
+    }
+
 
     ; ── Component lookup table reader ───────────────────────────────────────
     ; Walks the entity's component hash bucket and collects {name, index, address} entries.
@@ -212,23 +303,49 @@ class PoE2ComponentDecoders
             return out
 
         readCount := Min(rawCount, 256)
+
+        ; Batch-read entire bucket data array in one RPM call (was 2 RPM per entry)
+        bucketBuf := this.Mem.ReadBytes(dataFirst, readCount * entrySize)
+        if !bucketBuf
+            return out
+
+        ; Batch-read the component pointer vector in one RPM call
+        vecBytes := Min(componentCount, 512) * A_PtrSize
+        vecBuf := this.Mem.ReadBytes(compVecFirst, vecBytes)
+
         seenNames := Map()
+        offNamePtr := 0x00  ; ComponentLookupEntry.NamePtr
+        offIndex   := 0x08  ; ComponentLookupEntry.Index
+
+        ; Component name cache: namePtr → string. Component names are static in the game's
+        ; memory — once read they never change. Caching them avoids ~30 RPM per entity after
+        ; the first few entities populate the cache.
+        if !this.HasOwnProp("_compNameCache")
+            this._compNameCache := Map()
 
         idx := 0
         while (idx < readCount && out.Length < maxComponents)
         {
-            entryAddr := dataFirst + (idx * entrySize)
-            namePtr := this.Mem.ReadPtr(entryAddr + PoE2Offsets.ComponentLookupEntry["NamePtr"])
-            compIndex := this.Mem.ReadInt(entryAddr + PoE2Offsets.ComponentLookupEntry["Index"])
+            bufOff  := idx * entrySize
+            namePtr := NumGet(bucketBuf.Ptr, bufOff + offNamePtr, "Ptr")
+            compIndex := NumGet(bucketBuf.Ptr, bufOff + offIndex, "Int")
 
             if (compIndex >= 0 && compIndex < componentCount)
             {
-                compPtr := this.Mem.ReadPtr(compVecFirst + (compIndex * A_PtrSize))
+                compPtr := vecBuf ? NumGet(vecBuf.Ptr, compIndex * A_PtrSize, "Ptr") : 0
                 if this.IsProbablyValidPointer(compPtr)
                 {
-                    compName := this.ReadNarrowString(namePtr, 96)
-                    if (compName = "")
-                        compName := this.Mem.ReadUnicodeString(namePtr)
+                    ; Check name cache first
+                    if this._compNameCache.Has(namePtr)
+                        compName := this._compNameCache[namePtr]
+                    else
+                    {
+                        compName := this.ReadNarrowString(namePtr, 96)
+                        if (compName = "")
+                            compName := this.Mem.ReadUnicodeString(namePtr)
+                        if (compName != "")
+                            this._compNameCache[namePtr] := compName
+                    }
 
                     if this.IsLikelyComponentName(compName)
                     {
@@ -258,13 +375,19 @@ class PoE2ComponentDecoders
     ; Returns: Map with isTargetable, isHighlightable, isTargetedByPlayer, hiddenFromPlayer, etc., or 0 on failure
     DecodeTargetableComponent(componentPtr)
     {
-        isTargetableRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["IsTargetable"])
-        isHighlightableRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["IsHighlightable"])
-        isTargetedByPlayerRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["IsTargetedByPlayer"])
-        meetsQuestStateRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["MeetsQuestState"])
-        needsTrueRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["NeedsTrue"])
-        hiddenFromPlayerRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["HiddenFromPlayer"])
-        needsFalseRaw := this.Mem.ReadUChar(componentPtr + PoE2Offsets.Targetable["NeedsFalse"])
+        ; Batch-read 10 bytes covering all Targetable flags (0x51..0x5A)
+        static tgtBase := PoE2Offsets.Targetable["IsTargetable"]
+        tgtBuf := this.Mem.ReadBytes(componentPtr + tgtBase, 10)
+        if !tgtBuf
+            return 0
+
+        isTargetableRaw        := NumGet(tgtBuf.Ptr, 0, "UChar")  ; 0x51
+        isHighlightableRaw     := NumGet(tgtBuf.Ptr, 1, "UChar")  ; 0x52
+        isTargetedByPlayerRaw  := NumGet(tgtBuf.Ptr, 2, "UChar")  ; 0x53
+        meetsQuestStateRaw     := NumGet(tgtBuf.Ptr, 5, "UChar")  ; 0x56
+        needsTrueRaw           := NumGet(tgtBuf.Ptr, 7, "UChar")  ; 0x58
+        hiddenFromPlayerRaw    := NumGet(tgtBuf.Ptr, 8, "UChar")  ; 0x59
+        needsFalseRaw          := NumGet(tgtBuf.Ptr, 9, "UChar")  ; 0x5A
 
         plausible := (isTargetableRaw <= 1)
             && (isHighlightableRaw <= 1)
@@ -296,12 +419,17 @@ class PoE2ComponentDecoders
     ; Returns: Map with worldPosition, gridPosition, modelBounds, terrainHeight, or 0 on failure
     DecodeRenderComponent(componentPtr)
     {
-        worldX := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CurrentWorldPosition"])
-        worldY := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CurrentWorldPositionY"])
-        worldZ := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CurrentWorldPositionZ"])
-        boundsX := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CharacterModelBounds"])
-        boundsY := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CharacterModelBoundsY"])
-        boundsZ := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["CharacterModelBoundsZ"])
+        ; Batch-read XYZ + model bounds (0x138..0x14F = 24 bytes) in one RPM call
+        static baseOff := PoE2Offsets.Render["CurrentWorldPosition"]
+        posBuf := this.Mem.ReadBytes(componentPtr + baseOff, 24)
+        if !posBuf
+            return 0
+        worldX  := NumGet(posBuf.Ptr, 0,  "Float")
+        worldY  := NumGet(posBuf.Ptr, 4,  "Float")
+        worldZ  := NumGet(posBuf.Ptr, 8,  "Float")
+        boundsX := NumGet(posBuf.Ptr, 12, "Float")
+        boundsY := NumGet(posBuf.Ptr, 16, "Float")
+        boundsZ := NumGet(posBuf.Ptr, 20, "Float")
         terrainHeight := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["TerrainHeight"])
 
         plausible := (Abs(worldX) <= 200000)
@@ -1136,9 +1264,23 @@ class PoE2ComponentDecoders
     ; Returns: Map with isAlive, percent fields, regen values, and nested life/mana/energyShield Maps, or 0
     DecodeLifeComponentBasic(componentPtr)
     {
-        life := this.ReadVitalStructSnapshot(componentPtr, PoE2Offsets.Life["Health"])
-        mana := this.ReadVitalStructSnapshot(componentPtr, PoE2Offsets.Life["Mana"])
-        es := this.ReadVitalStructSnapshot(componentPtr, PoE2Offsets.Life["EnergyShield"])
+        ; Batch-read all three vital structs (Health, Mana, ES) in one RPM call.
+        ; Health starts at Life.Health(0x1A8) + Vital.ReservedFlat(0x10) = 0x1B8
+        ; ES ends at Life.ES(0x230) + Vital.Current(0x30) + 4 = 0x264
+        ; Total span: 0x264 - 0x1B8 = 0xAC (172 bytes) — was 18 separate RPM calls
+        static healthBase := PoE2Offsets.Life["Health"]
+        static manaBase   := PoE2Offsets.Life["Mana"]
+        static esBase     := PoE2Offsets.Life["EnergyShield"]
+        static readStart  := healthBase + 0x10  ; start at Health.ReservedFlat
+        static readLen    := (esBase + 0x34) - readStart  ; through ES.Current+4
+
+        vitalBuf := this.Mem.ReadBytes(componentPtr + readStart, readLen)
+        if !vitalBuf
+            return 0
+
+        life := this._ParseVitalFromBuffer(vitalBuf, healthBase - readStart + 0x10)
+        mana := this._ParseVitalFromBuffer(vitalBuf, manaBase - readStart + 0x10)
+        es   := this._ParseVitalFromBuffer(vitalBuf, esBase - readStart + 0x10)
 
         healthMax := life["max"]
         healthCurrent := life["current"]
