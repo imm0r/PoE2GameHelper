@@ -103,4 +103,4 @@ InGameStateMonitor.ahk (Main Entry, WebView UI Host)
 - **DAT-Schema:** https://github.com/poe-tool-dev/dat-schema
 - **AHK v2 Docs:** https://www.autohotkey.com/docs/v2/
 
-Detaillierte Dokumentation: siehe `PROJECT_STATUS.md`
+Detaillierte Dokumentation: siehe [`PROJECT_STATUS.md`](https://github.com/imm0r/PoE2GameHelper/blob/master/PROJECT_STATUS.md)
