@@ -99,7 +99,7 @@ InGameStateMonitor.ahk (Main Entry, WebView UI Host)
 ## Referenzen
 
 - [**C# Original**](https://gitlab.com/bylafko/gamehelper2)
-- [**Wraedar (Zone Nav)*](https://github.com/diesal/Wraedar)
+- [**Wraedar (Zone Nav)**](https://github.com/diesal/Wraedar)
 - [**DAT-Schema**](https://github.com/poe-tool-dev/dat-schema)
 - [**AHK v2 Docs**](https://www.autohotkey.com/docs/v2/)
 
