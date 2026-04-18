@@ -1375,23 +1375,33 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         totalTilesX := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesX"])
         totalTilesY := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TotalTilesY"])
         if (totalTilesX < 1 || totalTilesX > 1000 || totalTilesY < 1 || totalTilesY > 1000)
+        {
+            this._zoneScanFailReason := "tiles-oob(" totalTilesX "x" totalTilesY ")"
             return false
+        }
 
         tileVecFirst := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"])
         tileVecLast  := this.Mem.ReadInt64(terrainBase + PoE2Offsets.TerrainMetadata["TileDetailsPtr"] + 8)
         if !this.IsProbablyValidPointer(tileVecFirst) || tileVecLast <= tileVecFirst
+        {
+            this._zoneScanFailReason := "vec-bad(f:" Format("0x{:X}", tileVecFirst) " l:" Format("0x{:X}", tileVecLast) ")"
             return false
+        }
 
         tileStructSize := 0x38
         totalTiles := Floor((tileVecLast - tileVecFirst) / tileStructSize)
         if (totalTiles < 1 || totalTiles > 100000)
+        {
+            this._zoneScanFailReason := "count-oob(" totalTiles ")"
             return false
+        }
 
         this._tgtScanTileIdx := 0
         this._tgtScanTotalTiles := totalTiles
         this._tgtScanTileVecFirst := tileVecFirst
         this._tgtScanTotalTilesX := totalTilesX
         this._tgtScanPartialResults := Map()
+        this._zoneScanFailReason := ""
         return true
     }
 

@@ -95,6 +95,8 @@ class RadarOverlay
 
         ; Terrain walkability data (set from snapshot each render frame).
         this._terrain             := 0
+        ; Shared pathfinder instance (used for A* paths and line-of-sight).
+        this._pathfinder          := TerrainPathfinder()
         ; Cached A* path: array of [gridX, gridY] absolute coordinates.
         this._pathGridCoords      := []
         ; Cache-invalidation keys for the path.
@@ -104,7 +106,6 @@ class RadarOverlay
         this._pathEntityGX        := -999999
         this._pathEntityGY        := -999999
         this._pathLastComputeTick := 0
-        this._pathDebug           := ""   ; last failure reason from _FindPath
         ; Highlighted entity world position — written by _RenderMapLayer, read by Render().
         this._hlEntityWorldX      := 0
         this._hlEntityWorldY      := 0
@@ -120,6 +121,10 @@ class RadarOverlay
         this._navLastComputeTick  := 0
         this._navAreaHash         := 0xFFFFFFFF
         this._navEnabled          := true  ; toggle from config
+
+        ; Range circles: array of Maps with "range" (world units), "color" (BGR), "label" (text)
+        ; Set externally via SetRangeCircles(); drawn as isometric ellipses around the player.
+        this._rangeCircles := []
 
         ; Map hack: pre-rendered walkable terrain border bitmap
         this._mapHackEnabled      := true  ; toggle from config
@@ -185,7 +190,10 @@ class RadarOverlay
 
         ; Update terrain data from snapshot (re-read only when area hash changes in the reader).
         if (areaInstance && areaInstance.Has("terrain") && areaInstance["terrain"])
+        {
             this._terrain := areaInstance["terrain"]
+            this._pathfinder.SetTerrain(this._terrain)
+        }
         terrainError := (areaInstance && areaInstance.Has("terrainError")) ? areaInstance["terrainError"] : ""
 
         ; Regenerate maphack bitmap when terrain data changes (new area loaded)
@@ -280,7 +288,7 @@ class RadarOverlay
                            || Abs(eGY - this._pathEntityGY) > 5))
             if recompute
             {
-                this._pathGridCoords      := this._FindPath(pGX, pGY, eGX, eGY)
+                this._pathGridCoords      := this._pathfinder.FindPath(pGX, pGY, eGX, eGY)
                 this._pathPlayerGX        := pGX
                 this._pathPlayerGY        := pGY
                 this._pathEntityGX        := eGX
@@ -293,7 +301,7 @@ class RadarOverlay
                 "path: pG=" pGX "," pGY " eG=" eGX "," eGY
                 " pts=" this._pathGridCoords.Length
                 " terrain=" (this._terrain ? "OK" : "NIL")
-                " dbg=" this._pathDebug,
+                " dbg=" this._pathfinder.LastDebug,
                 0x00FF00)
         }
         else if (this.highlightedEntityPath = "")
@@ -363,7 +371,7 @@ class RadarOverlay
                     t := this._navTargets[bestIdx]
                     tGX := Round(t["gridX"])
                     tGY := Round(t["gridY"])
-                    this._navPathCoords      := this._FindPath(pGX, pGY, tGX, tGY)
+                    this._navPathCoords      := this._pathfinder.FindPath(pGX, pGY, tGX, tGY)
                     this._navTargetIdx       := bestIdx
                     this._navPlayerGX        := pGX
                     this._navPlayerGY        := pGY
@@ -505,6 +513,16 @@ class RadarOverlay
 
         ; Spieler-Dot in der Kartenmitte
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
+
+        ; ── Range circles (shown while editing combat ranges in config) ──
+        for _, rc in this._rangeCircles
+        {
+            if (rc.Has("range") && rc["range"] > 0)
+                this._DrawRangeCircle(rc["range"], mapCenterX, mapCenterY,
+                    projectionCos, projectionSin,
+                    rc.Has("color") ? rc["color"] : 0x00FFFF,
+                    rc.Has("label") ? rc["label"] : "")
+        }
 
         ; ── Entities zeichnen ────────────────────────────────────────────────────────────
         awakeEntities   := (areaInstance && areaInstance.Has("awakeEntities"))    ? areaInstance["awakeEntities"]    : 0
@@ -890,6 +908,49 @@ class RadarOverlay
         DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldBrush)
     }
 
+    ; ── Range circle API ─────────────────────────────────────────────────────────────────
+
+    ; Sets (or clears) range circles to draw around the player.
+    ; circles: Array of Maps, each with "range" (world units), "color" (BGR), "label" (string).
+    ; Pass an empty array [] to clear.
+    SetRangeCircles(circles)
+    {
+        this._rangeCircles := circles
+    }
+
+    ; Draws an isometric range ellipse around the player.
+    ; rangeWorld: radius in world units.  mapCenterX/Y: player screen position.
+    ; projectionCos/Sin: current projection factors.  colorBGR: line color.  label: optional text.
+    _DrawRangeCircle(rangeWorld, mapCenterX, mapCenterY, projectionCos, projectionSin, colorBGR, label := "")
+    {
+        gridR := rangeWorld / RadarOverlay.WORLD_TO_GRID_RATIO
+        segments := 48
+        step := 6.2831853 / segments   ; 2π / segments
+        prevSX := 0, prevSY := 0
+        topSX := 0, topSY := 999999    ; track topmost point for label placement
+
+        Loop segments + 1
+        {
+            angle := (A_Index - 1) * step
+            gx := gridR * Cos(angle)
+            gy := gridR * Sin(angle)
+
+            sx := Round(mapCenterX + (gx - gy) * projectionCos)
+            sy := Round(mapCenterY + (0 - gx - gy) * projectionSin)
+
+            if (A_Index > 1)
+                this._DrawLine(prevSX, prevSY, sx, sy, colorBGR, 2)
+
+            if (sy < topSY)
+                topSX := sx, topSY := sy
+
+            prevSX := sx, prevSY := sy
+        }
+
+        if (label != "")
+            this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
+    }
+
     ; ── Interne Buffer-Verwaltung ────────────────────────────────────────────────────────
 
     ; Creates (or re-creates) the compatible memory DC and DIB bitmap used for off-screen rendering.
@@ -919,294 +980,6 @@ class RadarOverlay
                 "Int", 0, "Int", 0, "Int", width, "Int", height,
                 "Ptr", this.memoryDC, "Int", 0, "Int", 0, "UInt", 0x00CC0020)   ; SRCCOPY
         DllCall("ReleaseDC", "Ptr", this.windowHandle, "Ptr", screenDC)
-    }
-
-    ; ── Terrain pathfinding ──────────────────────────────────────────────────────────────
-
-    ; Returns true if grid cell (gx, gy) is walkable according to the packed nibble terrain data.
-    _IsWalkable(gx, gy, buf, bpr, rows, dsz)
-    {
-        if (gx < 0 || gy < 0 || gy >= rows || gx >= bpr * 2)
-            return false
-        idx := gy * bpr + (gx >> 1)
-        if (idx >= dsz)
-            return false
-        byt := NumGet(buf.Ptr, idx, "UChar")
-        return ((byt >> ((gx & 1) * 4)) & 0xF) != 0
-    }
-
-    ; A* pathfinder on the walkable terrain grid.
-    ; startGX/GY and endGX/GY are absolute grid coordinates.
-    ; Operates on a step-2 coarse grid (4× smaller search space) for speed.
-    ; Returns an Array of [gx, gy] pairs (player → entity), smoothed via line-of-sight culling.
-    ; Returns [] on failure (no terrain, unwalkable endpoints, or time cap exceeded).
-    _FindPath(startGX, startGY, endGX, endGY)
-    {
-        terrain := this._terrain
-        if !(terrain && terrain.Has("data"))
-        {
-            this._pathDebug := "no-terrain"
-            return []
-        }
-
-        buf  := terrain["data"]
-        bpr  := terrain["bytesPerRow"]
-        rows := terrain["totalRows"]
-        dsz  := terrain["dataSize"]
-        maxW := bpr * 2
-
-        ; Clamp to grid bounds.
-        startGX := Max(0, Min(startGX, maxW - 1))
-        startGY := Max(0, Min(startGY, rows - 1))
-        endGX   := Max(0, Min(endGX,   maxW - 1))
-        endGY   := Max(0, Min(endGY,   rows - 1))
-
-        ; Nudge start / end to nearest walkable cell (handles player/entity standing on a border).
-        startGX := this._NudgeToWalkable(startGX, startGY, buf, bpr, rows, dsz, &startGY)
-        endGX   := this._NudgeToWalkable(endGX,   endGY,   buf, bpr, rows, dsz, &endGY)
-        if (startGX < 0 || endGX < 0)
-        {
-            this._pathDebug := "nudge-fail sW=" (startGX < 0 ? "0" : "1") " eW=" (endGX < 0 ? "0" : "1")
-            return []
-        }
-
-        ; ── Coarse grid (STEP cells per logical unit) ─────────────────────────────────
-        ; Reduces search space: STEP=2 for short, STEP=4 for medium, STEP=8 for very long paths.
-        rawDist := Max(Abs(startGX - endGX), Abs(startGY - endGY))
-        STEP := (rawDist > 500) ? 8 : (rawDist > 200) ? 4 : 2
-        csX := startGX // STEP,   csY := startGY // STEP
-        ceX := endGX   // STEP,   ceY := endGY   // STEP
-        cmW := maxW    // STEP + 1
-        cmH := rows    // STEP + 1
-
-        STRIDE   := cmW + 1
-        startKey := csY * STRIDE + csX
-        endKey   := ceY * STRIDE + ceX
-
-        ; Bounding box (in coarse coords) + padding to restrict expansion area.
-        ; Bounding box: at least PAD_MIN coarse cells around the rect, scaled up for distance.
-        dist  := Max(Abs(csX - ceX), Abs(csY - ceY))
-        PAD   := Max(30, dist // 4)   ; grow with distance so far entities don't get clipped
-        bMinX := Max(0,      Min(csX, ceX) - PAD)
-        bMaxX := Min(cmW-1,  Max(csX, ceX) + PAD)
-        bMinY := Max(0,      Min(csY, ceY) - PAD)
-        bMaxY := Min(cmH-1,  Max(csY, ceY) + PAD)
-
-        ; A* data structures (integer-keyed Maps avoid slow string hashing).
-        gScore   := Map()
-        cameFrom := Map()
-        closed   := Map()
-        gScore[startKey] := 0
-
-        h0   := (Abs(csX - ceX) + Abs(csY - ceY)) * 10
-        heap := [[h0, startKey]]
-
-        ; 8-directional movement vectors and costs (×10 for integer arithmetic).
-        static DX := [1, -1, 0, 0, 1, 1, -1, -1]
-        static DY := [0, 0, 1, -1, 1, -1, 1, -1]
-        static DC := [10, 10, 10, 10, 14, 14, 14, 14]
-
-        ; Scale iteration budget with search area so far entities aren't cut off.
-        searchArea := (bMaxX - bMinX + 1) * (bMaxY - bMinY + 1)
-        MAX_ITER := Min(200000, Max(15000, searchArea))
-        iter     := 0
-        found    := false
-        deadline := A_TickCount + ((rawDist > 400) ? 500 : 200)   ; extended budget for zone-wide paths
-
-        while (heap.Length > 0 && iter < MAX_ITER && A_TickCount < deadline)
-        {
-            ; Heap pop.
-            curItem  := heap[1]
-            lastItem := heap.RemoveAt(heap.Length)
-            if heap.Length > 0
-            {
-                heap[1] := lastItem
-                this._HeapDown(heap, 1)
-            }
-            curKey := curItem[2]
-
-            if closed.Has(curKey)
-                continue
-            closed[curKey] := true
-            iter++
-
-            if (curKey = endKey)
-            {
-                found := true
-                break
-            }
-
-            cx := Mod(curKey, STRIDE)
-            cy := (curKey - cx) // STRIDE
-            curG := gScore[curKey]
-
-            loop 8
-            {
-                ii := A_Index
-                nx := cx + DX[ii]
-                ny := cy + DY[ii]
-
-                if (nx < bMinX || nx > bMaxX || ny < bMinY || ny > bMaxY)
-                    continue
-                ; Check walkability at actual grid coordinates.
-                if !this._IsWalkable(nx * STEP, ny * STEP, buf, bpr, rows, dsz)
-                    continue
-
-                nKey := ny * STRIDE + nx
-                if closed.Has(nKey)
-                    continue
-
-                tentG := curG + DC[ii]
-                oldG  := gScore.Has(nKey) ? gScore[nKey] : 999999999
-
-                if (tentG < oldG)
-                {
-                    gScore[nKey]   := tentG
-                    cameFrom[nKey] := curKey
-                    h := (Abs(nx - ceX) + Abs(ny - ceY)) * 10
-                    heap.Push([tentG + h, nKey])
-                    this._HeapUp(heap, heap.Length)
-                }
-            }
-        }
-
-        if !found
-        {
-            this._pathDebug := "astar-fail iter=" iter "/" MAX_ITER " heap=" heap.Length " rawD=" rawDist " STEP=" STEP " dist=" dist " PAD=" PAD
-            return []
-        }
-        this._pathDebug := "ok iter=" iter "/" MAX_ITER " STEP=" STEP
-
-        ; Reconstruct path (end → start) in actual grid coords, then reverse.
-        path := []
-        k    := endKey
-        loop 20000
-        {
-            cx := Mod(k, STRIDE)
-            cy := (k - cx) // STRIDE
-            path.Push([cx * STEP, cy * STEP])
-            if (k = startKey || !cameFrom.Has(k))
-                break
-            k := cameFrom[k]
-        }
-
-        n := path.Length
-        loop n // 2
-        {
-            ii := A_Index, jj := n - ii + 1
-            tmp := path[ii], path[ii] := path[jj], path[jj] := tmp
-        }
-
-        return this._SmoothPath(path, buf, bpr, rows, dsz)
-    }
-
-    ; Finds the nearest walkable cell within radius 5 of (gx, gy).
-    ; Returns the walkable gx (and modifies gy via byref); returns -1 if none found.
-    _NudgeToWalkable(gx, gy, buf, bpr, rows, dsz, &outGY)
-    {
-        if this._IsWalkable(gx, gy, buf, bpr, rows, dsz)
-        {
-            outGY := gy
-            return gx
-        }
-        loop 5
-        {
-            r := A_Index
-            loop r * 8
-            {
-                angle := (A_Index - 1) * (6.2831853 / (r * 8))
-                nx := gx + Round(r * Cos(angle))
-                ny := gy + Round(r * Sin(angle))
-                if this._IsWalkable(nx, ny, buf, bpr, rows, dsz)
-                {
-                    outGY := ny
-                    return nx
-                }
-            }
-        }
-        outGY := gy
-        return -1
-    }
-
-    ; Reduces path waypoints by greedily skipping intermediate points with line-of-sight.
-    _SmoothPath(path, buf, bpr, rows, dsz)
-    {
-        n := path.Length
-        if (n <= 2)
-            return path
-
-        smoothed := [path[1]]
-        i := 1
-        while (i < n)
-        {
-            ; Find the furthest point reachable in a straight walkable line.
-            best := i + 1
-            loop Min(n - i, 25) - 1    ; look ahead up to 25 steps
-            {
-                j := i + A_Index + 1
-                if this._HasLineOfSight(smoothed[smoothed.Length][1], smoothed[smoothed.Length][2],
-                                        path[j][1], path[j][2], buf, bpr, rows, dsz)
-                    best := j
-            }
-            i := best
-            if (i <= n)
-                smoothed.Push(path[i])
-        }
-        return smoothed
-    }
-
-    ; Bresenham line-of-sight check: returns true iff all cells on the line are walkable.
-    _HasLineOfSight(x0, y0, x1, y1, buf, bpr, rows, dsz)
-    {
-        dx := Abs(x1 - x0), dy := Abs(y1 - y0)
-        sx := (x0 < x1) ? 1 : -1
-        sy := (y0 < y1) ? 1 : -1
-        err := dx - dy
-        x := x0, y := y0
-        loop 400
-        {
-            if !this._IsWalkable(x, y, buf, bpr, rows, dsz)
-                return false
-            if (x = x1 && y = y1)
-                return true
-            e2 := err * 2
-            if (e2 > -dy)
-                err -= dy, x += sx
-            if (e2 < dx)
-                err += dx, y += sy
-        }
-        return false
-    }
-
-    ; Binary min-heap: sift item at index i upward.
-    _HeapUp(heap, i)
-    {
-        while (i > 1)
-        {
-            p := i >> 1
-            if (heap[p][1] <= heap[i][1])
-                break
-            tmp := heap[p], heap[p] := heap[i], heap[i] := tmp
-            i := p
-        }
-    }
-
-    ; Binary min-heap: sift item at index i downward.
-    _HeapDown(heap, i)
-    {
-        n := heap.Length
-        loop
-        {
-            s := i, l := i * 2, r := i * 2 + 1
-            if (l <= n && heap[l][1] < heap[s][1])
-                s := l
-            if (r <= n && heap[r][1] < heap[s][1])
-                s := r
-            if (s = i)
-                break
-            tmp := heap[i], heap[i] := heap[s], heap[s] := tmp
-            i := s
-        }
     }
 
     ; ── Map Hack: walkable terrain border overlay ──────────────────────────────────

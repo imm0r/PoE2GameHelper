@@ -40,6 +40,9 @@ PushHeaderToWebView()
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled
     global g_cfgOpenSections
+    global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
+    global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
+    global g_exploreEnabled, g_exploreCurrentPercent, g_exploreTargetPercent, g_exploreLastReason
 
     poeRunning := (ProcessExist("PathOfExileSteam.exe") || ProcessExist("PathOfExile.exe")) ? "true" : "false"
     slot1Key := g_flaskKeyBySlot.Has(1) ? g_flaskKeyBySlot[1] : "?"
@@ -89,9 +92,90 @@ PushHeaderToWebView()
           . "},"
           . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
           . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
-          . '"cfgSections":' _JsStr(g_cfgOpenSections)
+          . '"cfgSections":' _JsStr(g_cfgOpenSections) ","
+          . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
+          . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
+          . '"combatState":' _JsStr(g_combatState) ","
+          . '"combatReason":' _JsStr(g_combatLastReason) ","
+          . '"combatRange":' g_combatRange ","
+          . '"combatDisengage":' g_combatDisengageRange ","
+          . '"combatGCD":' g_combatGlobalCooldownMs ","
+          . '"combatW2S":' Format("{:.2f}", g_combatW2SScale) ","
+          . '"combatSlots":' _SerializeCombatSlots() ","
+          . '"exploreEnabled":' (g_exploreEnabled ? "true" : "false") ","
+          . '"explorePct":' Format("{:.1f}", g_exploreCurrentPercent) ","
+          . '"exploreTarget":' g_exploreTargetPercent ","
+          . '"exploreReason":' _JsStr(g_exploreLastReason) ","
+          . '"zoneScan":' _SerializeZoneScanStatus()
           . "}"
     WebViewExec("updateHeader(" json ")")
+}
+
+; Serialises combat skill slots to a JSON array for the header push.
+_SerializeCombatSlots()
+{
+    global g_combatSkillSlots
+    json := "["
+    first := true
+    Loop 8
+    {
+        slotNum := A_Index
+        if !g_combatSkillSlots.Has(slotNum)
+            continue
+        s := g_combatSkillSlots[slotNum]
+        if !first
+            json .= ","
+        first := false
+        json .= "{"
+            . '"slot":' slotNum ","
+            . '"enabled":' (s["enabled"] ? "true" : "false") ","
+            . '"key":' _JsStr(s["key"]) ","
+            . '"priority":' s["priority"] ","
+            . '"skillName":' _JsStr(s.Has("skillName") ? s["skillName"] : "") ","
+            . '"type":' _JsStr(s["type"]) ","
+            . '"cooldownMs":' (s.Has("cooldownMs") ? s["cooldownMs"] : 0) ","
+            . '"skillRange":' (s.Has("skillRange") ? s["skillRange"] : 0)
+            . "}"
+    }
+    json .= "]"
+    return json
+}
+
+; Serialises zone scan (maphack) status for the header push.
+_SerializeZoneScanStatus()
+{
+    global g_reader
+    if !(IsObject(g_reader))
+        return '{"done":false,"inProgress":false,"elapsed":0,"timing":0,"tiles":0}'
+
+    done       := g_reader._zoneScanDone
+    inProgress := g_reader._tgtScanInProgress
+    timing     := g_reader._zoneScanTimingMs
+    tiles      := g_reader._zoneScanAccumulated.Count
+    startedAt  := g_reader._zoneScanStartedAt
+    retries    := g_reader._zoneScanRetries
+    schedAt    := g_reader._zoneScanScheduledAt
+    totalTiles := g_reader.HasOwnProp("_tgtScanTotalTiles") ? g_reader._tgtScanTotalTiles : 0
+    tileIdx    := g_reader.HasOwnProp("_tgtScanTileIdx") ? g_reader._tgtScanTileIdx : 0
+    failReason := g_reader.HasOwnProp("_zoneScanFailReason") ? g_reader._zoneScanFailReason : ""
+
+    if (!done && startedAt > 0)
+        elapsed := A_TickCount - startedAt
+    else
+        elapsed := timing
+
+    return "{"
+        . '"done":'       (done ? "true" : "false") ","
+        . '"inProgress":' (inProgress ? "true" : "false") ","
+        . '"elapsed":'    elapsed ","
+        . '"timing":'     timing ","
+        . '"tiles":'      tiles ","
+        . '"retries":'    retries ","
+        . '"totalTiles":' totalTiles ","
+        . '"tileIdx":'    tileIdx ","
+        . '"schedAt":'    (schedAt > 0 ? "true" : "false") ","
+        . '"fail":'       _JsStr(failReason)
+        . "}"
 }
 
 ; Serialises the active TreeView tab and pushes it to updateTree() in the WebView.
@@ -411,6 +495,27 @@ PushDiffResultsToWebView(diffResult)
 
     json .= "}"
     try WebViewExec("updateDiffResults(" json ")")
+}
+
+; Pushes saved panel offsets to the WebView for display in the Debug tab.
+_PushSavedPanelOffsets()
+{
+    global g_webViewReady
+    if !g_webViewReady
+        return
+
+    offsets := PoE2Offsets.DiscoveredPanelOffsets
+    json := "["
+    first := true
+    for name, off in offsets
+    {
+        if !first
+            json .= ","
+        json .= '{"name":' _JsStr(name) ',"offset":' _JsStr(Format("0x{:X}", off)) '}'
+        first := false
+    }
+    json .= "]"
+    try WebViewExec("updateSavedPanelOffsets(" json ")")
 }
 
 ; Pushes all four non-tree special tabs (buffs, entities, UI, gameState, skills) to the WebView.

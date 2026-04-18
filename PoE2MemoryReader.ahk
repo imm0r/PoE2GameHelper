@@ -142,6 +142,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._zoneScanTimingMs    := 0       ; how long the last deep scan took
         this._zoneScanScheduledAt := 0       ; tick when deep scan should run
         this._zoneScanRetries     := 0       ; retry count if deep scan finds 0 results
+        this._zoneScanStartedAt   := 0       ; tick when scan began (for elapsed display)
+        this._zoneScanFailReason  := ""      ; last setup failure reason for diagnostics
         this._tgtScanInProgress   := false   ; true while incremental tile scan is running
 
         ; BFS throttle: reuse tree scan results for 200ms to reduce per-tick RPM calls.
@@ -1005,11 +1007,25 @@ class PoE2GameStateReader extends PoE2InventoryReader
             worldAreaDat := this.ReadWorldAreaDat(worldAreaDetailsRowPtr)
         }
 
+        ; Read 4x4 WorldToScreen matrix (16 floats = 64 bytes) from camera structure
+        w2sMatrix := []
+        try
+        {
+            matAddr := worldDataAddress + PoE2Offsets.WorldData["W2SMatrix"]
+            matBuf := this.Mem.ReadBytes(matAddr, 64)
+            if (matBuf && matBuf.Size >= 64)
+            {
+                Loop 16
+                    w2sMatrix.Push(NumGet(matBuf.Ptr, (A_Index - 1) * 4, "Float"))
+            }
+        }
+
         return Map(
             "address", worldDataAddress,
             "worldAreaDetailsPtr", worldAreaDetailsPtr,
             "worldAreaDetailsRowPtr", worldAreaDetailsRowPtr,
-            "worldAreaDat", worldAreaDat
+            "worldAreaDat", worldAreaDat,
+            "w2sMatrix", w2sMatrix
         )
     }
 
@@ -1311,6 +1327,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
         parentPtrOff := PoE2Offsets.UiElementBase["ParentPtr"]
 
         ; ── Phase 1: scan struct for heap UiElement pointers ──
+        ; Also read each element's UnscaledSize to classify panel-sized vs small UI noise.
+        ; Real panels (inventory, stash, skill tree, etc.) are large elements (300+ UI units).
+        ; Combat buffs, damage numbers, etc. are tiny icons (< 200 UI units).
         scanStart := 0x400
         scanEnd := 0xC00
         scanSize := scanEnd - scanStart
@@ -1321,6 +1340,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
         scannedPtrCount := 0
         heapPtrCount := 0
         uiElemCount := 0
+        sizeOffset := PoE2Offsets.UiElementBase["UnscaledSize"]  ; 0x288: float W, float H
+        ; Threshold: elements wider than 300 AND taller than 200 in UI coords (base 2560×1600)
+        ; are considered panel-sized. Typical panels are 800+ wide, buff icons are ~40-80.
+        panelMinW := 300.0
+        panelMinH := 200.0
 
         heapElements := []
         off := 0
@@ -1342,7 +1366,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 continue
 
             uiElemCount += 1
-            heapElements.Push(Map("off", structOffset, "ptr", candidatePtr))
+
+            ; Read UnscaledSize (8 bytes: float W + float H) to classify element
+            sizeBuf := this.Mem.ReadBytes(candidatePtr + sizeOffset, 8)
+            elemW := 0.0
+            elemH := 0.0
+            if sizeBuf
+            {
+                elemW := NumGet(sizeBuf.Ptr, 0, "Float")
+                elemH := NumGet(sizeBuf.Ptr, 4, "Float")
+            }
+            isPanel := (elemW >= panelMinW && elemH >= panelMinH)
+
+            heapElements.Push(Map("off", structOffset, "ptr", candidatePtr, "isPanel", isPanel, "w", elemW, "h", elemH))
         }
 
         ; ── Phase 2: visibility baseline scan ──
@@ -1351,6 +1387,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         visBaseline := Map()
         visibleCount := 0
         invisibleCount := 0
+        panelCount := 0
         diagSamples := []
 
         for _, elem in heapElements
@@ -1367,9 +1404,17 @@ class PoE2GameStateReader extends PoE2InventoryReader
             else
                 invisibleCount += 1
 
+            if elem["isPanel"]
+                panelCount += 1
+
             if (diagSamples.Length < 60)
             {
                 label := knownOffsets.Has(structOffset) ? knownOffsets[structOffset] : ""
+                sizeStr := Format("{:.0f}×{:.0f}", elem["w"], elem["h"])
+                if elem["isPanel"]
+                    label .= (label != "" ? " " : "") . "📋 " . sizeStr
+                else
+                    label .= (label != "" ? " " : "") . sizeStr
                 diagSamples.Push(Map(
                     "idx", Format("0x{:X}", structOffset),
                     "ptr", Format("0x{:X}", elemPtr),
@@ -1388,6 +1433,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         result["_totalChildren"] := scannedPtrCount
         result["_heapPtrCount"] := heapPtrCount
         result["_uiElemCount"] := uiElemCount
+        result["_panelCount"] := panelCount
         result["_diagSamples"] := diagSamples
         result["_visibleCount"] := visibleCount
         result["_invisibleCount"] := invisibleCount
@@ -1466,11 +1512,13 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
     ; Reads visibility (Flags bit 11) for all heap UiElements discovered in Phase 1.
     ; Uses visibility-differential: compares current state to baseline.
-    ; Detects BOTH newly visible AND newly hidden elements as panel state changes.
+    ; Panel detection uses element size (UnscaledSize): only elements larger than
+    ; 300×200 UI units are considered panels. Combat buffs/debuffs are tiny icons
+    ; and never reach this threshold. Size is cached from discovery; newly-visible
+    ; elements get a lazy re-check in case they reported 0×0 when hidden.
     ; Also performs raw struct pointer-level change detection (1 RPM call).
-    ; Returns: Map with "anyPanelOpen" → bool, "newlyVisible" → count,
-    ;          "newlyHidden" → count, "totalChanged" → count,
-    ;          "currentVisible" → count, "baselineVisible" → count
+    ; Returns: Map with "anyPanelOpen" → bool, "panelVisible"/"panelHidden" → count,
+    ;          "newlyVisible"/"newlyHidden" → count (all elements incl. non-panels)
     ReadAllPanelVisibility(gameUiPtr)
     {
         vis := Map()
@@ -1487,12 +1535,16 @@ class PoE2GameStateReader extends PoE2InventoryReader
             return vis
 
         flagsOffset := PoE2Offsets.UiElementBase["Flags"]
-        ; Skip containers that always have visibility and fluctuate for other reasons
         knownAlwaysVisible := Map(0x5C0, true, 0x6B0, true, 0x748, true, 0xAA8, true)
         newlyVisCount := 0
         newlyHidCount := 0
         currentVisCount := 0
         baselineVisCount := 0
+        ; Panel-specific counters — only count large elements (panel-sized)
+        panelVisCount := 0
+        panelHidCount := 0
+        hasPanelElements := false
+        sizeOffset := PoE2Offsets.UiElementBase["UnscaledSize"]
 
         for _, elem in this._heapUiElems
         {
@@ -1514,19 +1566,54 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if (knownAlwaysVisible.Has(structOff))
                     continue
 
-                ; Newly visible = was hidden → now visible (panel opened)
+                isPanel := elem.Has("isPanel") ? elem["isPanel"] : false
+                if isPanel
+                    hasPanelElements := true
+
                 if (isVisNow && !wasVis)
                 {
                     newlyVisCount += 1
+                    ; Lazy size re-check: element just became visible, verify it's panel-sized.
+                    ; This catches elements that reported 0×0 when hidden at discovery time.
+                    if !isPanel
+                    {
+                        sizeBuf := this.Mem.ReadBytes(elemPtr + sizeOffset, 8)
+                        if sizeBuf
+                        {
+                            w := NumGet(sizeBuf.Ptr, 0, "Float")
+                            h := NumGet(sizeBuf.Ptr, 4, "Float")
+                            if (w >= 300.0 && h >= 200.0)
+                            {
+                                elem["isPanel"] := true
+                                elem["w"] := w
+                                elem["h"] := h
+                                isPanel := true
+                                hasPanelElements := true
+                            }
+                        }
+                    }
+                    if isPanel
+                        panelVisCount += 1
                     if (vis["_changedOffsets"].Length < 20)
-                        vis["_changedOffsets"].Push(Format("+0x{:X}", structOff))
+                    {
+                        entry := Format("+0x{:X}", structOff)
+                        if isPanel
+                            entry .= " 📋"
+                        vis["_changedOffsets"].Push(entry)
+                    }
                 }
-                ; Newly hidden = was visible → now hidden (panel state change)
                 else if (!isVisNow && wasVis)
                 {
                     newlyHidCount += 1
+                    if isPanel
+                        panelHidCount += 1
                     if (vis["_changedOffsets"].Length < 20)
-                        vis["_changedOffsets"].Push(Format("-0x{:X}", structOff))
+                    {
+                        entry := Format("-0x{:X}", structOff)
+                        if isPanel
+                            entry .= " 📋"
+                        vis["_changedOffsets"].Push(entry)
+                    }
                 }
             }
         }
@@ -1563,11 +1650,21 @@ class PoE2GameStateReader extends PoE2InventoryReader
             }
         }
 
-        ; Panel is open = new elements became visible OR new pointers appeared
-        ; (closing a panel reverts these — newlyHidden/ptrsDisappeared don't count as "open")
-        vis["anyPanelOpen"] := (newlyVisCount > 0 || ptrsAppeared > 0)
+        ; Panel detection strategy:
+        ; 1. If we identified panel-sized elements (≥300×200 UI units), only those matter.
+        ;    A single panel-sized element becoming visible = panel is open.
+        ;    Combat buffs/debuffs are tiny icons and never reach this size threshold.
+        ; 2. Fallback: if no panel-sized elements exist (unlikely),
+        ;    use the generic threshold of ≥3 newly visible elements.
+        if hasPanelElements
+            vis["anyPanelOpen"] := (panelVisCount >= 1)
+        else
+            vis["anyPanelOpen"] := (newlyVisCount >= 3)
         vis["newlyVisible"] := newlyVisCount
         vis["newlyHidden"] := newlyHidCount
+        vis["panelVisible"] := panelVisCount
+        vis["panelHidden"] := panelHidCount
+        vis["hasPanelElements"] := hasPanelElements
         vis["totalChanged"] := newlyVisCount + newlyHidCount
         vis["ptrsAppeared"] := ptrsAppeared
         vis["ptrsDisappeared"] := ptrsDisappeared
@@ -1582,6 +1679,47 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if !IsObject(panelVisMap)
             return false
         return panelVisMap.Has("anyPanelOpen") ? panelVisMap["anyPanelOpen"] : false
+    }
+
+    ; ── Fast Panel Check (saved offsets only) ──────────────────────────
+    ; Checks visibility at user-discovered panel offsets stored in PoE2Offsets.DiscoveredPanelOffsets.
+    ; Each offset is a struct offset relative to GameUiPtr → points to a UiElement pointer.
+    ; We dereference it, then read the Flags field → check bit 11 (IS_VISIBLE).
+    ; Cost: 1 RPM per known panel (typically 3-8 panels = 6-16 RPM calls).
+    ; Returns: Map with "anyPanelOpen" → bool, "openPanels" → [names], "checkedCount" → int
+    ReadKnownPanelVisibility(gameUiPtr)
+    {
+        result := Map()
+        result["anyPanelOpen"] := false
+        result["openPanels"] := []
+        result["checkedCount"] := 0
+        result["mode"] := "known_offsets"
+
+        offsets := PoE2Offsets.DiscoveredPanelOffsets
+        if (offsets.Count = 0 || !this.IsProbablyValidPointer(gameUiPtr))
+            return result
+
+        flagsOff := PoE2Offsets.UiElementBase["Flags"]
+        openPanels := []
+
+        for panelName, structOff in offsets
+        {
+            result["checkedCount"] += 1
+            ; Read the UiElement pointer at this struct offset
+            elemPtr := this.Mem.ReadPtr(gameUiPtr + structOff)
+            if !this.IsProbablyValidPointer(elemPtr)
+                continue
+
+            ; Read flags → check visibility bit 11
+            flags := this.Mem.ReadUInt(elemPtr + flagsOff)
+            isVis := ((flags >> 11) & 1) ? true : false
+            if isVis
+                openPanels.Push(panelName)
+        }
+
+        result["anyPanelOpen"] := (openPanels.Length > 0)
+        result["openPanels"] := openPanels
+        return result
     }
 
     ; ── Struct Diff Diagnostic ──────────────────────────────────────────
@@ -2382,7 +2520,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         ; Re-resolve InGameState address every 800ms — the 12-state loop is expensive at 100ms.
         nowTick := A_TickCount
-        if (!this._radarInGameStateCache || (nowTick - this._radarInGameStateTick) > 800)
+        if ((nowTick - this._radarInGameStateTick) > 800)
         {
             staticGameStatePtr := this.Mem.ReadPtr(this.GameStatesAddress)
             if !this.IsProbablyValidPointer(staticGameStatePtr)
@@ -2465,6 +2603,23 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarWorldAreaHash := currentAreaHash
         }
 
+        ; W2S camera matrix — read every tick (64 bytes, one ReadBytes call)
+        w2sMatrix := []
+        try {
+            if !IsSet(worldData)
+                worldData := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["WorldData"])
+            if this.IsProbablyValidPointer(worldData)
+            {
+                matAddr := worldData + PoE2Offsets.WorldData["W2SMatrix"]
+                matBuf := this.Mem.ReadBytes(matAddr, 64)
+                if (matBuf && matBuf.Size >= 64)
+                {
+                    Loop 16
+                        w2sMatrix.Push(NumGet(matBuf.Ptr, (A_Index - 1) * 4, "Float"))
+                }
+            }
+        }
+
         ; Player world position
         playerInfoPtr     := areaInstanceData + PoE2Offsets.AreaInstance["PlayerInfo"]
         localPlayerRawPtr := this.Mem.ReadPtr(playerInfoPtr + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
@@ -2472,18 +2627,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
         playerRenderComponent := this.ReadPlayerRenderComponent(localPlayerPtr)
 
         ; Player vitals — cached, re-read every 200ms (cheap: ~3 RPM)
-        if (!this._radarPlayerVitalsCache || (nowTick - this._radarPlayerVitalsTick) > 200)
+        if ((nowTick - this._radarPlayerVitalsTick) > 200)
         {
-            try this._radarPlayerVitalsCache := this.ReadPlayerVitals(localPlayerPtr)
-            catch
-                this._radarPlayerVitalsCache := 0
+            freshVitals := 0
+            try freshVitals := this.ReadPlayerVitals(localPlayerPtr)
+            if freshVitals
+                this._radarPlayerVitalsCache := freshVitals
             this._radarPlayerVitalsTick := nowTick
         }
         t2 := A_TickCount  ; after player read
 
         ; Map UI element data — re-read only every 400ms to avoid expensive UI tree walk at 100ms.
         ; Map positions/zoom rarely change mid-frame; re-reading less often has no visible impact.
-        if (!this._radarUiCache || (nowTick - this._radarUiCacheTick) > 400)
+        if ((nowTick - this._radarUiCacheTick) > 400)
         {
             uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
             importantUiElements := 0
@@ -2495,13 +2651,17 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 activeGameUiPtr     := isControllerMode ? gameUiControllerPtr : gameUiPtr
                 importantUiElements := this.ReadImportantUiElements(activeGameUiPtr, isControllerMode)
             }
-            this._radarUiCache := importantUiElements
+            ; Preserve valid cache through GC blips — only replace when we got real data
+            if (importantUiElements && IsObject(importantUiElements))
+                this._radarUiCache := importantUiElements
             this._radarUiCacheTick := nowTick
         }
 
-        ; Panel visibility — re-read every 200ms (cheap: 1 ReadPtr + 1 ReadUInt per panel).
-        ; Also triggers one-time discovery if panel offsets haven't been discovered yet.
-        if (!this._radarPanelVisCache || (nowTick - this._radarPanelVisCacheTick) > 200)
+        ; Panel visibility — re-read every 200ms.
+        ; Strategy: if user has saved panel offsets, use fast ReadKnownPanelVisibility
+        ; (just check those specific offsets — no scanning). Otherwise fall back to
+        ; heuristic scan (DiscoverPanelOffsets + ReadAllPanelVisibility).
+        if ((nowTick - this._radarPanelVisCacheTick) > 200)
         {
             if !IsSet(uiRootStructPtr)
                 uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
@@ -2514,23 +2674,63 @@ class PoE2GameStateReader extends PoE2InventoryReader
                     activeGameUiPtr     := (!gameUiPtr && gameUiControllerPtr) ? gameUiControllerPtr : gameUiPtr
                 }
                 this._lastActiveGameUiPtr := activeGameUiPtr
-                ; One-time discovery (or re-discovery after zone change)
+
+                ; Prefer fast known-offset check when user has saved panel offsets
+                if (PoE2Offsets.DiscoveredPanelOffsets.Count > 0)
+                {
+                    freshPanelVis := this.ReadKnownPanelVisibility(activeGameUiPtr)
+                    if (freshPanelVis && IsObject(freshPanelVis))
+                        this._radarPanelVisCache := freshPanelVis
+                }
+                else
+                {
+                    ; Fallback: heuristic scan (discovery + differential baseline)
+                    if (!this._radarPanelDiscoveryDone)
+                    {
+                        this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
+                        this._radarPanelDiscoveryDone := true
+                        this._baselineDelayTick := A_TickCount + 3000
+                    }
+                    if (this._baselineDelayTick > 0 && nowTick >= this._baselineDelayTick)
+                    {
+                        this.RefreshVisibilityBaseline()
+                        this._baselineDelayTick := 0
+                    }
+                    freshPanelVis := this.ReadAllPanelVisibility(activeGameUiPtr)
+                    if (freshPanelVis && IsObject(freshPanelVis))
+                    {
+                        this._radarPanelVisCache := freshPanelVis
+                        ; Self-healing baseline: absorb combat UI drift after 10s clean
+                        if !(freshPanelVis.Has("anyPanelOpen") && freshPanelVis["anyPanelOpen"])
+                        {
+                            if (!this.HasOwnProp("_panelCleanSince") || this._panelCleanSince = 0)
+                                this._panelCleanSince := nowTick
+                            else if ((nowTick - this._panelCleanSince) > 10000)
+                            {
+                                this.RefreshVisibilityBaseline()
+                                this._panelCleanSince := nowTick
+                            }
+                        }
+                        else
+                        {
+                            this._panelCleanSince := 0
+                        }
+                    }
+                }
+
+                ; Always run heuristic discovery for the Struct Diff Diagnostic tool,
+                ; even if we use known offsets for actual panel detection.
                 if (!this._radarPanelDiscoveryDone)
                 {
                     this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
                     this._radarPanelDiscoveryDone := true
-                    ; After zone change, schedule a clean baseline 3s later
-                    ; (all panels are guaranteed closed right after zone load)
-                    if (this._baselineDelayTick > 0)
-                        this._baselineDelayTick := A_TickCount + 3000
+                    this._baselineDelayTick := A_TickCount + 3000
                 }
-                ; Delayed baseline refresh: re-read flags 3s after zone change
                 if (this._baselineDelayTick > 0 && nowTick >= this._baselineDelayTick)
                 {
                     this.RefreshVisibilityBaseline()
                     this._baselineDelayTick := 0
                 }
-                this._radarPanelVisCache := this.ReadAllPanelVisibility(activeGameUiPtr)
             }
             this._radarPanelVisCacheTick := nowTick
         }
@@ -2555,10 +2755,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarEntityCacheAreaHash := currentAreaHash
             ; Schedule zone scanner (terrain tiles are available almost immediately)
             this._zoneScanDone := false
-            this._zoneScanScheduledAt := A_TickCount + 500
+            this._zoneScanScheduledAt := A_TickCount + 2000
             this._zoneScanRetries := 0
             this._zoneScanAccumulated := Map()
             this._zoneScanTimingMs := 0
+            this._zoneScanStartedAt := A_TickCount
+            this._zoneScanFailReason := ""
             this._tgtScanInProgress := false
             ; Force fresh BFS on zone change
             this._radarLastBfsTick := 0
@@ -2582,27 +2784,45 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
 
         ; Zone scanner: incremental TGT tile scan (processes batch per tick instead of all-at-once)
-        if (this._zoneScanEnabled && !this._zoneScanDone
-            && this._zoneScanScheduledAt > 0 && A_TickCount >= this._zoneScanScheduledAt)
+        ; Two entry conditions: (1) scheduled scan ready, OR (2) scan in progress (continue batch)
+        zoneScanReady := (this._zoneScanEnabled && !this._zoneScanDone
+            && (this._tgtScanInProgress
+                || (this._zoneScanScheduledAt > 0 && A_TickCount >= this._zoneScanScheduledAt)))
+
+        ; Watchdog: if scan has been running > 45s without completing, force-terminate
+        if (!this._zoneScanDone && this._zoneScanStartedAt > 0
+            && (A_TickCount - this._zoneScanStartedAt) > 45000)
+        {
+            this._zoneScanDone := true
+            this._zoneScanScheduledAt := 0
+            this._tgtScanInProgress := false
+            this._zoneScanFailReason := "watchdog-45s(ret:" this._zoneScanRetries " prog:" this._tgtScanInProgress ")"
+            zoneScanReady := false
+        }
+
+        if (zoneScanReady)
         {
             scanStart := A_TickCount
 
             if (!this._tgtScanInProgress)
             {
                 try this._tgtScanInProgress := this._SetupTgtScan(areaInstanceData)
-                catch
+                catch as e
+                {
                     this._tgtScanInProgress := false
+                    this._zoneScanFailReason := "setup-ex(" SubStr(e.Message, 1, 40) ")"
+                }
 
                 if (!this._tgtScanInProgress)
                 {
                     this._zoneScanRetries += 1
-                    if (this._zoneScanRetries >= 3)
+                    if (this._zoneScanRetries >= 10)
                     {
                         this._zoneScanDone := true
                         this._zoneScanScheduledAt := 0
                     }
                     else
-                        this._zoneScanScheduledAt := A_TickCount + 2000
+                        this._zoneScanScheduledAt := A_TickCount + 3000
                 }
             }
 
@@ -2999,8 +3219,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "inGameState", Map(
                 "address",             inGameStateAddress,
                 "importantUiElements", this._radarUiCache,
+                "w2sMatrix",           w2sMatrix,
                 "areaInstance", Map(
                     "address",               areaInstanceData,
+                    "localPlayerPtr",        localPlayerPtr,
                     "playerRenderComponent", playerRenderComponent,
                     "awakeEntities",         awakeEntities,
                     "sleepingEntities",      sleepingEntities,

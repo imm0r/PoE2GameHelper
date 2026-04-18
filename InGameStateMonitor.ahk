@@ -5,6 +5,7 @@ SetWorkingDir(A_ScriptDir)
 #Include Lib/WebViewToo.ahk
 #Include PoE2MemoryReader.ahk
 #Include PatchChecker.ahk
+#Include Lib/TerrainPathfinder.ahk
 #Include RadarOverlay.ahk
 #Include PlayerHUD.ahk
 
@@ -59,6 +60,25 @@ g_webGui           := 0
 g_selectedNodePath := ""
 g_flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
 g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
+
+; Combat Automation globals
+g_combatAutoEnabled := false
+g_combatToggleHotkey := "F10"
+g_combatRange := 1500
+g_combatDisengageRange := 2500
+g_combatGlobalCooldownMs := 120
+g_combatW2SScale := 0.20
+g_combatSkillSlots := Map()
+g_combatState := "idle"
+g_combatLastReason := "idle"
+g_lastSkillUseTime := 0
+g_combatSkillCooldowns := Map()
+
+; Exploration Module
+g_exploreEnabled       := false
+g_exploreTargetPercent := 80
+g_exploreCurrentPercent := 0.0
+g_exploreLastReason    := "idle"
 
 ; Radar Entity-Filter
 g_radarShowEnemyNormal := true
@@ -121,6 +141,9 @@ g_offsetTableSortDesc := false
 
 ; Load persisted settings before showing the window
 LoadConfig()
+LoadCombatAutoConfig()
+LoadExplorationConfig()
+RegisterCombatHotkey()
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
 g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , {DefaultWidth: g_winW, DefaultHeight: g_winH})
@@ -133,7 +156,7 @@ if g_winMaximized
     g_webGui.Maximize()
 
 ; Save window geometry on exit and after move/resize
-OnExit((*) => (_CaptureWindowGeometry(), SaveConfig()))
+OnExit((*) => (_CaptureWindowGeometry(), SaveConfig(), SaveCombatAutoConfig()))
 OnMessage(0x0232, _OnExitSizeMove)  ; WM_EXITSIZEMOVE
 
 ; Set window icon (title bar + taskbar) using LoadImage for reliable HICON
@@ -536,6 +559,8 @@ OnTreeTabChanged(*)
 #Include BridgeDispatch.ahk
 
 #Include AutoFlask.ahk
+#Include CombatAutomation.ahk
+#Include ExplorationModule.ahk
 #Include UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.

@@ -10,7 +10,7 @@
   --bg:#0a0d1a;--surface:#111527;--surface2:#1a1f35;--border:#252a45;
   --accent:#6a8fbf;--text:#d0d6e8;--subtext:#666d88;
 }
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Bahnschrift SemiLight SemiCondensed','Bahnschrift','Segoe UI',system-ui,sans-serif;font-size:14px}
 body{display:flex;flex-direction:column}
 
 /* HEADER */
@@ -30,7 +30,10 @@ body{display:flex;flex-direction:column}
 .pill.active .dot{background:#4aad4a}
 .pill.inactive .dot{background:#555}
 .pill.disconnected .dot{background:#aa4444}
+.pill.warning .dot{background:#e0a030}
 .pill.connected .dot{background:#4aad4a}
+.pill.scanning .dot{background:#5b9bd5;animation:pulse-scan 1s ease-in-out infinite}
+@keyframes pulse-scan{0%,100%{opacity:1}50%{opacity:.35}}
 #header-right{margin-left:auto;display:flex;gap:4px;align-items:center}
 .hbtn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:3px 10px;font-size:11px;cursor:pointer}
 .hbtn:hover{background:var(--border)}
@@ -236,6 +239,7 @@ body{display:flex;flex-direction:column}
 .cfg-btn{background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 12px;font-size:11px;cursor:pointer;margin:2px}
 .cfg-btn:hover{background:var(--border)}
 .cfg-status{font-size:11px;color:var(--subtext);padding:4px 0}
+.cfg-status.warning{color:#e0a030;font-weight:600}
 .filter-row{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0}
 .filter-pill{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer}
 .filter-pill input{cursor:pointer}
@@ -246,10 +250,31 @@ body{display:flex;flex-direction:column}
 .cfg-section details:not([open]) summary::after{content:'▸'}
 .cfg-section details summary .cfg-header{margin:0}
 .cfg-subsection{padding:4px 0 0 0}
-.cfg-slider-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.cfg-slider-row{display:flex;align-items:center;gap:8px;padding:3px 0;flex-wrap:wrap}
 .cfg-slider-row .cfg-label{min-width:52px;flex-shrink:0}
-.cfg-slider-row input[type="range"]{flex:1;min-width:80px}
-.cfg-slider-row .cfg-slider-val{min-width:32px;text-align:right;font-size:12px;color:var(--text);font-variant-numeric:tabular-nums}
+/* Paired sliders: two per line with aligned labels */
+.cfg-slider-pair{display:flex;gap:10px;width:100%;padding:3px 0}
+.cfg-slider-pair .cfg-slider-item{flex:1;display:flex;align-items:center;gap:6px}
+.cfg-slider-pair .cfg-label{width:64px;min-width:64px;flex-shrink:0;font-size:11px}
+/* Custom slider: pill track with value-on-thumb */
+.cfg-slider-row input[type="range"], .cfg-slider-pair input[type="range"], .combat-slot-cd, .combat-slot-range{
+  flex:1;min-width:60px;-webkit-appearance:none;appearance:none;
+  height:18px;border-radius:9px;background:#243447;outline:none;cursor:pointer;
+  margin:0;padding:0;
+}
+.cfg-slider-row input[type="range"]::-webkit-slider-thumb, .cfg-slider-pair input[type="range"]::-webkit-slider-thumb, .combat-slot-cd::-webkit-slider-thumb, .combat-slot-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:48px;height:20px;border-radius:5px;
+  background:#cdd3dc;border:none;cursor:grab;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);transition:background .12s;
+}
+.cfg-slider-row input[type="range"]::-webkit-slider-thumb:hover, .cfg-slider-pair input[type="range"]::-webkit-slider-thumb:hover, .combat-slot-cd::-webkit-slider-thumb:hover, .combat-slot-range::-webkit-slider-thumb:hover{background:#e0e5ec}
+.cfg-slider-row input[type="range"]:active::-webkit-slider-thumb, .cfg-slider-pair input[type="range"]:active::-webkit-slider-thumb, .combat-slot-cd:active::-webkit-slider-thumb, .combat-slot-range:active::-webkit-slider-thumb{cursor:grabbing;background:#fff}
+/* Value label permanently centered on thumb */
+.slider-wrap{position:relative;flex:1;min-width:60px;height:20px;display:flex;align-items:center}
+.slider-val{position:absolute;top:52%;font-size:11px;font-weight:700;color:#1a2030;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  pointer-events:none;white-space:nowrap;transform:translate(-50%,-50%);z-index:2;user-select:none}
 
 /* WATCHLIST */
 .wl-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0 8px 8px}
@@ -291,8 +316,11 @@ body{display:flex;flex-direction:column}
   <div class="pill active"       id="pill-updates" onclick="ahkCall('TogglePause')"  title="Toggle Pause" style="cursor:pointer"><div class="dot"></div><span id="pill-updates-text">Live</span></div>
   <div class="pill inactive clickable" id="pill-debug"  onclick="ahkCall('ToggleDebug')"     title="Toggle Debug"><div class="dot"></div><span id="pill-debug-text">Debug OFF</span></div>
   <div class="pill inactive clickable" id="pill-flask"  onclick="ahkCall('ToggleAutoFlask')" title="Toggle AutoFlask"><div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span></div>
+  <div class="pill inactive clickable" id="pill-combat" onclick="ahkCall('ToggleCombatAuto')" title="Toggle Combat Auto (F10)"><div class="dot"></div><span id="pill-combat-text">Combat OFF</span></div>
+  <div class="pill inactive clickable" id="pill-explore" onclick="ahkCall('ToggleExploration')" title="Toggle Auto-Explore"><div class="dot"></div><span id="pill-explore-text">Explore OFF</span></div>
   <div class="pill inactive clickable" id="pill-radar"  onclick="ahkCall('ToggleRadar')"     title="Toggle Radar"><div class="dot"></div><span id="pill-radar-text">Radar ON</span></div>
   <div class="pill inactive clickable" id="pill-hud"    onclick="ahkCall('TogglePlayerHud')" title="Toggle Player HUD"><div class="dot"></div><span id="pill-hud-text">HUD ON</span></div>
+  <div class="pill inactive"           id="pill-maphack" title="Maphack / Zone Scanner"><div class="dot"></div><span id="pill-maphack-text">Map —</span></div>
   <div class="pill inactive"     id="pill-fps"    ><div class="dot"></div><span id="pill-fps-text">0 fps</span></div>
   <div id="header-right">
     <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
@@ -420,24 +448,30 @@ body{display:flex;flex-direction:column}
       </div>
 
       <div class="cfg-section">
-        <details id="det-autoflask" open ontoggle="syncCfgSections()">
+        <details id="det-autoflask" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
           <summary><div class="cfg-header">Autoflask</div></summary>
           <div class="cfg-subsection">
             <div class="cfg-row"><span class="cfg-label">Enable AutoFlask</span>
               <label class="toggle"><input type="checkbox" id="tog-flask" onchange="ahkCall('ToggleAutoFlask')"><span class="toggle-slider"></span></label></div>
             <div class="cfg-row"><span class="cfg-label">AF Performance Mode</span>
               <label class="toggle"><input type="checkbox" id="tog-afperf" onchange="ahkCall('ToggleAutoFlaskPerf')"><span class="toggle-slider"></span></label></div>
-            <div class="cfg-slider-row">
-              <span class="cfg-label">Life %</span>
-              <input type="range" id="inp-life" min="1" max="100" value="50"
-                oninput="document.getElementById('life-val').textContent=this.value; ahkCall('SetThresholds', this.value, document.getElementById('inp-mana').value)">
-              <span class="cfg-slider-val" id="life-val">50</span>
-            </div>
-            <div class="cfg-slider-row">
-              <span class="cfg-label">Mana %</span>
-              <input type="range" id="inp-mana" min="1" max="100" value="30"
-                oninput="document.getElementById('mana-val').textContent=this.value; ahkCall('SetThresholds', document.getElementById('inp-life').value, this.value)">
-              <span class="cfg-slider-val" id="mana-val">30</span>
+            <div class="cfg-slider-pair">
+              <div class="cfg-slider-item">
+                <span class="cfg-label">Life %</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="life-bub">50</span>
+                  <input type="range" id="inp-life" min="1" max="100" value="50"
+                    oninput="_sb(this,'life-bub',this.value); ahkCall('SetThresholds', this.value, document.getElementById('inp-mana').value)">
+                </div>
+              </div>
+              <div class="cfg-slider-item">
+                <span class="cfg-label">Mana %</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="mana-bub">30</span>
+                  <input type="range" id="inp-mana" min="1" max="100" value="30"
+                    oninput="_sb(this,'mana-bub',this.value); ahkCall('SetThresholds', document.getElementById('inp-life').value, this.value)">
+                </div>
+              </div>
             </div>
             <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-af-reason" class="cfg-status idle">—</span></div>
           </div>
@@ -445,7 +479,78 @@ body{display:flex;flex-direction:column}
       </div>
 
       <div class="cfg-section">
-        <details id="det-radar" open ontoggle="syncCfgSections()">
+        <details id="det-combatauto" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
+          <summary><div class="cfg-header">⚔ Combat Automation</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row"><span class="cfg-label">Enable Combat Auto</span>
+              <label class="toggle"><input type="checkbox" id="tog-combat" onchange="ahkCall('ToggleCombatAuto'); updateRangeCircleVisibility()"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Toggle Hotkey</span><span id="cfg-combat-hotkey" class="cfg-status" style="color:#7ec8e3;font-weight:600">F10</span></div>
+            <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-combat-state" class="cfg-status idle">idle</span></div>
+            <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-combat-reason" class="cfg-status idle">—</span></div>
+            <div class="cfg-slider-pair">
+              <div class="cfg-slider-item">
+                <span class="cfg-label">Engage</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="combat-range-bub">1500</span>
+                  <input type="range" id="inp-combat-range" min="200" max="5000" step="100" value="1500"
+                    oninput="_sb(this,'combat-range-bub',this.value); ahkCall('SetCombatRange', parseInt(this.value)); showCombatRangeCircles()">
+                </div>
+              </div>
+              <div class="cfg-slider-item">
+                <span class="cfg-label">Disengage</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="combat-disengage-bub">2500</span>
+                  <input type="range" id="inp-combat-disengage" min="500" max="8000" step="100" value="2500"
+                    oninput="_sb(this,'combat-disengage-bub',this.value); ahkCall('SetCombatDisengageRange', parseInt(this.value)); showCombatRangeCircles()">
+                </div>
+              </div>
+            </div>
+            <div class="cfg-slider-pair">
+              <div class="cfg-slider-item">
+                <span class="cfg-label">GCD (ms)</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="combat-gcd-bub">120</span>
+                  <input type="range" id="inp-combat-gcd" min="50" max="2000" step="10" value="120"
+                    oninput="_sb(this,'combat-gcd-bub',this.value); ahkCall('SetCombatGCD', parseInt(this.value))">
+                </div>
+              </div>
+              <div class="cfg-slider-item">
+                <span class="cfg-label">W2S Scale</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="combat-w2s-bub">0.20</span>
+                  <input type="range" id="inp-combat-w2s" min="0.05" max="1.00" step="0.01" value="0.20"
+                    oninput="_sb(this,'combat-w2s-bub',parseFloat(this.value).toFixed(2)); ahkCall('SetCombatW2S', parseFloat(this.value))">
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:var(--accent);font-weight:600">Skill Slots</div>
+            <div id="combat-slots-cfg" style="margin-top:4px"></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details id="det-explore" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
+          <summary><div class="cfg-header">🧭 Exploration</div></summary>
+          <div class="cfg-subsection">
+            <div class="cfg-row"><span class="cfg-label">Enable Auto-Explore</span>
+              <label class="toggle"><input type="checkbox" id="tog-explore" onchange="ahkCall('ToggleExploration')"><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Progress</span><span id="cfg-explore-pct" class="cfg-status" style="color:#7ec8e3;font-weight:600">0%</span></div>
+            <div class="cfg-row"><span class="cfg-label">Status</span><span id="cfg-explore-reason" class="cfg-status idle">idle</span></div>
+            <div class="cfg-slider-row">
+              <span class="cfg-label">Target %</span>
+              <div class="slider-wrap">
+                <span class="slider-val" id="explore-target-bub">80%</span>
+                <input type="range" id="inp-explore-target" min="10" max="99" step="1" value="80"
+                  oninput="_sb(this,'explore-target-bub',this.value+'%'); ahkCall('SetExploreTarget', parseInt(this.value))">
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-section">
+        <details id="det-radar" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
           <summary><div class="cfg-header">Radar</div></summary>
           <div class="cfg-subsection">
             <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
@@ -466,9 +571,11 @@ body{display:flex;flex-direction:column}
               <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')" checked><span class="toggle-slider"></span></label></div>
             <div class="cfg-slider-row">
               <span class="cfg-label">Opacity</span>
-              <input type="range" id="radar-alpha" min="20" max="255" value="255"
-                oninput="document.getElementById('radar-alpha-val').textContent=Math.round(this.value/255*100)+'%'; ahkCall('SetRadarAlpha', parseInt(this.value))">
-              <span class="cfg-slider-val" id="radar-alpha-val">100%</span>
+              <div class="slider-wrap">
+                <span class="slider-val" id="radar-alpha-bub">100%</span>
+                <input type="range" id="radar-alpha" min="20" max="255" value="255"
+                  oninput="_sb(this,'radar-alpha-bub',Math.round(this.value/255*100)+'%'); ahkCall('SetRadarAlpha', parseInt(this.value))">
+              </div>
             </div>
           </div>
         </details>
@@ -541,12 +648,15 @@ body{display:flex;flex-direction:column}
           <summary><div class="cfg-header">🧪 Struct Diff Diagnostic</div></summary>
           <div style="padding:8px 0;font-size:11px;color:var(--subtext)">
             Close all panels → <b>📸 Snapshot</b>, then open a panel → <b>🔍 Compare</b> to find what bytes change.
+            Use <b>💾 Save</b> on a changed element to register it as a known panel offset.
           </div>
           <div style="display:flex;gap:8px;padding:0 0 8px">
             <button class="tree-tbtn" onclick="ahkCall('TakeDiffSnapshot')" style="font-size:11px">📸 Snapshot (panels closed)</button>
             <button class="tree-tbtn" onclick="ahkCall('CompareDiffSnapshot')" style="font-size:11px">🔍 Compare (panel open)</button>
+            <button class="tree-tbtn" onclick="ahkCall('GetSavedPanelOffsets')" style="font-size:11px">📋 Show Saved</button>
           </div>
           <div id="debug-diff-status" style="font-size:10px;color:var(--subtext);padding:2px 0"></div>
+          <div id="debug-saved-panels" style="padding:0 0 8px"></div>
           <div class="cfg-body" id="debug-diff-results"><div class="no-data-msg">No diff data yet</div></div>
         </details>
       </div>
@@ -669,6 +779,23 @@ function updateHeader(json) {
     pillFlask.className = 'pill clickable ' + (on ? 'active' : 'inactive');
     document.getElementById('pill-flask-text').textContent = 'AutoFlask ' + (on ? 'ON' : 'OFF');
   }
+  const pillCombat = document.getElementById('pill-combat');
+  if (pillCombat) {
+    const on = d.combatAuto === true || d.combatAuto === 'true';
+    const state = d.combatState || 'idle';
+    const inCombat = state === 'combat';
+    const hk = d.combatHotkey || 'F10';
+    pillCombat.className = 'pill clickable ' + (on ? (inCombat ? 'warning' : 'active') : 'inactive');
+    pillCombat.title = 'Toggle Combat Auto (' + hk + ')';
+    document.getElementById('pill-combat-text').textContent = 'Combat ' + (on ? (inCombat ? '⚔' : 'ON') : 'OFF');
+  }
+  const pillExplore = document.getElementById('pill-explore');
+  if (pillExplore) {
+    const on = d.exploreEnabled === true || d.exploreEnabled === 'true';
+    const pct = d.explorePct !== undefined ? parseFloat(d.explorePct).toFixed(0) : '0';
+    pillExplore.className = 'pill clickable ' + (on ? 'active' : 'inactive');
+    document.getElementById('pill-explore-text').textContent = 'Explore ' + (on ? pct + '%' : 'OFF');
+  }
   const pillRadar = document.getElementById('pill-radar');
   if (pillRadar) {
     const on = d.radarEnabled !== false && d.radarEnabled !== 'false';
@@ -680,6 +807,41 @@ function updateHeader(json) {
     const on = d.playerHud !== false && d.playerHud !== 'false';
     pillHud.className = 'pill clickable ' + (on ? 'active' : 'inactive');
     document.getElementById('pill-hud-text').textContent = 'HUD ' + (on ? 'ON' : 'OFF');
+  }
+
+  // Maphack / Zone Scanner pill
+  const pillMap = document.getElementById('pill-maphack');
+  if (pillMap && d.zoneScan) {
+    const zs = d.zoneScan;
+    const done = zs.done === true;
+    const inProg = zs.inProgress === true;
+    const tiles = zs.tiles || 0;
+    const elapsed = zs.elapsed || 0;
+    const secs = (elapsed / 1000).toFixed(1);
+    const totalT = zs.totalTiles || 0;
+    const tileIdx = zs.tileIdx || 0;
+    const retries = zs.retries || 0;
+    const schedOk = zs.schedAt === true;
+    const fail = zs.fail || '';
+    let diag;
+    if (done && !fail) {
+      diag = 'Scanned ' + tileIdx + ' terrain tiles · ' + retries + ' retries';
+    } else {
+      diag = 'idx:' + tileIdx + '/' + totalT + ' ret:' + retries + (fail ? ' · ' + fail : '');
+    }
+    if (done) {
+      pillMap.className = 'pill active';
+      pillMap.title = 'Maphack ready — ' + tiles + ' POIs in ' + secs + 's\n' + diag;
+      document.getElementById('pill-maphack-text').textContent = 'Map ✓ ' + tiles;
+    } else if (inProg || elapsed > 0) {
+      pillMap.className = 'pill scanning';
+      pillMap.title = 'Scanning… ' + tiles + ' found, ' + secs + 's\n' + diag;
+      document.getElementById('pill-maphack-text').textContent = 'Map ⟳ ' + tiles + ' · ' + secs + 's';
+    } else {
+      pillMap.className = 'pill inactive';
+      pillMap.title = 'Maphack idle' + (fail ? '\n' + fail : '');
+      document.getElementById('pill-maphack-text').textContent = 'Map —';
+    }
   }
 
   // Header buttons active state
@@ -709,12 +871,10 @@ function updateHeader(json) {
   if (radarFilters) radarFilters.style.opacity = (d.radarEnabled === false || d.radarEnabled === 'false') ? '0.4' : '1';
 
   if (d.lifeThreshold !== undefined) {
-    const el=document.getElementById('inp-life'); if(el) el.value=d.lifeThreshold;
-    const lb=document.getElementById('life-val'); if(lb) lb.textContent=d.lifeThreshold;
+    const el=document.getElementById('inp-life'); if(el) { el.value=d.lifeThreshold; _sbSync(el,'life-bub',d.lifeThreshold); }
   }
   if (d.manaThreshold !== undefined) {
-    const el=document.getElementById('inp-mana'); if(el) el.value=d.manaThreshold;
-    const lb=document.getElementById('mana-val'); if(lb) lb.textContent=d.manaThreshold;
+    const el=document.getElementById('inp-mana'); if(el) { el.value=d.manaThreshold; _sbSync(el,'mana-bub',d.manaThreshold); }
   }
 
   const poeStatus  = document.getElementById('cfg-poe-status');
@@ -739,9 +899,7 @@ function updateHeader(json) {
 
   if (d.radarAlpha !== undefined) {
     const sl = document.getElementById('radar-alpha');
-    const lb = document.getElementById('radar-alpha-val');
-    if (sl) sl.value = d.radarAlpha;
-    if (lb) lb.textContent = Math.round(d.radarAlpha / 255 * 100) + '%';
+    if (sl) { sl.value = d.radarAlpha; _sbSync(sl,'radar-alpha-bub',Math.round(d.radarAlpha/255*100)+'%'); }
   }
 
   if (d.entityFilter) {
@@ -755,9 +913,57 @@ function updateHeader(json) {
     setEf('other',     d.entityFilter.other);
   }
 
+  // Combat Automation config sync
+  const prevCombatEnabled = document.getElementById('tog-combat')?.checked || false;
+  setChk('tog-combat', d.combatAuto);
+  const nowCombatEnabled = document.getElementById('tog-combat')?.checked || false;
+  const combatHotkeyEl = document.getElementById('cfg-combat-hotkey');
+  if (combatHotkeyEl && d.combatHotkey) combatHotkeyEl.textContent = d.combatHotkey;
+  const combatState  = document.getElementById('cfg-combat-state');
+  const combatReason = document.getElementById('cfg-combat-reason');
+  if (combatState) {
+    const st = d.combatState || 'idle';
+    combatState.textContent = st;
+    combatState.className = 'cfg-status ' + (st === 'combat' ? 'warning' : 'idle');
+  }
+  if (combatReason && d.combatReason !== undefined) combatReason.textContent = d.combatReason || '—';
+  if (d.combatRange !== undefined) {
+    const el = document.getElementById('inp-combat-range');
+    if (el && el !== document.activeElement) { el.value = d.combatRange; _sbSync(el,'combat-range-bub',d.combatRange); }
+  }
+  if (d.combatDisengage !== undefined) {
+    const el = document.getElementById('inp-combat-disengage');
+    if (el && el !== document.activeElement) { el.value = d.combatDisengage; _sbSync(el,'combat-disengage-bub',d.combatDisengage); }
+  }
+  if (d.combatGCD !== undefined) {
+    const el = document.getElementById('inp-combat-gcd');
+    if (el && el !== document.activeElement) { el.value = d.combatGCD; _sbSync(el,'combat-gcd-bub',d.combatGCD); }
+  }
+  if (d.combatW2S !== undefined) {
+    const el = document.getElementById('inp-combat-w2s');
+    if (el && el !== document.activeElement) { el.value = d.combatW2S; _sbSync(el,'combat-w2s-bub',parseFloat(d.combatW2S).toFixed(2)); }
+  }
+  if (d.combatSlots !== undefined) _renderCombatSlots(d.combatSlots);
+
+  // Update range circles when combat enabled state changes (e.g. via F10 hotkey)
+  if (prevCombatEnabled !== nowCombatEnabled) updateRangeCircleVisibility();
+
+  // ── Exploration Module sync ────────────────────────────────────────────
+  setChk('tog-explore', d.exploreEnabled);
+  const explorePct    = document.getElementById('cfg-explore-pct');
+  const exploreReason = document.getElementById('cfg-explore-reason');
+  if (explorePct && d.explorePct !== undefined) explorePct.textContent = d.explorePct + '%';
+  if (exploreReason && d.exploreReason !== undefined) exploreReason.textContent = d.exploreReason || 'idle';
+  if (d.exploreTarget !== undefined) {
+    const el = document.getElementById('inp-explore-target');
+    if (el && el !== document.activeElement) { el.value = d.exploreTarget; _sbSync(el,'explore-target-bub',d.exploreTarget+'%'); }
+  }
+
   if (d.cfgSections !== undefined && !_cfgSectionsLoaded) {
     _cfgSectionsLoaded = true;
     applyCfgSections(d.cfgSections);
+    // Show range circles on initial config load
+    updateRangeCircleVisibility();
   }
 
   // Maximize / restore button icon
@@ -768,6 +974,239 @@ function updateHeader(json) {
     wmMax.title = isMax ? 'Restore' : 'Maximize';
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+//  SLIDER BUBBLE HELPERS
+// ═══════════════════════════════════════════════════════════════════
+// Position the value label centered on the thumb of a range slider.
+// Uses percentage-based left so it works even before layout.
+function _sb(slider, bubId, val) {
+  const bub = document.getElementById(bubId);
+  if (!bub) return;
+  bub.textContent = val;
+  _posVal(slider, bub);
+}
+// Sync value position from code (not user drag)
+function _sbSync(slider, bubId, val) {
+  const bub = document.getElementById(bubId);
+  if (!bub) return;
+  bub.textContent = val;
+  _posVal(slider, bub);
+}
+// Position inline (within combat slot rows)
+function _sbInline(slider) {
+  const wrap = slider.parentElement;
+  const bub = wrap?.querySelector('.slider-val');
+  if (!bub) return;
+  bub.textContent = slider.value;
+  _posVal(slider, bub);
+}
+// Core positioning: percentage-based so it works without offsetWidth
+function _posVal(slider, bub) {
+  const pct = (slider.value - slider.min) / (slider.max - slider.min);
+  // Thumb is 48px wide on a track of 100%. Express thumb half-width as % of track.
+  // Offset: at 0% thumb center is at ~thumbHalf, at 100% it's at ~(100%-thumbHalf).
+  // We approximate thumbHalf% from the slider's actual width if available, else assume 8%.
+  const w = slider.offsetWidth;
+  if (w > 0) {
+    const thumbW = 48;
+    const trackW = w - thumbW;
+    bub.style.left = (thumbW / 2 + pct * trackW) + 'px';
+  } else {
+    // Fallback: pure CSS percentage (slightly off at extremes but visible)
+    const margin = 8; // ~half thumb as % of track
+    bub.style.left = (margin + pct * (100 - 2 * margin)) + '%';
+  }
+}
+// Init all value label positions on load / after DOM updates
+function _sbInitAll() {
+  document.querySelectorAll('.slider-wrap input[type="range"]').forEach(sl => {
+    const bub = sl.parentElement?.querySelector('.slider-val');
+    if (!bub) return;
+    _posVal(sl, bub);
+  });
+}
+// Defer init until sliders are laid out
+requestAnimationFrame(() => setTimeout(_sbInitAll, 100));
+
+// ═══════════════════════════════════════════════════════════════════
+//  COMBAT SLOTS UI
+// ═══════════════════════════════════════════════════════════════════
+let _lastCombatSlotsJson = '';
+let _combatSlotsBuilt = false;   // true once initial DOM is created
+let _availableSkills = [];       // populated from updateSkills()
+
+function _renderCombatSlots(slots) {
+  const j = JSON.stringify(slots);
+  if (j === _lastCombatSlotsJson) return;
+  _lastCombatSlotsJson = j;
+
+  const container = document.getElementById('combat-slots-cfg');
+  if (!container) return;
+
+  const slotMap = {};
+  if (Array.isArray(slots)) slots.forEach(s => slotMap[s.slot] = s);
+
+  // First render: build full DOM once
+  if (!_combatSlotsBuilt) {
+    let html = `<datalist id="skill-datalist"></datalist>`;
+    html += `<div style="display:flex;gap:4px;align-items:center;padding:2px 0;font-size:10px;color:var(--subtext);border-bottom:1px solid var(--border)">
+      <span style="width:18px"></span><span style="width:16px"></span>
+      <span style="width:36px;text-align:center">Key</span>
+      <span style="flex:1;min-width:60px">Skill Name</span>
+      <span style="width:55px">Type</span>
+      <span style="width:26px;text-align:center">Prio</span>
+      <span style="flex:1;min-width:70px;text-align:center">CD ms</span>
+      <span style="flex:1;min-width:70px;text-align:center">Range</span>
+    </div>`;
+    for (let i = 1; i <= 8; i++) {
+      const s = slotMap[i] || _defaultSlot(i);
+      html += _buildSlotRowHtml(s, i);
+    }
+    container.innerHTML = html;
+    _combatSlotsBuilt = true;
+    _updateSkillDatalist();
+    // Position value labels on slot sliders after DOM is ready
+    requestAnimationFrame(() => _sbInitAll());
+    return;
+  }
+
+  // Subsequent renders: incremental update — never touch focused elements
+  const focused = document.activeElement;
+  const rows = container.querySelectorAll('.combat-slot-row');
+  for (let i = 1; i <= 8; i++) {
+    const s = slotMap[i] || _defaultSlot(i);
+    const row = rows[i - 1];
+    if (!row) continue;
+    _updateSlotRow(row, s, focused);
+  }
+}
+
+function _defaultSlot(i) {
+  return { slot: i, enabled: false, key: '', priority: i, skillName: '', type: 'single', cooldownMs: 0, skillRange: 0 };
+}
+
+function _buildSlotRowHtml(s, i) {
+  const en = s.enabled ? 'checked' : '';
+  const types = ['single','aoe','buff','movement'];
+  const typeOpts = types.map(t => `<option value="${t}"${s.type===t?' selected':''}>${t}</option>`).join('');
+  const cd = s.cooldownMs || 0;
+  const rng = s.skillRange || 0;
+  return `<div class="combat-slot-row" data-slot="${i}" style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:11px;border-bottom:1px solid var(--border)">
+    <label style="width:18px;text-align:center"><input type="checkbox" class="combat-slot-ena" ${en} onchange="saveCombatSlot(${i})"></label>
+    <span style="color:var(--accent);width:16px">S${i}</span>
+    <input type="text" class="combat-slot-key" placeholder="Key" value="${_esc(s.key)}" style="width:36px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 4px;font-size:11px;text-align:center" onchange="saveCombatSlot(${i})">
+    <input type="text" class="combat-slot-name" list="skill-datalist" placeholder="Skill name" value="${_esc(s.skillName)}" style="flex:1;min-width:60px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 4px;font-size:11px" onchange="saveCombatSlot(${i}); updateRangeCircleVisibility()">
+    <select class="combat-slot-type" style="background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px;font-size:10px" onchange="saveCombatSlot(${i})">${typeOpts}</select>
+    <input type="number" class="combat-slot-prio" min="1" max="99" value="${s.priority}" style="width:26px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px;font-size:10px;text-align:center" title="Priority (lower = first)" onchange="saveCombatSlot(${i})">
+    <span class="slider-wrap combat-slot-cd-wrap" style="flex:1;min-width:80px" title="Override cooldown (ms, 0=auto)">
+      <span class="slider-val">${cd}</span>
+      <input type="range" class="combat-slot-cd" min="0" max="5000" step="100" value="${cd}" oninput="_sbInline(this); saveCombatSlot(${i})">
+    </span>
+    <span class="slider-wrap combat-slot-range-wrap" style="flex:1;min-width:80px" title="Skill range (0=auto)">
+      <span class="slider-val">${rng}</span>
+      <input type="range" class="combat-slot-range" min="0" max="5000" step="50" value="${rng}" oninput="_sbInline(this); saveCombatSlot(${i}); updateRangeCircleVisibility()" onfocus="updateRangeCircleVisibility()">
+    </span>
+  </div>`;
+}
+
+// Incrementally update a slot row without destroying DOM (preserves focus)
+function _updateSlotRow(row, s, focused) {
+  const inRow = focused && row.contains(focused);
+  const ena = row.querySelector('.combat-slot-ena');
+  if (ena && ena !== focused) ena.checked = s.enabled;
+  const key = row.querySelector('.combat-slot-key');
+  if (key && key !== focused) key.value = s.key || '';
+  const name = row.querySelector('.combat-slot-name');
+  if (name && name !== focused) name.value = s.skillName || '';
+  const type = row.querySelector('.combat-slot-type');
+  if (type && type !== focused) type.value = s.type || 'single';
+  const prio = row.querySelector('.combat-slot-prio');
+  if (prio && prio !== focused) prio.value = s.priority;
+  // Sliders: skip if any element in this row is focused (user is dragging)
+  if (!inRow) {
+    const cd = row.querySelector('.combat-slot-cd');
+    const cdBub = row.querySelector('.combat-slot-cd-wrap .slider-val');
+    if (cd) { cd.value = s.cooldownMs || 0; if (cdBub) cdBub.textContent = s.cooldownMs || 0; _sbInline(cd); }
+    const rng = row.querySelector('.combat-slot-range');
+    const rngBub = row.querySelector('.combat-slot-range-wrap .slider-val');
+    if (rng) { rng.value = s.skillRange || 0; if (rngBub) rngBub.textContent = s.skillRange || 0; _sbInline(rng); }
+  }
+}
+
+function _updateSkillDatalist() {
+  const dl = document.getElementById('skill-datalist');
+  if (!dl) return;
+  dl.innerHTML = _availableSkills.map(s =>
+    `<option value="${_esc(s.dn || s.n)}">${_esc(s.n)}</option>`
+  ).join('');
+}
+
+function _esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function saveCombatSlot(slotNum) {
+  const rows = document.querySelectorAll('.combat-slot-row');
+  if (slotNum < 1 || slotNum > rows.length) return;
+  const row = rows[slotNum - 1];
+  const enabled = row.querySelector('.combat-slot-ena').checked;
+  const key = row.querySelector('.combat-slot-key').value;
+  const prio = row.querySelector('.combat-slot-prio').value;
+  const name = row.querySelector('.combat-slot-name').value;
+  const type = row.querySelector('.combat-slot-type').value;
+  const cd = row.querySelector('.combat-slot-cd').value;
+  const range = row.querySelector('.combat-slot-range').value;
+  ahkCall('SetCombatSlot', slotNum, key, prio, name, type, cd, enabled, range);
+}
+
+// ── Range circle overlay visualization ──────────────────────────
+// BGR colors for range circles
+const RC_ENGAGE    = 65280;   // 0x00FF00 green
+const RC_DISENGAGE = 255;     // 0x0000FF red
+const RC_SKILL     = 16776960; // 0xFFFF00 cyan
+// Per-slot colors (distinct hues in BGR)
+const RC_SLOT_COLORS = [
+  16776960, // cyan
+  16744448, // blue-ish
+  8388863,  // pink-ish
+  65535,    // yellow
+  8421376,  // teal
+  16711935, // magenta
+  5592575,  // orange
+  8454016,  // spring green
+];
+let _rcFocusedSlot = 0;
+
+function _isCombatEnabled() {
+  return document.getElementById('tog-combat')?.checked || false;
+}
+function showRangeCircles(circles) {
+  ahkCall('ShowRangeCircles', JSON.stringify(circles));
+}
+function updateRangeCircleVisibility() {
+  if (_isCombatEnabled()) {
+    ahkCall('ShowRangeCircles', '');
+    return;
+  }
+  const eng = parseInt(document.getElementById('inp-combat-range')?.value) || 0;
+  const dis = parseInt(document.getElementById('inp-combat-disengage')?.value) || 0;
+  const circles = [];
+  if (eng > 0) circles.push({range: eng, color: RC_ENGAGE, label: 'Engage ' + eng});
+  if (dis > 0) circles.push({range: dis, color: RC_DISENGAGE, label: 'Disengage ' + dis});
+  // Add circles for all configured skill slots
+  const rows = document.querySelectorAll('.combat-slot-row');
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const ena = row.querySelector('.combat-slot-ena');
+    if (!ena || !ena.checked) continue;
+    const range = parseInt(row.querySelector('.combat-slot-range')?.value) || 0;
+    if (range <= 0) continue;
+    const name = row.querySelector('.combat-slot-name')?.value || ('S' + (i+1));
+    circles.push({range: range, color: RC_SLOT_COLORS[i % RC_SLOT_COLORS.length], label: name + ' ' + range});
+  }
+  showRangeCircles(circles);
+}
+function showCombatRangeCircles() { updateRangeCircleVisibility(); }
+function showSkillRangeCircle(slotNum) { _rcFocusedSlot = slotNum; updateRangeCircleVisibility(); }
+function clearSkillRangeCircleFocus() { _rcFocusedSlot = 0; updateRangeCircleVisibility(); }
 
 // ═══════════════════════════════════════════════════════════════════
 //  OVERVIEW TREE
@@ -1110,22 +1549,32 @@ function updateDebugPanels(jsonStr) {
   const liveEl = document.getElementById('debug-panels-live');
   if (liveEl) {
     const anyOpen = vis.anyPanelOpen || false;
+    const mode = vis.mode || '';
+    const openPanels = vis.openPanels || [];
     const newlyVis = vis.newlyVisible || 0;
     const newlyHid = vis.newlyHidden || 0;
-    const totalChanged = vis.totalChanged || 0;
-    const ptrsApp = vis.ptrsAppeared || 0;
-    const ptrsDis = vis.ptrsDisappeared || 0;
-    const curVis = vis.currentVisible || 0;
-    const baseVis = vis.baselineVisible || 0;
     const changed = vis._changedOffsets || [];
+    const panelVis = vis.panelVisible || 0;
+    const checkedCount = vis.checkedCount || 0;
 
     let liveHtml = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px">`;
     liveHtml += `<div style="font-size:20px;font-weight:700;color:${anyOpen ? '#ef4444' : '#4ade80'}">${anyOpen ? '🔴 PANEL OPEN' : '🟢 ALL CLEAR'}</div>`;
-    liveHtml += `<div style="font-size:11px;color:var(--subtext)">Visible: ${curVis} · Baseline: ${baseVis} · Flags: <span style="color:${newlyVis > 0 ? '#ef4444' : '#4ade80'}">+${newlyVis}</span>/<span style="color:${newlyHid > 0 ? '#e8c44a' : '#888'}">−${newlyHid}</span> · Ptrs: <span style="color:${ptrsApp > 0 ? '#ef4444' : '#4ade80'}">+${ptrsApp}</span>/<span style="color:${ptrsDis > 0 ? '#e8c44a' : '#888'}">−${ptrsDis}</span></div>`;
-    liveHtml += `</div>`;
+    liveHtml += `<div style="font-size:11px;color:var(--subtext)">`;
 
-    if (changed.length > 0) {
-      liveHtml += `<div style="font-size:10px;color:#e8c44a;margin-top:4px">Changed offsets: ${changed.map(o => `<span style="font-family:monospace;color:${o.startsWith('+') ? '#4ade80' : '#ef4444'}">${escHtml(o)}</span>`).join(', ')}</div>`;
+    if (mode === 'known_offsets') {
+      liveHtml += `<span style="color:#4ade80">📋 Known offsets (${checkedCount})</span>`;
+      if (openPanels.length > 0) {
+        liveHtml += ` · <span style="color:#ef4444">${openPanels.map(n => escHtml(n)).join(', ')}</span>`;
+      }
+    } else if (vis.hasPanelElements) {
+      liveHtml += `<span style="color:#60a5fa">📏 Size-based</span> · Panels: <span style="color:${panelVis > 0 ? '#ef4444' : '#4ade80'}">+${panelVis}</span>`;
+    } else {
+      liveHtml += `<span style="color:#e8c44a">⚠ Heuristic mode</span> · Flags: +${newlyVis}/-${newlyHid}`;
+    }
+    liveHtml += `</div></div>`;
+
+    if (changed && changed.length > 0) {
+      liveHtml += `<div style="font-size:10px;color:#e8c44a;margin-top:4px">Changed: ${changed.map(o => `<span style="font-family:monospace;color:${o.startsWith('+') ? '#4ade80' : '#ef4444'}">${escHtml(o)}</span>`).join(', ')}</div>`;
     }
     liveEl.innerHTML = liveHtml;
   }
@@ -1136,7 +1585,7 @@ function updateDebugPanels(jsonStr) {
     _lastPanelDiscovery = dKey;
     const discEl = document.getElementById('debug-panels-discovery');
     if (discEl) {
-      let html = `<div style="padding:6px 0;font-size:11px;color:var(--subtext)">Scanned: ${discovery._totalChildren} · Heap ptrs: ${discovery._heapPtrCount || 0} · UiElements: ${discovery._uiElemCount || 0} · Visible at baseline: <span style="color:#4ade80">${discovery._visibleCount || 0}</span> · Hidden: <span style="color:#888">${discovery._invisibleCount || 0}</span></div>`;
+      let html = `<div style="padding:6px 0;font-size:11px;color:var(--subtext)">Scanned: ${discovery._totalChildren} · Heap ptrs: ${discovery._heapPtrCount || 0} · UiElements: ${discovery._uiElemCount || 0} · <span style="color:#60a5fa">📋 Panels: ${discovery._panelCount || 0}</span> · Visible at baseline: <span style="color:#4ade80">${discovery._visibleCount || 0}</span> · Hidden: <span style="color:#888">${discovery._invisibleCount || 0}</span></div>`;
 
       // Visibility baseline table (all elements with flags + vis state)
       const diag = discovery._diagSamples || [];
@@ -1217,17 +1666,19 @@ function updateDiffResults(data) {
     html += `</div>`;
   }
 
-  // Element field changes
+  // Element field changes — with "Save as panel" button for each changed element
   html += `<div style="color:var(--accent);font-size:11px;font-weight:600;margin:6px 0 4px">ELEMENT FIELD CHANGES (Flags/Size/Children): ${ec.length === 0 ? '<span style="color:#888">none</span>' : `<span style="color:#ef4444">${ec.length} elements</span>`}</div>`;
   if (ec.length > 0) {
     html += `<div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:4px">`;
     ec.forEach(e => {
       const label = e.label ? ` <span style="color:#e8c44a">${escHtml(e.label)}</span>` : '';
-      html += `<div style="font-family:monospace;font-size:10px;padding:2px 4px;border-bottom:1px solid var(--border)">`;
-      html += `<span style="color:var(--subtext)">${escHtml(e.off)}</span>${label} <span style="font-size:9px;color:#666">${escHtml(e.ptr)}</span>`;
+      html += `<div style="font-family:monospace;font-size:10px;padding:2px 4px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start">`;
+      html += `<div><span style="color:var(--subtext)">${escHtml(e.off)}</span>${label} <span style="font-size:9px;color:#666">${escHtml(e.ptr)}</span>`;
       (e.changes || []).forEach(ch => {
         html += `<div style="padding-left:16px;color:#ef4444;font-size:10px">${escHtml(ch)}</div>`;
       });
+      html += `</div>`;
+      html += `<button onclick="promptSavePanelOffset('${escHtml(e.off)}')" style="font-size:9px;padding:2px 6px;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--accent);white-space:nowrap;margin-left:8px" title="Save this offset as a known panel">💾 Save</button>`;
       html += `</div>`;
     });
     html += `</div>`;
@@ -1239,6 +1690,59 @@ function updateDiffResults(data) {
 
   el.innerHTML = html;
   updateDiffStatus('Comparison complete — ' + sc.length + ' struct bytes, ' + ec.length + ' elements changed');
+}
+
+// Panel names suggested for the save prompt
+const _panelNameSuggestions = [
+  'InventoryPanel', 'CharacterPanel', 'SkillPanel', 'PassiveTree',
+  'StashPanel', 'SocialPanel', 'WorldPanel', 'QuestPanel',
+  'NpcDialogPanel', 'SellWindow', 'TradeWindow', 'MarketPanel',
+  'ChallengesPanel', 'RitualWindow', 'EscapeMenu', 'LeftPanel', 'RightPanel'
+];
+
+function promptSavePanelOffset(hexOffset) {
+  // Show a simple inline prompt to name this panel offset
+  const el = document.getElementById('debug-diff-status');
+  if (!el) return;
+  let html = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0">`;
+  html += `<span style="color:var(--accent)">Save <b>${escHtml(hexOffset)}</b> as:</span>`;
+  html += `<select id="_panelNameSelect" style="font-size:11px;padding:2px 4px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:3px">`;
+  _panelNameSuggestions.forEach(n => { html += `<option value="${n}">${n}</option>`; });
+  html += `</select>`;
+  html += `<input id="_panelNameCustom" type="text" placeholder="or custom name…" style="font-size:11px;padding:2px 4px;width:140px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:3px">`;
+  html += `<button onclick="_doSavePanelOffset('${hexOffset}')" style="font-size:11px;padding:2px 8px;cursor:pointer;background:var(--accent);border:none;border-radius:3px;color:#fff">💾 Save</button>`;
+  html += `<button onclick="updateDiffStatus('')" style="font-size:11px;padding:2px 8px;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--subtext)">Cancel</button>`;
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function _doSavePanelOffset(hexOffset) {
+  const custom = (document.getElementById('_panelNameCustom') || {}).value || '';
+  const selected = (document.getElementById('_panelNameSelect') || {}).value || '';
+  const name = custom.trim() || selected;
+  if (!name) return;
+  ahkCall('SavePanelOffset', hexOffset, name);
+}
+
+function updateSavedPanelOffsets(data) {
+  const el = document.getElementById('debug-saved-panels');
+  if (!el) return;
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) { return; } }
+  if (!data || data.length === 0) {
+    el.innerHTML = '<div style="font-size:10px;color:#888;padding:2px 0">No saved panel offsets — use Struct Diff to discover and save them.</div>';
+    return;
+  }
+  let html = `<div style="font-size:10px;color:var(--accent);font-weight:600;margin-bottom:4px">📋 SAVED PANEL OFFSETS (${data.length}) — used for fast runtime detection:</div>`;
+  html += `<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+  data.forEach(p => {
+    html += `<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-family:monospace;font-size:10px">`;
+    html += `<span style="color:#4ade80">${escHtml(p.name)}</span>`;
+    html += `<span style="color:#888">${escHtml(p.offset)}</span>`;
+    html += `<button onclick="ahkCall('RemovePanelOffset','${escHtml(p.name)}')" style="font-size:9px;cursor:pointer;background:none;border:none;color:#ef4444;padding:0 2px" title="Remove">✕</button>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
 }
 
 function syntaxHighlight(json) {
@@ -1258,6 +1762,12 @@ function updateSkills(jsonStr) {
   const data = Array.isArray(raw) ? raw : (raw && raw.skills ? raw.skills : []);
   const asOff = raw && raw.asOff ? '0x'+raw.asOff.toString(16).toUpperCase() : '0';
   const distCh = raw && typeof raw.distCh === 'number' ? raw.distCh : -1;
+  // Populate skill datalist for combat config auto-fill
+  if (Array.isArray(data) && data.length > 0) {
+    const prev = JSON.stringify(_availableSkills.map(s=>s.n));
+    _availableSkills = data.filter(s => s.n && !_blacklist.has(s.n));
+    if (JSON.stringify(_availableSkills.map(s=>s.n)) !== prev) _updateSkillDatalist();
+  }
   if (!Array.isArray(data) || data.length === 0) {
     el.innerHTML='<div class="no-data-msg">No skills found (ActiveSkill offset: '+asOff+')</div>'; return;
   }
@@ -1326,7 +1836,7 @@ function applyWlFilter() { _renderWatchlist(); }
 // ═══════════════════════════════════════════════════════════════════
 //  CONFIG HELPERS
 // ═══════════════════════════════════════════════════════════════════
-const _cfgSectionIds = ['status','overview','toggles','autoflask','radar','blacklist','entities','actions'];
+const _cfgSectionIds = ['status','overview','toggles','autoflask','combatauto','explore','radar','blacklist','entities','actions'];
 let _cfgSectionsGuard = 0;
 let _cfgSectionsLoaded = false;
 

@@ -212,5 +212,109 @@ _DispatchBridgeCall(method, args)
             }
             else
                 WebViewExec("window.updateDiffStatus && window.updateDiffStatus(" _JsStr("No snapshot — take one first") ")")
+        case "SavePanelOffset":
+            ; args[1] = struct offset (hex string like "0x4A8"), args[2] = panel name
+            if (args.Length >= 2)
+            {
+                offStr := args[1]
+                panelName := args[2]
+                offVal := 0
+                try offVal := Integer(offStr)
+                if (offVal > 0 && panelName != "")
+                {
+                    PoE2Offsets.DiscoveredPanelOffsets[panelName] := offVal
+                    SavePanelOffsetsToConfig()
+                    ; Push updated list to UI
+                    _PushSavedPanelOffsets()
+                    WebViewExec("window.updateDiffStatus && window.updateDiffStatus(" _JsStr("✅ Saved: " panelName " = " offStr) ")")
+                }
+            }
+        case "RemovePanelOffset":
+            ; args[1] = panel name to remove
+            if (args.Length >= 1)
+            {
+                panelName := args[1]
+                if PoE2Offsets.DiscoveredPanelOffsets.Has(panelName)
+                {
+                    PoE2Offsets.DiscoveredPanelOffsets.Delete(panelName)
+                    SavePanelOffsetsToConfig()
+                    _PushSavedPanelOffsets()
+                    WebViewExec("window.updateDiffStatus && window.updateDiffStatus(" _JsStr("🗑 Removed: " panelName) ")")
+                }
+            }
+        case "GetSavedPanelOffsets":
+            _PushSavedPanelOffsets()
+
+        ; ── Combat Automation ─────────────────────────────────────────────
+        case "ToggleCombatAuto":
+            SetTimer(_ToggleCombatAuto, -1)
+        case "SetCombatRange":
+            global g_combatRange
+            val := (args.Length >= 1) ? args[1] : 1500
+            g_combatRange := Max(200, Min(5000, Integer(val)))
+            SetTimer(() => SaveCombatAutoConfig(), -100)
+        case "SetCombatDisengageRange":
+            global g_combatDisengageRange
+            val := (args.Length >= 1) ? args[1] : 2500
+            g_combatDisengageRange := Max(500, Min(8000, Integer(val)))
+            SetTimer(() => SaveCombatAutoConfig(), -100)
+        case "SetCombatGCD":
+            global g_combatGlobalCooldownMs
+            val := (args.Length >= 1) ? args[1] : 120
+            g_combatGlobalCooldownMs := Max(50, Min(2000, Integer(val)))
+            SetTimer(() => SaveCombatAutoConfig(), -100)
+        case "SetCombatW2S":
+            global g_combatW2SScale
+            val := (args.Length >= 1) ? args[1] : 0.20
+            g_combatW2SScale := Max(0.05, Min(1.0, Float(val)))
+            SetTimer(() => SaveCombatAutoConfig(), -100)
+        case "SetCombatSlot":
+            ; args: [slotNum, key, priority, skillName, type, cooldownMs, enabled, skillRange]
+            _ApplyCombatSlotConfig(args)
+
+        ; ── Exploration Module ────────────────────────────────────────────
+        case "ToggleExploration":
+            global g_exploreEnabled, g_exploreLastReason
+            g_exploreEnabled := !g_exploreEnabled
+            if !g_exploreEnabled
+                g_exploreLastReason := "disabled"
+            SaveExplorationConfig()
+            PushHeaderToWebView()
+        case "SetExploreTarget":
+            global g_exploreTargetPercent
+            val := (args.Length >= 1) ? args[1] : 80
+            g_exploreTargetPercent := Max(10, Min(99, Integer(val)))
+            SetTimer(() => SaveExplorationConfig(), -100)
+
+        ; ── Range circle overlay (temporary visualization while editing) ──
+        case "ShowRangeCircles":
+            ; args: JSON-encoded array of {range, color, label} objects, or empty string to clear
+            global g_radarOverlay
+            if (!g_radarOverlay)
+                return
+            raw := (args.Length >= 1) ? args[1] : ""
+            if (raw = "" || raw = "[]")
+            {
+                g_radarOverlay.SetRangeCircles([])
+                return
+            }
+            ; Parse simple JSON array: [{range:N,color:N,label:"..."},...]
+            circles := []
+            pos := 1
+            while (found := RegExMatch(raw, '\{[^}]+\}', &m, pos))
+            {
+                entry := m[]
+                rc := Map()
+                if RegExMatch(entry, '"range"\s*:\s*(\d+)', &rm)
+                    rc["range"] := Integer(rm[1])
+                if RegExMatch(entry, '"color"\s*:\s*(\d+)', &cm)
+                    rc["color"] := Integer(cm[1])
+                if RegExMatch(entry, '"label"\s*:\s*"([^"]*)"', &lm)
+                    rc["label"] := lm[1]
+                if (rc.Has("range"))
+                    circles.Push(rc)
+                pos := found + StrLen(entry)
+            }
+            g_radarOverlay.SetRangeCircles(circles)
     }
 }

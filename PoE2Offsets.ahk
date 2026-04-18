@@ -21,7 +21,9 @@ class PoE2Offsets
 
     static WorldData := Map(
         "WorldAreaDetailsPtr", 0x98,
-        "WorldAreaDetailsRowPtr", 0xA0
+        "WorldAreaDetailsRowPtr", 0xA0,
+        "CameraStructure", 0xA0,
+        "W2SMatrix", 0x1A0   ; CameraStructure(0xA0) + Matrix4x4 offset(0x100)
     )
 
     static AreaInstance := Map(
@@ -436,7 +438,10 @@ class PoE2Offsets
 
     ; Runtime-populated: panelName → byte offset from GameUiPtr.
     ; Filled by DiscoverPanelOffsets(), persisted to INI under [PanelOffsets].
-    static DiscoveredPanelOffsets := Map()
+    static DiscoveredPanelOffsets := Map(
+        "LeftPanel",        0x748,
+        "RightPanel",       0x9F8
+    )
 
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)

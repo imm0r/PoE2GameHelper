@@ -171,15 +171,198 @@ _CaptureWindowGeometry()
 
 ; Saves discovered panel offsets to INI with the current patch version.
 ; Format: [PanelOffsets] patchVersion=X.X.X, PanelName=0xNNN, ...
-; Panel offset persistence is disabled — discovery now stores runtime pointers
-; which change each session. Re-discovery runs automatically on each zone change.
+; Struct offsets (relative to GameUiPtr) are stable within a patch version.
 SavePanelOffsetsToConfig()
 {
-    return  ; no-op: runtime pointers are not persistable
+    f := _ConfigPath()
+    offsets := PoE2Offsets.DiscoveredPanelOffsets
+
+    ; Read current patch version from file
+    patchFile := A_ScriptDir "\last_known_patch.txt"
+    patchVer := ""
+    if FileExist(patchFile)
+    {
+        try
+        {
+            patchVer := Trim(FileRead(patchFile), " `t`r`n")
+        }
+        catch
+        {
+            patchVer := ""
+        }
+    }
+    IniWrite(patchVer, f, "PanelOffsets", "patchVersion")
+
+    ; Clear old entries first — delete and recreate section
+    ; Write count so we know how many to load
+    count := 0
+    for name, off in offsets
+        count += 1
+    IniWrite(count, f, "PanelOffsets", "count")
+
+    idx := 0
+    for name, off in offsets
+    {
+        IniWrite(name, f, "PanelOffsets", "name" idx)
+        IniWrite(Format("0x{:X}", off), f, "PanelOffsets", "offset" idx)
+        idx += 1
+    }
 }
 
-; Panel offset persistence is disabled — discovery runs automatically each session.
+; Loads cached panel offsets from INI. Only loads if patch version matches.
+; Returns true if offsets were loaded, false if stale/missing.
 LoadPanelOffsetsFromConfig()
 {
+    f := _ConfigPath()
+    if !FileExist(f)
+        return false
+
+    ; Check patch version
+    patchFile := A_ScriptDir "\last_known_patch.txt"
+    currentPatch := ""
+    if FileExist(patchFile)
+    {
+        try
+        {
+            currentPatch := Trim(FileRead(patchFile), " `t`r`n")
+        }
+        catch
+        {
+            currentPatch := ""
+        }
+    }
+    savedPatch := IniRead(f, "PanelOffsets", "patchVersion", "")
+    if (savedPatch = "" || savedPatch != currentPatch)
+        return false
+
+    ; parseNum removed — inline parsing used in-place below
+
+    offsets := Map()
+
+    ; Try reading count first. If count missing or <=0, fall back to scanning sequential nameN keys.
+    count := Integer(IniRead(f, "PanelOffsets", "count", "0"))
+    if (count > 0)
+    {
+        idx := 0
+        while (idx < count)
+        {
+            name := IniRead(f, "PanelOffsets", "name" idx, "")
+            offStr := IniRead(f, "PanelOffsets", "offset" idx, "")
+            if (name != "" && offStr != "")
+            {
+                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                offVal := 0
+                s := Trim(offStr)
+                if (s != "")
+                {
+                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", m)
+                    {
+                        hex := StrUpper(m1)
+                        offVal := 0
+                        i2 := 1
+                        len2 := StrLen(hex)
+                        while (i2 <= len2)
+                        {
+                            c := SubStr(hex, i2, 1)
+                            asc := Asc(c)
+                            if (asc >= 48 && asc <= 57)
+                                d := asc - 48
+                            else if (asc >= 65 && asc <= 70)
+                                d := asc - 55
+                            else
+                                d := 0
+                            offVal := offVal * 16 + d
+                            i2 += 1
+                        }
+                    }
+                    else
+                    {
+                        try
+                    {
+                        offVal := Integer(s)
+                    }
+                    catch
+                    {
+                        offVal := 0
+                    }
+                    }
+                }
+                if (offVal > 0)
+                    offsets[name] := offVal
+            }
+            idx += 1
+        }
+    }
+    else
+    {
+        idx := 0
+        while (idx < 128)
+        {
+            name := IniRead(f, "PanelOffsets", "name" idx, "")
+            offStr := IniRead(f, "PanelOffsets", "offset" idx, "")
+            if (name = "" && offStr = "")
+                break
+            if (name != "" && offStr != "")
+            {
+                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                offVal := 0
+                s := Trim(offStr)
+                if (s != "")
+                {
+                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", m)
+                    {
+                        hex := StrUpper(m1)
+                        offVal := 0
+                        i2 := 1
+                        len2 := StrLen(hex)
+                        while (i2 <= len2)
+                        {
+                            c := SubStr(hex, i2, 1)
+                            asc := Asc(c)
+                            if (asc >= 48 && asc <= 57)
+                                d := asc - 48
+                            else if (asc >= 65 && asc <= 70)
+                                d := asc - 55
+                            else
+                                d := 0
+                            offVal := offVal * 16 + d
+                            i2 += 1
+                        }
+                    }
+                    else
+                    {
+                        try
+                    {
+                        offVal := Integer(s)
+                    }
+                    catch
+                    {
+                        offVal := 0
+                    }
+                    }
+                }
+                if (offVal > 0)
+                    offsets[name] := offVal
+            }
+            idx += 1
+        }
+    }
+
+    if (offsets.Count > 0)
+    {
+        PoE2Offsets.DiscoveredPanelOffsets := offsets
+        ; Push to WebView if it's ready so UI shows saved panels immediately
+        try
+        {
+            _PushSavedPanelOffsets()
+        }
+        catch
+        {
+            ; ignore
+        }
+        return true
+    }
+
     return false
 }
+

@@ -33,15 +33,42 @@ UpdateRadarFast()
         radarReadStart := A_TickCount
         radarSnap := g_reader.ReadRadarSnapshot()
         g_radarReadMs := A_TickCount - radarReadStart
-        if !radarSnap
+
+        ; Grace period: tolerate brief GC-related read failures instead of
+        ; immediately hiding the overlay and stopping automation.
+        static _lastValidSnap := 0
+        static _overlayHideTick := 0
+        static _OVERLAY_GRACE_MS := 800
+
+        if radarSnap
         {
-            if g_radarOverlay
-                g_radarOverlay.Hide()
-            if g_playerHud
-                g_playerHud.Hide()
-            return
+            _lastValidSnap := radarSnap
+            _overlayHideTick := 0
+        }
+        else
+        {
+            ; Snapshot failed — use last valid for combat/exploration,
+            ; and start the overlay hide grace timer
+            if _lastValidSnap
+                radarSnap := _lastValidSnap
+            if (_overlayHideTick = 0)
+                _overlayHideTick := A_TickCount
+            if (!_lastValidSnap || (A_TickCount - _overlayHideTick) > _OVERLAY_GRACE_MS)
+            {
+                if g_radarOverlay
+                    g_radarOverlay.Hide()
+                if g_playerHud
+                    g_playerHud.Hide()
+                return
+            }
         }
         g_radarLastSnap := radarSnap  ; cache for Dump Entities button
+
+        ; ── Combat Automation (independent of overlay visibility) ─────────
+        TryCombatAutomation(radarSnap)
+
+        ; ── Exploration Module (auto-explore after combat) ────────────────
+        TryExploration(radarSnap)
 
         currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
 
@@ -111,15 +138,30 @@ UpdateRadarFast()
         if overlayAllowed
         {
             ; Visibility-differential check: any newly visible elements = panel open
+            ; Temporal debounce: combat UI elements can briefly flicker visibility flags,
+            ; so require the "panel open" signal to persist for 500ms before hiding.
+            ; Real panels stay open for seconds; combat noise lasts < 200ms.
+            static _panelOpenSinceTick := 0
+            static _PANEL_DEBOUNCE_MS := 500
             panelVis := radarSnap.Has("panelVisibility") ? radarSnap["panelVisibility"] : 0
+            panelDetected := false
             if (panelVis && IsObject(panelVis))
+                panelDetected := (panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
+
+            if panelDetected
             {
-                if (panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
+                if (_panelOpenSinceTick = 0)
+                    _panelOpenSinceTick := A_TickCount
+                if ((A_TickCount - _panelOpenSinceTick) >= _PANEL_DEBOUNCE_MS)
                 {
                     overlayAllowed := false
                     newlyVis := panelVis.Has("newlyVisible") ? panelVis["newlyVisible"] : 0
                     hideReason := "panel-open(" newlyVis " new)"
                 }
+            }
+            else
+            {
+                _panelOpenSinceTick := 0
             }
 
             ; Chat check (ImportantUiElements)
@@ -157,13 +199,44 @@ UpdateRadarFast()
         }
 
         ; ── Hide overlays if conditions not met ──────────────────────────────
+        ; GC-susceptible conditions (no-largemap, no-player) get a grace period
+        ; to avoid flicker from brief memory read failures.
+        static _overlayCondHideTick := 0
         if !overlayAllowed
         {
-            if g_radarOverlay
-                g_radarOverlay.Hide()
-            if g_playerHud
-                g_playerHud.Hide()
-            return
+            gcSensitive := (hideReason = "no-largemap" || hideReason = "no-player")
+            if gcSensitive
+            {
+                if (_overlayCondHideTick = 0)
+                    _overlayCondHideTick := A_TickCount
+                if ((A_TickCount - _overlayCondHideTick) < _OVERLAY_GRACE_MS)
+                {
+                    ; Within grace — skip hide, continue to render with last data
+                }
+                else
+                {
+                    _overlayCondHideTick := 0
+                    if g_radarOverlay
+                        g_radarOverlay.Hide()
+                    if g_playerHud
+                        g_playerHud.Hide()
+                    return
+                }
+            }
+            else
+            {
+                ; Deliberate state changes (panel open, chat, dead) — hide immediately
+                _overlayCondHideTick := 0
+                if g_radarOverlay
+                    g_radarOverlay.Hide()
+                if g_playerHud
+                    g_playerHud.Hide()
+                return
+            }
+        }
+        else
+        {
+            _overlayCondHideTick := 0
         }
 
         ; ── Game window checks ────────────────────────────────────────────────
@@ -179,11 +252,16 @@ UpdateRadarFast()
 
         if !WinActive("ahk_id " gameHwnd)
         {
-            if g_radarOverlay
-                g_radarOverlay.Hide()
-            if g_playerHud
-                g_playerHud.Hide()
-            return
+            ; Still render range circles when GameHelper has focus (config preview)
+            hasCircles := (g_radarOverlay && g_radarOverlay._rangeCircles.Length > 0)
+            if !hasCircles
+            {
+                if g_radarOverlay
+                    g_radarOverlay.Hide()
+                if g_playerHud
+                    g_playerHud.Hide()
+                return
+            }
         }
 
         ; ── Render overlays ───────────────────────────────────────────────────
@@ -636,27 +714,25 @@ ResolvePoEWindow()
     return 0
 }
 
-; Sends a keystroke to the PoE2 window via ControlSend using the window handle.
-; Params: sendKey - AHK Send-format key name; gameHwnd - target window HWND
-; Returns: true if ControlSend succeeded
+; Sends a keystroke to the PoE2 window via keybd_event (Win32 API).
+; Bypasses UIPI when the game runs elevated, unlike ControlSend/SendInput.
+; Params: sendKey - AHK key name; gameHwnd - target window HWND
+; Returns: true if key was sent
 SendFlaskKeyToGame(sendKey, gameHwnd)
 {
     if (sendKey = "" || !gameHwnd)
         return false
 
-    gameWin := "ahk_id " gameHwnd
+    ; Convert AHK key name → virtual key code
+    vk := GetKeyVK(sendKey)
+    if (!vk)
+        return false
 
-    ; Primary path requested: direct ControlSend to PoE window handle.
-    try
-    {
-        ControlSend("{Blind}{" sendKey "}", , gameWin)
-        return true
-    }
-    catch
-    {
-    }
-
-    return false
+    ; keybd_event: key down then key up (bypasses UIPI)
+    DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0, "uptr", 0)
+    Sleep(20)
+    DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0x0002, "uptr", 0)
+    return true
 }
 
 ; Opens the in-game chat (or reuses it if already open) and types a slash command, then submits it.
