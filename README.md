@@ -1,80 +1,102 @@
-# PoE2 GameHelper v0.4.11.2
+# <div align="center">
+<img src="assets/logo_poE2gamehelper.png" width="600">
+</div>
 
-AHK v2.0 Port der Path of Exile 2 Memory-Reading-Engine mit Radar/Maphack-Overlay, Zone-Navigation, AutoFlask und WebView-basierter UI.
+<div align="center">
+[![Version](https://img.shields.io/badge/version-v0.4.21.7-blue)]()
+[![Build](https://img.shields.io/badge/build-stable-green)]()
+[![License](https://img.shields.io/badge/license-MIT-lightgrey)]()
+[![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)]()
+</div>
 
-**Status:** ✅ **Produktiv**
+---
+
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation & Usage](#installation--usage)
+- [Project Structure](#project-structure)
+- [References](#references)
+- [License](#license)
+
+---
+
+## Overview
+**PoE2 GameHelper** is a modern AutoHotkey v2 toolset for *Path of Exile 2*, featuring:
+- Real‑time memory reading
+- Radar/maphack overlay
+- Zone navigation
+- AutoFlask automation
+- WebView‑based UI
+
+Actively maintained and production‑ready.
+
+---
 
 ## Features
 
-### ✅ Radar & Maphack Overlay
-- **GDI Overlay** mit Minimap + Large Map Modus
-- **Maphack** — Enthüllt die gesamte Zone auf der Large Map (walkable terrain borders)
-- **Entity-Icons** — AreaTransitions, Waypoints, Checkpoints, NPCs, Bosses
-- **Distance-Labels** für alle sichtbaren Entities
-- Isometrische Projektion passend zum Game-Kamerawinkel
-- **Large Map gating** — Overlay erscheint nur bei aktiver Large Map (nicht Minimap)
+### Radar & Maphack Overlay
+- High‑performance GDI overlay
+- Minimap + Large Map modes
+- Full‑zone reveal (maphack)
+- Entity icons (NPCs, Bosses, Waypoints, etc.)
+- Distance indicators
+- Isometric projection
 
-### ✅ Zone Navigation
-- **A* Pathfinder** mit 3-Tier STEP-System (2/4/8 je nach Distanz)
-- Zone-weiter Scan für AreaTransitions via TgtTilesLocations
-- Pfad zum nächsten Ziel wird auf der Karte gezeichnet
+<img src="assets/radar_overlay.png" width="600">
 
-### ✅ Memory-Reading
-- Pattern-Scanning mit RIP-relative Adress-Auflösung
-- GameState-Tracking (InGameState, Loading, Menu)
-- Player-Vitals, Entity-Dekodierung, Component-System
-- Awake & Sleeping Entity-Maps
+### Zone Navigation
+- A* pathfinding with adaptive step sizes (2/4/8)
+- Automatic AreaTransition detection
+- Real‑time path rendering
 
-### ✅ Panel Detection & Overlay Gating
-- **Runtime UI-Panel-Erkennung** — scannt ImportantUiElements Struct (0x400-0xC00) für Heap-UiElement-Pointer
-- **Visibility-Differential** — Flags-bit-11-Baseline mit Live-Vergleich erkennt Panel-Öffnen/Schließen
-- **Raw-Struct-Pointer-Tracking** — 2KB single-RPM-call erkennt Pointer-Erscheinen/Verschwinden
-- **Overlay auto-hide** wenn ein Game-Panel (Inventory, Skills, etc.) geöffnet ist
+### Memory Reading Engine
+- Pattern scanning with RIP‑relative resolution
+- Game state tracking (InGame, Loading, Menu)
+- Player vitals, entity decoding, component system
+- Awake/sleeping entity maps
+- Inventory & item metadata
 
-### ✅ Player HUD
-- Kompakter HUD-Overlay mit Life, Mana, Shield, ES, Evasion
-- Dynamische Farben und Prozent-Anzeige
+<img src="assets/entities_tab.png" width="600">
 
-### ✅ AutoFlask
-- Life/Mana-Schwellen (konfigurierbar)
-- Cooldown-Tracking mit Verification
-- ControlSend + PostMessage Fallback
+### AutoFlask
+- Configurable life/mana thresholds
+- Cooldown‑aware flask usage
+- ControlSend + PostMessage fallback
 
-### ✅ Skills & Buffs
-- Dedizierter Tab für aktive Buffs/Debuffs
-- Icons, Duration-Timer, Charges
-- Blacklist mit INI-Persistenz
+### Skills & Buffs Panel
+- Dedicated UI tab
+- Icons, timers, charges
+- Blacklist with persistent INI storage
 
-### ✅ WebView UI
-- **Multi-Tab-Layout** mit Icons (Entities, Skills & Buffs, UI, gameState, WatchList, TSVs, Debug, Config)
-- Config-Tab rechts ausgerichtet, alle anderen Tabs links
-- Sortierbare Entity-Liste mit Distance und Type
-- Konfigurierbare Toggles für alle Features
+<img src="assets/skills_buffs.png" width="600">
 
-### ✅ Debug Tab
-- **Panel Visibility (Live)** — Echtzeit-Anzeige ob Panels offen/geschlossen
-- **Panel Discovery Results** — Struct-Scan mit UiElement-Validierung
-- **Struct Diff Diagnostic** — Byte-für-Byte Vergleich zum Finden neuer Panel-Mechanismen
-- **Overlay State** — Alle Overlay-Bedingungen auf einen Blick
+### WebView‑Based UI
+- Multi‑tab interface
+- Sortable entity list
+- Configurable toggles
+- Clean, modern layout
 
-## Start
+<img src="assets/configuration1.png" width="600">
+<img src="assets/configuration2.png" width="600">
 
-1. **Voraussetzungen:**
-   - AutoHotkey v2.0+ ([Download](https://www.autohotkey.com/download/))
-   - PoE2 installiert und laufend
-   - Terminal mit Admin-Rechten (für Memory-Zugriff)
+---
 
-2. **Starten:**
-   ```powershell
-   # Terminal als Administrator öffnen
-   cd <GameHelper-Verzeichnis>
-   "C:\Program Files\AutoHotkey\v2\AutoHotkey.exe" InGameStateMonitor.ahk
-   ```
+## Requirements
+- AutoHotkey v2.0+
+- Path of Exile 2 installed and running
+- Administrator privileges (for memory access)
 
-3. **Beenden:** `Esc`
+---
 
-## Architektur
+## Installation & Usage
+```bash
+cd <PoE2GameHelper-directory>
+"C:\Program Files\AutoHotkey\v2\AutoHotkey.exe" InGameStateMonitor.ahk
 
+```
+## Project Structure
 ```
 InGameStateMonitor.ahk (Main Entry, WebView UI Host)
 ├── PoE2MemoryReader.ahk (Core: Pattern-Scan, Static Addresses, Panel Detection)
@@ -104,4 +126,7 @@ InGameStateMonitor.ahk (Main Entry, WebView UI Host)
 - [**poe data tools**](https://github.com/LocalIdentity/poe_data_tools)
 - [**AHK v2 Docs**](https://www.autohotkey.com/docs/v2/)
 
-Detaillierte Dokumentation: siehe [`PROJECT_STATUS.md`](https://github.com/imm0r/PoE2GameHelper/blob/master/PROJECT_STATUS.md)
+Detaillierte Dokumentation: siehe [`DEV_README.md`](https://github.com/imm0r/PoE2GameHelper/blob/master/DEV_README.md)
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

@@ -103,6 +103,11 @@ _DispatchBridgeCall(method, args)
             if (g_radarOverlay)
                 g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             SetTimer(SaveConfig, -100)
+        case "TogglePanelDetection":
+            global g_panelDetectionEnabled
+            g_panelDetectionEnabled := !g_panelDetectionEnabled
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "SetRadarAlpha":
             global g_radarAlpha
             val := (args.Length >= 1) ? args[1] : 255

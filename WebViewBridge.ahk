@@ -38,7 +38,7 @@ PushHeaderToWebView()
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_zoneNavEnabled
-    global g_radarAlpha, g_mapHackEnabled
+    global g_radarAlpha, g_mapHackEnabled, g_panelDetectionEnabled
     global g_cfgOpenSections
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
@@ -92,6 +92,7 @@ PushHeaderToWebView()
           . "},"
           . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
           . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
+          . '"panelDetection":' (g_panelDetectionEnabled ? "true" : "false") ","
           . '"cfgSections":' _JsStr(g_cfgOpenSections) ","
           . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
           . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","

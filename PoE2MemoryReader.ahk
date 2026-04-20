@@ -2675,16 +2675,54 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 }
                 this._lastActiveGameUiPtr := activeGameUiPtr
 
-                ; Prefer fast known-offset check when user has saved panel offsets
-                if (PoE2Offsets.DiscoveredPanelOffsets.Count > 0)
+                global g_panelDetectionEnabled
+                if (g_panelDetectionEnabled)
                 {
-                    freshPanelVis := this.ReadKnownPanelVisibility(activeGameUiPtr)
-                    if (freshPanelVis && IsObject(freshPanelVis))
-                        this._radarPanelVisCache := freshPanelVis
-                }
-                else
-                {
-                    ; Fallback: heuristic scan (discovery + differential baseline)
+                    ; Prefer fast known-offset check when user has saved panel offsets
+                    if (PoE2Offsets.DiscoveredPanelOffsets.Count > 0)
+                    {
+                        freshPanelVis := this.ReadKnownPanelVisibility(activeGameUiPtr)
+                        if (freshPanelVis && IsObject(freshPanelVis))
+                            this._radarPanelVisCache := freshPanelVis
+                    }
+                    else
+                    {
+                        ; Fallback: heuristic scan (discovery + differential baseline)
+                        if (!this._radarPanelDiscoveryDone)
+                        {
+                            this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
+                            this._radarPanelDiscoveryDone := true
+                            this._baselineDelayTick := A_TickCount + 3000
+                        }
+                        if (this._baselineDelayTick > 0 && nowTick >= this._baselineDelayTick)
+                        {
+                            this.RefreshVisibilityBaseline()
+                            this._baselineDelayTick := 0
+                        }
+                        freshPanelVis := this.ReadAllPanelVisibility(activeGameUiPtr)
+                        if (freshPanelVis && IsObject(freshPanelVis))
+                        {
+                            this._radarPanelVisCache := freshPanelVis
+                            ; Self-healing baseline: absorb combat UI drift after 10s clean
+                            if !(freshPanelVis.Has("anyPanelOpen") && freshPanelVis["anyPanelOpen"])
+                            {
+                                if (!this.HasOwnProp("_panelCleanSince") || this._panelCleanSince = 0)
+                                    this._panelCleanSince := nowTick
+                                else if ((nowTick - this._panelCleanSince) > 10000)
+                                {
+                                    this.RefreshVisibilityBaseline()
+                                    this._panelCleanSince := nowTick
+                                }
+                            }
+                            else
+                            {
+                                this._panelCleanSince := 0
+                            }
+                        }
+                    }
+
+                    ; Always run heuristic discovery for the Struct Diff Diagnostic tool,
+                    ; even if we use known offsets for actual panel detection.
                     if (!this._radarPanelDiscoveryDone)
                     {
                         this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
@@ -2696,40 +2734,6 @@ class PoE2GameStateReader extends PoE2InventoryReader
                         this.RefreshVisibilityBaseline()
                         this._baselineDelayTick := 0
                     }
-                    freshPanelVis := this.ReadAllPanelVisibility(activeGameUiPtr)
-                    if (freshPanelVis && IsObject(freshPanelVis))
-                    {
-                        this._radarPanelVisCache := freshPanelVis
-                        ; Self-healing baseline: absorb combat UI drift after 10s clean
-                        if !(freshPanelVis.Has("anyPanelOpen") && freshPanelVis["anyPanelOpen"])
-                        {
-                            if (!this.HasOwnProp("_panelCleanSince") || this._panelCleanSince = 0)
-                                this._panelCleanSince := nowTick
-                            else if ((nowTick - this._panelCleanSince) > 10000)
-                            {
-                                this.RefreshVisibilityBaseline()
-                                this._panelCleanSince := nowTick
-                            }
-                        }
-                        else
-                        {
-                            this._panelCleanSince := 0
-                        }
-                    }
-                }
-
-                ; Always run heuristic discovery for the Struct Diff Diagnostic tool,
-                ; even if we use known offsets for actual panel detection.
-                if (!this._radarPanelDiscoveryDone)
-                {
-                    this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
-                    this._radarPanelDiscoveryDone := true
-                    this._baselineDelayTick := A_TickCount + 3000
-                }
-                if (this._baselineDelayTick > 0 && nowTick >= this._baselineDelayTick)
-                {
-                    this.RefreshVisibilityBaseline()
-                    this._baselineDelayTick := 0
                 }
             }
             this._radarPanelVisCacheTick := nowTick

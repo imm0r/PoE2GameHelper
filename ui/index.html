@@ -569,6 +569,8 @@ body{display:flex;flex-direction:column}
               <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')" checked><span class="toggle-slider"></span></label></div>
             <div class="cfg-row"><span class="cfg-label">Map Hack</span>
               <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')" checked><span class="toggle-slider"></span></label></div>
+            <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
+              <label class="toggle"><input type="checkbox" id="tog-paneldetection" onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label></div>
             <div class="cfg-slider-row">
               <span class="cfg-label">Opacity</span>
               <div class="slider-wrap">
@@ -896,6 +898,7 @@ function updateHeader(json) {
 
   setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
   setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+  setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
 
   if (d.radarAlpha !== undefined) {
     const sl = document.getElementById('radar-alpha');
