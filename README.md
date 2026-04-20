@@ -1,12 +1,10 @@
-# <div align="center">
-<img src="assets/logo_poE2gamehelper.png" width="600">
-</div>
-
 <div align="center">
-[![Version](https://img.shields.io/badge/version-v0.4.21.7-blue)]()
-[![Build](https://img.shields.io/badge/build-stable-green)]()
-[![License](https://img.shields.io/badge/license-MIT-lightgrey)]()
-[![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)]()
+<img src="assets/logo_poE2gamehelper.png" width="600">
+
+![Version](https://img.shields.io/badge/version-v0.4.21.7-blue)
+![Build](https://img.shields.io/badge/build-stable-green)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
 </div>
 
 ---
