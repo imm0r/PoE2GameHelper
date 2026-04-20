@@ -41,8 +41,7 @@ Actively maintained and production‑ready.
 - Entity icons (NPCs, Bosses, Waypoints, etc.)
 - Distance indicators
 - Isometric projection
-
-<img src="assets/radar_overlay.png" width="600">
+<div align="center"><img src="assets/radar_overlay.png" width="600"></div>
 
 ### Zone Navigation
 - A* pathfinding with adaptive step sizes (2/4/8)
@@ -52,11 +51,11 @@ Actively maintained and production‑ready.
 ### Memory Reading Engine
 - Pattern scanning with RIP‑relative resolution
 - Game state tracking (InGame, Loading, Menu)
+<div align="center"><img src="assets/gamestate_tab.png" width="600"></div>
 - Player vitals, entity decoding, component system
 - Awake/sleeping entity maps
+<div align="center"><img src="assets/entities_tab.png" width="600"></div>
 - Inventory & item metadata
-
-<img src="assets/entities_tab.png" width="600">
 
 ### AutoFlask
 - Configurable life/mana thresholds
@@ -67,17 +66,15 @@ Actively maintained and production‑ready.
 - Dedicated UI tab
 - Icons, timers, charges
 - Blacklist with persistent INI storage
-
-<img src="assets/skills_buffs.png" width="600">
+<div align="center"><img src="assets/skills_buffs.png" width="600"></div>
 
 ### WebView‑Based UI
 - Multi‑tab interface
 - Sortable entity list
 - Configurable toggles
+<div align="center"><img src="assets/configuration1.png" width="600"></div>
 - Clean, modern layout
-
-<img src="assets/configuration1.png" width="600">
-<img src="assets/configuration2.png" width="600">
+<div align="center"><img src="assets/configuration2.png" width="600"></div>
 
 ---
 
@@ -124,7 +121,7 @@ InGameStateMonitor.ahk (Main Entry, WebView UI Host)
 - [**poe data tools**](https://github.com/LocalIdentity/poe_data_tools)
 - [**AHK v2 Docs**](https://www.autohotkey.com/docs/v2/)
 
-Detaillierte Dokumentation: siehe [`DEV_README.md`](https://github.com/imm0r/PoE2GameHelper/blob/master/DEV_README.md)
+detailed documentation: [`DEV_README.md`](https://github.com/imm0r/PoE2GameHelper/blob/master/DEV_README.md)
 
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
