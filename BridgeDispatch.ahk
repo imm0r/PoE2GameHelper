@@ -104,8 +104,45 @@ _DispatchBridgeCall(method, args)
                 g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             SetTimer(SaveConfig, -100)
         case "TogglePanelDetection":
-            global g_panelDetectionEnabled
+            global g_panelDetectionEnabled, g_reader, g_radarLastSnap
             g_panelDetectionEnabled := !g_panelDetectionEnabled
+            if (!g_panelDetectionEnabled)
+            {
+                ; Clear cached panel visibility so UI/overlay doesn't think panels are open
+                if IsObject(g_reader)
+                {
+                    try
+                    {
+                        g_reader._radarPanelVisCache := Map()
+                        g_reader._radarPanelVisCacheTick := 0
+                        g_reader._panelCleanSince := 0
+                    }
+                    catch
+                    {
+
+                    }
+                }
+                ; Push debug panels immediately to refresh UI
+                SetTimer(() => PushDebugPanelsToWebView(g_radarLastSnap), -50)
+            }
+            else
+            {
+                ; When enabling, ensure discovery restarts cleanly
+                if IsObject(g_reader)
+                {
+                    try
+                    {
+                        g_reader._radarPanelDiscoveryDone := false
+                        g_reader._radarPanelDiscoveryResult := 0
+                        g_reader._visBaselineTaken := false
+                        g_reader._diffSnapshotTaken := false
+                    }
+                    catch
+                    {
+                        
+                    }
+                }
+            }
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
         case "SetRadarAlpha":

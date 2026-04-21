@@ -106,6 +106,7 @@ g_skillBuffBlacklist := []
 ; Zone navigation toggle
 g_zoneNavEnabled := true
 g_mapHackEnabled := true
+g_panelDetectionEnabled := true
 
 ; Window geometry (restored from INI by LoadConfig)
 g_winX := 20
