@@ -1,4 +1,5 @@
 # PoE2 GameHelper — Developer Documentation
+<img src="assets/logo2_poE2gamehelper.png>
 
 ## Architecture Overview
 ### Core Systems
