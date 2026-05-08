@@ -117,46 +117,46 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._radarCurrentStateName := "GameNotLoaded"
 
         ; Cached terrain walkability data — re-read only when area hash changes.
-        this._radarTerrainCache     := 0
-        this._radarTerrainAreaHash  := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
+        this._radarTerrainCache := 0
+        this._radarTerrainAreaHash := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
         this._radarTerrainRetryTick := 0            ; tick of last failed-read retry attempt
-        this._terrainLastError      := ""           ; last ReadTerrainData failure reason
+        this._terrainLastError := ""           ; last ReadTerrainData failure reason
 
         ; World area data cache (town/hideout flags) — re-read on zone change.
-        this._radarWorldAreaCache   := 0
-        this._radarWorldAreaHash    := 0xFFFFFFFF
+        this._radarWorldAreaCache := 0
+        this._radarWorldAreaHash := 0xFFFFFFFF
 
         ; Persistent entity cache (mirrors C# AreaInstance.AwakeEntities ConcurrentDictionary).
         ; entityId → sampleEntry Map (same format as CollectEntityMapCandidates output).
         ; Reset on area change. New entities get full ReadEntityBasic decode; existing ones get
         ; cheap per-tick updates (position, life, targetable, flags) via UpdateCachedEntityRadar.
-        this._radarEntityCache      := Map()
+        this._radarEntityCache := Map()
         this._radarEntityCacheAreaHash := 0xFFFFFFFF
 
         ; Zone navigation: continuous accumulation of important entities.
         ; Initial deep scan on area change, then harvests from regular scans each tick.
         this._zoneScanAccumulated := Map()   ; path → Map(path, type, worldX/Y/Z, gridX/Y)
-        this._zoneScanAreaHash    := 0xFFFFFFFF
-        this._zoneScanDone        := false   ; true once initial deep scan completed
-        this._zoneScanEnabled     := true    ; toggle from config
-        this._zoneScanTimingMs    := 0       ; how long the last deep scan took
+        this._zoneScanAreaHash := 0xFFFFFFFF
+        this._zoneScanDone := false   ; true once initial deep scan completed
+        this._zoneScanEnabled := true    ; toggle from config
+        this._zoneScanTimingMs := 0       ; how long the last deep scan took
         this._zoneScanScheduledAt := 0       ; tick when deep scan should run
-        this._zoneScanRetries     := 0       ; retry count if deep scan finds 0 results
-        this._zoneScanStartedAt   := 0       ; tick when scan began (for elapsed display)
-        this._zoneScanFailReason  := ""      ; last setup failure reason for diagnostics
-        this._tgtScanInProgress   := false   ; true while incremental tile scan is running
+        this._zoneScanRetries := 0       ; retry count if deep scan finds 0 results
+        this._zoneScanStartedAt := 0       ; tick when scan began (for elapsed display)
+        this._zoneScanFailReason := ""      ; last setup failure reason for diagnostics
+        this._tgtScanInProgress := false   ; true while incremental tile scan is running
 
         ; BFS throttle: reuse tree scan results for 200ms to reduce per-tick RPM calls.
-        this._radarLastBfsTick           := 0
-        this._radarLastCurrentEntities   := 0
-        this._radarLastFullAwakeRawPtrs  := 0
+        this._radarLastBfsTick := 0
+        this._radarLastCurrentEntities := 0
+        this._radarLastFullAwakeRawPtrs := 0
 
         ; Round-robin cursor for time-budgeted cheap entity updates.
         this._cheapUpdateOffset := 0
 
         ; Player vitals cache (refreshed every 200ms in radar snapshot)
         this._radarPlayerVitalsCache := 0
-        this._radarPlayerVitalsTick  := 0
+        this._radarPlayerVitalsTick := 0
 
         ; Cached StaticPtr for the Charges component type (populated on first named-lookup hit)
         this._chargesStaticPtr := 0
@@ -444,15 +444,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         return this.FindPatternAddressesInBuffer(
             moduleBytes,
             moduleBytes.Size,
-                this.Mem.ModuleSnapshotBase,
+            this.Mem.ModuleSnapshotBase,
             parsedPattern,
             maxMatches)
     }
 
-            ; Searches buffer for all occurrences of parsedPattern, returning up to maxMatches results.
-            ; Uses MemChr on the anchor byte as a fast pre-filter before running the full mask comparison.
-            ; Returns: array of absolute addresses (baseAddress + buffer offset of each match).
-            FindPatternAddressesInBuffer(buffer, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
+    ; Searches buffer for all occurrences of parsedPattern, returning up to maxMatches results.
+    ; Uses MemChr on the anchor byte as a fast pre-filter before running the full mask comparison.
+    ; Returns: array of absolute addresses (baseAddress + buffer offset of each match).
+    FindPatternAddressesInBuffer(buffer, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
     {
         if (!buffer || bufferSize <= 0)
             return []
@@ -1189,10 +1189,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if !this.IsProbablyValidPointer(gameUiPtr)
             return 0
 
-        chatParentPtr     := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["ChatParentPtr"])
-        passiveTreePanel  := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["PassiveSkillTreePanel"])
-        mapParentPtr      := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["MapParentPtr"])
-        ctrlMapParentPtr  := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["ControllerModeMapParentPtr"])
+        chatParentPtr := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["ChatParentPtr"])
+        passiveTreePanel := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["PassiveSkillTreePanel"])
+        mapParentPtr := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["MapParentPtr"])
+        ctrlMapParentPtr := this.Mem.ReadPtr(gameUiPtr + PoE2Offsets.ImportantUiElements["ControllerModeMapParentPtr"])
 
         ; Pick the active map parent depending on controller mode
         activeMapParentPtr := (isControllerMode && this.IsProbablyValidPointer(ctrlMapParentPtr))
@@ -1200,13 +1200,13 @@ class PoE2GameStateReader extends PoE2InventoryReader
             : mapParentPtr
 
         largeMapPtr := 0
-        miniMapPtr  := 0
+        miniMapPtr := 0
         miniMapData := 0
         largeMapData := 0
         if this.IsProbablyValidPointer(activeMapParentPtr)
         {
             largeMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["LargeMapPtr"])
-            miniMapPtr  := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["MiniMapPtr"])
+            miniMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["MiniMapPtr"])
 
             ; Cache location can become stale (same issue as PassiveSkillTree).
             ; Fall back to navigating the children StdVector directly if both pointers are equal.
@@ -1216,7 +1216,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if this.IsProbablyValidPointer(childrenDataPtr)
                 {
                     largeMapPtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)  ; 1st child
-                    miniMapPtr  := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)  ; 2nd child
+                    miniMapPtr := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)  ; 2nd child
                 }
             }
 
@@ -1230,9 +1230,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; Strategy: check background alpha on chatParent and its first children (float4 .W and uint approach).
         ; Also check visibility flags as a secondary signal.
         chatAlphaFloat := 0.0
-        chatAlpha      := 0
-        isChatActive   := false
-        chatDebugInfo  := ""
+        chatAlpha := 0
+        isChatActive := false
+        chatDebugInfo := ""
         if this.IsProbablyValidPointer(chatParentPtr)
         {
             bgColorOffset := PoE2Offsets.UiElementBase["BackgroundColor"]
@@ -1241,8 +1241,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
             ; Read raw values at BackgroundColor offset from parent for diagnostics
             parentFloatW := this.Mem.ReadFloat(chatParentPtr + bgColorOffset + 12)
-            parentUint   := this.Mem.ReadUInt(chatParentPtr + bgColorOffset)
-            parentFlags  := this.Mem.ReadUInt(chatParentPtr + flagsOffset)
+            parentUint := this.Mem.ReadUInt(chatParentPtr + bgColorOffset)
+            parentFlags := this.Mem.ReadUInt(chatParentPtr + flagsOffset)
             parentVisible := (parentFlags >> 11) & 1
 
             bestAlpha := parentFloatW
@@ -1251,7 +1251,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
             ; Check children
             childrenFirst := this.Mem.ReadPtr(chatParentPtr + childrenFirstOffset)
-            childrenLast  := this.Mem.ReadPtr(chatParentPtr + childrenFirstOffset + A_PtrSize)
+            childrenLast := this.Mem.ReadPtr(chatParentPtr + childrenFirstOffset + A_PtrSize)
             childCount := 0
             if (this.IsProbablyValidPointer(childrenFirst) && this.IsProbablyValidPointer(childrenLast) && childrenLast > childrenFirst)
                 childCount := Min(Floor((childrenLast - childrenFirst) / A_PtrSize), 8)
@@ -1264,9 +1264,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if this.IsProbablyValidPointer(childPtr)
                 {
                     cFloatW := this.Mem.ReadFloat(childPtr + bgColorOffset + 12)
-                    cUint   := this.Mem.ReadUInt(childPtr + bgColorOffset)
-                    cFlags  := this.Mem.ReadUInt(childPtr + flagsOffset)
-                    cVis    := (cFlags >> 11) & 1
+                    cUint := this.Mem.ReadUInt(childPtr + bgColorOffset)
+                    cFlags := this.Mem.ReadUInt(childPtr + flagsOffset)
+                    cVis := (cFlags >> 11) & 1
                     chatDebugInfo .= " c" idx "F=" Round(cFloatW, 3) "/U=" Format("0x{:X}", cUint) "/V=" cVis
 
                     if (cFloatW > bestAlpha)
@@ -1285,26 +1285,26 @@ class PoE2GameStateReader extends PoE2InventoryReader
             }
 
             chatAlphaFloat := bestAlpha
-            chatAlpha      := Round(chatAlphaFloat * 255)
-            isChatActive   := chatAlpha >= 0x8C
+            chatAlpha := Round(chatAlphaFloat * 255)
+            isChatActive := chatAlpha >= 0x8C
         }
 
         return Map(
-            "chatParentPtr",              chatParentPtr,
-            "chatAlphaFloat",             chatAlphaFloat,
-            "chatAlpha",                  chatAlpha,
-            "isChatActive",               isChatActive,
-            "chatDebugInfo",              chatDebugInfo,
-            "passiveSkillTreePanel",      passiveTreePanel,
-            "passiveTreeVisible",         (this.IsProbablyValidPointer(passiveTreePanel)
-                                           && (this.Mem.ReadUInt(passiveTreePanel + PoE2Offsets.UiElementBase["Flags"]) >> 11) & 1) ? true : false,
-            "mapParentPtr",               mapParentPtr,
+            "chatParentPtr", chatParentPtr,
+            "chatAlphaFloat", chatAlphaFloat,
+            "chatAlpha", chatAlpha,
+            "isChatActive", isChatActive,
+            "chatDebugInfo", chatDebugInfo,
+            "passiveSkillTreePanel", passiveTreePanel,
+            "passiveTreeVisible", (this.IsProbablyValidPointer(passiveTreePanel)
+                && (this.Mem.ReadUInt(passiveTreePanel + PoE2Offsets.UiElementBase["Flags"]) >> 11) & 1) ? true : false,
+            "mapParentPtr", mapParentPtr,
             "controllerModeMapParentPtr", ctrlMapParentPtr,
-            "activeMapParentPtr",         activeMapParentPtr,
-            "largeMapPtr",                largeMapPtr,
-            "miniMapPtr",                 miniMapPtr,
-            "miniMapData",                miniMapData,
-            "largeMapData",               largeMapData
+            "activeMapParentPtr", activeMapParentPtr,
+            "largeMapPtr", largeMapPtr,
+            "miniMapPtr", miniMapPtr,
+            "miniMapData", miniMapData,
+            "largeMapData", largeMapData
         )
     }
 
@@ -1397,7 +1397,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
             flags := this.Mem.ReadUInt(elemPtr + flagsOffset)
             isVis := ((flags >> 11) & 1) ? true : false
-            visBaseline[structOffset] := {ptr: elemPtr, vis: isVis, flags: flags}
+            visBaseline[structOffset] := { ptr: elemPtr, vis: isVis, flags: flags }
 
             if isVis
                 visibleCount += 1
@@ -1490,7 +1490,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             structOff := elem["off"]
             flags := this.Mem.ReadUInt(elemPtr + flagsOffset)
             isVis := ((flags >> 11) & 1) ? true : false
-            visBaseline[structOff] := {ptr: elemPtr, vis: isVis, flags: flags}
+            visBaseline[structOff] := { ptr: elemPtr, vis: isVis, flags: flags }
         }
 
         this._visBaseline := visBaseline
@@ -1878,12 +1878,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
         Loop 10 {
             if !this.IsProbablyValidPointer(curPtr)
                 break
-            relX    := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["RelativePosition"])
-            relY    := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["RelativePosition"] + 4)
-            flags   := this.Mem.ReadUInt( curPtr + PoE2Offsets.UiElementBase["Flags"])
+            relX := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["RelativePosition"])
+            relY := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["RelativePosition"] + 4)
+            flags := this.Mem.ReadUInt(curPtr + PoE2Offsets.UiElementBase["Flags"])
             posModX := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["PositionModifier"])
             posModY := this.Mem.ReadFloat(curPtr + PoE2Offsets.UiElementBase["PositionModifier"] + 4)
-            parentP := this.Mem.ReadPtr(  curPtr + PoE2Offsets.UiElementBase["ParentPtr"])
+            parentP := this.Mem.ReadPtr(curPtr + PoE2Offsets.UiElementBase["ParentPtr"])
             chain.Push(Map(
                 "relX", relX, "relY", relY,
                 "flags", flags,
@@ -1904,9 +1904,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
             accX := chain[N]["relX"]    ; root starts from its own relPos
             accY := chain[N]["relY"]
             Loop N - 1 {
-                childIdx  := N - A_Index    ; walks N-1, N-2, …, 1
+                childIdx := N - A_Index    ; walks N-1, N-2, …, 1
                 parentIdx := childIdx + 1
-                child  := chain[childIdx]
+                child := chain[childIdx]
                 parent := chain[parentIdx]
                 if (child["flags"] >> 10) & 1 {    ; ShouldModifyPos = bit 10
                     accX += parent["posModX"]
@@ -1922,37 +1922,37 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ;   scaleIdx 1 → wScale = lMult*v1, hScale = lMult*v1
         ;   scaleIdx 2 → wScale = lMult*v2, hScale = lMult*v2
         ;   scaleIdx 3 → wScale = lMult*v1, hScale = lMult*v2  (most UI elements)
-        scaleIdx  := this.Mem.ReadUChar(mapElemPtr + PoE2Offsets.UiElementBase["ScaleIndex"])
+        scaleIdx := this.Mem.ReadUChar(mapElemPtr + PoE2Offsets.UiElementBase["ScaleIndex"])
         localMult := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["LocalScaleMultiplier"])
 
         ; ── Map element fields ─────────────────────────────────────────────────────
-        flags     := (N > 0) ? chain[1]["flags"] : 0
+        flags := (N > 0) ? chain[1]["flags"] : 0
         isVisible := (flags >> 11) & 1
-        sizeW     := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"])
-        sizeH     := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"] + 4)
-        shiftX    := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"])
-        shiftY    := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"] + 4)
+        sizeW := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"])
+        sizeH := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"] + 4)
+        shiftX := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"])
+        shiftY := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"] + 4)
         defShiftX := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["DefaultShift"])
         defShiftY := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["DefaultShift"] + 4)
-        zoom      := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Zoom"])
+        zoom := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Zoom"])
 
         return Map(
-            "ptr",           mapElemPtr,
-            "unscaledPosX",  accX,       ; UI-coord position (apply GameWindowScale to get screen pixels)
-            "unscaledPosY",  accY,
-            "scaleIdx",      scaleIdx,   ; for GameWindowScale lookup
-            "localMult",     localMult,
-            "flags",         flags,
-            "isVisible",     isVisible,
-            "sizeW",         sizeW,      ; unscaled element size (UI coords)
-            "sizeH",         sizeH,
-            "shiftX",        shiftX,     ; already in screen-pixel units (no additional scaling needed)
-            "shiftY",        shiftY,
+            "ptr", mapElemPtr,
+            "unscaledPosX", accX,       ; UI-coord position (apply GameWindowScale to get screen pixels)
+            "unscaledPosY", accY,
+            "scaleIdx", scaleIdx,   ; for GameWindowScale lookup
+            "localMult", localMult,
+            "flags", flags,
+            "isVisible", isVisible,
+            "sizeW", sizeW,      ; unscaled element size (UI coords)
+            "sizeH", sizeH,
+            "shiftX", shiftX,     ; already in screen-pixel units (no additional scaling needed)
+            "shiftY", shiftY,
             "defaultShiftX", defShiftX,
             "defaultShiftY", defShiftY,
-            "zoom",          zoom,
-            "chainDepth",    N,
-            "relX",          (N > 0) ? chain[1]["relX"] : 0   ; debug: element's own relPos
+            "zoom", zoom,
+            "chainDepth", N,
+            "relX", (N > 0) ? chain[1]["relX"] : 0   ; debug: element's own relPos
         )
     }
 
@@ -2115,19 +2115,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (areaHashKey != this._lastAreaInstanceAddr)
         {
             this._deadEntityBlacklist := Map()
-            this._everAliveAddrs      := Map()
-            this._targetableDeadMap   := Map()
-            this._targetableEverOn    := Map()
-            this._firstSeenTick       := Map()
-            this._posLastXY           := Map()
-            this._posFrozenSinceTick  := Map()
+            this._everAliveAddrs := Map()
+            this._targetableDeadMap := Map()
+            this._targetableEverOn := Map()
+            this._firstSeenTick := Map()
+            this._posLastXY := Map()
+            this._posFrozenSinceTick := Map()
             this._lastAreaInstanceAddr := areaHashKey
         }
 
         blacklist := this._deadEntityBlacklist
-        sample    := entitySummary["sample"]
+        sample := entitySummary["sample"]
         newSample := []
-        nowTick   := A_TickCount
+        nowTick := A_TickCount
         ; Filter signal counters for debug output
         dbgS1 := 0, dbgS2 := 0, dbgS3 := 0, dbgS4 := 0, dbgS5 := 0, dbgS6 := 0, dbgBL := 0
 
@@ -2140,7 +2140,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 continue
             }
 
-            addr   := entity.Has("address") ? entity["address"] : 0
+            addr := entity.Has("address") ? entity["address"] : 0
             rawPtr := (sampleEntry && sampleEntry.Has("entityRawPtr")) ? sampleEntry["entityRawPtr"] : 0
 
             ; Permanently blacklisted from a previous tick — drop immediately.
@@ -2177,11 +2177,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
             isMonster := entity.Has("path") && InStr(StrLower(entity["path"]), "metadata/monsters/")
             ; rarityId=3 = Unique/Boss: exempt from the targetable-dead timer because bosses have
             ; legitimate multi-second untargetable phases (phase transitions, invulnerability windows).
-            rarityId  := (entity.Has("decodedComponents") && entity["decodedComponents"].Has("rarityId"))
-                         ? entity["decodedComponents"]["rarityId"] : 0
-            isBoss    := (rarityId = 3)
+            rarityId := (entity.Has("decodedComponents") && entity["decodedComponents"].Has("rarityId"))
+                ? entity["decodedComponents"]["rarityId"] : 0
+            isBoss := (rarityId = 3)
 
-            dc          := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
+            dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
             lifeDecoded := (dc && dc.Has("life") && dc["life"] && Type(dc["life"]) = "Map")
 
             ; Normalize targetable to a tri-state boolean:
@@ -2198,11 +2198,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
             else
                 tgtBool := tgtRaw
             targetableOff := (tgtBool = false)
-            tgtFound      := (tgtBool = true || tgtBool = false)
+            tgtFound := (tgtBool = true || tgtBool = false)
 
-            isDead   := false
+            isDead := false
             hardDead := false
-            dbgSig   := 0
+            dbgSig := 0
 
             ; ── Dead-signal evaluation ──────────────────────────────────────────────────
             ; Signal 1: game engine cleared the isValid flag
@@ -2276,7 +2276,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if (shouldAdd && isMonster && !isBoss && addr > 0)
                 {
                     render := (dc && dc.Has("render") && dc["render"] && Type(dc["render"]) = "Map") ? dc["render"] : 0
-                    wp     := (render && render.Has("worldPosition")) ? render["worldPosition"] : 0
+                    wp := (render && render.Has("worldPosition")) ? render["worldPosition"] : 0
                     if (wp && wp.Has("x") && wp.Has("y"))
                     {
                         posKey := Round(wp["x"], 1) . "," . Round(wp["y"], 1)
@@ -2335,9 +2335,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
             ;  whose life component transiently fails to decode.)
         }
 
-        entitySummary["sample"]        := newSample
-        entitySummary["sampleCount"]   := newSample.Length
-        entitySummary["filterStats"]   := Map(
+        entitySummary["sample"] := newSample
+        entitySummary["sampleCount"] := newSample.Length
+        entitySummary["filterStats"] := Map(
             "s1", dbgS1, "s2", dbgS2, "s3", dbgS3, "s4", dbgS4, "s5", dbgS5, "s6", dbgS6,
             "bl", dbgBL, "blTotal", blacklist.Count,
             "preFilter", sample.Length, "postFilter", newSample.Length
@@ -2363,7 +2363,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         terrainMetaBase := areaInstanceAddress + PoE2Offsets.AreaInstance["TerrainMetadata"]
 
         firstPtr := this.Mem.ReadPtr(terrainMetaBase + PoE2Offsets.TerrainMetadata["GridWalkableData"])
-        lastPtr  := this.Mem.ReadPtr(terrainMetaBase + PoE2Offsets.TerrainMetadata["GridWalkableData"] + 8)
+        lastPtr := this.Mem.ReadPtr(terrainMetaBase + PoE2Offsets.TerrainMetadata["GridWalkableData"] + 8)
 
         if (!firstPtr || !lastPtr || lastPtr <= firstPtr)
         {
@@ -2374,10 +2374,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
             matchCount := 0
             loop 63
             {
-                off  := 0x18 + (A_Index - 1) * 4
-                fp2  := this.Mem.ReadPtr(terrainMetaBase + off)
-                lp2  := this.Mem.ReadPtr(terrainMetaBase + off + 8)
-                sz2  := lp2 - fp2
+                off := 0x18 + (A_Index - 1) * 4
+                fp2 := this.Mem.ReadPtr(terrainMetaBase + off)
+                lp2 := this.Mem.ReadPtr(terrainMetaBase + off + 8)
+                sz2 := lp2 - fp2
                 if (fp2 > 0x10000 && lp2 > fp2 && sz2 > 4096 && sz2 < 8 * 1024 * 1024)
                 {
                     ptrScan .= "[0x" Format("{:X}", off) ":sz=" sz2 "]"
@@ -2499,11 +2499,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         this._terrainLastError := "bprOff=" (foundBprOffset >= 0 ? "0x" Format("{:X}", foundBprOffset) : "brute")
         return Map(
-            "data",        buf,
+            "data", buf,
             "bytesPerRow", bytesPerRow,
-            "totalRows",   totalRows,
-            "dataSize",    buf.Size,
-            "gridWidth",   bytesPerRow * 2
+            "totalRows", totalRows,
+            "dataSize", buf.Size,
+            "gridWidth", bytesPerRow * 2
         )
     }
 
@@ -2528,12 +2528,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
             currentStateVecLast := this.Mem.ReadInt64(staticGameStatePtr + PoE2Offsets.GameState["CurrentStateVecLast"])
 
-            statesByIndex   := []
+            statesByIndex := []
             statesByAddress := Map()
             statesBase := staticGameStatePtr + PoE2Offsets.GameState["States"]
             loop 12
             {
-                idx       := A_Index - 1
+                idx := A_Index - 1
                 stateAddr := this.Mem.ReadPtr(statesBase + (idx * PoE2Offsets.GameState["StateEntrySize"]))
                 stateName := this.StateNames[A_Index]
                 statesByIndex.Push(Map("index", idx, "name", stateName, "address", stateAddr))
@@ -2570,7 +2570,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; Terrain walkability data — re-read when area hash changes, or retry every 3 s after a failed read.
         currentAreaHash := this.Mem.ReadUInt(areaInstanceData + PoE2Offsets.AreaInstance["CurrentAreaHash"])
         needsTerrainRead := (currentAreaHash != this._radarTerrainAreaHash)
-                         || (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 3000)
+            || (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 3000)
         if needsTerrainRead
         {
             this._radarTerrainRetryTick := nowTick
@@ -2621,9 +2621,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
 
         ; Player world position
-        playerInfoPtr     := areaInstanceData + PoE2Offsets.AreaInstance["PlayerInfo"]
+        playerInfoPtr := areaInstanceData + PoE2Offsets.AreaInstance["PlayerInfo"]
         localPlayerRawPtr := this.Mem.ReadPtr(playerInfoPtr + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
-        localPlayerPtr    := this.ResolveEntityPointer(localPlayerRawPtr)
+        localPlayerPtr := this.ResolveEntityPointer(localPlayerRawPtr)
         playerRenderComponent := this.ReadPlayerRenderComponent(localPlayerPtr)
 
         ; Player vitals — cached, re-read every 200ms (cheap: ~3 RPM)
@@ -2637,20 +2637,27 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
         t2 := A_TickCount  ; after player read
 
+        ; ── UI pointer resolution (einmalig pro Tick) ──────────────────────────────
+        ; uiRootStructPtr und activeGameUiPtr werden EINMAL gelesen und von beiden
+        ; Cache-Blöcken (UI-Cache 400ms + Panel-Visibility 200ms) geteilt.
+        uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
+        activeGameUiPtr := 0
+        isControllerMode := false
+        if this.IsProbablyValidPointer(uiRootStructPtr)
+        {
+            gameUiPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
+            gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
+            isControllerMode := (!gameUiPtr && gameUiControllerPtr)
+            activeGameUiPtr := isControllerMode ? gameUiControllerPtr : gameUiPtr
+        }
+
         ; Map UI element data — re-read only every 400ms to avoid expensive UI tree walk at 100ms.
         ; Map positions/zoom rarely change mid-frame; re-reading less often has no visible impact.
         if ((nowTick - this._radarUiCacheTick) > 400)
         {
-            uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
             importantUiElements := 0
-            if this.IsProbablyValidPointer(uiRootStructPtr)
-            {
-                gameUiPtr           := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
-                gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
-                isControllerMode    := (!gameUiPtr && gameUiControllerPtr)
-                activeGameUiPtr     := isControllerMode ? gameUiControllerPtr : gameUiPtr
+            if this.IsProbablyValidPointer(activeGameUiPtr)
                 importantUiElements := this.ReadImportantUiElements(activeGameUiPtr, isControllerMode)
-            }
             ; Preserve valid cache through GC blips — only replace when we got real data
             if (importantUiElements && IsObject(importantUiElements))
                 this._radarUiCache := importantUiElements
@@ -2658,27 +2665,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
 
         ; Panel visibility — re-read every 200ms.
-        ; Strategy: if user has saved panel offsets, use fast ReadKnownPanelVisibility
-        ; (just check those specific offsets — no scanning). Otherwise fall back to
-        ; heuristic scan (DiscoverPanelOffsets + ReadAllPanelVisibility).
         if ((nowTick - this._radarPanelVisCacheTick) > 200)
         {
-            if !IsSet(uiRootStructPtr)
-                uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
-            if this.IsProbablyValidPointer(uiRootStructPtr)
+            if this.IsProbablyValidPointer(activeGameUiPtr)
             {
-                if !IsSet(activeGameUiPtr)
-                {
-                    gameUiPtr           := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
-                    gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
-                    activeGameUiPtr     := (!gameUiPtr && gameUiControllerPtr) ? gameUiControllerPtr : gameUiPtr
-                }
                 this._lastActiveGameUiPtr := activeGameUiPtr
 
                 global g_panelDetectionEnabled
                 if (g_panelDetectionEnabled)
                 {
-                    ; Prefer fast known-offset check when user has saved panel offsets
                     if (PoE2Offsets.DiscoveredPanelOffsets.Count > 0)
                     {
                         freshPanelVis := this.ReadKnownPanelVisibility(activeGameUiPtr)
@@ -2715,14 +2710,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
                                 }
                             }
                             else
-                            {
                                 this._panelCleanSince := 0
-                            }
                         }
                     }
-
-                    ; Always run heuristic discovery for the Struct Diff Diagnostic tool,
-                    ; even if we use known offsets for actual panel detection.
+                    ; Discovery für Struct Diff Diagnostic (läuft nur einmalig)
                     if (!this._radarPanelDiscoveryDone)
                     {
                         this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
@@ -2748,9 +2739,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ;   3. Cheap-update EXISTING cached entities (position, life, targetable, flags)
         ;   4. Remove from cache entities no longer in the tree
         ; This finds ALL entities like the C# reference, not just a 40-entity sample.
-        entityListOffset   := PoE2Offsets.AreaInstance["AwakeEntities"]
-        awakeMapAddress    := areaInstanceData + entityListOffset
-        playerOrigin       := this.ExtractWorldPositionFromRenderComponent(playerRenderComponent)
+        entityListOffset := PoE2Offsets.AreaInstance["AwakeEntities"]
+        awakeMapAddress := areaInstanceData + entityListOffset
+        playerOrigin := this.ExtractWorldPositionFromRenderComponent(playerRenderComponent)
 
         ; Reset cache on area change
         if (currentAreaHash != this._radarEntityCacheAreaHash)
@@ -2903,7 +2894,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         cacheFillRatio := mapSize > 0 ? (cache.Count / mapSize) : 1.0
         isZoneLoading := (cacheFillRatio < 0.90)
         decodeBudgetMs := isZoneLoading ? 45 : 30
-        cheapBudgetMs  := isZoneLoading ? 10 : 30
+        cheapBudgetMs := isZoneLoading ? 10 : 30
 
         ; ── Phase 1: Classify entities (no RPM) ──────────────────────────
         newEntityList := []       ; [{id, rawPtr}, ...]
@@ -2939,12 +2930,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 {
                     entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
                     sampleEntry := Map(
-                        "id",           item["id"],
-                        "entityPtr",    entityPtr,
+                        "id", item["id"],
+                        "entityPtr", entityPtr,
                         "entityRawPtr", item["rawPtr"],
-                        "entity",       entityBasic,
-                        "distance",     this.ComputeDistance3DFromMaps(playerOrigin, entityPos),
-                        "priority",     this.ComputeSampleEntryPriority(entityBasic, 0)
+                        "entity", entityBasic,
+                        "distance", this.ComputeDistance3DFromMaps(playerOrigin, entityPos),
+                        "priority", this.ComputeSampleEntryPriority(entityBasic, 0)
                     )
                     cache[item["id"]] := sampleEntry
                     newDecodeCount += 1
@@ -2968,11 +2959,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 {
                     entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
                     cached := item["cached"]
-                    cached["entity"]       := entityBasic
-                    cached["entityPtr"]    := entityPtr
+                    cached["entity"] := entityBasic
+                    cached["entityPtr"] := entityPtr
                     cached["entityRawPtr"] := item["rawPtr"]
-                    cached["distance"]     := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
-                    cached["priority"]     := this.ComputeSampleEntryPriority(entityBasic, 0)
+                    cached["distance"] := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
+                    cached["priority"] := this.ComputeSampleEntryPriority(entityBasic, 0)
                     newDecodeCount += 1
                 }
             }
@@ -3126,8 +3117,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
                                 existing["worldX"] := worldX
                                 existing["worldY"] := worldY
                                 existing["worldZ"] := worldZ
-                                existing["gridX"]  := gridX
-                                existing["gridY"]  := gridY
+                                existing["gridX"] := gridX
+                                existing["gridY"] := gridY
                                 existing["refined"] := true
                                 refined := true
                                 break
@@ -3157,7 +3148,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; See _FilterStaleRadarEntities for the 5 dead signals used.
         ; fullAwakeRawPtrs enables the network-bubble check: entities removed from the AwakeMap
         ; are blacklisted on the very next tick regardless of what their HP memory reads.
-        awakeEntities    := this._FilterStaleRadarEntities(awakeEntities,    areaInstanceData, fullAwakeRawPtrs)
+        awakeEntities := this._FilterStaleRadarEntities(awakeEntities, areaInstanceData, fullAwakeRawPtrs)
         sleepingEntities := this._FilterStaleRadarEntities(sleepingEntities, areaInstanceData)
 
         ; Sync cache: remove entities that the stale filter blacklisted.
@@ -3188,29 +3179,29 @@ class PoE2GameStateReader extends PoE2InventoryReader
         try {
             fs := awakeEntities.Has("filterStats") ? awakeEntities["filterStats"] : 0
             if (fs && Type(fs) = "Map") {
-                filterPre  := fs.Has("preFilter") ? fs["preFilter"] : 0
+                filterPre := fs.Has("preFilter") ? fs["preFilter"] : 0
                 filterPost := fs.Has("postFilter") ? fs["postFilter"] : 0
-                filterBL   := fs.Has("blTotal") ? fs["blTotal"] : 0
+                filterBL := fs.Has("blTotal") ? fs["blTotal"] : 0
             }
         }
 
         ; Store sub-timings for display in status bar (all in ms).
         this.RadarTimings := Map(
-            "state",   t1 - t0,
-            "player",  t2 - t1,
-            "ui",      t3 - t2,
-            "awake",   t4 - t3,
-            "sleep",   t5 - t4,
-            "filter",  t6 - t5,
-            "total",   t6 - t0,
-            "cacheSize",  cache.Count,
-            "mapSize",    mapSize,
-            "newDecode",  newDecodeCount,
+            "state", t1 - t0,
+            "player", t2 - t1,
+            "ui", t3 - t2,
+            "awake", t4 - t3,
+            "sleep", t5 - t4,
+            "filter", t6 - t5,
+            "total", t6 - t0,
+            "cacheSize", cache.Count,
+            "mapSize", mapSize,
+            "newDecode", newDecodeCount,
             "cheapUpdate", cheapUpdateCount,
             "cacheErrors", cacheErrors,
-            "filterPre",  filterPre,
+            "filterPre", filterPre,
             "filterPost", filterPost,
-            "filterBL",   filterBL
+            "filterBL", filterBL
         )
 
         return Map(
@@ -3221,20 +3212,20 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "panelVisibility", this._radarPanelVisCache,
             "panelDiscovery", this._radarPanelDiscoveryResult,
             "inGameState", Map(
-                "address",             inGameStateAddress,
+                "address", inGameStateAddress,
                 "importantUiElements", this._radarUiCache,
-                "w2sMatrix",           w2sMatrix,
+                "w2sMatrix", w2sMatrix,
                 "areaInstance", Map(
-                    "address",               areaInstanceData,
-                    "localPlayerPtr",        localPlayerPtr,
+                    "address", areaInstanceData,
+                    "localPlayerPtr", localPlayerPtr,
                     "playerRenderComponent", playerRenderComponent,
-                    "awakeEntities",         awakeEntities,
-                    "sleepingEntities",      sleepingEntities,
-                    "terrain",               this._radarTerrainCache,
-                    "terrainError",          this._terrainLastError,
-                    "zoneScanResults",       this._ZoneScanAccumulatedArray(),
-                    "zoneScanDone",          this._zoneScanDone,
-                    "zoneScanTimingMs",      this._zoneScanTimingMs
+                    "awakeEntities", awakeEntities,
+                    "sleepingEntities", sleepingEntities,
+                    "terrain", this._radarTerrainCache,
+                    "terrainError", this._terrainLastError,
+                    "zoneScanResults", this._ZoneScanAccumulatedArray(),
+                    "zoneScanDone", this._zoneScanDone,
+                    "zoneScanTimingMs", this._zoneScanTimingMs
                 )
             )
         )
@@ -3262,10 +3253,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 DirCreate(outDir)
         }
         timestamp := FormatTime(A_Now, "yyyyMMdd_HHmmss")
-        outPath   := outDir "\radar_entity_debug_" timestamp ".tsv"
+        outPath := outDir "\radar_entity_debug_" timestamp ".tsv"
 
-        inGs  := (radarSnap && radarSnap.Has("inGameState")) ? radarSnap["inGameState"] : 0
-        area  := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        inGs := (radarSnap && radarSnap.Has("inGameState")) ? radarSnap["inGameState"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
         if !area
             return ""
 
@@ -3280,35 +3271,35 @@ class PoE2GameStateReader extends PoE2InventoryReader
             fullRawPtrs := this.ScanEntityMapRawPtrs(mapBase)
         }
 
-        blacklist  := this._deadEntityBlacklist
-        firstSeen  := this._firstSeenTick
+        blacklist := this._deadEntityBlacklist
+        firstSeen := this._firstSeenTick
         tgtDeadMap := this._targetableDeadMap
-        tgtEverOn  := this._targetableEverOn
+        tgtEverOn := this._targetableEverOn
 
-        awake    := area.Has("awakeEntities")    ? area["awakeEntities"]    : Map()
+        awake := area.Has("awakeEntities") ? area["awakeEntities"] : Map()
         sleeping := area.Has("sleepingEntities") ? area["sleepingEntities"] : Map()
 
         ; Build a diagnostic stats line: StdMap size, BFS pre/post filter counts, signal breakdown.
-        awakeFs  := (awake.Has("filterStats") && Type(awake["filterStats"]) = "Map")  ? awake["filterStats"]  : 0
-        sleepFs  := (sleeping.Has("filterStats") && Type(sleeping["filterStats"]) = "Map") ? sleeping["filterStats"] : 0
+        awakeFs := (awake.Has("filterStats") && Type(awake["filterStats"]) = "Map") ? awake["filterStats"] : 0
+        sleepFs := (sleeping.Has("filterStats") && Type(sleeping["filterStats"]) = "Map") ? sleeping["filterStats"] : 0
         awakeSize := awake.Has("size") ? awake["size"] : "?"
         statsLine := "; STATS awake: mapSize=" awakeSize
-                   . " preFilter=" (awakeFs ? awakeFs["preFilter"] : "?")
-                   . " postFilter=" (awakeFs ? awakeFs["postFilter"] : "?")
-                   . " s1(invalid)=" (awakeFs ? awakeFs["s1"] : "?")
-                   . " s2(hp=0)=" (awakeFs ? awakeFs["s2"] : "?")
-                   . " s3(lifeTgtGone)=" (awakeFs ? awakeFs["s3"] : "?")
-                   . " s5(tgtFlip)=" (awakeFs ? awakeFs["s5"] : "?")
-                   . " s6(frozen)=" (awakeFs ? awakeFs["s6"] : "?")
-                   . " bl(blacklisted)=" (awakeFs ? awakeFs["bl"] : "?")
-                   . " blTotal=" (awakeFs ? awakeFs["blTotal"] : "?")
-                   . "`n"
+            . " preFilter=" (awakeFs ? awakeFs["preFilter"] : "?")
+            . " postFilter=" (awakeFs ? awakeFs["postFilter"] : "?")
+            . " s1(invalid)=" (awakeFs ? awakeFs["s1"] : "?")
+            . " s2(hp=0)=" (awakeFs ? awakeFs["s2"] : "?")
+            . " s3(lifeTgtGone)=" (awakeFs ? awakeFs["s3"] : "?")
+            . " s5(tgtFlip)=" (awakeFs ? awakeFs["s5"] : "?")
+            . " s6(frozen)=" (awakeFs ? awakeFs["s6"] : "?")
+            . " bl(blacklisted)=" (awakeFs ? awakeFs["bl"] : "?")
+            . " blTotal=" (awakeFs ? awakeFs["blTotal"] : "?")
+            . "`n"
 
         header := "Timestamp`tAddress`tRawPtr`tPath`tRarityId`tIsValid`tLifeDecoded`tHPcur`tHPmax`tIsAlive`tTargetableRaw`tTargetableDecoded`tReaction`tInBlacklist`tFirstSeenMs`tTgtDeadCount`tInFullAwakeScan`tEverAlive`tTgtEverOn`tRenderDecoded`tWorldX`tWorldY`tFrozenMs`n"
-        rows   := ""
-        now    := FormatTime(A_Now, "HH:mm:ss")
+        rows := ""
+        now := FormatTime(A_Now, "HH:mm:ss")
 
-        awakeSample    := (awake.Has("sample"))    ? awake["sample"]    : []
+        awakeSample := (awake.Has("sample")) ? awake["sample"] : []
         sleepingSample := (sleeping.Has("sample")) ? sleeping["sample"] : []
 
         processSample(sampleList, sourceLabel)
@@ -3319,10 +3310,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if !entity
                     continue
 
-                addr   := entity.Has("address")    ? entity["address"]    : 0
+                addr := entity.Has("address") ? entity["address"] : 0
                 rawPtr := sampleEntry.Has("entityRawPtr") ? sampleEntry["entityRawPtr"] : 0
-                path   := entity.Has("path")        ? entity["path"]       : ""
-                isValid := entity.Has("isValid")   ? (entity["isValid"] ? 1 : 0) : "?"
+                path := entity.Has("path") ? entity["path"] : ""
+                isValid := entity.Has("isValid") ? (entity["isValid"] ? 1 : 0) : "?"
 
                 dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
 
@@ -3338,7 +3329,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                     if lStruct
                     {
                         HPcur := lStruct.Has("current") ? lStruct["current"] : ""
-                        HPmax := lStruct.Has("max")     ? lStruct["max"]     : ""
+                        HPmax := lStruct.Has("max") ? lStruct["max"] : ""
                     }
                     isAlive := lf.Has("isAlive") ? (lf["isAlive"] ? 1 : 0) : ""
                 }
@@ -3377,13 +3368,13 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if (dc && dc.Has("positioned") && dc["positioned"] && Type(dc["positioned"]) = "Map")
                     reaction := dc["positioned"].Has("reaction") ? dc["positioned"]["reaction"] : ""
 
-                rarityId    := (dc && dc.Has("rarityId")) ? dc["rarityId"] : ""
-                inBL        := (addr > 0 && blacklist.Has(addr))   ? 1 : 0
-                firstSeenMs := (addr > 0 && firstSeen.Has(addr))   ? (A_TickCount - firstSeen[addr]) : 0
-                tgtDead     := (addr > 0 && tgtDeadMap.Has(addr))  ? tgtDeadMap[addr] : 0
-                inFullScan  := (rawPtr > 0 && fullRawPtrs.Has(rawPtr)) ? 1 : 0
-                everAlive   := (addr > 0 && this._everAliveAddrs.Has(addr))  ? 1 : 0
-                tgtEverOnF  := (addr > 0 && tgtEverOn.Has(addr))   ? 1 : 0
+                rarityId := (dc && dc.Has("rarityId")) ? dc["rarityId"] : ""
+                inBL := (addr > 0 && blacklist.Has(addr)) ? 1 : 0
+                firstSeenMs := (addr > 0 && firstSeen.Has(addr)) ? (A_TickCount - firstSeen[addr]) : 0
+                tgtDead := (addr > 0 && tgtDeadMap.Has(addr)) ? tgtDeadMap[addr] : 0
+                inFullScan := (rawPtr > 0 && fullRawPtrs.Has(rawPtr)) ? 1 : 0
+                everAlive := (addr > 0 && this._everAliveAddrs.Has(addr)) ? 1 : 0
+                tgtEverOnF := (addr > 0 && tgtEverOn.Has(addr)) ? 1 : 0
 
                 renderDecoded := 0
                 worldX := ""
@@ -3403,11 +3394,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
                     frozenMs := A_TickCount - this._posFrozenSinceTick[addr]
 
                 rows .= now "`t" Format("0x{:X}", addr) "`t" Format("0x{:X}", rawPtr) "`t" path
-                     . "`t" rarityId "`t" isValid "`t" lifeDecoded "`t" HPcur "`t" HPmax
-                     . "`t" isAlive "`t" targetableRaw "`t" targetableDecoded "`t" reaction
-                     . "`t" inBL "`t" firstSeenMs "`t" tgtDead "`t" inFullScan
-                     . "`t" everAlive "`t" tgtEverOnF
-                     . "`t" renderDecoded "`t" worldX "`t" worldY "`t" frozenMs "`n"
+                    . "`t" rarityId "`t" isValid "`t" lifeDecoded "`t" HPcur "`t" HPmax
+                    . "`t" isAlive "`t" targetableRaw "`t" targetableDecoded "`t" reaction
+                    . "`t" inBL "`t" firstSeenMs "`t" tgtDead "`t" inFullScan
+                    . "`t" everAlive "`t" tgtEverOnF
+                    . "`t" renderDecoded "`t" worldX "`t" worldY "`t" frozenMs "`n"
             }
         }
         processSample(awakeSample, "awake")

@@ -1,0 +1,7 @@
+src/MemoryReader.ahk
+src/Memory/Offsets.json
+src/Entity/EntitySystem.ahk
+src/Entity/EntityReader.ahk
+src/Overlay/Overlay.ahk
+src/Overlay/DrawUtils.ahk
+src/GameHelper.ahk

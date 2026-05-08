@@ -8,6 +8,20 @@ SetWorkingDir(A_ScriptDir)
 #Include Lib/TerrainPathfinder.ahk
 #Include RadarOverlay.ahk
 #Include PlayerHUD.ahk
+#Include UiTreeBrowser.ahk
+#Include UiBrowserHandler.ahk
+
+/*
+Das Projekt mit all seinen Dateien in welchen ich entwickle befindet sich bei mir lokal unter "E:\PoE2GameHelper\"
+Für maximale Lesbarkeit sind sämtliche ahk Dateien so klein wie möglich zu halten.Sollten Sie feststellen, dass Sie mitterweile eine ganze Reihe an neuem Code zu einem bestimmten Bereich entwickelt haben, so ist dieser in eine neue ahk Datei zu verschieben und diese dann mittel #include einzubinden.
+Große Aufgaben in kleinere Teilschritte zerlegen und bei Bedarf klärende Fragen stellen.
+Erläutern Sie bei Ihrem Feedback den Denkprozess und weisen Sie auf Probleme und Möglichkeiten hin.
+Schritt für Schritt denken und bei komplexen Problemen die Überlegungen aufzeigen.
+Konkrete Beispiele verwenden.
+Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/bylafko/gamehelper2") geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
+Wenn Sie neue Funktionen anlegen, sollten diese vorab immer mit 2 bis 3 Zeilen kommentiert werden.Wofür ist die Funktion, welche Parameter benutzt sie und gibt es return Werte.
+Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen und dem bisherigen allgemeinen style folgen.
+*/
 
 GAMEHELPER_VERSION := "0.4.11.2"
 
@@ -27,19 +41,19 @@ g_autoFlaskLastReason := "idle"
 g_autoFlaskPerformanceMode := false
 g_pinnedNodePaths := []
 g_lastSnapshotForUi := 0
-g_radarEnabled  := true   ; whether radar overlay is active
-g_radarAlpha    := 255    ; overlay opacity (0=transparent, 255=opaque)
+g_radarEnabled := true   ; whether radar overlay is active
+g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions"  ; comma-separated open detail sections
-g_radarOverlay  := 0   ; lazy-init beim ersten Render-Aufruf
+g_radarOverlay := 0   ; lazy-init beim ersten Render-Aufruf
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
-g_playerHud     := 0   ; lazy-init on first render
+g_playerHud := 0   ; lazy-init on first render
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
-g_radarReadMs   := 0  ; Last ReadRadarSnapshot() duration (ms)
+g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
-g_radarFps      := 0  ; Achieved overlay frames per second
-g_profReadLastMs  := 0
-g_profReadAvgMs   := 0
-g_profTreeLastMs  := 0
+g_radarFps := 0  ; Achieved overlay frames per second
+g_profReadLastMs := 0
+g_profReadAvgMs := 0
+g_profTreeLastMs := 0
 g_profTotalLastMs := 0
 g_offsetTableRowPathByRow := Map()
 g_offsetPreviousValueByPath := Map()
@@ -54,9 +68,9 @@ g_showTreePane := true
 g_treeTabKeys := ["Overview", "Buffs", "Entities", "UI", "gameState"]
 g_activeTreeTabKey := "Overview"
 g_activeTreeTabIdx := 1
-g_webViewReady   := false
-g_bridge         := 0
-g_webGui           := 0
+g_webViewReady := false
+g_bridge := 0
+g_webGui := 0
 g_selectedNodePath := ""
 g_flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
 g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
@@ -75,30 +89,30 @@ g_lastSkillUseTime := 0
 g_combatSkillCooldowns := Map()
 
 ; Exploration Module
-g_exploreEnabled       := false
+g_exploreEnabled := false
 g_exploreTargetPercent := 80
 g_exploreCurrentPercent := 0.0
-g_exploreLastReason    := "idle"
+g_exploreLastReason := "idle"
 
 ; Radar Entity-Filter
 g_radarShowEnemyNormal := true
-g_radarShowEnemyRare   := true
-g_radarShowEnemyBoss   := true
+g_radarShowEnemyRare := true
+g_radarShowEnemyBoss := true
 g_radarShowMinions := true
-g_radarShowNpcs    := true
-g_radarShowChests  := true
+g_radarShowNpcs := true
+g_radarShowChests := true
 
 ; Entity selected in the Entities tab — radar draws a line to it
 g_highlightedEntityPath := ""
 
 ; Entities-Tab Type-Filter
-g_entityShowPlayer    := true
-g_entityShowMinion    := true
-g_entityShowEnemy     := true
-g_entityShowNPC       := true
-g_entityShowChest     := true
+g_entityShowPlayer := true
+g_entityShowMinion := true
+g_entityShowEnemy := true
+g_entityShowNPC := true
+g_entityShowChest := true
 g_entityShowWorldItem := true
-g_entityShowOther     := true
+g_entityShowOther := true
 
 ; Skills & Buffs blacklist
 g_skillBuffBlacklist := []
@@ -147,9 +161,9 @@ LoadExplorationConfig()
 RegisterCombatHotkey()
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
-g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , {DefaultWidth: g_winW, DefaultHeight: g_winH})
+g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , { DefaultWidth: g_winW, DefaultHeight: g_winH })
 g_webGui.OnEvent("Close", (*) => ExitApp())
-g_webGui.OnEvent("Size",  OnWebGuiSize)
+g_webGui.OnEvent("Size", OnWebGuiSize)
 g_webGui.Show()
 ; Restore saved outer-rect geometry (WinMove uses window rect, not client area)
 WinMove(g_winX, g_winY, g_winW, g_winH, "ahk_id " g_webGui.Hwnd)
@@ -167,7 +181,7 @@ try
     hIconSm := DllCall("LoadImage", "Ptr", 0, "Str", iconPath, "UInt", 1, "Int", 16, "Int", 16, "UInt", 0x10, "Ptr")
     hIconBig := DllCall("LoadImage", "Ptr", 0, "Str", iconPath, "UInt", 1, "Int", 32, "Int", 32, "UInt", 0x10, "Ptr")
     if hIconSm
-        SendMessage(0x0080, 0, hIconSm,  , "ahk_id " g_webGui.Hwnd)
+        SendMessage(0x0080, 0, hIconSm, , "ahk_id " g_webGui.Hwnd)
     if hIconBig
         SendMessage(0x0080, 1, hIconBig, , "ahk_id " g_webGui.Hwnd)
 }
@@ -216,7 +230,7 @@ UpdateStatusBar()
     global GAMEHELPER_VERSION
 
     patch := GetLastKnownPoeVersion()
-    now   := FormatTime(A_Now, "HH:mm:ss")
+    now := FormatTime(A_Now, "HH:mm:ss")
 
     leftText := "GameHelper v" GAMEHELPER_VERSION " for PoE2 v" (patch != "" ? patch : "—")
     rightText := "Last Updated: " now
@@ -270,7 +284,7 @@ OnWebMessage(wv, args, *)
         if !IsObject(data)
             return
         method := data.Has("method") ? data["method"] : ""
-        jargs  := data.Has("args")   ? data["args"]   : []
+        jargs := data.Has("args") ? data["args"] : []
         _DispatchBridgeCall(method, jargs)
     }
     catch as ex
@@ -296,7 +310,7 @@ ReadAndShow(forceTreeRefresh := false)
     g_readAndShowRunning := true
     totalStart := A_TickCount
     try
-        {
+    {
         global g_reader, g_valueTree, g_nodePaths, g_debugMode, g_updatesPaused, g_autoFlaskEnabled, g_flaskKeyLoadStatus, g_flaskKeyBySlot, g_showTreePane
         global g_lifeThresholdPercent, g_manaThresholdPercent, g_autoFlaskLastReason, autoFlaskStatusText, hotkeyLegendText, g_autoFlaskPerformanceMode, g_lastSnapshotForUi
         global g_treeRefreshRequested, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs
@@ -368,9 +382,9 @@ ReadAndShow(forceTreeRefresh := false)
             g_treeRefreshRequested := false
         }
         _totalLastMs := A_TickCount - totalStart
-        g_profReadLastMs  := _readLastMs
-        g_profReadAvgMs   := readAvgMs
-        g_profTreeLastMs  := _treeLastMs
+        g_profReadLastMs := _readLastMs
+        g_profReadAvgMs := readAvgMs
+        g_profTreeLastMs := _treeLastMs
         g_profTotalLastMs := _totalLastMs
         UpdateOffsetTable(snapshot)
         ; Push the active (tree) tab plus all special-tab data to the WebView UI.
@@ -437,19 +451,19 @@ RenderActiveTreeTab(snapshot, snapshotModeText, readAvgMs, readLastMs, treeLastM
     global g_radarReadMs, g_radarRenderMs
 
     title := "Updated: " FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-       . " | PID: " g_reader.Mem.Pid
-        " | Debug: " (g_debugMode ? "ON" : "OFF")
-        " | Updates: " (g_updatesPaused ? "PAUSED" : "LIVE")
-        " | AutoFlask: " (g_autoFlaskEnabled ? "ON" : "OFF")
-        " | AFPerf: " (g_autoFlaskPerformanceMode ? "ON" : "OFF")
-      . " | Snap: " snapshotModeText
-      . " | Profiling(ms): read=" readLastMs "(avg=" readAvgMs ") tree=" treeLastMs " total=" totalLastMs " radar=r" g_radarReadMs "+d" g_radarRenderMs
-      . " | EntityMode: " StrUpper(entityModeText)
-      . " | EntityOff: " entityOffsetText
-      . " | FallbackAgo: " entityFallbackAgeText
-      . " | L/M %: " g_lifeThresholdPercent "/" g_manaThresholdPercent
-      . " | Keys: " g_flaskKeyLoadStatus
-      . " | AF: " g_autoFlaskLastReason
+        . " | PID: " g_reader.Mem.Pid
+    " | Debug: " (g_debugMode ? "ON" : "OFF")
+    " | Updates: " (g_updatesPaused ? "PAUSED" : "LIVE")
+    " | AutoFlask: " (g_autoFlaskEnabled ? "ON" : "OFF")
+    " | AFPerf: " (g_autoFlaskPerformanceMode ? "ON" : "OFF")
+    . " | Snap: " snapshotModeText
+        . " | Profiling(ms): read=" readLastMs "(avg=" readAvgMs ") tree=" treeLastMs " total=" totalLastMs " radar=r" g_radarReadMs "+d" g_radarRenderMs
+        . " | EntityMode: " StrUpper(entityModeText)
+        . " | EntityOff: " entityOffsetText
+        . " | FallbackAgo: " entityFallbackAgeText
+        . " | L/M %: " g_lifeThresholdPercent "/" g_manaThresholdPercent
+        . " | Keys: " g_flaskKeyLoadStatus
+        . " | AF: " g_autoFlaskLastReason
 
     header := g_valueTree.Add(title)
     g_nodePaths[header] := "snapshot"
@@ -565,4 +579,4 @@ OnTreeTabChanged(*)
 #Include UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
-F3::OnF3DebugDump()
+F3:: OnF3DebugDump()

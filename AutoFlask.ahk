@@ -181,8 +181,8 @@ UpdateRadarFast()
         }
 
         ; Condition 6: Player render component present (truly in-game)
-        inGs         := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
-        area         := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
         playerRender := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
         if (overlayAllowed && !playerRender)
         {
@@ -279,12 +279,12 @@ UpdateRadarFast()
         if (g_radarEnabled && g_radarOverlay)
         {
             g_radarOverlay.ShowEnemyNormal := g_radarShowEnemyNormal
-            g_radarOverlay.ShowEnemyRare   := g_radarShowEnemyRare
-            g_radarOverlay.ShowEnemyBoss   := g_radarShowEnemyBoss
+            g_radarOverlay.ShowEnemyRare := g_radarShowEnemyRare
+            g_radarOverlay.ShowEnemyBoss := g_radarShowEnemyBoss
             g_radarOverlay.ShowMinions := g_radarShowMinions
-            g_radarOverlay.ShowNpcs    := g_radarShowNpcs
-            g_radarOverlay.ShowChests  := g_radarShowChests
-            g_radarOverlay.DebugMode   := g_debugMode
+            g_radarOverlay.ShowNpcs := g_radarShowNpcs
+            g_radarOverlay.ShowChests := g_radarShowChests
+            g_radarOverlay.DebugMode := g_debugMode
             g_radarOverlay._navEnabled := g_zoneNavEnabled
             g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
@@ -352,12 +352,12 @@ _UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
     if (pv && IsObject(pv) && pv.Has("stats"))
     {
         stats := pv["stats"]
-        lifeCur := stats.Has("lifeCurrent")  ? stats["lifeCurrent"]  : 0
-        lifeMax := stats.Has("lifeMax")      ? stats["lifeMax"]      : 1
-        manaCur := stats.Has("manaCurrent")  ? stats["manaCurrent"]  : 0
-        manaMax := stats.Has("manaMax")      ? stats["manaMax"]      : 1
-        esCur   := stats.Has("esCurrent")    ? stats["esCurrent"]    : 0
-        esMax   := stats.Has("esMax")        ? stats["esMax"]        : 0
+        lifeCur := stats.Has("lifeCurrent") ? stats["lifeCurrent"] : 0
+        lifeMax := stats.Has("lifeMax") ? stats["lifeMax"] : 1
+        manaCur := stats.Has("manaCurrent") ? stats["manaCurrent"] : 0
+        manaMax := stats.Has("manaMax") ? stats["manaMax"] : 1
+        esCur := stats.Has("esCurrent") ? stats["esCurrent"] : 0
+        esMax := stats.Has("esMax") ? stats["esMax"] : 0
 
         hudData["lifeCur"] := lifeCur
         hudData["lifeMax"] := lifeMax
@@ -365,15 +365,15 @@ _UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
         hudData["manaCur"] := manaCur
         hudData["manaMax"] := manaMax
         hudData["manaPct"] := manaMax > 0 ? (manaCur / manaMax) * 100 : 0
-        hudData["esCur"]   := esCur
-        hudData["esMax"]   := esMax
-        hudData["esPct"]   := esMax > 0 ? (esCur / esMax) * 100 : 0
+        hudData["esCur"] := esCur
+        hudData["esMax"] := esMax
+        hudData["esPct"] := esMax > 0 ? (esCur / esMax) * 100 : 0
     }
     else
     {
         hudData["lifeCur"] := 0, hudData["lifeMax"] := 0, hudData["lifePct"] := 0
         hudData["manaCur"] := 0, hudData["manaMax"] := 0, hudData["manaPct"] := 0
-        hudData["esCur"]   := 0, hudData["esMax"]   := 0, hudData["esPct"]   := 0
+        hudData["esCur"] := 0, hudData["esMax"] := 0, hudData["esPct"] := 0
     }
 
     WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
@@ -718,25 +718,33 @@ ResolvePoEWindow()
 ; Bypasses UIPI when the game runs elevated, unlike ControlSend/SendInput.
 ; Params: sendKey - AHK key name; gameHwnd - target window HWND
 ; Returns: true if key was sent
+; Sends a keystroke to the PoE2 window via keybd_event (Win32 API).
+; KeyDown is sent immediately; KeyUp is fired after KEY_UP_DELAY_MS via SetTimer.
+; Bypasses UIPI when the game runs elevated, unlike ControlSend/SendInput.
 SendFlaskKeyToGame(sendKey, gameHwnd)
 {
+    static KEY_UP_DELAY_MS := 20
+
     if (sendKey = "" || !gameHwnd)
         return false
 
-    ; Convert AHK key name → virtual key code
     vk := GetKeyVK(sendKey)
     if (!vk)
         return false
 
-    ; keybd_event: key down then key up (bypasses UIPI)
+    ; KeyDown sofort
     DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0, "uptr", 0)
-    Sleep(20)
-    DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0x0002, "uptr", 0)
+
+    ; KeyUp nach 20ms — nicht-blockierend über SetTimer
+    ; Closure capturt vk als Kopie (AHK v2: Variablen in Closures sind by-value captures)
+    keyUpFn := () => DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0x0002, "uptr", 0)
+    SetTimer(keyUpFn, -KEY_UP_DELAY_MS)   ; negativ = einmaliger Fire
+
     return true
 }
 
-; Opens the in-game chat (or reuses it if already open) and types a slash command, then submits it.
-; Reads isChatActive from the last snapshot to decide whether to open or clear the input first.
+; Opens the in-game chat and types a slash command — non-blocking version.
+; The three steps (open chat / clear, wait, send command) are chained via SetTimer.
 ; Params: cmd - slash command string, must begin with "/"
 ; Returns: true if the command was sent successfully
 SendChatSlashCommand(cmd)
@@ -752,43 +760,31 @@ SendChatSlashCommand(cmd)
 
     gameWin := "ahk_id " gameHwnd
 
-    ; IsChatActive aus dem letzten Snapshot lesen
     isChatActive := false
-    try
-    {
-        inGame  := (g_lastSnapshotForUi && g_lastSnapshotForUi.Has("inGameState")) ? g_lastSnapshotForUi["inGameState"] : 0
+    try {
+        inGame := (g_lastSnapshotForUi && g_lastSnapshotForUi.Has("inGameState")) ? g_lastSnapshotForUi["inGameState"] : 0
         uiElems := (inGame && inGame.Has("importantUiElements")) ? inGame["importantUiElements"] : 0
         if (uiElems && uiElems.Has("isChatActive"))
             isChatActive := uiElems["isChatActive"]
     }
-    catch
+
+    if isChatActive
     {
+        ; Chat schon offen: Ctrl+A + End, dann 30ms warten, dann Command senden
+        ControlSend("^a", , gameWin)
+        ControlSend("{End}", , gameWin)
+        sendFn := () => ControlSend(cmd "{Enter}", , gameWin)
+        SetTimer(sendFn, -30)
+    }
+    else
+    {
+        ; Chat öffnen, 100ms warten, dann Command senden
+        ControlSend("{Enter}", , gameWin)
+        sendFn := () => ControlSend(cmd "{Enter}", , gameWin)
+        SetTimer(sendFn, -100)
     }
 
-    try
-    {
-        if isChatActive
-        {
-            ; Chat ist offen: Ctrl+A um vorhandenen Text zu überschreiben
-            ControlSend("^a", , gameWin)
-            Sleep(30)
-            ControlSend("{End}", , gameWin)
-            Sleep(20)
-        }
-        else
-        {
-            ; Chat öffnen
-            ControlSend("{Enter}", , gameWin)
-            Sleep(100)
-        }
-
-        ControlSend(cmd "{Enter}", , gameWin)
-        return true
-    }
-    catch
-    {
-        return false
-    }
+    return true
 }
 
 ; Loads flask key bindings from a PoE2 config INI file and populates g_flaskKeyBySlot.
@@ -958,4 +954,3 @@ NormalizeConfigKeyToSend(rawKey)
 
     return key
 }
-

@@ -40,21 +40,21 @@ _DispatchBridgeCall(method, args)
             SetTimer(() => ApplyThresholdsFromUI(life, mana), -1)
         case "SetEntityFilter":
             etype := (args.Length >= 1) ? args[1] : ""
-            val   := (args.Length >= 2) ? args[2] : 0
-            bval  := (val = "true" || val = true || val = 1) ? true : false
+            val := (args.Length >= 2) ? args[2] : 0
+            bval := (val = "true" || val = true || val = 1) ? true : false
             SetTimer(() => _ApplyEntityFilter(etype, bval), -1)
         case "SetRadarFilter":
             type := (args.Length >= 1) ? args[1] : ""
-            val  := (args.Length >= 2) ? args[2] : 0
+            val := (args.Length >= 2) ? args[2] : 0
             bval := (val = "true" || val = true || val = 1) ? true : false
             switch type
             {
-                case "normal":  g_radarShowEnemyNormal := bval
-                case "rare":    g_radarShowEnemyRare   := bval
-                case "boss":    g_radarShowEnemyBoss   := bval
-                case "minions": g_radarShowMinions     := bval
-                case "npcs":    g_radarShowNpcs        := bval
-                case "chests":  g_radarShowChests      := bval
+                case "normal": g_radarShowEnemyNormal := bval
+                case "rare": g_radarShowEnemyRare := bval
+                case "boss": g_radarShowEnemyBoss := bval
+                case "minions": g_radarShowMinions := bval
+                case "npcs": g_radarShowNpcs := bval
+                case "chests": g_radarShowChests := bval
             }
             SetTimer(SaveConfig, -100)
         case "PinPath":
@@ -139,7 +139,7 @@ _DispatchBridgeCall(method, args)
                     }
                     catch
                     {
-                        
+
                     }
                 }
             }
@@ -287,7 +287,7 @@ _DispatchBridgeCall(method, args)
         case "GetSavedPanelOffsets":
             _PushSavedPanelOffsets()
 
-        ; ── Combat Automation ─────────────────────────────────────────────
+            ; ── Combat Automation ─────────────────────────────────────────────
         case "ToggleCombatAuto":
             SetTimer(_ToggleCombatAuto, -1)
         case "SetCombatRange":
@@ -314,7 +314,7 @@ _DispatchBridgeCall(method, args)
             ; args: [slotNum, key, priority, skillName, type, cooldownMs, enabled, skillRange]
             _ApplyCombatSlotConfig(args)
 
-        ; ── Exploration Module ────────────────────────────────────────────
+            ; ── Exploration Module ────────────────────────────────────────────
         case "ToggleExploration":
             global g_exploreEnabled, g_exploreLastReason
             g_exploreEnabled := !g_exploreEnabled
@@ -328,7 +328,7 @@ _DispatchBridgeCall(method, args)
             g_exploreTargetPercent := Max(10, Min(99, Integer(val)))
             SetTimer(() => SaveExplorationConfig(), -100)
 
-        ; ── Range circle overlay (temporary visualization while editing) ──
+            ; ── Range circle overlay (temporary visualization while editing) ──
         case "ShowRangeCircles":
             ; args: JSON-encoded array of {range, color, label} objects, or empty string to clear
             global g_radarOverlay
@@ -358,5 +358,25 @@ _DispatchBridgeCall(method, args)
                 pos := found + StrLen(entry)
             }
             g_radarOverlay.SetRangeCircles(circles)
+
+            ; ── UI Browser ────────────────────────────────────────────────────
+        case "UiBrowseRoot":
+            ToolTip("BridgeDispatch UiBrowseRoot reached!", 100, 50)
+            SetTimer(() => ToolTip(), -2000)
+            SetTimer(() => UiBrowseRoot(), -1)
+        case "UiBrowseParent":
+            SetTimer(() => UiBrowseParent(), -1)
+        case "UiBrowseBack":
+            SetTimer(() => UiBrowseBack(), -1)
+        case "UiBrowseChild":
+            idx := (args.Length >= 1) ? args[1] : 0
+            SetTimer(() => UiBrowseChild(idx), -1)
+        case "UiBrowseAddress":
+            hex := (args.Length >= 1) ? String(args[1]) : ""
+            if (hex != "")
+                SetTimer(() => UiBrowseAddress(hex), -1)
+        case "UiBrowseSearch":
+            q := (args.Length >= 1) ? String(args[1]) : ""
+            SetTimer(() => UiBrowseSearch(q), -1)
     }
 }

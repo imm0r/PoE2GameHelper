@@ -5,6 +5,7 @@
 		}
 	],
 	"settings": {
-		"github.copilot.chat.agentDebugLog.enabled": true
+		"github.copilot.chat.agentDebugLog.enabled": true,
+		"css.validate": false
 	}
 }
