@@ -407,16 +407,17 @@ class RadarOverlay
 
         ; ── UI Browser highlight — red border around selected UI element ──────
         global g_uiBrowserHighlight
-        if g_uiBrowserHighlight
+        if IsObject(g_uiBrowserHighlight)
         {
-            sfX := gameWindowWidth  / 2560.0
-            sfY := gameWindowHeight / 1600.0
-            hx := Round(g_uiBrowserHighlight["x"] * sfX)
-            hy := Round(g_uiBrowserHighlight["y"] * sfY)
-            hw := Round(g_uiBrowserHighlight["w"] * sfX)
-            hh := Round(g_uiBrowserHighlight["h"] * sfY)
+            ; PoE2 UI uses uniform scaling based on window height (1600-unit base).
+            ; Both axes use the same scale factor so elements aren't stretched.
+            sf := gameWindowHeight / 1600.0
+            hx := Round(g_uiBrowserHighlight["x"] * sf)
+            hy := Round(g_uiBrowserHighlight["y"] * sf)
+            hw := Round(g_uiBrowserHighlight["w"] * sf)
+            hh := Round(g_uiBrowserHighlight["h"] * sf)
             if (hw > 4 && hh > 4)
-                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 2)   ; 0x0000FF = red (BGR)
+                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)   ; 0x0000FF = red (BGR), 3px pen
         }
 
         this._Blit(gameWindowWidth, gameWindowHeight)

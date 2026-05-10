@@ -18,7 +18,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
-        global g_playerHudEnabled, g_playerHud, g_uiBrowserCurrentPtr
+        global g_playerHudEnabled, g_playerHud
         if g_updatesPaused
         {
             if g_radarOverlay
@@ -198,6 +198,13 @@ UpdateRadarFast()
             _debugPanelPushTick := A_TickCount
         }
 
+        ; ── UI Browser inspect mode overrides all hide conditions ────────────
+        ; When a highlight is active the user is actively inspecting an element;
+        ; show the overlay regardless of map state, panels, or focus.
+        global g_uiBrowserHighlight
+        if IsObject(g_uiBrowserHighlight)
+            overlayAllowed := true
+
         ; ── Hide overlays if conditions not met ──────────────────────────────
         ; GC-susceptible conditions (no-largemap, no-player) get a grace period
         ; to avoid flicker from brief memory read failures.
@@ -252,11 +259,13 @@ UpdateRadarFast()
 
         if !WinActive("ahk_id " gameHwnd)
         {
-            ; Keep rendering when UI Browser is active (user clicks in GameHelper, not game)
+            ; Keep rendering when our own tool window is focused (user clicks in GameHelper)
             ; or when range circles are set (config preview mode).
+            ; Any other window in focus → hide.
+            global g_webGui
             hasCircles := (g_radarOverlay && g_radarOverlay._rangeCircles.Length > 0)
-            uiBrowserActive := (g_uiBrowserCurrentPtr != 0)
-            if (!hasCircles && !uiBrowserActive)
+            toolFocused := IsObject(g_webGui) && WinActive("ahk_id " g_webGui.Hwnd)
+            if (!hasCircles && !toolFocused)
             {
                 if g_radarOverlay
                     g_radarOverlay.Hide()
