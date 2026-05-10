@@ -318,30 +318,87 @@ PushUiBrowserState()
         }
         chJson .= "]"
 
+        ; Index path (root → element) like [1, 41, 1]
+        idxPath := UiTree_GetIndexPath(g_reader, g_uiBrowserRootPtr, g_uiBrowserCurrentPtr)
+        ipJson := "["
+        for i, ix in idxPath {
+            if (i > 1)
+                ipJson .= ","
+            ipJson .= ix
+        }
+        ipJson .= "]"
+
+        ; Compute Screen Pos and per-axis scale factors (need game window size)
+        gwW := 0, gwH := 0
+        try {
+            gameHwnd := ResolvePoEWindow()
+            if gameHwnd
+                WinGetPos(, , &gwW, &gwH, "ahk_id " gameHwnd)
+        }
+        screenPosX := 0.0, screenPosY := 0.0
+        try {
+            sp := UiTree_GetScreenPos(g_reader, g_uiBrowserCurrentPtr)
+            screenPosX := sp["x"]
+            screenPosY := sp["y"]
+        }
+        ; Computed scale based on Scale Index. PoE2 design res = 2560x1600.
+        sf := (gwH > 0) ? (gwH / 1600.0) : 1.0
+        sfX := (gwW > 0) ? (gwW / 2560.0) : 1.0
+        scIdx := elem["scaleIndex"]
+        if (scIdx = 1)
+            cs := sfX, csY := sfX, scLabel := "Width/Width"
+        else if (scIdx = 2)
+            cs := sf,  csY := sf,  scLabel := "Height/Height"
+        else if (scIdx = 3)
+            cs := sfX, csY := sf,  scLabel := "Width/Height"
+        else
+            cs := 1.0, csY := 1.0, scLabel := "None"
+
+        screenSizeW := elem["sizeW"] * cs
+        screenSizeH := elem["sizeH"] * csY
+        ; Screen Pos in pixels = computed UI-space pos * height-scale (matches game projection)
+        screenPxX := screenPosX * sf
+        screenPxY := screenPosY * sf
+
         ; Build props JSON — use _UibF() for floats to avoid locale-specific decimal comma
         sid := StrReplace(elem["stringId"], "\", "\\")
         sid := StrReplace(sid, '"', '\"')
         fnt := StrReplace(elem["fontName"], "\", "\\")
         fnt := StrReplace(fnt, '"', '\"')
+        scLabelJ := StrReplace(scLabel, '"', '\"')
         propsJson := '{'
             . '"address":"' . Format("0x{:X}", g_uiBrowserCurrentPtr) . '"'
             . ',"stringId":"' . sid . '"'
             . ',"fontName":"' . fnt . '"'
             . ',"isVisible":' . (elem["isVisible"] ? "true" : "false")
+            . ',"shouldModifyPos":' . (elem["shouldModifyPos"] ? "true" : "false")
             . ',"childCount":' . elem["childCount"]
             . ',"flags":"' . Format("0x{:08X}", elem["flags"]) . '"'
             . ',"relX":' . _UibF(elem["relX"], 2)
             . ',"relY":' . _UibF(elem["relY"], 2)
+            . ',"posModX":' . _UibF(elem["posModX"], 2)
+            . ',"posModY":' . _UibF(elem["posModY"], 2)
+            . ',"unscaledPosX":' . _UibF(screenPosX, 2)
+            . ',"unscaledPosY":' . _UibF(screenPosY, 2)
+            . ',"screenPosX":' . _UibF(screenPxX, 2)
+            . ',"screenPosY":' . _UibF(screenPxY, 2)
             . ',"sizeW":' . _UibF(elem["sizeW"], 1)
             . ',"sizeH":' . _UibF(elem["sizeH"], 1)
-            . ',"scaleIndex":' . elem["scaleIndex"]
+            . ',"screenSizeW":' . _UibF(screenSizeW, 1)
+            . ',"screenSizeH":' . _UibF(screenSizeH, 1)
+            . ',"scaleIndex":' . scIdx
+            . ',"scaleLabel":"' . scLabelJ . '"'
+            . ',"computedScaleW":' . _UibF(cs, 4)
+            . ',"computedScaleH":' . _UibF(csY, 4)
             . ',"localMult":' . _UibF(elem["localMult"], 4)
             . ',"vtable":"' . Format("0x{:X}", elem["vtable"]) . '"'
             . ',"parentPtr":"' . Format("0x{:X}", elem["parentPtr"]) . '"'
+            . ',"bgColor":"' . Format("0x{:08X}", elem["bgColor"]) . '"'
             . '}'
 
         payload := '{'
             . '"breadcrumb":' . bcJson
+            . ',"indexPath":' . ipJson
             . ',"children":' . chJson
             . ',"props":' . propsJson
             . ',"canBack":' . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
