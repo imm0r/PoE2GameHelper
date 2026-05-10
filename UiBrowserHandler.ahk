@@ -215,11 +215,9 @@ UiBrowseSearch(query)
             }
         }
         rows := "["
-        first := true
-        for _, r in results {
-            if !first
+        for i, r in results {
+            if (i > 1)
                 rows .= ","
-            first := false
             sid := StrReplace(r["stringId"], "\", "\\")
             sid := StrReplace(sid, '"', '\"')
             rows .= '{"ptr":"' . Format("0x{:X}", r["ptr"]) . '"'
@@ -295,10 +293,9 @@ PushUiBrowserState()
 
         ; Build breadcrumb JSON
         bcJson := "["
-        first := true
-        for _, b in breadcrumb {
-            if !first bcJson .= ","
-                first := false
+        for i, b in breadcrumb {
+            if (i > 1)
+                bcJson .= ","
             sid := StrReplace(b["stringId"], "\", "\\")
             sid := StrReplace(sid, '"', '\"')
             bcJson .= '{"ptr":"' . Format("0x{:X}", b["ptr"]) . '","stringId":"' . sid . '"}'
@@ -307,10 +304,9 @@ PushUiBrowserState()
 
         ; Build children JSON
         chJson := "["
-        first := true
-        for _, c in children {
-            if !first chJson .= ","
-                first := false
+        for i, c in children {
+            if (i > 1)
+                chJson .= ","
             sid := StrReplace(c["stringId"], "\", "\\")
             sid := StrReplace(sid, '"', '\"')
             chJson .= '{"idx":' . c["idx"]
