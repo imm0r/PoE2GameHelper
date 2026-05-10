@@ -121,6 +121,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._radarTerrainAreaHash := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
         this._radarTerrainRetryTick := 0            ; tick of last failed-read retry attempt
         this._terrainLastError := ""           ; last ReadTerrainData failure reason
+        this._terrainDumpAreaHash := 0xFFFFFFFF   ; throttle: terrain hex dump appended at most once per zone
 
         ; World area data cache (town/hideout flags) — re-read on zone change.
         this._radarWorldAreaCache := 0
@@ -2367,6 +2368,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         if (!firstPtr || !lastPtr || lastPtr <= firstPtr)
         {
+            ; Fast-path for the common "still loading" state: when both ptrs are null the
+            ; expensive 63-offset scan and hex dump are pure waste — terrain isn't populated
+            ; yet, just bail and let the caller retry in 1.5 s.
+            if (!firstPtr && !lastPtr)
+            {
+                this._terrainLastError := "loading (ptrs null)"
+                return 0
+            }
+
             ; Pointer-pair scan: find where GridWalkableData StdVector actually is.
             ; Step by 4 (not 8) to catch any alignment, since the actual offset may not
             ; be 8-byte-aligned from the struct base. Covers offsets 0x18..0x10C.
@@ -2387,8 +2397,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 }
             }
             ; When no ptr pairs found, dump the raw TerrainStruct bytes to a debug file.
-            if (ptrScan = "")
+            ; Throttle: at most one dump per area-hash so we don't spam I/O while terrain
+            ; is loading (which can be 30-90 s on some maps).
+            if (ptrScan = "" && this._terrainDumpAreaHash != this._radarTerrainAreaHash)
             {
+                this._terrainDumpAreaHash := this._radarTerrainAreaHash
                 try {
                     dumpBuf := this.Mem.ReadBytes(terrainMetaBase, 0x120, false)
                     if (dumpBuf && dumpBuf.Size >= 0x120)
@@ -2411,7 +2424,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 }
             }
             this._terrainLastError := "bad-vec fp=0x" Format("{:X}", firstPtr) " lp=0x" Format("{:X}", lastPtr)
-                . (ptrScan != "" ? " ptrs=" ptrScan : " no-ptrs (see debug\terrain_dump.txt)")
+                . (ptrScan != "" ? " ptrs=" ptrScan : " no-ptrs")
             return 0
         }
 
@@ -2567,10 +2580,20 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if !this.IsProbablyValidPointer(areaInstanceData)
             return 0
 
-        ; Terrain walkability data — re-read when area hash changes, or retry every 3 s after a failed read.
+        ; Terrain walkability data — re-read on zone change or retry every 1.5 s after a failed read.
+        ; The previous logic kept (hashChanged || retry-3s) ORed, so as long as the hash differed AND
+        ; ReadTerrainData failed, every 50 ms tick would re-attempt — burning RPM calls and (when the
+        ; struct ptrs are still null) appending a hex dump to terrain_dump.txt 20×/s. After zone change
+        ; the game can take 30-90 s to populate the terrain struct; by locking the new hash immediately
+        ; even on failure we drop the retry rate to once per 1.5 s.
         currentAreaHash := this.Mem.ReadUInt(areaInstanceData + PoE2Offsets.AreaInstance["CurrentAreaHash"])
-        needsTerrainRead := (currentAreaHash != this._radarTerrainAreaHash)
-            || (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 3000)
+        if (currentAreaHash != this._radarTerrainAreaHash)
+        {
+            this._radarTerrainCache := 0
+            this._radarTerrainAreaHash := currentAreaHash
+            this._radarTerrainRetryTick := 0   ; force first attempt immediately
+        }
+        needsTerrainRead := (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 1500)
         if needsTerrainRead
         {
             this._radarTerrainRetryTick := nowTick
@@ -2578,10 +2601,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             try terrainResult := this.ReadTerrainData(areaInstanceData)
             catch
                 terrainResult := 0
-            this._radarTerrainCache := terrainResult
-            ; Only lock in the area hash when we have a valid result — on failure we retry in 3 s.
             if terrainResult
-                this._radarTerrainAreaHash := currentAreaHash
+                this._radarTerrainCache := terrainResult
         }
 
         ; World area data (town/hideout flags) — re-read only on zone change (area hash).
