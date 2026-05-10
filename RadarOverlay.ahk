@@ -238,6 +238,9 @@ class RadarOverlay
             hy := Round(g_uiBrowserHighlight["y"] * sf)
             hw := Round(g_uiBrowserHighlight["w"] * sf)
             hh := Round(g_uiBrowserHighlight["h"] * sf)
+            ; DIAG: confirm render path
+            ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, , , 19)
+            SetTimer(() => ToolTip(,,, 19), -3000)
             if (hw > 4 && hh > 4)
                 this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
         }

@@ -350,8 +350,13 @@ PushUiBrowserState()
             pos := UiTree_GetScreenPos(g_reader, g_uiBrowserCurrentPtr)
             g_uiBrowserHighlight := Map("x", pos["x"], "y", pos["y"],
                                         "w", elem["sizeW"], "h", elem["sizeH"])
-        } catch {
+            ; DIAG: confirm data path
+            ToolTip("UIH set: x=" Round(pos["x"]) " y=" Round(pos["y"]) " w=" Round(elem["sizeW"]) " h=" Round(elem["sizeH"]), , , 18)
+            SetTimer(() => ToolTip(,,, 18), -3000)
+        } catch as hEx {
             g_uiBrowserHighlight := 0
+            ToolTip("UIH FAIL: " hEx.Message, , , 18)
+            SetTimer(() => ToolTip(,,, 18), -3000)
         }
 
         WebViewExec("updateUiBrowser(" . _JsStr(payload) . ")")
