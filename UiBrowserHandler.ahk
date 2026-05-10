@@ -337,15 +337,6 @@ PushUiBrowserState()
             . ',"parentPtr":"' . Format("0x{:X}", elem["parentPtr"]) . '"'
             . '}'
 
-        payload := '{'
-            . '"breadcrumb":' . bcJson
-            . ',"children":' . chJson
-            . ',"props":' . propsJson
-            . ',"probedStrings":' . psJson
-            . ',"canBack":' . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
-            . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
-            . '}'
-
         ; Probe element header for StdWStrings at every 8-byte offset — helps locate
         ; the correct StringId offset after game patches shift struct layouts.
         psJson := "[]"
@@ -361,6 +352,15 @@ PushUiBrowserState()
             }
             psJson .= "]"
         }
+
+        payload := '{'
+            . '"breadcrumb":' . bcJson
+            . ',"children":' . chJson
+            . ',"props":' . propsJson
+            . ',"probedStrings":' . psJson
+            . ',"canBack":' . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
+            . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
+            . '}'
 
         ; Update overlay highlight BEFORE WebViewExec so outer catch can't clear it.
         try {
