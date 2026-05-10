@@ -2488,6 +2488,18 @@
     <div class="tab-panel" id="panel-debug">
       <div class="cfg-scroll">
         <div class="cfg-section">
+          <details id="det-radar-debug" open>
+            <summary>
+              <div class="cfg-header">📊 Radar Render Debug</div>
+            </summary>
+            <div style="padding:6px 0;display:flex;gap:8px;align-items:center;font-size:11px">
+              <span id="radar-debug-state" style="color:var(--subtext)">DebugMode disabled — toggle in Config tab</span>
+              <button class="tree-tbtn" onclick="copyRadarDebug()" style="font-size:11px;margin-left:auto">📋 Copy</button>
+            </div>
+            <pre id="radar-debug-content" style="margin:0;padding:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;font-family:Consolas,monospace;font-size:11px;color:#d8d8d8;white-space:pre-wrap;word-break:break-all;user-select:text;min-height:40px">(no data)</pre>
+          </details>
+        </div>
+        <div class="cfg-section">
           <details id="det-debug-panels" open>
             <summary>
               <div class="cfg-header">🎛 Panel Visibility (Live)</div>
@@ -3585,6 +3597,39 @@
     //  DEBUG TAB — Panel Visibility & Discovery
     // ═══════════════════════════════════════════════════════════════════
     let _lastPanelDiscovery = null;
+
+    function updateRadarDebug(jsonStr) {
+      let data;
+      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }
+      if (!data) return;
+      const stateEl = document.getElementById('radar-debug-state');
+      const contentEl = document.getElementById('radar-debug-content');
+      if (!stateEl || !contentEl) return;
+      if (!data.enabled) {
+        stateEl.textContent = 'DebugMode disabled — toggle in Config tab';
+        stateEl.style.color = 'var(--subtext)';
+        contentEl.textContent = '(disabled)';
+        return;
+      }
+      stateEl.textContent = `read=${data.readMs ?? 0}ms · render=${data.renderMs ?? 0}ms · updated ${new Date().toLocaleTimeString()}`;
+      stateEl.style.color = '#7be07b';
+      const lines = (data.lines || []).map(l => l.text).filter(Boolean);
+      contentEl.textContent = lines.length ? lines.join('\n') : '(no debug lines yet)';
+    }
+    function copyRadarDebug() {
+      const el = document.getElementById('radar-debug-content');
+      if (!el) return;
+      const text = el.textContent || '';
+      try { navigator.clipboard.writeText(text); }
+      catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    }
 
     function updateDebugPanels(jsonStr) {
       let data; try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }

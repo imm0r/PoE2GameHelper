@@ -138,6 +138,10 @@ class RadarOverlay
         this._mapHackGridH        := 0     ; grid height covered by bitmap
         this._mapHackTerrainSz    := 0     ; terrain data size — only updated on successful generate
         this._mapHackRetryTick    := 0     ; tick of last regenerate attempt (for retry throttle)
+
+        ; Debug lines — collected each Render() when DebugMode is on, pushed to WebView
+        ; (Debug tab) instead of being drawn on the overlay so they're copyable.
+        this._debugLines := Map()
     }
 
     ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
@@ -226,8 +230,9 @@ class RadarOverlay
         awakeEntityCount    := (areaInstance && areaInstance.Has("awakeEntities") && areaInstance["awakeEntities"].Has("sampleCount"))
                                ? areaInstance["awakeEntities"]["sampleCount"] : "?"
 
-        ; ── Status lines at bottom-center (debug only) ─────────────────────────────────
-        dbgX := gameWindowWidth // 2 - 400
+        ; ── Status (debug only) — collected for the WebView Debug tab, no overlay draw ──
+        dbgX := 0   ; kept for backward-compatible math; no longer used for text
+        this._debugLines := Map()   ; reset each frame
         if this.DebugMode
         {
             miniMapSize    := miniMapData  ? (Round(miniMapData["sizeW"])  "x" Round(miniMapData["sizeH"]))  : "no-mm"
@@ -241,13 +246,11 @@ class RadarOverlay
                 : ("terr:NIL" (terrainError != "" ? " (" terrainError ")" : ""))
             mhDbg := " mh:" ((this._mapHackDC && this._mapHackMask) ? "OK" : "NIL")
                 . "(sz=" this._mapHackTerrainSz " w=" this._mapHackW " h=" this._mapHackH ")"
-            terrDbg .= mhDbg
-            this._DrawText(dbgX, gameWindowHeight - 80,
-                "area:" (areaInstance?"OK":"NIL") " pr:" (hasPlayerPosition?"OK":"NIL") " ent:" awakeEntityCount
-                " mm:" miniMapSize "[" miniMapVisible "]" " upos:" miniMapPos " lm:" largeMapSize "[" largeMapVisible "]"
-                " " terrDbg,
-                0x00FFFF)
-            this._DrawDot(8, 8, 0xFFFFFF, 5)   ; weißer Punkt = Overlay läuft
+            this._debugLines["status"] := "area:" (areaInstance?"OK":"NIL")
+                . " pr:" (hasPlayerPosition?"OK":"NIL") " ent:" awakeEntityCount
+                . " mm:" miniMapSize "[" miniMapVisible "]" " upos:" miniMapPos
+                . " lm:" largeMapSize "[" largeMapVisible "]"
+                . " " terrDbg . mhDbg
         }
 
         if !hasPlayerPosition
@@ -318,13 +321,14 @@ class RadarOverlay
                 this._pathHlEntity        := this.highlightedEntityPath
                 this._pathLastComputeTick := A_TickCount
             }
-            ; Always show path status when entity is highlighted
-            this._DrawText(dbgX, gameWindowHeight - 65,
-                "path: pG=" pGX "," pGY " eG=" eGX "," eGY
-                " pts=" this._pathGridCoords.Length
-                " terrain=" (this._terrain ? "OK" : "NIL")
-                " dbg=" this._pathfinder.LastDebug,
-                0x00FF00)
+            ; Always collect path status when entity is highlighted (shown in WebView debug tab)
+            if this.DebugMode
+            {
+                this._debugLines["path"] := "path: pG=" pGX "," pGY " eG=" eGX "," eGY
+                    . " pts=" this._pathGridCoords.Length
+                    . " terrain=" (this._terrain ? "OK" : "NIL")
+                    . " dbg=" this._pathfinder.LastDebug
+            }
         }
         else if (this.highlightedEntityPath = "")
             this._pathGridCoords := []
@@ -407,7 +411,7 @@ class RadarOverlay
             this._navTargetIdx  := -1
         }
 
-        ; Debug: show zone scan status
+        ; Debug: collect zone scan status for the WebView debug tab
         if (this.DebugMode)
         {
             if (zoneScanResults.Length > 0 || zoneScanDone)
@@ -416,14 +420,12 @@ class RadarOverlay
                 for _, t in zoneScanResults
                     if (t["type"] = "AreaTransition")
                         atCount += 1
-                this._DrawText(dbgX, gameWindowHeight - 95,
-                    "nav: accum=" zoneScanResults.Length " AT=" atCount " path=" this._navPathCoords.Length
-                    " initMs=" zoneScanMs,
-                    0xFFD700)
+                this._debugLines["nav"] := "nav: accum=" zoneScanResults.Length " AT=" atCount
+                    . " path=" this._navPathCoords.Length " initMs=" zoneScanMs
             }
             else if (this._navEnabled)
             {
-                this._DrawText(dbgX, gameWindowHeight - 95, "nav: scanning...", 0xFFD700)
+                this._debugLines["nav"] := "nav: scanning..."
             }
         }
 
@@ -527,19 +529,17 @@ class RadarOverlay
         if (!(mapZoom > 0) || mapZoom > 20)
             mapZoom := 0.5
 
-        ; ── DEBUG: Mittelpunkt und Info ──────────────────────────────────────────
+        ; ── DEBUG: collect per-map info for the WebView debug tab ────────────────
         if this.DebugMode
         {
-            debugColor := isLargeMap ? 0xFFFF00 : 0xFF8800
-            this._DrawDot(Round(mapCenterX), Round(mapCenterY), debugColor, 15)
-            debugTextRow := isLargeMap ? 32 : 16
-            this._DrawText(4, debugTextRow,
-                (isLargeMap?"L":"M") " ctr=" Round(mapCenterX) "," Round(mapCenterY)
-                " spos=" Round(mapElementScreenX) "," Round(mapElementScreenY)
-                " rawsz=" Round(mapData["sizeW"]) "x" Round(mapData["sizeH"])
-                " sz=" Round(mapScreenWidth) "x" Round(mapScreenHeight)
-                " si=" mapData["scaleIdx"] " dep=" mapData["chainDepth"] " z=" Round(mapZoom, 3),
-                debugColor)
+            mapKey := isLargeMap ? "mapL" : "mapM"
+            this._debugLines[mapKey] := (isLargeMap?"L":"M")
+                . " ctr=" Round(mapCenterX) "," Round(mapCenterY)
+                . " spos=" Round(mapElementScreenX) "," Round(mapElementScreenY)
+                . " rawsz=" Round(mapData["sizeW"]) "x" Round(mapData["sizeH"])
+                . " sz=" Round(mapScreenWidth) "x" Round(mapScreenHeight)
+                . " si=" mapData["scaleIdx"] " dep=" mapData["chainDepth"]
+                . " z=" Round(mapZoom, 3)
         }
 
         ; ── Projektionsfaktoren für Radar-Koordinatentransformation ──────────────────────
@@ -862,24 +862,23 @@ class RadarOverlay
             }
         }
 
-        ; Debug-Statuszeile: zeigt wie viele Entities durch welchen Filter gefallen sind
+        ; Debug entity-filter stats — collected for the WebView debug tab.
         if this.DebugMode
         {
-            debugColor := isLargeMap ? 0xFFFF00 : 0xFF8800
-            dbgX2      := gameWindowWidth // 2 - 400
-            this._DrawText(dbgX2, gameWindowHeight - 50,
-                (isLargeMap?"L":"M") "-ent: tot=" statTotal " noD=" statNoDecoded " noR=" statNoRender
-                " flt=" statFiltered " dead=" statDead " drawn=" statDrawn " p0=" firstEntityPath,
-                debugColor)
+            entKey := isLargeMap ? "entL" : "entM"
+            this._debugLines[entKey] := (isLargeMap?"L":"M")
+                . "-ent: tot=" statTotal " noD=" statNoDecoded " noR=" statNoRender
+                . " flt=" statFiltered " dead=" statDead " drawn=" statDrawn
+                . " p0=" firstEntityPath
             if fs
             {
                 preFlt  := fs.Has("preFilter")  ? fs["preFilter"]  : "?"
                 postFlt := fs.Has("postFilter") ? fs["postFilter"] : "?"
-                this._DrawText(dbgX2, gameWindowHeight - 36,
-                    "flt: s1=" fs["s1"] " s2=" fs["s2"] " s3=" fs["s3"] " s4=" fs["s4"]
-                    " s5=" fs["s5"] " s6=" fs["s6"] " bl=" fs["bl"] " blTot=" fs["blTotal"]
-                    " pre=" preFlt " post=" postFlt,
-                    debugColor)
+                fltKey := isLargeMap ? "fltL" : "fltM"
+                this._debugLines[fltKey] := "flt: s1=" fs["s1"] " s2=" fs["s2"]
+                    . " s3=" fs["s3"] " s4=" fs["s4"] " s5=" fs["s5"] " s6=" fs["s6"]
+                    . " bl=" fs["bl"] " blTot=" fs["blTotal"]
+                    . " pre=" preFlt " post=" postFlt
             }
         }
     }

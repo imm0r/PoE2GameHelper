@@ -442,6 +442,40 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
     try WebViewExec("updateDebugPanels(" json ")")
 }
 
+; Pushes the RadarOverlay's collected debug lines to the Debug tab.
+; The lines (formerly drawn at the bottom of the game overlay) are now copyable
+; in the WebView. Pushed every ~500 ms from UpdateRadarFast when DebugMode is on.
+PushRadarDebugToWebView()
+{
+    global g_webViewReady, g_radarOverlay, g_radarReadMs, g_radarRenderMs
+    if !g_webViewReady
+        return
+
+    json := "{"
+    debugMode := (g_radarOverlay && g_radarOverlay.DebugMode) ? true : false
+    json .= '"enabled":' (debugMode ? "true" : "false") ","
+    json .= '"readMs":'   (IsSet(g_radarReadMs)   ? Integer(g_radarReadMs)   : 0) ","
+    json .= '"renderMs":' (IsSet(g_radarRenderMs) ? Integer(g_radarRenderMs) : 0) ","
+    json .= '"lines":['
+    if (g_radarOverlay && IsObject(g_radarOverlay._debugLines))
+    {
+        ; Stable display order
+        order := ["status", "nav", "path", "mapL", "mapM", "entL", "entM", "fltL", "fltM"]
+        first := true
+        for _, key in order
+        {
+            if !g_radarOverlay._debugLines.Has(key)
+                continue
+            if !first
+                json .= ","
+            json .= '{"key":' _JsStr(key) ',"text":' _JsStr(g_radarOverlay._debugLines[key]) "}"
+            first := false
+        }
+    }
+    json .= "]}"
+    try WebViewExec("updateRadarDebug(" json ")")
+}
+
 ; Pushes struct diff comparison results to the Debug tab's updateDiffResults() JS function.
 PushDiffResultsToWebView(diffResult)
 {
