@@ -420,11 +420,23 @@ class RadarOverlay
             hy := Round(g_uiBrowserHighlight["y"] * sf)
             hw := Round(g_uiBrowserHighlight["w"] * sf)
             hh := Round(g_uiBrowserHighlight["h"] * sf)
-            ; DIAG tooltips — remove when confirmed working
             ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, 10, 150, 19)
             SetTimer(() => ToolTip(,,, 19), -3000)
             if (hw > 4 && hh > 4 && hx < gameWindowWidth && hy < gameWindowHeight)
-                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
+            {
+                ; Draw border as 4 filled dots at corners + LineTo lines
+                ; (Rectangle+NULL_BRUSH may silently fail; LineTo uses only pen)
+                pen := this._GetPen(0x0000FF, 4)
+                oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+                DllCall("MoveToEx", "Ptr", this.memoryDC, "Int", hx,    "Int", hy,      "Ptr", 0)
+                DllCall("LineTo",   "Ptr", this.memoryDC, "Int", hx+hw, "Int", hy)
+                DllCall("LineTo",   "Ptr", this.memoryDC, "Int", hx+hw, "Int", hy+hh)
+                DllCall("LineTo",   "Ptr", this.memoryDC, "Int", hx,    "Int", hy+hh)
+                DllCall("LineTo",   "Ptr", this.memoryDC, "Int", hx,    "Int", hy)
+                DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+                ; Filled center dot — confirms position even if lines are invisible
+                this._DrawDot(hx + hw//2, hy + hh//2, 0x0000FF, 8)
+            }
         }
         this._Blit(gameWindowWidth, gameWindowHeight)
     }
