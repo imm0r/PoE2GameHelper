@@ -444,12 +444,19 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
 
 ; Pushes the RadarOverlay's collected debug lines to the Debug tab.
 ; The lines (formerly drawn at the bottom of the game overlay) are now copyable
-; in the WebView. Pushed every ~500 ms from UpdateRadarFast when DebugMode is on.
-PushRadarDebugToWebView()
+; in the WebView. Pushed every ~500 ms from UpdateRadarFast — runs always (not
+; only when Render() ran) so a 'gate' line shows why the overlay is hidden.
+PushRadarDebugToWebView(overlayAllowed := true, hideReason := "")
 {
     global g_webViewReady, g_radarOverlay, g_radarReadMs, g_radarRenderMs
     if !g_webViewReady
         return
+
+    ; Always include a gate line that shows allow/hide-reason — this updates
+    ; even when Render() is skipped, so we can see WHY rendering stopped.
+    if (g_radarOverlay && IsObject(g_radarOverlay._debugLines))
+        g_radarOverlay._debugLines["gate"] := "gate: allowed=" (overlayAllowed ? "YES" : "NO")
+            . (hideReason != "" ? " reason=" hideReason : "")
 
     json := "{"
     debugMode := (g_radarOverlay && g_radarOverlay.DebugMode) ? true : false
@@ -459,8 +466,8 @@ PushRadarDebugToWebView()
     json .= '"lines":['
     if (g_radarOverlay && IsObject(g_radarOverlay._debugLines))
     {
-        ; Stable display order
-        order := ["status", "nav", "path", "mapL", "mapM", "entL", "entM", "fltL", "fltM"]
+        ; Stable display order — gate at top so it's always at-a-glance
+        order := ["gate", "status", "nav", "path", "mapL", "mapM", "entL", "entM", "fltL", "fltM"]
         first := true
         for _, key in order
         {

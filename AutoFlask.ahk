@@ -195,6 +195,7 @@ UpdateRadarFast()
         if (A_TickCount - _debugPanelPushTick > 500)
         {
             PushDebugPanelsToWebView(radarSnap, overlayAllowed, hideReason)
+            PushRadarDebugToWebView(overlayAllowed, hideReason)
             _debugPanelPushTick := A_TickCount
         }
 
@@ -303,14 +304,6 @@ UpdateRadarFast()
             radarRenderStart := A_TickCount
             g_radarOverlay.Render(radarSnap, gwX, gwY, gwW, gwH)
             g_radarRenderMs := A_TickCount - radarRenderStart
-
-            ; Push collected debug lines to WebView Debug tab (~500 ms throttle).
-            static _radarDbgPushTick := 0
-            if (A_TickCount - _radarDbgPushTick > 500)
-            {
-                _radarDbgPushTick := A_TickCount
-                PushRadarDebugToWebView()
-            }
         }
         else if (!g_radarEnabled && g_radarOverlay)
         {
