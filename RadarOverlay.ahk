@@ -136,7 +136,8 @@ class RadarOverlay
         this._mapHackStep         := 4     ; grid sampling step
         this._mapHackGridW        := 0     ; grid width covered by bitmap
         this._mapHackGridH        := 0     ; grid height covered by bitmap
-        this._mapHackTerrainSz    := 0     ; terrain data size (for change detection)
+        this._mapHackTerrainSz    := 0     ; terrain data size — only updated on successful generate
+        this._mapHackRetryTick    := 0     ; tick of last regenerate attempt (for retry throttle)
     }
 
     ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
@@ -197,10 +198,28 @@ class RadarOverlay
         terrainError := (areaInstance && areaInstance.Has("terrainError")) ? areaInstance["terrainError"] : ""
 
         ; Regenerate maphack bitmap when terrain data changes (new area loaded)
-        if (this._terrain && this._terrain["dataSize"] != this._mapHackTerrainSz)
+        ; OR when terrain is valid but bitmap got destroyed (e.g. by a half-failed
+        ; previous generate after an InGameState transition). Don't lock in the new
+        ; terrain size until generate actually succeeds — otherwise a silent failure
+        ; leaves _mapHackTerrainSz at the new value, _mapHackDC at 0, and the size
+        ; check in this branch never fires again until the next zone change.
+        if (this._terrain)
         {
-            this._mapHackTerrainSz := this._terrain["dataSize"]
-            this._GenerateMapHackBitmap()
+            curSz := this._terrain["dataSize"]
+            sizeChanged := (curSz != this._mapHackTerrainSz)
+            bitmapMissing := !this._mapHackDC || !this._mapHackMask
+            ; Throttle the bitmap-missing retry to once per 2s so a permanently
+            ; failing generate doesn't burn CPU at 50ms ticks.
+            retryReady := bitmapMissing && (A_TickCount - this._mapHackRetryTick) > 2000
+            if (sizeChanged || retryReady)
+            {
+                this._mapHackRetryTick := A_TickCount
+                this._GenerateMapHackBitmap()
+                ; Only commit the new size when the generate actually produced a bitmap.
+                ; Leaves the regenerate trigger primed if generate silently bailed.
+                if (this._mapHackDC && this._mapHackMask)
+                    this._mapHackTerrainSz := curSz
+            }
         }
 
         hasPlayerPosition   := (playerRender && playerRender.Has("worldPosition"))
@@ -220,6 +239,9 @@ class RadarOverlay
                 ? ("terr:" this._terrain["dataSize"] " gW=" this._terrain["gridWidth"] " gH=" this._terrain["totalRows"]
                    " bpr=" this._terrain["bytesPerRow"] (terrainError != "" ? " [" terrainError "]" : ""))
                 : ("terr:NIL" (terrainError != "" ? " (" terrainError ")" : ""))
+            mhDbg := " mh:" ((this._mapHackDC && this._mapHackMask) ? "OK" : "NIL")
+                . "(sz=" this._mapHackTerrainSz " w=" this._mapHackW " h=" this._mapHackH ")"
+            terrDbg .= mhDbg
             this._DrawText(dbgX, gameWindowHeight - 80,
                 "area:" (areaInstance?"OK":"NIL") " pr:" (hasPlayerPosition?"OK":"NIL") " ent:" awakeEntityCount
                 " mm:" miniMapSize "[" miniMapVisible "]" " upos:" miniMapPos " lm:" largeMapSize "[" largeMapVisible "]"
