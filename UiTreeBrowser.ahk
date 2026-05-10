@@ -106,6 +106,7 @@ UiTree_ReadElement(reader, elemPtr)
     localMult  := NumGet(hdr.Ptr, 0x130, "Float")
     scaleIndex := NumGet(hdr.Ptr, 0x18A, "UChar")
     stringId   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["StringIdPtr"])
+    fontName   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["FontNamePtr"])
     flags      := NumGet(hdr.Ptr, 0x180, "UInt")
     isVisible  := ((flags >> 11) & 1) ? true : false
     sizeW      := NumGet(hdr.Ptr, 0x288, "Float")
@@ -116,6 +117,7 @@ UiTree_ReadElement(reader, elemPtr)
     return Map(
         "address",     elemPtr,
         "stringId",    stringId,
+        "fontName",    fontName,
         "isVisible",   isVisible,
         "flags",       flags,
         "childCount",  childCount,
@@ -134,61 +136,6 @@ UiTree_ReadElement(reader, elemPtr)
         "posModY",     posModY,
         "vtable",      vtable
     )
-}
-
-; Probe an element header for StdWStrings at every 8-byte aligned offset.
-; Returns: Array of Maps {offset, value} for offsets where a non-empty plausible
-; StdWString was decoded. Used to locate the correct StringId offset after a game
-; patch shifts struct layouts.
-UiTree_ProbeStrings(reader, elemPtr, scanRange := 0x400)
-{
-    results := []
-    if (!IsObject(reader) || !reader.IsProbablyValidPointer(elemPtr))
-        return results
-    ; Read enough bytes to cover the entire scan range plus 0x20 for the last StdWString header.
-    totalBytes := scanRange + 0x20
-    hdr := reader.Mem.ReadBytes(elemPtr, totalBytes)
-    if !hdr
-        return results
-    off := 0
-    while (off + 0x20 <= totalBytes)
-    {
-        bufferOrInline := NumGet(hdr.Ptr, off + 0x00, "Int64")
-        length         := NumGet(hdr.Ptr, off + 0x10, "Int")
-        capacity       := NumGet(hdr.Ptr, off + 0x18, "Int")
-        ; StdWString plausibility filter: small length, capacity >= length,
-        ; capacity is one of 7 (default SSO) or higher.
-        if (length > 0 && length <= 256 && capacity >= length && capacity <= 4096)
-        {
-            try
-            {
-                str := reader.ReadStdWStringAt(elemPtr + off, 256)
-                ; Reject non-printable / empty results
-                if (str != "" && _UibIsPrintable(str))
-                    results.Push(Map("offset", off, "value", str))
-            }
-            catch
-            {
-                ; ignore
-            }
-        }
-        off += 8
-    }
-    return results
-}
-
-; Helper: returns true if string contains only printable ASCII / common whitespace.
-_UibIsPrintable(str)
-{
-    if (str = "")
-        return false
-    Loop Parse, str
-    {
-        c := Ord(A_LoopField)
-        if (c < 32 || c > 126)
-            return false
-    }
-    return true
 }
 
 ; Navigate by StringId path like "LeftPanel > InventoryPanel"

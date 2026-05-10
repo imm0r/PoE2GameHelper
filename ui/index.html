@@ -3349,6 +3349,7 @@
       document.getElementById('uib-props-content').innerHTML = `
     <div class="uib-prop-section">StringId</div>
     <div class="uib-prop-row"><span class="uib-prop-key">StringId</span>${nv(p.stringId || '(none)')}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Font Name</span>${nv(p.fontName || '(none)')}</div>
     <div class="uib-prop-section">Address</div>
     <div class="uib-prop-row"><span class="uib-prop-key">Address</span>${hv(p.address || '')}</div>
     <div class="uib-prop-row"><span class="uib-prop-key">Parent</span>${hv(p.parentPtr || '')}</div>
@@ -3364,15 +3365,7 @@
     <div class="uib-prop-row"><span class="uib-prop-key">Flags (raw)</span>${hv(p.flags || '')}</div>
     <div class="uib-prop-row"><span class="uib-prop-key">IsVisible bit</span>${bv(p.isVisible)}</div>
     <div class="uib-prop-section">Children</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Children</span>${nv(p.childCount || 0)}</div>
-    ${(() => {
-      const ps = data.probedStrings || [];
-      if (!ps.length) return '<div class="uib-prop-section">Probed Strings (none found)</div>';
-      const rows = ps.map(s =>
-        `<div class="uib-prop-row"><span class="uib-prop-key">${escHtml(s.offset)}</span>${nv(s.value)}</div>`
-      ).join('');
-      return `<div class="uib-prop-section">Probed Strings (${ps.length})</div>${rows}`;
-    })()}`;
+    <div class="uib-prop-row"><span class="uib-prop-key">Children</span>${nv(p.childCount || 0)}</div>`;
     }
 
     function uibDoSearch() {

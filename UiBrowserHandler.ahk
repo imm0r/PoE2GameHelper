@@ -321,9 +321,12 @@ PushUiBrowserState()
         ; Build props JSON — use _UibF() for floats to avoid locale-specific decimal comma
         sid := StrReplace(elem["stringId"], "\", "\\")
         sid := StrReplace(sid, '"', '\"')
+        fnt := StrReplace(elem["fontName"], "\", "\\")
+        fnt := StrReplace(fnt, '"', '\"')
         propsJson := '{'
             . '"address":"' . Format("0x{:X}", g_uiBrowserCurrentPtr) . '"'
             . ',"stringId":"' . sid . '"'
+            . ',"fontName":"' . fnt . '"'
             . ',"isVisible":' . (elem["isVisible"] ? "true" : "false")
             . ',"childCount":' . elem["childCount"]
             . ',"flags":"' . Format("0x{:08X}", elem["flags"]) . '"'
@@ -337,27 +340,10 @@ PushUiBrowserState()
             . ',"parentPtr":"' . Format("0x{:X}", elem["parentPtr"]) . '"'
             . '}'
 
-        ; Probe element header for StdWStrings at every 8-byte offset — helps locate
-        ; the correct StringId offset after game patches shift struct layouts.
-        psJson := "[]"
-        try {
-            probedStrings := UiTree_ProbeStrings(g_reader, g_uiBrowserCurrentPtr, 0x400)
-            psJson := "["
-            for i, ps in probedStrings {
-                if (i > 1)
-                    psJson .= ","
-                sv := StrReplace(ps["value"], "\", "\\")
-                sv := StrReplace(sv, '"', '\"')
-                psJson .= '{"offset":"' . Format("0x{:X}", ps["offset"]) . '","value":"' . sv . '"}'
-            }
-            psJson .= "]"
-        }
-
         payload := '{'
             . '"breadcrumb":' . bcJson
             . ',"children":' . chJson
             . ',"props":' . propsJson
-            . ',"probedStrings":' . psJson
             . ',"canBack":' . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
             . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
             . '}'
