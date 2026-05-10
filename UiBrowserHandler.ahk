@@ -235,7 +235,7 @@ UiBrowseSearch(query)
 
 PushUiBrowserState()
 {
-    global g_uiBrowserCurrentPtr, g_uiBrowserHistory, g_uiBrowserRootPtr, g_reader
+    global g_uiBrowserCurrentPtr, g_uiBrowserHistory, g_uiBrowserRootPtr, g_reader, g_uiBrowserHighlight
     if !IsObject(g_reader)
         return
 
