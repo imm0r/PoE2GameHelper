@@ -241,6 +241,10 @@ class RadarOverlay
             ; DIAG: confirm render path (separate position from ToolTip 18)
             ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, 10, 150, 19)
             SetTimer(() => ToolTip(,,, 19), -3000)
+            ; DIAG: fixed test rect at center-screen — if visible, _DrawRect works
+            cx := gameWindowWidth // 2
+            cy := gameWindowHeight // 2
+            this._DrawRect(cx - 100, cy - 100, 200, 200, 0x0000FF, 4)
             ; Only draw if element is within the game window bounds
             onScreen := (hx >= 0 && hy >= 0 && hx < gameWindowWidth && hy < gameWindowHeight)
             if (hw > 4 && hh > 4 && onScreen)
