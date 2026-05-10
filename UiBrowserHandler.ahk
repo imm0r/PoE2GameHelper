@@ -345,23 +345,24 @@ PushUiBrowserState()
             . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
             . '}'
 
-        ; Update overlay highlight — absolute UI-coord position for red border drawing
+        ; Update overlay highlight BEFORE WebViewExec so outer catch can't clear it.
         try {
             pos := UiTree_GetScreenPos(g_reader, g_uiBrowserCurrentPtr)
             g_uiBrowserHighlight := Map("x", pos["x"], "y", pos["y"],
                                         "w", elem["sizeW"], "h", elem["sizeH"])
-            ; DIAG: confirm data path
-            ToolTip("UIH set: x=" Round(pos["x"]) " y=" Round(pos["y"]) " w=" Round(elem["sizeW"]) " h=" Round(elem["sizeH"]), , , 18)
+            ; DIAG: confirm data path (at top-left corner to stay separate from RDR tooltip)
+            ToolTip("UIH: x=" Round(pos["x"]) " y=" Round(pos["y"]) " w=" Round(elem["sizeW"]) " h=" Round(elem["sizeH"]), 10, 100, 18)
             SetTimer(() => ToolTip(,,, 18), -3000)
         } catch as hEx {
             g_uiBrowserHighlight := 0
-            ToolTip("UIH FAIL: " hEx.Message, , , 18)
+            ToolTip("UIH FAIL: " hEx.Message, 10, 100, 18)
             SetTimer(() => ToolTip(,,, 18), -3000)
         }
 
         WebViewExec("updateUiBrowser(" . _JsStr(payload) . ")")
     } catch as ex {
-        g_uiBrowserHighlight := 0
+        ; Don't clear g_uiBrowserHighlight — it was set successfully above; only the
+        ; WebView push failed, which is independent of the overlay highlight state.
         WebViewExec("updateUiBrowser(" . _JsStr('{"error":"Exception in PushUiBrowserState: ' . ex.Message . '"}') . ")")
     }
 }
