@@ -2611,6 +2611,8 @@
     function switchTab(key) {
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === key));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
+      if (activeTab === 'ui' && key !== 'ui')
+        ahkCall('UiBrowserClearHighlight');
       activeTab = key;
       if (treeTabs.has(key))
         ahkCall('SwitchTab', key.charAt(0).toUpperCase() + key.slice(1));

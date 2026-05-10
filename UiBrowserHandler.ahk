@@ -4,6 +4,7 @@
 global g_uiBrowserCurrentPtr := 0
 global g_uiBrowserHistory := []
 global g_uiBrowserRootPtr := 0
+global g_uiBrowserHighlight := 0   ; Map(x,y,w,h) in UI coords, or 0 when inactive
 
 ; Formats a float for JSON — always uses "." regardless of Windows locale.
 _UibF(n, decimals := 2)
@@ -344,8 +345,25 @@ PushUiBrowserState()
             . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
             . '}'
 
+        ; Update overlay highlight — absolute UI-coord position for red border drawing
+        try {
+            pos := UiTree_GetScreenPos(g_reader, g_uiBrowserCurrentPtr)
+            g_uiBrowserHighlight := Map("x", pos["x"], "y", pos["y"],
+                                        "w", elem["sizeW"], "h", elem["sizeH"])
+        } catch {
+            g_uiBrowserHighlight := 0
+        }
+
         WebViewExec("updateUiBrowser(" . _JsStr(payload) . ")")
     } catch as ex {
+        g_uiBrowserHighlight := 0
         WebViewExec("updateUiBrowser(" . _JsStr('{"error":"Exception in PushUiBrowserState: ' . ex.Message . '"}') . ")")
     }
+}
+
+; Clears the UI Browser overlay highlight (call when leaving the UI tab).
+UiBrowserClearHighlight()
+{
+    global g_uiBrowserHighlight
+    g_uiBrowserHighlight := 0
 }

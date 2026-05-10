@@ -376,5 +376,7 @@ _DispatchBridgeCall(method, args)
         case "UiBrowseSearch":
             q := (args.Length >= 1) ? String(args[1]) : ""
             SetTimer(() => UiBrowseSearch(q), -1)
+        case "UiBrowserClearHighlight":
+            SetTimer(() => UiBrowserClearHighlight(), -1)
     }
 }

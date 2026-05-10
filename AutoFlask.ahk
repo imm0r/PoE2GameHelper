@@ -18,7 +18,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
-        global g_playerHudEnabled, g_playerHud
+        global g_playerHudEnabled, g_playerHud, g_uiBrowserCurrentPtr
         if g_updatesPaused
         {
             if g_radarOverlay
@@ -252,9 +252,11 @@ UpdateRadarFast()
 
         if !WinActive("ahk_id " gameHwnd)
         {
-            ; Still render range circles when GameHelper has focus (config preview)
+            ; Keep rendering when UI Browser is active (user clicks in GameHelper, not game)
+            ; or when range circles are set (config preview mode).
             hasCircles := (g_radarOverlay && g_radarOverlay._rangeCircles.Length > 0)
-            if !hasCircles
+            uiBrowserActive := (g_uiBrowserCurrentPtr != 0)
+            if (!hasCircles && !uiBrowserActive)
             {
                 if g_radarOverlay
                     g_radarOverlay.Hide()
