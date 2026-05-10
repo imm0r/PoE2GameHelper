@@ -1209,22 +1209,42 @@ class PoE2GameStateReader extends PoE2InventoryReader
             largeMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["LargeMapPtr"])
             miniMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["MiniMapPtr"])
 
-            ; Cache location can become stale (same issue as PassiveSkillTree).
-            ; Fall back to navigating the children StdVector directly if both pointers are equal.
-            if (largeMapPtr = miniMapPtr && this.IsProbablyValidPointer(largeMapPtr))
-            {
-                childrenDataPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.UiElementBase["ChildrenFirst"])
-                if this.IsProbablyValidPointer(childrenDataPtr)
-                {
-                    largeMapPtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)  ; 1st child
-                    miniMapPtr := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)  ; 2nd child
-                }
-            }
-
+            ; Cache location can become stale after zone changes (same issue as PassiveSkillTree).
+            ; Two failure modes: (1) both cache slots converge on the same ptr; (2) one slot
+            ; (often LargeMapPtr) keeps a stale ptr pointing to an unpopulated UiElement that
+            ; reports isVisible=true but size 0x0. Both modes get fixed by walking the
+            ; MapParent's children StdVector directly: child[0] = LargeMap, child[1] = MiniMap.
+            needChildFallback := (largeMapPtr = miniMapPtr && this.IsProbablyValidPointer(largeMapPtr))
             if this.IsProbablyValidPointer(miniMapPtr)
                 miniMapData := this.ReadMapUiElementData(miniMapPtr)
             if this.IsProbablyValidPointer(largeMapPtr)
                 largeMapData := this.ReadMapUiElementData(largeMapPtr)
+
+            ; Detect stale-LargeMapPtr: visible but zero size means the element pointer is no
+            ; longer pointing at the live large-map UiElement.
+            if (!needChildFallback && largeMapData && IsObject(largeMapData)
+                && largeMapData["isVisible"] && largeMapData["sizeW"] = 0 && largeMapData["sizeH"] = 0)
+                needChildFallback := true
+
+            if needChildFallback
+            {
+                childrenDataPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.UiElementBase["ChildrenFirst"])
+                if this.IsProbablyValidPointer(childrenDataPtr)
+                {
+                    altLargePtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)
+                    altMiniPtr  := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)
+                    if this.IsProbablyValidPointer(altLargePtr)
+                    {
+                        largeMapPtr := altLargePtr
+                        largeMapData := this.ReadMapUiElementData(largeMapPtr)
+                    }
+                    if this.IsProbablyValidPointer(altMiniPtr)
+                    {
+                        miniMapPtr := altMiniPtr
+                        miniMapData := this.ReadMapUiElementData(miniMapPtr)
+                    }
+                }
+            }
         }
 
         ; ChatParentUiElement — IsChatActive detection.
