@@ -228,6 +228,20 @@ class RadarOverlay
             this._DrawDot(8, 8, 0xFFFFFF, 5)   ; weißer Punkt = Overlay läuft
         }
 
+        ; ── UI Browser highlight — drawn before any early returns ──────────────
+        ; Must be here so it survives the !hasPlayerPosition early-exit below.
+        global g_uiBrowserHighlight
+        if IsObject(g_uiBrowserHighlight)
+        {
+            sf := gameWindowHeight / 1600.0
+            hx := Round(g_uiBrowserHighlight["x"] * sf)
+            hy := Round(g_uiBrowserHighlight["y"] * sf)
+            hw := Round(g_uiBrowserHighlight["w"] * sf)
+            hh := Round(g_uiBrowserHighlight["h"] * sf)
+            if (hw > 4 && hh > 4)
+                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
+        }
+
         if !hasPlayerPosition
         {
             this._DrawDot(20, 8, 0x0000FF, 5)   ; blauer Punkt = kein Spieler gefunden
@@ -403,21 +417,6 @@ class RadarOverlay
             {
                 this._DrawText(dbgX, gameWindowHeight - 95, "nav: scanning...", 0xFFD700)
             }
-        }
-
-        ; ── UI Browser highlight — red border around selected UI element ──────
-        global g_uiBrowserHighlight
-        if IsObject(g_uiBrowserHighlight)
-        {
-            ; PoE2 UI uses uniform scaling based on window height (1600-unit base).
-            ; Both axes use the same scale factor so elements aren't stretched.
-            sf := gameWindowHeight / 1600.0
-            hx := Round(g_uiBrowserHighlight["x"] * sf)
-            hy := Round(g_uiBrowserHighlight["y"] * sf)
-            hw := Round(g_uiBrowserHighlight["w"] * sf)
-            hh := Round(g_uiBrowserHighlight["h"] * sf)
-            if (hw > 4 && hh > 4)
-                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)   ; 0x0000FF = red (BGR), 3px pen
         }
 
         this._Blit(gameWindowWidth, gameWindowHeight)
