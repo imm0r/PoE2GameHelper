@@ -228,33 +228,10 @@ class RadarOverlay
             this._DrawDot(8, 8, 0xFFFFFF, 5)   ; weißer Punkt = Overlay läuft
         }
 
-        ; ── UI Browser highlight — drawn before any early returns ──────────────
-        ; Must be here so it survives the !hasPlayerPosition early-exit below.
-        global g_uiBrowserHighlight
-        if IsObject(g_uiBrowserHighlight)
-        {
-            sf := gameWindowHeight / 1600.0
-            hx := Round(g_uiBrowserHighlight["x"] * sf)
-            hy := Round(g_uiBrowserHighlight["y"] * sf)
-            hw := Round(g_uiBrowserHighlight["w"] * sf)
-            hh := Round(g_uiBrowserHighlight["h"] * sf)
-            ; DIAG: confirm render path (separate position from ToolTip 18)
-            ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, 10, 150, 19)
-            SetTimer(() => ToolTip(,,, 19), -3000)
-            ; DIAG: fixed test rect at center-screen — if visible, _DrawRect works
-            cx := gameWindowWidth // 2
-            cy := gameWindowHeight // 2
-            this._DrawRect(cx - 100, cy - 100, 200, 200, 0x0000FF, 4)
-            ; Only draw if element is within the game window bounds
-            onScreen := (hx >= 0 && hy >= 0 && hx < gameWindowWidth && hy < gameWindowHeight)
-            if (hw > 4 && hh > 4 && onScreen)
-                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
-        }
-
         if !hasPlayerPosition
         {
             this._DrawDot(20, 8, 0x0000FF, 5)   ; blauer Punkt = kein Spieler gefunden
-            this._Blit(gameWindowWidth, gameWindowHeight)
+            this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
             return
         }
 
@@ -428,6 +405,27 @@ class RadarOverlay
             }
         }
 
+        this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+    }
+
+    ; Draws UI Browser highlight (if active) then blits the back-buffer to screen.
+    ; Called instead of _Blit so the highlight is always the topmost drawn layer.
+    _BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+    {
+        global g_uiBrowserHighlight
+        if IsObject(g_uiBrowserHighlight)
+        {
+            sf := gameWindowHeight / 1600.0
+            hx := Round(g_uiBrowserHighlight["x"] * sf)
+            hy := Round(g_uiBrowserHighlight["y"] * sf)
+            hw := Round(g_uiBrowserHighlight["w"] * sf)
+            hh := Round(g_uiBrowserHighlight["h"] * sf)
+            ; DIAG tooltips — remove when confirmed working
+            ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, 10, 150, 19)
+            SetTimer(() => ToolTip(,,, 19), -3000)
+            if (hw > 4 && hh > 4 && hx < gameWindowWidth && hy < gameWindowHeight)
+                this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
+        }
         this._Blit(gameWindowWidth, gameWindowHeight)
     }
 
