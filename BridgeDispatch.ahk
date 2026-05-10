@@ -361,8 +361,6 @@ _DispatchBridgeCall(method, args)
 
             ; ── UI Browser ────────────────────────────────────────────────────
         case "UiBrowseRoot":
-            ToolTip("BridgeDispatch UiBrowseRoot reached!", 100, 50)
-            SetTimer(() => ToolTip(), -2000)
             SetTimer(() => UiBrowseRoot(), -1)
         case "UiBrowseParent":
             SetTimer(() => UiBrowseParent(), -1)

@@ -1,63 +1,88 @@
 ; UiBrowserHandler.ahk
+; Interactive Game UI Browser - AHK side logic
 
 global g_uiBrowserCurrentPtr := 0
 global g_uiBrowserHistory := []
 global g_uiBrowserRootPtr := 0
 
-MsgBox("UIBrowserHandler wurde geladen!")
+_UiBrowser_GetGameUiPtr()
+{
+    global g_reader
+    if !IsObject(g_reader)
+        return 0
+    try {
+        igs := g_reader._radarInGameStateCache
+        if !g_reader.IsProbablyValidPointer(igs)
+        {
+            if !g_reader.IsProbablyValidPointer(g_reader.GameStatesAddress)
+                return 0
+            staticPtr := g_reader.Mem.ReadPtr(g_reader.GameStatesAddress)
+            if !g_reader.IsProbablyValidPointer(staticPtr)
+                return 0
+            statesBase := staticPtr + PoE2Offsets.GameState["States"]
+            igs := g_reader.Mem.ReadPtr(statesBase + (4 * PoE2Offsets.GameState["StateEntrySize"]))
+            if !g_reader.IsProbablyValidPointer(igs)
+                return 0
+        }
+        uiRootStructPtr := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["UiRootStructPtr"])
+        if !g_reader.IsProbablyValidPointer(uiRootStructPtr)
+            return 0
+        gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
+        if !g_reader.IsProbablyValidPointer(gameUiPtr)
+            gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
+        return gameUiPtr
+    } catch {
+        return 0
+    }
+}
 
 UiBrowseRoot()
 {
     global g_uiBrowserCurrentPtr, g_uiBrowserHistory, g_uiBrowserRootPtr, g_reader
-    msg := ""
-    if !IsObject(g_reader)
-        msg := "DIAG1"
-    else if !g_reader.Mem.Handle
-        msg := "DIAG2"
-    if (msg != "") {
-        WebViewExec("updateUiBrowser(" . Chr(34) . "{" . Chr(92) . Chr(34) . "error" . Chr(92) . Chr(34) . ":" . Chr(92) . Chr(34) . msg . Chr(92) . Chr(34) . "}" . Chr(34) . ")")
+
+    if !IsObject(g_reader) {
+        WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 1: g_reader not ready"}') . ")")
+        return
+    }
+    if !g_reader.Mem.Handle {
+        WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 2: No process handle - game not connected?"}') . ")")
         return
     }
     igs := g_reader._radarInGameStateCache
-    if !g_reader.IsProbablyValidPointer(igs) {
-        try g_reader.Connect()
-        igs := g_reader._radarInGameStateCache
-    }
-    if !g_reader.IsProbablyValidPointer(igs) {
-        if g_reader.IsProbablyValidPointer(g_reader.GameStatesAddress) {
-            staticPtr := g_reader.Mem.ReadPtr(g_reader.GameStatesAddress)
-            if g_reader.IsProbablyValidPointer(staticPtr) {
-                base := staticPtr + PoE2Offsets.GameState["States"]
-                igs := g_reader.Mem.ReadPtr(base + (4 * PoE2Offsets.GameState["StateEntrySize"]))
-            }
+    if !g_reader.IsProbablyValidPointer(igs)
+    {
+        if !g_reader.IsProbablyValidPointer(g_reader.GameStatesAddress) {
+            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 3: GameStatesAddress invalid"}') . ")")
+            return
+        }
+        staticPtr := g_reader.Mem.ReadPtr(g_reader.GameStatesAddress)
+        if !g_reader.IsProbablyValidPointer(staticPtr) {
+            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 4: staticPtr invalid"}') . ")")
+            return
+        }
+        statesBase := staticPtr + PoE2Offsets.GameState["States"]
+        igs := g_reader.Mem.ReadPtr(statesBase + (4 * PoE2Offsets.GameState["StateEntrySize"]))
+        if !g_reader.IsProbablyValidPointer(igs) {
+            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 5: InGameState ptr invalid - in login screen?"}') . ")")
+            return
         }
     }
-    if !g_reader.IsProbablyValidPointer(igs) {
-        _UibErr("DIAG3: no InGameState")
+    uiRootStructPtr := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["UiRootStructPtr"])
+    if !g_reader.IsProbablyValidPointer(uiRootStructPtr) {
+        WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 6: UiRootStructPtr invalid (igs=0x' . Format("{:X}", igs) . ')"}') . ")")
         return
     }
-    uiRoot := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["UiRootStructPtr"])
-    if !g_reader.IsProbablyValidPointer(uiRoot) {
-        _UibErr("DIAG6: bad UiRootStructPtr")
-        return
-    }
-    gameUiPtr := g_reader.Mem.ReadPtr(uiRoot + PoE2Offsets.UiRootStruct["GameUiPtr"])
+    gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
     if !g_reader.IsProbablyValidPointer(gameUiPtr)
-        gameUiPtr := g_reader.Mem.ReadPtr(uiRoot + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
+        gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
     if !g_reader.IsProbablyValidPointer(gameUiPtr) {
-        _UibErr("DIAG7: bad GameUiPtr")
+        WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 7: GameUiPtr invalid (uiRootStruct=0x' . Format("{:X}", uiRootStructPtr) . ')"}') . ")")
         return
     }
     g_uiBrowserRootPtr := gameUiPtr
     g_uiBrowserCurrentPtr := gameUiPtr
     g_uiBrowserHistory := []
     PushUiBrowserState()
-}
-
-_UibErr(msg)
-{
-    j := Chr(34) . "{" . Chr(92) . Chr(34) . "error" . Chr(92) . Chr(34) . ":" . Chr(92) . Chr(34) . msg . Chr(92) . Chr(34) . "}" . Chr(34)
-    WebViewExec("updateUiBrowser(" . j . ")")
 }
 
 UiBrowseParent()
@@ -68,13 +93,13 @@ UiBrowseParent()
     if (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr)
         return
     try {
-        p := g_reader.Mem.ReadPtr(g_uiBrowserCurrentPtr + PoE2Offsets.UiElementBase["ParentPtr"])
-        if !g_reader.IsProbablyValidPointer(p)
+        parentPtr := g_reader.Mem.ReadPtr(g_uiBrowserCurrentPtr + PoE2Offsets.UiElementBase["ParentPtr"])
+        if !g_reader.IsProbablyValidPointer(parentPtr)
             return
         g_uiBrowserHistory.Push(g_uiBrowserCurrentPtr)
         if (g_uiBrowserHistory.Length > 64)
             g_uiBrowserHistory.RemoveAt(1)
-        g_uiBrowserCurrentPtr := p
+        g_uiBrowserCurrentPtr := parentPtr
         PushUiBrowserState()
     } catch {
 
@@ -86,13 +111,13 @@ UiBrowseChild(childIndex)
     global g_uiBrowserCurrentPtr, g_uiBrowserHistory, g_reader
     if !IsObject(g_reader) || !g_reader.IsProbablyValidPointer(g_uiBrowserCurrentPtr)
         return
-    cp := UiTree_GetChildByIndex(g_reader, g_uiBrowserCurrentPtr, Integer(childIndex))
-    if !g_reader.IsProbablyValidPointer(cp)
+    childPtr := UiTree_GetChildByIndex(g_reader, g_uiBrowserCurrentPtr, Integer(childIndex))
+    if !g_reader.IsProbablyValidPointer(childPtr)
         return
     g_uiBrowserHistory.Push(g_uiBrowserCurrentPtr)
     if (g_uiBrowserHistory.Length > 64)
         g_uiBrowserHistory.RemoveAt(1)
-    g_uiBrowserCurrentPtr := cp
+    g_uiBrowserCurrentPtr := childPtr
     PushUiBrowserState()
 }
 
@@ -155,11 +180,12 @@ UiBrowseSearch(query)
             results.Push(Map("ptr", ptr, "stringId", sid, "isVisible", elem["isVisible"]))
         if (results.Length >= 200)
             break
-        cf := elem["childFirst"]
-        cl := elem["childLast"]
-        if (g_reader.IsProbablyValidPointer(cf) && cl > cf) {
-            n := Min((cl - cf) // A_PtrSize, 256)
-            buf := g_reader.Mem.ReadBytes(cf, n * A_PtrSize)
+        childFirst := elem["childFirst"]
+        childLast := elem["childLast"]
+        if (g_reader.IsProbablyValidPointer(childFirst) && childLast > childFirst)
+        {
+            n := Min((childLast - childFirst) // A_PtrSize, 256)
+            buf := g_reader.Mem.ReadBytes(childFirst, n * A_PtrSize)
             if buf {
                 Loop n {
                     cp := NumGet(buf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
@@ -169,37 +195,22 @@ UiBrowseSearch(query)
             }
         }
     }
-    rows := _UibJsonArray(results)
-    qe := StrReplace(StrReplace(query, "\", "\\"), Chr(34), "\" . Chr(34))
-    WebViewExec("updateUiBrowserSearch(" . rows . "," . Chr(34) . qe . Chr(34) . ")")
-}
-
-_UibEsc(s)
-{
-    s := StrReplace(s, "\", "\\")
-    s := StrReplace(s, Chr(34), "\" . Chr(34))
-    return s
-}
-
-_UibQ(s)
-{
-    return Chr(34) . _UibEsc(s) . Chr(34)
-}
-
-_UibJsonArray(results)
-{
     rows := "["
     first := true
     for _, r in results {
         if !first
             rows .= ","
         first := false
-        rows .= "{" . _UibQ("ptr") . ":" . _UibQ(Format("0x{:X}", r["ptr"]))
-            . "," . _UibQ("stringId") . ":" . _UibQ(r["stringId"])
-            . "," . _UibQ("isVisible") . ":" . (r["isVisible"] ? "true" : "false") . "}"
+        sid := StrReplace(r["stringId"], "\", "\\")
+        sid := StrReplace(sid, '"', '\"')
+        rows .= '{"ptr":"' . Format("0x{:X}", r["ptr"]) . '"'
+            . ',"stringId":"' . sid . '"'
+            . ',"isVisible":' . (r["isVisible"] ? "true" : "false") . '}'
     }
     rows .= "]"
-    return rows
+    qEsc := StrReplace(query, "\", "\\")
+    qEsc := StrReplace(qEsc, '"', '\"')
+    WebViewExec("updateUiBrowserSearch(" . rows . ',"' . qEsc . '")')
 }
 
 PushUiBrowserState()
@@ -207,15 +218,18 @@ PushUiBrowserState()
     global g_uiBrowserCurrentPtr, g_uiBrowserHistory, g_uiBrowserRootPtr, g_reader
     if !IsObject(g_reader)
         return
-    if !g_reader.IsProbablyValidPointer(g_uiBrowserCurrentPtr) {
+    if !g_reader.IsProbablyValidPointer(g_uiBrowserCurrentPtr)
+    {
         UiBrowseRoot()
         return
     }
     elem := UiTree_ReadElement(g_reader, g_uiBrowserCurrentPtr)
     if !elem {
-        _UibErr("Element not readable")
+        WebViewExec("updateUiBrowser(" . _JsStr('{"error":"Element not readable (invalid address or game not connected)"}') . ")")
         return
     }
+
+    ; Build breadcrumb by walking parent chain
     breadcrumb := []
     curPtr := g_uiBrowserCurrentPtr
     Loop 16 {
@@ -225,71 +239,91 @@ PushUiBrowserState()
         if !e
             break
         breadcrumb.InsertAt(1, Map("ptr", curPtr, "stringId", e["stringId"]))
-        pp := e["parentPtr"]
-        if (!g_reader.IsProbablyValidPointer(pp) || pp = curPtr)
+        parentPtr := e["parentPtr"]
+        if (!g_reader.IsProbablyValidPointer(parentPtr) || parentPtr = curPtr)
             break
         if (curPtr = g_uiBrowserRootPtr)
             break
-        curPtr := pp
+        curPtr := parentPtr
     }
+
+    ; Build children list
     children := []
-    cf := elem["childFirst"]
-    cl := elem["childLast"]
-    cc := elem["childCount"]
-    if (g_reader.IsProbablyValidPointer(cf) && cl > cf && cc > 0) {
-        n := Min(cc, 256)
-        buf := g_reader.Mem.ReadBytes(cf, n * A_PtrSize)
+    childFirst := elem["childFirst"]
+    childLast := elem["childLast"]
+    childCount := elem["childCount"]
+    if (g_reader.IsProbablyValidPointer(childFirst) && childLast > childFirst && childCount > 0)
+    {
+        n := Min(childCount, 256)
+        buf := g_reader.Mem.ReadBytes(childFirst, n * A_PtrSize)
         if buf {
             Loop n {
                 cp := NumGet(buf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
                 if !g_reader.IsProbablyValidPointer(cp)
                     continue
                 ce := UiTree_ReadElement(g_reader, cp)
-                children.Push(Map("idx", A_Index - 1, "ptr", cp,
-                    "stringId", ce ? ce["stringId"] : "",
-                    "isVisible", ce ? ce["isVisible"] : false,
-                    "childCount", ce ? ce["childCount"] : 0))
+                sid := ce ? ce["stringId"] : ""
+                vis := ce ? ce["isVisible"] : false
+                cc := ce ? ce["childCount"] : 0
+                children.Push(Map("idx", A_Index - 1, "ptr", cp, "stringId", sid, "isVisible", vis, "childCount", cc))
             }
         }
     }
+
+    ; Build breadcrumb JSON
     bcJson := "["
     first := true
     for _, b in breadcrumb {
         if !first bcJson .= ","
             first := false
-        bcJson .= "{" . _UibQ("ptr") . ":" . _UibQ(Format("0x{:X}", b["ptr"]))
-            . "," . _UibQ("stringId") . ":" . _UibQ(b["stringId"]) . "}"
+        sid := StrReplace(b["stringId"], "\", "\\")
+        sid := StrReplace(sid, '"', '\"')
+        bcJson .= '{"ptr":"' . Format("0x{:X}", b["ptr"]) . '","stringId":"' . sid . '"}'
     }
     bcJson .= "]"
+
+    ; Build children JSON
     chJson := "["
     first := true
     for _, c in children {
         if !first chJson .= ","
             first := false
-        chJson .= "{" . _UibQ("idx") . ":" . c["idx"]
-            . "," . _UibQ("ptr") . ":" . _UibQ(Format("0x{:X}", c["ptr"]))
-            . "," . _UibQ("stringId") . ":" . _UibQ(c["stringId"])
-            . "," . _UibQ("isVisible") . ":" . (c["isVisible"] ? "true" : "false")
-            . "," . _UibQ("childCount") . ":" . c["childCount"] . "}"
+        sid := StrReplace(c["stringId"], "\", "\\")
+        sid := StrReplace(sid, '"', '\"')
+        chJson .= '{"idx":' . c["idx"]
+            . ',"ptr":"' . Format("0x{:X}", c["ptr"]) . '"'
+            . ',"stringId":"' . sid . '"'
+            . ',"isVisible":' . (c["isVisible"] ? "true" : "false")
+            . ',"childCount":' . c["childCount"] . '}'
     }
     chJson .= "]"
-    props := "{" . _UibQ("address") . ":" . _UibQ(Format("0x{:X}", g_uiBrowserCurrentPtr))
-        . "," . _UibQ("stringId") . ":" . _UibQ(elem["stringId"])
-        . "," . _UibQ("isVisible") . ":" . (elem["isVisible"] ? "true" : "false")
-        . "," . _UibQ("childCount") . ":" . elem["childCount"]
-        . "," . _UibQ("flags") . ":" . _UibQ(Format("0x{:08X}", elem["flags"]))
-        . "," . _UibQ("relX") . ":" . Round(elem["relX"], 2)
-        . "," . _UibQ("relY") . ":" . Round(elem["relY"], 2)
-        . "," . _UibQ("sizeW") . ":" . Round(elem["sizeW"], 1)
-        . "," . _UibQ("sizeH") . ":" . Round(elem["sizeH"], 1)
-        . "," . _UibQ("scaleIndex") . ":" . elem["scaleIndex"]
-        . "," . _UibQ("localMult") . ":" . Round(elem["localMult"], 4)
-        . "," . _UibQ("vtable") . ":" . _UibQ(Format("0x{:X}", elem["vtable"]))
-        . "," . _UibQ("parentPtr") . ":" . _UibQ(Format("0x{:X}", elem["parentPtr"])) . "}"
-    payload := "{" . _UibQ("breadcrumb") . ":" . bcJson
-        . "," . _UibQ("children") . ":" . chJson
-        . "," . _UibQ("props") . ":" . props
-        . "," . _UibQ("canBack") . ":" . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
-        . "," . _UibQ("isRoot") . ":" . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false") . "}"
+
+    ; Build props JSON
+    sid := StrReplace(elem["stringId"], "\", "\\")
+    sid := StrReplace(sid, '"', '\"')
+    propsJson := '{'
+        . '"address":"' . Format("0x{:X}", g_uiBrowserCurrentPtr) . '"'
+        . ',"stringId":"' . sid . '"'
+        . ',"isVisible":' . (elem["isVisible"] ? "true" : "false")
+        . ',"childCount":' . elem["childCount"]
+        . ',"flags":"' . Format("0x{:08X}", elem["flags"]) . '"'
+        . ',"relX":' . Round(elem["relX"], 2)
+        . ',"relY":' . Round(elem["relY"], 2)
+        . ',"sizeW":' . Round(elem["sizeW"], 1)
+        . ',"sizeH":' . Round(elem["sizeH"], 1)
+        . ',"scaleIndex":' . elem["scaleIndex"]
+        . ',"localMult":' . Round(elem["localMult"], 4)
+        . ',"vtable":"' . Format("0x{:X}", elem["vtable"]) . '"'
+        . ',"parentPtr":"' . Format("0x{:X}", elem["parentPtr"]) . '"'
+        . '}'
+
+    payload := '{'
+        . '"breadcrumb":' . bcJson
+        . ',"children":' . chJson
+        . ',"props":' . propsJson
+        . ',"canBack":' . (g_uiBrowserHistory.Length > 0 ? "true" : "false")
+        . ',"isRoot":' . (g_uiBrowserCurrentPtr = g_uiBrowserRootPtr ? "true" : "false")
+        . '}'
+
     WebViewExec("updateUiBrowser(" . _JsStr(payload) . ")")
 }
