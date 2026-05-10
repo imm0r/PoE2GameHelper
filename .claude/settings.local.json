@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"MsgBox\\\\|ToolTip.*BridgeDispatch\\\\|iBrowserHandler\" UiBrowserHandler.ahk BridgeDispatch.ahk InGameStateMonitor.ahk)",
+      "Bash(ls iBrowserHandler.ahk)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'Remove UI Browser debug artifacts, replace handler with clean rewrite' --body ' *)"
+    ]
+  }
+}

@@ -405,36 +405,22 @@ class RadarOverlay
             }
         }
 
-        ; DIAG: show g_uiBrowserHighlight state at render time using confirmed-working _DrawText
-        global g_uiBrowserHighlight
-        if IsObject(g_uiBrowserHighlight)
-            this._DrawText(100, 50, "HL-RENDER: x=" Round(g_uiBrowserHighlight["x"]) " y=" Round(g_uiBrowserHighlight["y"]) " w=" Round(g_uiBrowserHighlight["w"]) " h=" Round(g_uiBrowserHighlight["h"]), 0xFF00FF)
-        else
-            this._DrawText(100, 50, "HL-RENDER: ZERO", 0xFF00FF)
-
         this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
     }
 
     ; Draws UI Browser highlight (if active) then blits the back-buffer to screen.
-    ; Called instead of _Blit so the highlight is always the topmost drawn layer.
+    ; Called instead of _Blit so the highlight is always the topmost drawn layer
+    ; (after maphack and any other full-screen overlays).
     _BlitWithHighlight(gameWindowWidth, gameWindowHeight)
     {
-        ; DIAG A: unconditional magenta dot — proves this method is reached
-        this._DrawDot(80, 80, 0xFF00FF, 15)
-
         global g_uiBrowserHighlight
         if IsObject(g_uiBrowserHighlight)
         {
-            ; DIAG B: green dot — proves IsObject passes inside this method
-            this._DrawDot(80, 130, 0x00FF00, 15)
-
             sf := gameWindowHeight / 1600.0
             hx := Round(g_uiBrowserHighlight["x"] * sf)
             hy := Round(g_uiBrowserHighlight["y"] * sf)
             hw := Round(g_uiBrowserHighlight["w"] * sf)
             hh := Round(g_uiBrowserHighlight["h"] * sf)
-            ToolTip("RDR: x=" hx " y=" hy " w=" hw " h=" hh, 10, 150, 19)
-            SetTimer(() => ToolTip(,,, 19), -3000)
             if (hw > 4 && hh > 4 && hx < gameWindowWidth && hy < gameWindowHeight)
                 this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
         }
