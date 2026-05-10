@@ -3294,10 +3294,20 @@
 
     function updateUiBrowser(jsonStr) {
       let data;
-      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }
+      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; }
+      catch (e) {
+        document.getElementById('uib-children-list').innerHTML =
+          `<div class="uib-empty" style="color:#cc6666">JSON parse error: ${escHtml(String(e))}</div>`;
+        return;
+      }
       if (data.error) {
         document.getElementById('uib-children-list').innerHTML =
           `<div class="uib-empty" style="color:#cc6666">${escHtml(data.error)}</div>`;
+        return;
+      }
+      if (data.loading) {
+        document.getElementById('uib-children-list').innerHTML =
+          `<div class="uib-empty" style="color:#aaa">Connecting to game…</div>`;
         return;
       }
       // Breadcrumb
