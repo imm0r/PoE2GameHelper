@@ -142,6 +142,9 @@ class RadarOverlay
         ; Debug lines — collected each Render() when DebugMode is on, pushed to WebView
         ; (Debug tab) instead of being drawn on the overlay so they're copyable.
         this._debugLines := Map()
+        ; Cache for path-based entity classification flags to avoid repeated StrLower/InStr
+        ; work in the per-frame render hot path.
+        this._pathTypeCache := Map()
     }
 
     ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
@@ -615,17 +618,19 @@ class RadarOverlay
                     continue
                 }
 
-                ; Path-Filter: nur Monster, Spielercharaktere, NPCs und Chests anzeigen
-                entityPathLower := entity.Has("path") ? StrLower(entity["path"]) : ""
-                isMonster        := InStr(entityPathLower, "metadata/monsters/")
-                isCharacter      := InStr(entityPathLower, "metadata/characters/")
-                isNpcPath        := InStr(entityPathLower, "metadata/npc/")
-                isChestPath      := InStr(entityPathLower, "/chests/") || InStr(entityPathLower, "strongbox")
-                isAreaTransition := InStr(entityPathLower, "areatransition")
-                isWaypoint       := InStr(entityPathLower, "waypoint")
-                isCheckpoint     := InStr(entityPathLower, "checkpoint")
-                isBossPath       := isMonster && (InStr(entityPathLower, "boss") || InStr(entityPathLower, "unique"))
-                isImportantSleep := isAreaTransition || isWaypoint || isCheckpoint || isBossPath || isNpcPath
+                ; Path-Filter: nur Monster, Spielercharaktere, NPCs und Chests anzeigen.
+                ; Resolve via cached classification to avoid repeated StrLower/InStr per frame.
+                entityPath := entity.Has("path") ? entity["path"] : ""
+                pathFlags := this._GetPathTypeFlags(entityPath)
+                isMonster        := pathFlags["isMonster"]
+                isCharacter      := pathFlags["isCharacter"]
+                isNpcPath        := pathFlags["isNpcPath"]
+                isChestPath      := pathFlags["isChestPath"]
+                isAreaTransition := pathFlags["isAreaTransition"]
+                isWaypoint       := pathFlags["isWaypoint"]
+                isCheckpoint     := pathFlags["isCheckpoint"]
+                isBossPath       := pathFlags["isBossPath"]
+                isImportantSleep := pathFlags["isImportantSleep"]
 
                 entityWorldPos      := renderComponent["worldPosition"]
                 entityTerrainHeight := renderComponent.Has("terrainHeight") ? renderComponent["terrainHeight"] : 0.0
@@ -881,6 +886,45 @@ class RadarOverlay
                     . " pre=" preFlt " post=" postFlt
             }
         }
+    }
+
+    ; Returns cached path classification flags used by the hot render loop.
+    _GetPathTypeFlags(entityPath)
+    {
+        if (entityPath = "")
+            return Map(
+                "isMonster", false, "isCharacter", false, "isNpcPath", false, "isChestPath", false,
+                "isAreaTransition", false, "isWaypoint", false, "isCheckpoint", false, "isBossPath", false,
+                "isImportantSleep", false
+            )
+
+        if this._pathTypeCache.Has(entityPath)
+            return this._pathTypeCache[entityPath]
+
+        entityPathLower := StrLower(entityPath)
+        isMonster        := InStr(entityPathLower, "metadata/monsters/")
+        isCharacter      := InStr(entityPathLower, "metadata/characters/")
+        isNpcPath        := InStr(entityPathLower, "metadata/npc/")
+        isChestPath      := InStr(entityPathLower, "/chests/") || InStr(entityPathLower, "strongbox")
+        isAreaTransition := InStr(entityPathLower, "areatransition")
+        isWaypoint       := InStr(entityPathLower, "waypoint")
+        isCheckpoint     := InStr(entityPathLower, "checkpoint")
+        isBossPath       := isMonster && (InStr(entityPathLower, "boss") || InStr(entityPathLower, "unique"))
+        isImportantSleep := isAreaTransition || isWaypoint || isCheckpoint || isBossPath || isNpcPath
+
+        flags := Map(
+            "isMonster", isMonster,
+            "isCharacter", isCharacter,
+            "isNpcPath", isNpcPath,
+            "isChestPath", isChestPath,
+            "isAreaTransition", isAreaTransition,
+            "isWaypoint", isWaypoint,
+            "isCheckpoint", isCheckpoint,
+            "isBossPath", isBossPath,
+            "isImportantSleep", isImportantSleep
+        )
+        this._pathTypeCache[entityPath] := flags
+        return flags
     }
 
     ; ── GDI Zeichen-Helfer ───────────────────────────────────────────────────────────────
