@@ -13,6 +13,9 @@ __pycache__/
 # IDE / Editor
 .vscode/
 
+# Per-user Claude Code settings
+.claude/settings.local.json
+
 # Logs & temp files
 *.error.log
 *.error.log.*

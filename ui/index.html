@@ -2110,11 +2110,13 @@
     <div class="tab-panel" id="panel-ui">
       <div id="uib-toolbar">
         <div id="uib-breadcrumb"></div>
+        <div id="uib-idx-path" style="display:none;font-family:Consolas,monospace;font-size:11px;color:#9adff7;padding:2px 6px;"></div>
         <div id="uib-nav-btns">
           <button class="uib-btn" onclick="ahkCall('UiBrowseParent')" title="Parent">↑ Parent</button>
           <button class="uib-btn" onclick="ahkCall('UiBrowseBack')" title="Back">← Back</button>
           <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" title="Root">⌂ Root</button>
           <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" title="GameUI">⊞ GameUI</button>
+          <button class="uib-btn" onclick="uibCopyInfo()" title="Copy element info as text">📋 Copy Info</button>
         </div>
         <div id="uib-search-row">
           <input id="uib-search-input" type="text" placeholder="Search StringId…"
@@ -2486,6 +2488,18 @@
     <div class="tab-panel" id="panel-debug">
       <div class="cfg-scroll">
         <div class="cfg-section">
+          <details id="det-radar-debug" open>
+            <summary>
+              <div class="cfg-header">📊 Radar Render Debug</div>
+            </summary>
+            <div style="padding:6px 0;display:flex;gap:8px;align-items:center;font-size:11px">
+              <span id="radar-debug-state" style="color:var(--subtext)">DebugMode disabled — toggle in Config tab</span>
+              <button class="tree-tbtn" onclick="copyRadarDebug()" style="font-size:11px;margin-left:auto">📋 Copy</button>
+            </div>
+            <pre id="radar-debug-content" style="margin:0;padding:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;font-family:Consolas,monospace;font-size:11px;color:#d8d8d8;white-space:pre-wrap;word-break:break-all;user-select:text;min-height:40px">(no data)</pre>
+          </details>
+        </div>
+        <div class="cfg-section">
           <details id="det-debug-panels" open>
             <summary>
               <div class="cfg-header">🎛 Panel Visibility (Live)</div>
@@ -2611,6 +2625,8 @@
     function switchTab(key) {
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === key));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
+      if (activeTab === 'ui' && key !== 'ui')
+        ahkCall('UiBrowserClearHighlight');
       activeTab = key;
       if (treeTabs.has(key))
         ahkCall('SwitchTab', key.charAt(0).toUpperCase() + key.slice(1));
@@ -3294,13 +3310,23 @@
 
     function updateUiBrowser(jsonStr) {
       let data;
-      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }
+      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; }
+      catch (e) {
+        document.getElementById('uib-children-list').innerHTML =
+          `<div class="uib-empty" style="color:#cc6666">JSON parse error: ${escHtml(String(e))}</div>`;
+        return;
+      }
       if (data.error) {
         document.getElementById('uib-children-list').innerHTML =
           `<div class="uib-empty" style="color:#cc6666">${escHtml(data.error)}</div>`;
         return;
       }
-      // Breadcrumb
+      if (data.loading) {
+        document.getElementById('uib-children-list').innerHTML =
+          `<div class="uib-empty" style="color:#aaa">Connecting to game…</div>`;
+        return;
+      }
+      // Breadcrumb (StringId path)
       const bc = data.breadcrumb || [];
       document.getElementById('uib-breadcrumb').innerHTML = bc.map((b, i) => {
         const label = b.stringId || b.ptr;
@@ -3310,6 +3336,17 @@
                   title="${escAttr(b.ptr)}">${escHtml(label)}</span>`
           + `<span class="uib-crumb-sep">›</span>`;
       }).join('');
+      // Index path "[1] > [41] > [1] > *"
+      const ip = data.indexPath || [];
+      const ipEl = document.getElementById('uib-idx-path');
+      if (ip.length === 0) {
+        ipEl.style.display = 'none';
+      } else {
+        ipEl.style.display = 'block';
+        ipEl.innerHTML = '<span style="color:#777">Path [idx]:</span> '
+          + ip.map(i => `<span style="color:#9adff7">[${i}]</span>`).join(' <span style="color:#666">›</span> ')
+          + ' <span style="color:#666">›</span> <span style="color:#9adff7">*</span>';
+      }
       // Kinder
       const ch = data.children || [];
       const chEl = document.getElementById('uib-children-list');
@@ -3330,29 +3367,92 @@
       }
       // Properties
       const p = data.props || {};
-      const bv = v => v ? `<span class="uib-prop-val bool-true">TRUE</span>`
-        : `<span class="uib-prop-val bool-false">FALSE</span>`;
+      window._uibLastProps = p;
+      window._uibLastIdxPath = ip;
+      const bv = v => v ? `<span class="uib-prop-val bool-true">SET</span>`
+        : `<span class="uib-prop-val bool-false" style="color:#888">UNSET</span>`;
       const hv = v => `<span class="uib-prop-val hex">${escHtml(v)}</span>`;
       const nv = v => `<span class="uib-prop-val">${escHtml(String(v))}</span>`;
+      const colorVal = v => {
+        const isTransparent = !v || v === '0x00000000';
+        return `<span class="uib-prop-val hex" style="color:${isTransparent ? '#666' : '#fff'}">${escHtml(v || '0x00000000')}${isTransparent ? ' <span style="color:#666;font-style:italic">(transparent)</span>' : ''}</span>`;
+      };
+      const fxNum = (v, d) => Number(v || 0).toFixed(d);
+      const idxPathStr = ip.length ? ip.map(i => `[${i}]`).join(' -> ') : '(root)';
       document.getElementById('uib-props-content').innerHTML = `
-    <div class="uib-prop-section">StringId</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">StringId</span>${nv(p.stringId || '(none)')}</div>
-    <div class="uib-prop-section">Address</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">StringId</span><span class="uib-prop-val" style="color:#7be07b">"${escHtml(p.stringId || '')}"</span></div>
     <div class="uib-prop-row"><span class="uib-prop-key">Address</span>${hv(p.address || '')}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">UI Path</span><span class="uib-prop-val" style="color:#e8c674">${escHtml(idxPathStr)}</span></div>
     <div class="uib-prop-row"><span class="uib-prop-key">Parent</span>${hv(p.parentPtr || '')}</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Vtable</span>${hv(p.vtable || '')}</div>
-    <div class="uib-prop-section">Position</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Relative Pos</span>${nv((p.relX || 0).toFixed(2) + ', ' + (p.relY || 0).toFixed(2))}</div>
-    <div class="uib-prop-section">Size</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Unscaled Size</span>${nv((p.sizeW || 0).toFixed(1) + ' × ' + (p.sizeH || 0).toFixed(1))}</div>
-    <div class="uib-prop-section">Scale</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Scale Index</span>${nv(p.scaleIndex || 0)}</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Scale Multiplier</span>${nv((p.localMult || 0).toFixed(4))}</div>
-    <div class="uib-prop-section">Flags</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Visible (local)</span>${p.isVisible ? '<span class="uib-prop-val bool-true">TRUE</span>' : '<span class="uib-prop-val bool-false">FALSE</span>'}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Children</span>${nv(p.childCount || 0)}</div>
+
+    <div class="uib-prop-section" style="color:#7be07b">--- Position ---</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Screen Pos</span>${nv(fxNum(p.screenPosX, 1) + ', ' + fxNum(p.screenPosY, 1))}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Unscaled Pos</span>${nv(fxNum(p.unscaledPosX, 1) + ', ' + fxNum(p.unscaledPosY, 1))}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Relative Pos</span>${nv(fxNum(p.relX, 1) + ', ' + fxNum(p.relY, 1))}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Pos Modifier</span>${nv(fxNum(p.posModX, 1) + ', ' + fxNum(p.posModY, 1))}</div>
+
+    <div class="uib-prop-section" style="color:#7be07b">--- Size ---</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Screen Size</span>${nv(fxNum(p.screenSizeW, 1) + ' x ' + fxNum(p.screenSizeH, 1))}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Unscaled Size</span>${nv(fxNum(p.sizeW, 1) + ' x ' + fxNum(p.sizeH, 1))}</div>
+
+    <div class="uib-prop-section" style="color:#7be07b">--- Scale ---</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Scale Index</span>${nv((p.scaleIndex ?? 0) + ' (' + (p.scaleLabel || '?') + ')')}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Scale Multiplier</span>${nv(fxNum(p.localMult, 4))}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Computed Scale</span>${nv('W: ' + fxNum(p.computedScaleW, 4) + '  H: ' + fxNum(p.computedScaleH, 4))}</div>
+
+    <div class="uib-prop-section" style="color:#7be07b">--- Flags ---</div>
     <div class="uib-prop-row"><span class="uib-prop-key">Flags (raw)</span>${hv(p.flags || '')}</div>
     <div class="uib-prop-row"><span class="uib-prop-key">IsVisible bit</span>${bv(p.isVisible)}</div>
-    <div class="uib-prop-section">Children</div>
-    <div class="uib-prop-row"><span class="uib-prop-key">Children</span>${nv(p.childCount || 0)}</div>`;
+    <div class="uib-prop-row"><span class="uib-prop-key">ShouldModifyPos bit</span>${bv(p.shouldModifyPos)}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Background Color</span>${colorVal(p.bgColor)}</div>
+
+    <div class="uib-prop-section" style="color:#7be07b">--- Extra ---</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Font Name</span><span class="uib-prop-val" style="color:#7be07b">${p.fontName ? '"' + escHtml(p.fontName) + '"' : '<span style="color:#666">(none)</span>'}</span></div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Vtable</span>${hv(p.vtable || '')}</div>`;
+    }
+
+    function uibCopyInfo() {
+      const p = window._uibLastProps || {};
+      const ip = window._uibLastIdxPath || [];
+      const lines = [
+        `StringId:      "${p.stringId || ''}"`,
+        `Address:       ${p.address || ''}`,
+        `UI Path:       ${ip.length ? ip.map(i => `[${i}]`).join(' -> ') : '(root)'}`,
+        `Parent:        ${p.parentPtr || ''}`,
+        `Visible:       ${p.isVisible ? 'TRUE' : 'FALSE'}`,
+        `Children:      ${p.childCount || 0}`,
+        ``,
+        `Screen Pos:    ${Number(p.screenPosX||0).toFixed(1)}, ${Number(p.screenPosY||0).toFixed(1)}`,
+        `Unscaled Pos:  ${Number(p.unscaledPosX||0).toFixed(1)}, ${Number(p.unscaledPosY||0).toFixed(1)}`,
+        `Relative Pos:  ${Number(p.relX||0).toFixed(1)}, ${Number(p.relY||0).toFixed(1)}`,
+        `Pos Modifier:  ${Number(p.posModX||0).toFixed(1)}, ${Number(p.posModY||0).toFixed(1)}`,
+        ``,
+        `Screen Size:   ${Number(p.screenSizeW||0).toFixed(1)} x ${Number(p.screenSizeH||0).toFixed(1)}`,
+        `Unscaled Size: ${Number(p.sizeW||0).toFixed(1)} x ${Number(p.sizeH||0).toFixed(1)}`,
+        ``,
+        `Scale Index:   ${p.scaleIndex || 0} (${p.scaleLabel || '?'})`,
+        `Scale Mult:    ${Number(p.localMult||0).toFixed(4)}`,
+        `Computed:      W ${Number(p.computedScaleW||0).toFixed(4)}  H ${Number(p.computedScaleH||0).toFixed(4)}`,
+        ``,
+        `Flags:         ${p.flags || ''}`,
+        `Background:    ${p.bgColor || ''}`,
+        `Font Name:     "${p.fontName || ''}"`,
+        `Vtable:        ${p.vtable || ''}`,
+      ];
+      const text = lines.join('\n');
+      try {
+        navigator.clipboard.writeText(text);
+      } catch (e) {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
     }
 
     function uibDoSearch() {
@@ -3497,6 +3597,39 @@
     //  DEBUG TAB — Panel Visibility & Discovery
     // ═══════════════════════════════════════════════════════════════════
     let _lastPanelDiscovery = null;
+
+    function updateRadarDebug(jsonStr) {
+      let data;
+      try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }
+      if (!data) return;
+      const stateEl = document.getElementById('radar-debug-state');
+      const contentEl = document.getElementById('radar-debug-content');
+      if (!stateEl || !contentEl) return;
+      if (!data.enabled) {
+        stateEl.textContent = 'DebugMode disabled — toggle in Config tab';
+        stateEl.style.color = 'var(--subtext)';
+        contentEl.textContent = '(disabled)';
+        return;
+      }
+      stateEl.textContent = `read=${data.readMs ?? 0}ms · render=${data.renderMs ?? 0}ms · updated ${new Date().toLocaleTimeString()}`;
+      stateEl.style.color = '#7be07b';
+      const lines = (data.lines || []).map(l => l.text).filter(Boolean);
+      contentEl.textContent = lines.length ? lines.join('\n') : '(no debug lines yet)';
+    }
+    function copyRadarDebug() {
+      const el = document.getElementById('radar-debug-content');
+      if (!el) return;
+      const text = el.textContent || '';
+      try { navigator.clipboard.writeText(text); }
+      catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    }
 
     function updateDebugPanels(jsonStr) {
       let data; try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }

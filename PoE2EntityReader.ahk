@@ -1406,9 +1406,19 @@ class PoE2EntityReader extends PoE2ComponentDecoders
     }
 
     ; Processes a batch of tiles from the incremental TGT scan.
-    ; Reads tile structs in bulk (one RPM call per batch) and only does individual reads for path strings.
+    ; Reads tile structs in bulk (one RPM call up-front) and walks them, doing
+    ; one cross-process StdWString read per tile that has a valid TgtFilePtr.
     ; Returns true when all tiles have been processed.
-    _ProcessTgtScanBatch(batchSize)
+    ;
+    ; A time budget caps how long a single tick spends here — the per-tile
+    ; ReadStdWStringAt is a cross-process call (slow under load), so a naive
+    ; 2000-tile batch can block UpdateRadarFast for several seconds. The
+    ; reentrancy guard then skips every render tick for that whole period,
+    ; which is why the maphack used to only appear after the whole scan
+    ; finished. With the budget the loop yields back to the timer often
+    ; enough that Render() runs between batches and the maphack becomes
+    ; visible the moment a few tiles have been scanned.
+    _ProcessTgtScanBatch(batchSize, maxMs := 20)
     {
         tileStructSize := 0x38
         tileToGrid := 0x17
@@ -1430,10 +1440,24 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         offTileIdY    := PoE2Offsets.TileStruct["TileIdY"]
         offRotSel     := PoE2Offsets.TileStruct["RotationSelector"]
 
+        ; Time-sliced inner loop: bail early if we exceed maxMs even though
+        ; we still have tiles in the prefetched batch buffer. The next tick
+        ; resumes from this._tgtScanTileIdx + 1.
+        deadline := A_TickCount + maxMs
+        processed := 0
         Loop endIdx - startIdx
         {
             tileIdx := startIdx + A_Index - 1
             bufOff := (A_Index - 1) * tileStructSize
+
+            ; Check the deadline every 64 tiles (cheap; sufficiently fine-grained)
+            if (Mod(processed, 64) = 0 && A_TickCount > deadline)
+            {
+                ; Resume from the NEXT unprocessed tile next tick
+                this._tgtScanTileIdx := tileIdx
+                return false
+            }
+            processed += 1
 
             tgtFilePtr := NumGet(tileBatchBuf.Ptr, bufOff + offTgtFilePtr, "Ptr")
             if !this.IsProbablyValidPointer(tgtFilePtr)

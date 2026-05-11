@@ -79,11 +79,30 @@ UpdateRadarFast()
         overlayAllowed := true
         hideReason := ""
 
-        ; Condition 1: Must be in InGameState
-        if (currentState != "InGameState")
+        ; Condition 1: Reject only states that definitely have no player/area
+        ; (login / character management / credits). Don't gate on
+        ; currentState != "InGameState" alone — after a zone change the game
+        ; can keep transitional states (AreaLoadingState etc.) on top of the
+        ; state stack for tens of seconds, or report a state pointer we don't
+        ; recognize ('GameNotLoaded'), even though areaInstance, playerRender
+        ; and terrain are all valid (the snapshot's ResolveInGameStateAddress
+        ; scoring picks the right InGameState by data, not by name). Conds 2-6
+        ; below already filter out anything that isn't actually in-game.
+        nonGameStates := Map(
+            "PreGameState",         true,
+            "LoginState",           true,
+            "WaitingState",         true,
+            "CreateCharacterState", true,
+            "SelectCharacterState", true,
+            "DeleteCharacterState", true,
+            "ChangePasswordState",  true,
+            "CreditsState",         true,
+            "LoadingState",         true
+        )
+        if (nonGameStates.Has(currentState))
         {
             overlayAllowed := false
-            hideReason := "not-ingame"
+            hideReason := "not-ingame(" currentState ")"
         }
 
         ; Condition 2: Not town or hideout
@@ -195,8 +214,16 @@ UpdateRadarFast()
         if (A_TickCount - _debugPanelPushTick > 500)
         {
             PushDebugPanelsToWebView(radarSnap, overlayAllowed, hideReason)
+            PushRadarDebugToWebView(overlayAllowed, hideReason)
             _debugPanelPushTick := A_TickCount
         }
+
+        ; ── UI Browser inspect mode overrides all hide conditions ────────────
+        ; When a highlight is active the user is actively inspecting an element;
+        ; show the overlay regardless of map state, panels, or focus.
+        global g_uiBrowserHighlight
+        if IsObject(g_uiBrowserHighlight)
+            overlayAllowed := true
 
         ; ── Hide overlays if conditions not met ──────────────────────────────
         ; GC-susceptible conditions (no-largemap, no-player) get a grace period
@@ -252,9 +279,13 @@ UpdateRadarFast()
 
         if !WinActive("ahk_id " gameHwnd)
         {
-            ; Still render range circles when GameHelper has focus (config preview)
+            ; Keep rendering when our own tool window is focused (user clicks in GameHelper)
+            ; or when range circles are set (config preview mode).
+            ; Any other window in focus → hide.
+            global g_webGui
             hasCircles := (g_radarOverlay && g_radarOverlay._rangeCircles.Length > 0)
-            if !hasCircles
+            toolFocused := IsObject(g_webGui) && WinActive("ahk_id " g_webGui.Hwnd)
+            if (!hasCircles && !toolFocused)
             {
                 if g_radarOverlay
                     g_radarOverlay.Hide()
@@ -538,25 +569,42 @@ TryAutoFlask(snapshot)
     }
 }
 
-; Returns true only when the snapshot represents a live InGameState (not a loading screen or main menu).
-; Verifies that currentStateAddress matches inGameStateAddress to rule out stale pointer reads.
+; Returns true when the snapshot represents a live in-game session (entities/area/player
+; data present). Used to gate auto-flask so it doesn't fire on the login or character
+; select screen. Don't strictly require currentStateName == "InGameState": after a zone
+; change the game keeps a transitional state on top of the state stack for tens of
+; seconds while play is fully resumed, and the state-pointer offsets occasionally
+; produce a 'GameNotLoaded' false negative. Gate on actual data instead.
 IsStrictInGameState(snapshot)
 {
     if !snapshot
         return false
 
-    if !snapshot.Has("currentStateName") || snapshot["currentStateName"] != "InGameState"
+    ; Hard reject only the states that definitely have no character/area.
+    nonGameStates := Map(
+        "PreGameState",         true,
+        "LoginState",           true,
+        "WaitingState",         true,
+        "CreateCharacterState", true,
+        "SelectCharacterState", true,
+        "DeleteCharacterState", true,
+        "ChangePasswordState",  true,
+        "CreditsState",         true,
+        "LoadingState",         true
+    )
+    name := snapshot.Has("currentStateName") ? snapshot["currentStateName"] : ""
+    if (name != "" && nonGameStates.Has(name))
         return false
 
-    if !snapshot.Has("currentStateAddress") || !snapshot.Has("inGameStateAddress")
+    ; Need a player render component (proves the character exists in the world).
+    inGs := snapshot.Has("inGameState") ? snapshot["inGameState"] : 0
+    if !(inGs && IsObject(inGs))
         return false
-
-    currentAddr := snapshot["currentStateAddress"]
-    inGameAddr := snapshot["inGameStateAddress"]
-    if (!currentAddr || !inGameAddr)
+    area := inGs.Has("areaInstance") ? inGs["areaInstance"] : 0
+    if !(area && IsObject(area))
         return false
-
-    return currentAddr = inGameAddr
+    pr := area.Has("playerRenderComponent") ? area["playerRenderComponent"] : 0
+    return (pr && IsObject(pr)) ? true : false
 }
 
 ; Attempts to activate one flask slot; checks buff state, charges, cooldown, and key availability.

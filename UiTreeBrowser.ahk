@@ -106,6 +106,7 @@ UiTree_ReadElement(reader, elemPtr)
     localMult  := NumGet(hdr.Ptr, 0x130, "Float")
     scaleIndex := NumGet(hdr.Ptr, 0x18A, "UChar")
     stringId   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["StringIdPtr"])
+    fontName   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["FontNamePtr"])
     flags      := NumGet(hdr.Ptr, 0x180, "UInt")
     isVisible  := ((flags >> 11) & 1) ? true : false
     sizeW      := NumGet(hdr.Ptr, 0x288, "Float")
@@ -113,27 +114,96 @@ UiTree_ReadElement(reader, elemPtr)
     posModX    := NumGet(hdr.Ptr, 0x0F0, "Float")
     posModY    := NumGet(hdr.Ptr, 0x0F4, "Float")
     vtable     := NumGet(hdr.Ptr, 0x000, "Ptr")
+    ; BackgroundColor — 4 floats (RGBA, normalized 0..1) at 0x25C
+    bgR        := NumGet(hdr.Ptr, 0x25C + 0x00, "Float")
+    bgG        := NumGet(hdr.Ptr, 0x25C + 0x04, "Float")
+    bgB        := NumGet(hdr.Ptr, 0x25C + 0x08, "Float")
+    bgA        := NumGet(hdr.Ptr, 0x25C + 0x0C, "Float")
+    bgPacked   := _UiPackColor(bgR, bgG, bgB, bgA)
+    shouldModifyPos := ((flags >> 10) & 1) ? true : false
     return Map(
-        "address",     elemPtr,
-        "stringId",    stringId,
-        "isVisible",   isVisible,
-        "flags",       flags,
-        "childCount",  childCount,
-        "childFirst",  childFirst,
-        "childLast",   childLast,
-        "parentPtr",   parentPtr,
-        "relX",        relX,
-        "relY",        relY,
-        "screenX",     relX,
-        "screenY",     relY,
-        "sizeW",       sizeW,
-        "sizeH",       sizeH,
-        "localMult",   localMult,
-        "scaleIndex",  scaleIndex,
-        "posModX",     posModX,
-        "posModY",     posModY,
-        "vtable",      vtable
+        "address",         elemPtr,
+        "stringId",        stringId,
+        "fontName",        fontName,
+        "isVisible",       isVisible,
+        "shouldModifyPos", shouldModifyPos,
+        "flags",           flags,
+        "childCount",      childCount,
+        "childFirst",      childFirst,
+        "childLast",       childLast,
+        "parentPtr",       parentPtr,
+        "relX",            relX,
+        "relY",            relY,
+        "screenX",         relX,
+        "screenY",         relY,
+        "sizeW",           sizeW,
+        "sizeH",           sizeH,
+        "localMult",       localMult,
+        "scaleIndex",      scaleIndex,
+        "posModX",         posModX,
+        "posModY",         posModY,
+        "vtable",          vtable,
+        "bgColor",         bgPacked
     )
+}
+
+; Packs four normalized floats (0..1) into an RRGGBBAA hex uint.
+_UiPackColor(r, g, b, a)
+{
+    ri := Min(255, Max(0, Round(r * 255)))
+    gi := Min(255, Max(0, Round(g * 255)))
+    bi := Min(255, Max(0, Round(b * 255)))
+    ai := Min(255, Max(0, Round(a * 255)))
+    return (ri << 24) | (gi << 16) | (bi << 8) | ai
+}
+
+; Walks up from elemPtr through parent pointers until rootPtr (or hitting NULL),
+; finding each step's index in its parent's children array.
+; Returns: Array of integers like [1, 41, 1] (root → element).
+UiTree_GetIndexPath(reader, rootPtr, elemPtr)
+{
+    path := []
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(elemPtr))
+        return path
+    cur := elemPtr
+    Loop 32
+    {
+        if (cur = rootPtr || !reader.IsProbablyValidPointer(cur))
+            break
+        hdr := reader.Mem.ReadBytes(cur, 0xC0)
+        if !hdr
+            break
+        parent := NumGet(hdr.Ptr, 0x0B8, "Ptr")
+        if (!reader.IsProbablyValidPointer(parent))
+            break
+        ; Read parent's child array to find cur's index
+        phdr := reader.Mem.ReadBytes(parent, 0x20)
+        if !phdr
+            break
+        cFirst := NumGet(phdr.Ptr, 0x010, "Ptr")
+        cLast  := NumGet(phdr.Ptr, 0x018, "Ptr")
+        if (!reader.IsProbablyValidPointer(cFirst) || cLast <= cFirst)
+            break
+        n := Min((cLast - cFirst) // A_PtrSize, 4096)
+        buf := reader.Mem.ReadBytes(cFirst, n * A_PtrSize)
+        if !buf
+            break
+        idx := -1
+        Loop n
+        {
+            cp := NumGet(buf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
+            if (cp = cur)
+            {
+                idx := A_Index - 1
+                break
+            }
+        }
+        if (idx < 0)
+            break
+        path.InsertAt(1, idx)
+        cur := parent
+    }
+    return path
 }
 
 ; Navigate by StringId path like "LeftPanel > InventoryPanel"

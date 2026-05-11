@@ -121,6 +121,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._radarTerrainAreaHash := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
         this._radarTerrainRetryTick := 0            ; tick of last failed-read retry attempt
         this._terrainLastError := ""           ; last ReadTerrainData failure reason
+        this._terrainDumpAreaHash := 0xFFFFFFFF   ; throttle: terrain hex dump appended at most once per zone
 
         ; World area data cache (town/hideout flags) — re-read on zone change.
         this._radarWorldAreaCache := 0
@@ -1208,22 +1209,42 @@ class PoE2GameStateReader extends PoE2InventoryReader
             largeMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["LargeMapPtr"])
             miniMapPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.MapParentStruct["MiniMapPtr"])
 
-            ; Cache location can become stale (same issue as PassiveSkillTree).
-            ; Fall back to navigating the children StdVector directly if both pointers are equal.
-            if (largeMapPtr = miniMapPtr && this.IsProbablyValidPointer(largeMapPtr))
-            {
-                childrenDataPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.UiElementBase["ChildrenFirst"])
-                if this.IsProbablyValidPointer(childrenDataPtr)
-                {
-                    largeMapPtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)  ; 1st child
-                    miniMapPtr := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)  ; 2nd child
-                }
-            }
-
+            ; Cache location can become stale after zone changes (same issue as PassiveSkillTree).
+            ; Two failure modes: (1) both cache slots converge on the same ptr; (2) one slot
+            ; (often LargeMapPtr) keeps a stale ptr pointing to an unpopulated UiElement that
+            ; reports isVisible=true but size 0x0. Both modes get fixed by walking the
+            ; MapParent's children StdVector directly: child[0] = LargeMap, child[1] = MiniMap.
+            needChildFallback := (largeMapPtr = miniMapPtr && this.IsProbablyValidPointer(largeMapPtr))
             if this.IsProbablyValidPointer(miniMapPtr)
                 miniMapData := this.ReadMapUiElementData(miniMapPtr)
             if this.IsProbablyValidPointer(largeMapPtr)
                 largeMapData := this.ReadMapUiElementData(largeMapPtr)
+
+            ; Detect stale-LargeMapPtr: visible but zero size means the element pointer is no
+            ; longer pointing at the live large-map UiElement.
+            if (!needChildFallback && largeMapData && IsObject(largeMapData)
+                && largeMapData["isVisible"] && largeMapData["sizeW"] = 0 && largeMapData["sizeH"] = 0)
+                needChildFallback := true
+
+            if needChildFallback
+            {
+                childrenDataPtr := this.Mem.ReadPtr(activeMapParentPtr + PoE2Offsets.UiElementBase["ChildrenFirst"])
+                if this.IsProbablyValidPointer(childrenDataPtr)
+                {
+                    altLargePtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)
+                    altMiniPtr  := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)
+                    if this.IsProbablyValidPointer(altLargePtr)
+                    {
+                        largeMapPtr := altLargePtr
+                        largeMapData := this.ReadMapUiElementData(largeMapPtr)
+                    }
+                    if this.IsProbablyValidPointer(altMiniPtr)
+                    {
+                        miniMapPtr := altMiniPtr
+                        miniMapData := this.ReadMapUiElementData(miniMapPtr)
+                    }
+                }
+            }
         }
 
         ; ChatParentUiElement — IsChatActive detection.
@@ -2367,6 +2388,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         if (!firstPtr || !lastPtr || lastPtr <= firstPtr)
         {
+            ; Fast-path for the common "still loading" state: when both ptrs are null the
+            ; expensive 63-offset scan and hex dump are pure waste — terrain isn't populated
+            ; yet, just bail and let the caller retry in 1.5 s.
+            if (!firstPtr && !lastPtr)
+            {
+                this._terrainLastError := "loading (ptrs null)"
+                return 0
+            }
+
             ; Pointer-pair scan: find where GridWalkableData StdVector actually is.
             ; Step by 4 (not 8) to catch any alignment, since the actual offset may not
             ; be 8-byte-aligned from the struct base. Covers offsets 0x18..0x10C.
@@ -2387,8 +2417,11 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 }
             }
             ; When no ptr pairs found, dump the raw TerrainStruct bytes to a debug file.
-            if (ptrScan = "")
+            ; Throttle: at most one dump per area-hash so we don't spam I/O while terrain
+            ; is loading (which can be 30-90 s on some maps).
+            if (ptrScan = "" && this._terrainDumpAreaHash != this._radarTerrainAreaHash)
             {
+                this._terrainDumpAreaHash := this._radarTerrainAreaHash
                 try {
                     dumpBuf := this.Mem.ReadBytes(terrainMetaBase, 0x120, false)
                     if (dumpBuf && dumpBuf.Size >= 0x120)
@@ -2411,7 +2444,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 }
             }
             this._terrainLastError := "bad-vec fp=0x" Format("{:X}", firstPtr) " lp=0x" Format("{:X}", lastPtr)
-                . (ptrScan != "" ? " ptrs=" ptrScan : " no-ptrs (see debug\terrain_dump.txt)")
+                . (ptrScan != "" ? " ptrs=" ptrScan : " no-ptrs")
             return 0
         }
 
@@ -2567,10 +2600,20 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if !this.IsProbablyValidPointer(areaInstanceData)
             return 0
 
-        ; Terrain walkability data — re-read when area hash changes, or retry every 3 s after a failed read.
+        ; Terrain walkability data — re-read on zone change or retry every 1.5 s after a failed read.
+        ; The previous logic kept (hashChanged || retry-3s) ORed, so as long as the hash differed AND
+        ; ReadTerrainData failed, every 50 ms tick would re-attempt — burning RPM calls and (when the
+        ; struct ptrs are still null) appending a hex dump to terrain_dump.txt 20×/s. After zone change
+        ; the game can take 30-90 s to populate the terrain struct; by locking the new hash immediately
+        ; even on failure we drop the retry rate to once per 1.5 s.
         currentAreaHash := this.Mem.ReadUInt(areaInstanceData + PoE2Offsets.AreaInstance["CurrentAreaHash"])
-        needsTerrainRead := (currentAreaHash != this._radarTerrainAreaHash)
-            || (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 3000)
+        if (currentAreaHash != this._radarTerrainAreaHash)
+        {
+            this._radarTerrainCache := 0
+            this._radarTerrainAreaHash := currentAreaHash
+            this._radarTerrainRetryTick := 0   ; force first attempt immediately
+        }
+        needsTerrainRead := (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 1500)
         if needsTerrainRead
         {
             this._radarTerrainRetryTick := nowTick
@@ -2578,10 +2621,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             try terrainResult := this.ReadTerrainData(areaInstanceData)
             catch
                 terrainResult := 0
-            this._radarTerrainCache := terrainResult
-            ; Only lock in the area hash when we have a valid result — on failure we retry in 3 s.
             if terrainResult
-                this._radarTerrainAreaHash := currentAreaHash
+                this._radarTerrainCache := terrainResult
         }
 
         ; World area data (town/hideout flags) — re-read only on zone change (area hash).
