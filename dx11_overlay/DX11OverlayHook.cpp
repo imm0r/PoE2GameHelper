@@ -5,15 +5,12 @@
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include "RenderQueueShared.h"
+#include "MinHook.h"
 
 #pragma comment(lib, "d3d11.lib")
 
 using PresentFn = HRESULT(__stdcall*)(IDXGISwapChain*, UINT, UINT);
 using ResizeBuffersFn = HRESULT(__stdcall*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
-using MHInitializeFn = int(*)();
-using MHCreateHookFn = int(*)(LPVOID, LPVOID, LPVOID*);
-using MHEnableHookFn = int(*)(LPVOID);
-using MHUninitializeFn = int(*)();
 
 static PresentFn oPresent = nullptr;
 static ResizeBuffersFn oResizeBuffers = nullptr;
@@ -150,24 +147,14 @@ static bool GetSwapchainMethods(void** present, void** resizeBuffers)
 
 static DWORD WINAPI InstallHookThread(LPVOID)
 {
-    HMODULE mh = LoadLibraryW(L"minhook.x64.dll");
-    if (!mh) mh = LoadLibraryW(L"minhook.dll");
-    if (!mh) return 0;
-
-    auto MH_Initialize = reinterpret_cast<MHInitializeFn>(GetProcAddress(mh, "MH_Initialize"));
-    auto MH_CreateHook = reinterpret_cast<MHCreateHookFn>(GetProcAddress(mh, "MH_CreateHook"));
-    auto MH_EnableHook = reinterpret_cast<MHEnableHookFn>(GetProcAddress(mh, "MH_EnableHook"));
-    auto MH_Uninitialize = reinterpret_cast<MHUninitializeFn>(GetProcAddress(mh, "MH_Uninitialize"));
-    if (!MH_Initialize || !MH_CreateHook || !MH_EnableHook || !MH_Uninitialize) return 0;
-
     void* present = nullptr;
     void* resizeBuffers = nullptr;
     if (!GetSwapchainMethods(&present, &resizeBuffers)) return 0;
 
-    if (MH_Initialize() != 0) return 0;
-    if (MH_CreateHook(present, &hkPresent, reinterpret_cast<void**>(&oPresent)) != 0) return 0;
-    if (MH_CreateHook(resizeBuffers, &hkResizeBuffers, reinterpret_cast<void**>(&oResizeBuffers)) != 0) return 0;
-    if (MH_EnableHook(present) != 0 || MH_EnableHook(resizeBuffers) != 0) {
+    if (MH_Initialize() != MH_OK) return 0;
+    if (MH_CreateHook(present, &hkPresent, reinterpret_cast<void**>(&oPresent)) != MH_OK) return 0;
+    if (MH_CreateHook(resizeBuffers, &hkResizeBuffers, reinterpret_cast<void**>(&oResizeBuffers)) != MH_OK) return 0;
+    if (MH_EnableHook(present) != MH_OK || MH_EnableHook(resizeBuffers) != MH_OK) {
         MH_Uninitialize();
         return 0;
     }

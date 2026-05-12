@@ -1,24 +1,41 @@
 ; AHK v2 - Shared RenderQueue producer for DX11 overlay DLL.
 class GH2RenderQueueBridge {
-    static MAP_NAME := "Local\\PoE2GH_RenderQueue_v1"
-    static MUTEX_NAME := "Local\\PoE2GH_RenderQueueMutex_v1"
+    static MAP_NAME := "Local\PoE2GH_RenderQueue_v1"
+    static MUTEX_NAME := "Local\PoE2GH_RenderQueueMutex_v1"
     static CAPACITY := 2048
     static MAGIC := 0x51475248
     static OP_SIZE := 124
     static TEXT_SIZE := 96
 
     __New() {
-        this.hMap := DllCall("CreateFileMappingW", "ptr", -1, "ptr", 0, "uint", 0x04, "uint", 0, "uint", this.__MapSize(), "str", GH2RenderQueueBridge.MAP_NAME, "ptr")
-        if (!this.hMap)
-            throw Error("CreateFileMappingW failed")
+        this.hMap := 0
+        this.pView := 0
+        this.hMutex := 0
+
+        this.hMap := DllCall("OpenFileMappingW", "uint", 0xF001F, "int", 0, "wstr", GH2RenderQueueBridge.MAP_NAME, "ptr")
+        if (!this.hMap) {
+            this.hMap := DllCall("CreateFileMappingW", "ptr", -1, "ptr", 0, "uint", 0x04, "uint", 0, "uint", this.__MapSize(), "wstr", GH2RenderQueueBridge.MAP_NAME, "ptr")
+            if (!this.hMap)
+                throw Error("CreateFileMappingW failed: " this.__LastErrorText())
+        }
 
         this.pView := DllCall("MapViewOfFile", "ptr", this.hMap, "uint", 0xF001F, "uint", 0, "uint", 0, "uptr", this.__MapSize(), "ptr")
-        if (!this.pView)
-            throw Error("MapViewOfFile failed")
+        if (!this.pView) {
+            err := this.__LastErrorText()
+            DllCall("CloseHandle", "ptr", this.hMap)
+            this.hMap := 0
+            throw Error("MapViewOfFile failed: " err)
+        }
 
-        this.hMutex := DllCall("CreateMutexW", "ptr", 0, "int", 0, "str", GH2RenderQueueBridge.MUTEX_NAME, "ptr")
-        if (!this.hMutex)
-            throw Error("CreateMutexW failed")
+        this.hMutex := DllCall("CreateMutexW", "ptr", 0, "int", 0, "wstr", GH2RenderQueueBridge.MUTEX_NAME, "ptr")
+        if (!this.hMutex) {
+            err := this.__LastErrorText()
+            DllCall("UnmapViewOfFile", "ptr", this.pView)
+            DllCall("CloseHandle", "ptr", this.hMap)
+            this.pView := 0
+            this.hMap := 0
+            throw Error("CreateMutexW failed: " err)
+        }
 
         this.__EnsureHeader()
     }
@@ -45,6 +62,11 @@ class GH2RenderQueueBridge {
     }
 
     __MapSize() => 12 + (GH2RenderQueueBridge.CAPACITY * GH2RenderQueueBridge.OP_SIZE)
+
+    __LastErrorText() {
+        code := DllCall("GetLastError", "uint")
+        return "WinErr=" code
+    }
 
     __EnsureHeader() {
         DllCall("RtlMoveMemory", "ptr", buf := Buffer(4), "ptr", this.pView, "uptr", 4)
