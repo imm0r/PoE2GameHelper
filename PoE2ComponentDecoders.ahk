@@ -419,18 +419,24 @@ class PoE2ComponentDecoders
     ; Returns: Map with worldPosition, gridPosition, modelBounds, terrainHeight, or 0 on failure
     DecodeRenderComponent(componentPtr)
     {
-        ; Batch-read XYZ + model bounds (0x138..0x14F = 24 bytes) in one RPM call
-        static baseOff := PoE2Offsets.Render["CurrentWorldPosition"]
-        posBuf := this.Mem.ReadBytes(componentPtr + baseOff, 24)
+        ; Batch-read XYZ + model bounds + TerrainHeight in ONE RPM call.
+        ; Span 0x138 (CurrentWorldPosition) .. 0x1B3 (TerrainHeight + 4) = 0x7C = 124 bytes.
+        ; The ~96 bytes between bounds (0x14C end) and TerrainHeight (0x1B0) are discarded —
+        ; saves one full RPM kernel-switch per render-decode call.
+        static baseOff   := PoE2Offsets.Render["CurrentWorldPosition"]
+        static thRelOff  := PoE2Offsets.Render["TerrainHeight"] - PoE2Offsets.Render["CurrentWorldPosition"]
+        static readSize  := PoE2Offsets.Render["TerrainHeight"] - PoE2Offsets.Render["CurrentWorldPosition"] + 4
+
+        posBuf := this.Mem.ReadBytes(componentPtr + baseOff, readSize)
         if !posBuf
             return 0
-        worldX  := NumGet(posBuf.Ptr, 0,  "Float")
-        worldY  := NumGet(posBuf.Ptr, 4,  "Float")
-        worldZ  := NumGet(posBuf.Ptr, 8,  "Float")
-        boundsX := NumGet(posBuf.Ptr, 12, "Float")
-        boundsY := NumGet(posBuf.Ptr, 16, "Float")
-        boundsZ := NumGet(posBuf.Ptr, 20, "Float")
-        terrainHeight := this.Mem.ReadFloat(componentPtr + PoE2Offsets.Render["TerrainHeight"])
+        worldX        := NumGet(posBuf.Ptr, 0,        "Float")
+        worldY        := NumGet(posBuf.Ptr, 4,        "Float")
+        worldZ        := NumGet(posBuf.Ptr, 8,        "Float")
+        boundsX       := NumGet(posBuf.Ptr, 12,       "Float")
+        boundsY       := NumGet(posBuf.Ptr, 16,       "Float")
+        boundsZ       := NumGet(posBuf.Ptr, 20,       "Float")
+        terrainHeight := NumGet(posBuf.Ptr, thRelOff, "Float")
 
         plausible := (Abs(worldX) <= 200000)
             && (Abs(worldY) <= 200000)

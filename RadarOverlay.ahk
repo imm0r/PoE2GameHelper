@@ -124,7 +124,8 @@ class RadarOverlay
 
         ; Range circles: array of Maps with "range" (world units), "color" (BGR), "label" (text)
         ; Set externally via SetRangeCircles(); drawn as isometric ellipses around the player.
-        this._rangeCircles := []
+        this._rangeCircles        := []
+        this._rangeCirclesEnabled := true   ; toggle from config — gates the entire range-circle render
 
         ; Map hack: pre-rendered walkable terrain border bitmap
         this._mapHackEnabled      := true  ; toggle from config
@@ -145,6 +146,16 @@ class RadarOverlay
         ; Cache for path-based entity classification flags to avoid repeated StrLower/InStr
         ; work in the per-frame render hot path.
         this._pathTypeCache := Map()
+
+        ; ── Batch-Draw Queues ────────────────────────────────────────────────────────────
+        ; Draw-Calls werden gesammelt und am Ende des Frames in einem einzigen Batch
+        ; ausgeführt — reduziert Kernel-Mode-Switches um 80–95 %.
+        ;   Key-Encoding für _dotBatch / _dotTopBatch:  colorBGR | (radius << 24)
+        ;   Key-Encoding für _lineBatch:                colorBGR | (width  << 24)
+        this._dotBatch    := Map()   ; normale Entity-Dots (alle Farb-Gruppen)
+        this._dotTopBatch := Map()   ; Highlight-Dot — wird nach _dotBatch gerendert (on top)
+        this._lineBatch   := Map()   ; Liniensegmente: je Farb-/Breiten-Gruppe ein Array
+        this._textBatch   := []      ; Text-Einträge: [x, y, text, colorBGR]
     }
 
     ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
@@ -436,10 +447,13 @@ class RadarOverlay
     }
 
     ; Draws UI Browser highlight (if active) then blits the back-buffer to screen.
-    ; Called instead of _Blit so the highlight is always the topmost drawn layer
-    ; (after maphack and any other full-screen overlays).
+    ; Called instead of _Blit so the highlight is always the topmost drawn layer.
+    ; _FlushBatch() is called here — this is the single flush point per frame.
     _BlitWithHighlight(gameWindowWidth, gameWindowHeight)
     {
+        ; Flush all queued draw operations before the optional highlight rect and blit.
+        this._FlushBatch()
+
         global g_uiBrowserHighlight
         if IsObject(g_uiBrowserHighlight)
         {
@@ -558,14 +572,17 @@ class RadarOverlay
         ; Spieler-Dot in der Kartenmitte
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
 
-        ; ── Range circles (shown while editing combat ranges in config) ──
-        for _, rc in this._rangeCircles
+        ; ── Range circles (config toggle + only when entries are set) ──
+        if (this._rangeCirclesEnabled)
         {
-            if (rc.Has("range") && rc["range"] > 0)
-                this._DrawRangeCircle(rc["range"], mapCenterX, mapCenterY,
-                    projectionCos, projectionSin,
-                    rc.Has("color") ? rc["color"] : 0x00FFFF,
-                    rc.Has("label") ? rc["label"] : "")
+            for _, rc in this._rangeCircles
+            {
+                if (rc.Has("range") && rc["range"] > 0)
+                    this._DrawRangeCircle(rc["range"], mapCenterX, mapCenterY,
+                        projectionCos, projectionSin,
+                        rc.Has("color") ? rc["color"] : 0x00FFFF,
+                        rc.Has("label") ? rc["label"] : "")
+            }
         }
 
         ; ── Entities zeichnen ────────────────────────────────────────────────────────────
@@ -782,26 +799,29 @@ class RadarOverlay
             playerGY  := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
 
             ; Use cached A* path segments if available for this entity, else straight line.
+            ; Polyline: baut POINT-Buffer einmalig → 1 Syscall statt 4×n Syscalls.
             pathCoords := this._pathGridCoords
             if (pathCoords.Length >= 2 && this._pathHlEntity = this.highlightedEntityPath)
             {
-                prevSX := -1, prevSY := -1
-                for _, pt in pathCoords
+                n       := pathCoords.Length
+                pathPts := Buffer(n * 8, 0)
+                for i, pt in pathCoords
                 {
                     dGX := pt[1] - playerGX
                     dGY := pt[2] - playerGY
-                    pSX := Round(mapCenterX + (dGX - dGY) * projectionCos)
-                    pSY := Round(mapCenterY + (0 - dGX - dGY) * projectionSin)
-                    if (prevSX >= 0)
-                        this._DrawLine(prevSX, prevSY, pSX, pSY, hlColor, lineWidth)
-                    prevSX := pSX, prevSY := pSY
+                    NumPut("Int", Round(mapCenterX + (dGX - dGY)     * projectionCos), pathPts, (i-1)*8)
+                    NumPut("Int", Round(mapCenterY + (0-dGX-dGY)     * projectionSin), pathPts, (i-1)*8+4)
                 }
+                pen    := this._GetPen(hlColor, lineWidth)
+                oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+                DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pathPts, "Int", n)
+                DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
             }
             else
                 this._DrawLine(Round(mapCenterX), Round(mapCenterY), hlScreenX, hlScreenY, hlColor, lineWidth)
 
             hlRadius := isLargeMap ? 7 : 5
-            this._DrawDot(hlScreenX, hlScreenY, hlColor, hlRadius)
+            this._DrawTopDot(hlScreenX, hlScreenY, hlColor, hlRadius)
             ; Label: entity short name + distance
             labelText := (hlName != "" ? hlName : "?") . (hlDistM >= 0 ? " (" hlDistM "m)" : "")
             this._DrawText(hlScreenX + hlRadius + 3, hlScreenY - 6, labelText, hlColor)
@@ -847,6 +867,7 @@ class RadarOverlay
         }
 
         ; ── Navigation path: A* path to nearest AreaTransition ──
+        ; Polyline: 1 Syscall für den gesamten Pfad statt 4×n Syscalls.
         navCoords := this._navPathCoords
         if (this._navEnabled && navCoords.Length >= 2)
         {
@@ -854,17 +875,19 @@ class RadarOverlay
             navWidth  := isLargeMap ? 3 : 2
             playerGX  := playerWorldX / RadarOverlay.WORLD_TO_GRID_RATIO
             playerGY  := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
-            prevSX := -1, prevSY := -1
-            for _, pt in navCoords
+            n         := navCoords.Length
+            navPts    := Buffer(n * 8, 0)
+            for i, pt in navCoords
             {
                 dGX := pt[1] - playerGX
                 dGY := pt[2] - playerGY
-                pSX := Round(mapCenterX + (dGX - dGY) * projectionCos)
-                pSY := Round(mapCenterY + (0 - dGX - dGY) * projectionSin)
-                if (prevSX >= 0)
-                    this._DrawLine(prevSX, prevSY, pSX, pSY, navColor, navWidth)
-                prevSX := pSX, prevSY := pSY
+                NumPut("Int", Round(mapCenterX + (dGX - dGY)   * projectionCos), navPts, (i-1)*8)
+                NumPut("Int", Round(mapCenterY + (0-dGX-dGY)   * projectionSin), navPts, (i-1)*8+4)
             }
+            pen    := this._GetPen(navColor, navWidth)
+            oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+            DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", navPts, "Int", n)
+            DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
         }
 
         ; Debug entity-filter stats — collected for the WebView debug tab.
@@ -946,40 +969,136 @@ class RadarOverlay
         return this._brushCache[colorBGR]
     }
 
-    ; Draws a text string at the given back-buffer coordinates using transparent background mode.
-    _DrawText(screenX, screenY, text, colorBGR)
-    {
-        DllCall("SetTextColor", "Ptr", this.memoryDC, "UInt", colorBGR)
-        DllCall("SetBkMode",    "Ptr", this.memoryDC, "Int", 1)   ; TRANSPARENT
-        DllCall("TextOutW", "Ptr", this.memoryDC,
-                "Int", screenX, "Int", screenY, "Str", text, "Int", StrLen(text))
-    }
+    ; ── Batch-Collector-Methoden ─────────────────────────────────────────────────────────
+    ; Diese Methoden zeichnen NICHT sofort — sie sammeln Draw-Operationen im RAM.
+    ; _FlushBatch() führt alle gesammelten Ops in einem Batch aus (einmal pro Frame).
 
-    ; Draws a straight line on the back-buffer between two screen coordinates.
-    _DrawLine(x1, y1, x2, y2, colorBGR, penWidth := 1)
-    {
-        pen    := this._GetPen(colorBGR, penWidth)
-        oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-        DllCall("MoveToEx", "Ptr", this.memoryDC, "Int", x1, "Int", y1, "Ptr", 0)
-        DllCall("LineTo",   "Ptr", this.memoryDC, "Int", x2, "Int", y2)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
-    }
-
-    ; Draws a filled circle on the back-buffer at (centerX, centerY) with the given radius.
+    ; Queues a filled circle into the normal dot batch (drawn before the highlight dot).
     _DrawDot(centerX, centerY, colorBGR, radius := 3)
     {
-        pen      := this._GetPen(colorBGR)
-        brush    := this._GetBrush(colorBGR)
-        oldPen   := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen,   "Ptr")
-        oldBrush := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", brush, "Ptr")
-        DllCall("Ellipse", "Ptr", this.memoryDC,
-                "Int", centerX - radius, "Int", centerY - radius,
-                "Int", centerX + radius, "Int", centerY + radius)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldBrush)
+        key := colorBGR | (radius << 24)
+        if !this._dotBatch.Has(key)
+            this._dotBatch[key] := []
+        this._dotBatch[key].Push([centerX, centerY])
+    }
+
+    ; Queues a filled circle into the top-priority dot batch (drawn after _dotBatch → always on top).
+    ; Used exclusively for the highlighted entity dot so it appears above all other dots.
+    _DrawTopDot(centerX, centerY, colorBGR, radius := 3)
+    {
+        key := colorBGR | (radius << 24)
+        if !this._dotTopBatch.Has(key)
+            this._dotTopBatch[key] := []
+        this._dotTopBatch[key].Push([centerX, centerY])
+    }
+
+    ; Queues a line segment into the line batch.
+    _DrawLine(x1, y1, x2, y2, colorBGR, penWidth := 1)
+    {
+        key := colorBGR | (penWidth << 24)
+        if !this._lineBatch.Has(key)
+            this._lineBatch[key] := []
+        this._lineBatch[key].Push([x1, y1, x2, y2])
+    }
+
+    ; Queues a text draw into the text batch.
+    _DrawText(screenX, screenY, text, colorBGR)
+    {
+        this._textBatch.Push([screenX, screenY, text, colorBGR])
+    }
+
+    ; ── Batch-Flush ──────────────────────────────────────────────────────────────────────
+    ; Renders all queued draw operations in one pass — called once per frame before _Blit().
+    ;
+    ; Flush-Reihenfolge (korrekte Layering):
+    ;   1. Linien      — liegen unter Dots
+    ;   2. Normale Dots (entity-Dots, Player-Dot, Zone-Scan-Dots)
+    ;   3. Top-Dot     — Highlight-Entity immer on top
+    ;   4. Text        — Labels immer ganz oben
+    ;
+    ; Dot-Batch-Technik: BeginPath → n×Ellipse → EndPath → StrokeAndFillPath
+    ;   → 2 SelectObject + 1 BeginPath + n×Ellipse + 1 EndPath + 1 StrokeAndFillPath
+    ;   statt 5 DllCalls × n pro Farb-Gruppe.
+    ;
+    ; Linien-Technik: PolyPolyline mit n×2-Punkt-Segmenten
+    ;   → 1 SelectObject + 1 PolyPolyline statt 4 DllCalls × n.
+    _FlushBatch()
+    {
+        dc := this.memoryDC
+
+        ; ── 1. Linien ────────────────────────────────────────────────────────────────────
+        for key, segs in this._lineBatch
+        {
+            n := segs.Length
+            if !n
+                continue
+            color  := key & 0xFFFFFF
+            width  := (key >> 24) & 0xFF
+            pen    := this._GetPen(color, width)
+            oldPen := DllCall("SelectObject", "Ptr", dc, "Ptr", pen, "Ptr")
+
+            ; PolyPolyline: alle Segmente als 2-Punkt-Polylines in einem Syscall
+            pts    := Buffer(n * 16, 0)    ; n Segmente × 2 POINTs × 8 Byte
+            counts := Buffer(n * 4,  0)    ; n DWORD-Counts à 2
+            i := 0
+            for seg in segs
+            {
+                NumPut("Int", seg[1], pts, i * 16)
+                NumPut("Int", seg[2], pts, i * 16 + 4)
+                NumPut("Int", seg[3], pts, i * 16 + 8)
+                NumPut("Int", seg[4], pts, i * 16 + 12)
+                NumPut("UInt", 2, counts, i * 4)
+                i++
+            }
+            DllCall("PolyPolyline", "Ptr", dc, "Ptr", pts, "Ptr", counts, "UInt", n)
+            DllCall("SelectObject", "Ptr", dc, "Ptr", oldPen)
+        }
+        this._lineBatch.Clear()
+
+        ; ── 2. + 3. Dots (normal, dann top) ─────────────────────────────────────────────
+        this._FlushDotLayer(this._dotBatch)
+        this._dotBatch.Clear()
+        this._FlushDotLayer(this._dotTopBatch)
+        this._dotTopBatch.Clear()
+
+        ; ── 4. Text ──────────────────────────────────────────────────────────────────────
+        ; SetBkMode einmal pro Frame — alle TextOut-Calls profitieren davon
+        DllCall("SetBkMode", "Ptr", dc, "Int", 1)   ; TRANSPARENT
+        for t in this._textBatch
+        {
+            DllCall("SetTextColor", "Ptr", dc, "UInt", t[4])
+            DllCall("TextOutW", "Ptr", dc, "Int", t[1], "Int", t[2], "Str", t[3], "Int", StrLen(t[3]))
+        }
+        this._textBatch := []
+    }
+
+    ; Internal: renders one dot-batch Map (used for both normal and top-priority dots).
+    ; Technique: BeginPath + n×Ellipse + EndPath + StrokeAndFillPath per color/radius group.
+    _FlushDotLayer(batch)
+    {
+        dc := this.memoryDC
+        for key, dots in batch
+        {
+            color  := key & 0xFFFFFF
+            radius := (key >> 24) & 0xFF
+            pen    := this._GetPen(color)
+            brush  := this._GetBrush(color)
+            oldPen   := DllCall("SelectObject", "Ptr", dc, "Ptr", pen,   "Ptr")
+            oldBrush := DllCall("SelectObject", "Ptr", dc, "Ptr", brush, "Ptr")
+            DllCall("BeginPath", "Ptr", dc)
+            for dot in dots
+                DllCall("Ellipse", "Ptr", dc,
+                    "Int", dot[1] - radius, "Int", dot[2] - radius,
+                    "Int", dot[1] + radius, "Int", dot[2] + radius)
+            DllCall("EndPath", "Ptr", dc)
+            DllCall("StrokeAndFillPath", "Ptr", dc)
+            DllCall("SelectObject", "Ptr", dc, "Ptr", oldPen)
+            DllCall("SelectObject", "Ptr", dc, "Ptr", oldBrush)
+        }
     }
 
     ; Draws a hollow rectangle outline on the back-buffer; uses NULL_BRUSH to avoid filling the interior.
+    ; Not batched — called at most once per frame (UI-Browser highlight).
     _DrawRect(screenX, screenY, width, height, colorBGR, penWidth := 1)
     {
         pen       := this._GetPen(colorBGR, penWidth)
@@ -1005,31 +1124,33 @@ class RadarOverlay
     ; Draws an isometric range ellipse around the player.
     ; rangeWorld: radius in world units.  mapCenterX/Y: player screen position.
     ; projectionCos/Sin: current projection factors.  colorBGR: line color.  label: optional text.
+    ; Uses Polyline (1 GDI call for all 49 segments) instead of 48 individual _DrawLine calls.
     _DrawRangeCircle(rangeWorld, mapCenterX, mapCenterY, projectionCos, projectionSin, colorBGR, label := "")
     {
-        gridR := rangeWorld / RadarOverlay.WORLD_TO_GRID_RATIO
+        gridR    := rangeWorld / RadarOverlay.WORLD_TO_GRID_RATIO
         segments := 48
-        step := 6.2831853 / segments   ; 2π / segments
-        prevSX := 0, prevSY := 0
-        topSX := 0, topSY := 999999    ; track topmost point for label placement
+        step     := 6.2831853 / segments   ; 2π / 48
+        n        := segments + 1           ; closed loop: last point = first point
+        pts      := Buffer(n * 8, 0)       ; n POINTs × 8 Byte
+        topSX    := 0, topSY := 999999
 
-        Loop segments + 1
+        Loop n
         {
             angle := (A_Index - 1) * step
-            gx := gridR * Cos(angle)
-            gy := gridR * Sin(angle)
-
-            sx := Round(mapCenterX + (gx - gy) * projectionCos)
-            sy := Round(mapCenterY + (0 - gx - gy) * projectionSin)
-
-            if (A_Index > 1)
-                this._DrawLine(prevSX, prevSY, sx, sy, colorBGR, 2)
-
+            gx    := gridR * Cos(angle)
+            gy    := gridR * Sin(angle)
+            sx    := Round(mapCenterX + (gx - gy)       * projectionCos)
+            sy    := Round(mapCenterY + (0 - gx - gy)   * projectionSin)
+            NumPut("Int", sx, pts, (A_Index - 1) * 8)
+            NumPut("Int", sy, pts, (A_Index - 1) * 8 + 4)
             if (sy < topSY)
                 topSX := sx, topSY := sy
-
-            prevSX := sx, prevSY := sy
         }
+
+        pen    := this._GetPen(colorBGR, 2)
+        oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pts, "Int", n)
+        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
 
         if (label != "")
             this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
