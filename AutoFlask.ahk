@@ -318,6 +318,7 @@ UpdateRadarFast()
             g_radarOverlay.DebugMode := g_debugMode
             g_radarOverlay._navEnabled := g_zoneNavEnabled
             g_radarOverlay._mapHackEnabled := g_mapHackEnabled
+            g_radarOverlay._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
             g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
 
             radarRenderStart := A_TickCount

@@ -2405,6 +2405,10 @@
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-row"><span class="cfg-label">Range Circles</span>
+                <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
+                    checked><span class="toggle-slider"></span></label>
+              </div>
               <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
                 <label class="toggle"><input type="checkbox" id="tog-paneldetection"
                     onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
@@ -2803,6 +2807,7 @@
 
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+      setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
 
       if (d.radarAlpha !== undefined) {

@@ -103,6 +103,12 @@ _DispatchBridgeCall(method, args)
             if (g_radarOverlay)
                 g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             SetTimer(SaveConfig, -100)
+        case "ToggleRangeCircles":
+            global g_rangeCirclesEnabled
+            g_rangeCirclesEnabled := !g_rangeCirclesEnabled
+            if (g_radarOverlay)
+                g_radarOverlay._rangeCirclesEnabled := g_rangeCirclesEnabled
+            SetTimer(SaveConfig, -100)
         case "TogglePanelDetection":
             global g_panelDetectionEnabled, g_reader, g_radarLastSnap
             g_panelDetectionEnabled := !g_panelDetectionEnabled

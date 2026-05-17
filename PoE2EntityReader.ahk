@@ -96,6 +96,16 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         deadlineTick := A_TickCount + bfsBudgetMs
         bfsIter      := 0
 
+        ; ── RPM-Batch: one 0x30-byte node read covers Left/Right/KeyId/ValueEntityPtr ──
+        ; Replaces 4 separate RPMs per node (Left, Right, KeyId, ValueEntityPtr) with a
+        ; single ReadProcessMemory call → ~75 % fewer kernel switches in the BFS hot path.
+        ; Offsets mirror PoE2Offsets.StdMapNode: Left=0x00, Right=0x10, KeyId=0x20, Value=0x28.
+        static nodeReadSize := 0x30
+        static offLeft      := 0x00
+        static offRight     := 0x10
+        static offKeyId     := 0x20
+        static offValue     := 0x28
+
         while (queueIndex <= queue.Length)
         {
             if (visited.Count >= maxVisited)
@@ -123,43 +133,50 @@ class PoE2EntityReader extends PoE2ComponentDecoders
                 continue
             visited[node] := true
 
-            left  := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Left"])
-            right := this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["Right"])
+            ; Single batched node read — extract all four fields from one buffer.
+            nodeBuf := this.Mem.ReadBytes(node, nodeReadSize)
+            if !nodeBuf
+                continue
 
-            nodeEntry    := this.DecodeEntityMapNodeEntry(node)
-            entityId     := (nodeEntry && nodeEntry.Has("id"))        ? nodeEntry["id"]        : this.Mem.ReadUInt(node + PoE2Offsets.StdMapNode["KeyId"])
-            entityRawPtr := (nodeEntry && nodeEntry.Has("rawPtr"))    ? nodeEntry["rawPtr"]    : this.Mem.ReadPtr(node + PoE2Offsets.StdMapNode["ValueEntityPtr"])
-            entityPtr    := (nodeEntry && nodeEntry.Has("entityPtr")) ? nodeEntry["entityPtr"] : this.ResolveEntityPointer(entityRawPtr)
+            left         := NumGet(nodeBuf.Ptr, offLeft,  "Ptr")
+            right        := NumGet(nodeBuf.Ptr, offRight, "Ptr")
+            entityId     := NumGet(nodeBuf.Ptr, offKeyId, "UInt")
+            entityRawPtr := NumGet(nodeBuf.Ptr, offValue, "Ptr")
+            entityPtr    := this.ResolveEntityPointer(entityRawPtr)
 
-            if (entityId <= 0 && this.IsProbablyValidPointer(entityPtr))
-                entityId := this.Mem.ReadUInt(entityPtr + PoE2Offsets.Entity["Id"])
-
-            if this.IsEntityLikePointer(entityPtr)
+            ; ReadEntityBasic now validates the header inline and returns 0 for non-entity
+            ; pointers — eliminates the separate IsEntityLikePointer pre-check (4 extra RPMs)
+            ; and the early entityId fallback (1 extra RPM). Total saved per node: ~5 RPMs.
+            entityBasic := this.ReadEntityBasic(entityPtr, entityId)
+            if !(entityBasic && Type(entityBasic) = "Map")
             {
-                entityBasic := this.ReadEntityBasic(entityPtr, entityId)
-                if !(entityBasic && Type(entityBasic) = "Map")
-                    entityBasic := 0
-                if !entityBasic
-                    continue
-
-                sampleEntry := Map(
-                    "id",           entityId,
-                    "entityPtr",    entityPtr,
-                    "entityRawPtr", entityRawPtr,
-                    "node",         node
-                )
-                if (nodeEntry && nodeEntry.Has("layout"))
-                    sampleEntry["nodeLayout"] := nodeEntry["layout"]
-
-                entityPos               := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
-                sampleEntry["entity"]   := entityBasic
-                sampleEntry["distance"] := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
-                sampleEntry["priority"] := this.ComputeSampleEntryPriority(entityBasic, sampleEntry["distance"])
-                if (sampleEntry["priority"] >= 30)
-                    npcCandidateCount += 1
-
-                candidates.Push(sampleEntry)
+                if (this.IsProbablyValidPointer(left) && left != head)
+                    queue.Push(left)
+                if (this.IsProbablyValidPointer(right) && right != head)
+                    queue.Push(right)
+                continue
             }
+
+            ; If KeyId in the node was 0, prefer the entity's own Id (already validated >0).
+            if (entityId <= 0)
+                entityId := entityBasic["entityId"]
+
+            sampleEntry := Map(
+                "id",           entityId,
+                "entityPtr",    entityPtr,
+                "entityRawPtr", entityRawPtr,
+                "node",         node,
+                "nodeLayout",   "direct"
+            )
+
+            entityPos               := this.ExtractEntityWorldPositionFromEntityBasic(entityBasic, playerOrigin)
+            sampleEntry["entity"]   := entityBasic
+            sampleEntry["distance"] := this.ComputeDistance3DFromMaps(playerOrigin, entityPos)
+            sampleEntry["priority"] := this.ComputeSampleEntryPriority(entityBasic, sampleEntry["distance"])
+            if (sampleEntry["priority"] >= 30)
+                npcCandidateCount += 1
+
+            candidates.Push(sampleEntry)
 
             if (this.IsProbablyValidPointer(left) && left != head)
                 queue.Push(left)
@@ -559,31 +576,43 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(entityPtr)
             return 0
 
-        ; Batch-read entity header: 0x08..0x1F → EntityDetailsPtr(0x08), ComponentsVec(0x10), ComponentsVecLast(0x18)
-        ; and 0x80..0x87 → Id(0x80), Flags(0x84) — two reads instead of five
-        hdrBuf := this.Mem.ReadBytes(entityPtr + 0x08, 0x18)
+        ; Batch-read full entity header in ONE RPM call: 0x08..0x87 covers
+        ;   EntityDetailsPtr(0x08), ComponentsVec(0x10), ComponentsVecLast(0x18),
+        ;   Id(0x80), Flags(0x84).
+        ; Replaces 2 separate reads (was 0x18 + 8 = 32 B in two RPMs) with one 0x80-byte read.
+        ; Extra ~96 bytes are discarded — the saved kernel-mode switch outweighs the transfer cost.
+        hdrBuf := this.Mem.ReadBytes(entityPtr + 0x08, 0x80)
         if !hdrBuf
             return 0
-        entityDetailsPtr := NumGet(hdrBuf.Ptr, 0x00, "Ptr")   ; offset 0x08 in entity struct
-        compVecFirst     := NumGet(hdrBuf.Ptr, 0x08, "Int64")  ; offset 0x10
-        compVecLast      := NumGet(hdrBuf.Ptr, 0x10, "Int64")  ; offset 0x18
+        entityDetailsPtr := NumGet(hdrBuf.Ptr, 0x00, "Ptr")    ; entity 0x08
+        compVecFirst     := NumGet(hdrBuf.Ptr, 0x08, "Int64")  ; entity 0x10
+        compVecLast      := NumGet(hdrBuf.Ptr, 0x10, "Int64")  ; entity 0x18
+        entityId         := NumGet(hdrBuf.Ptr, 0x78, "UInt")   ; entity 0x80
+        flags            := NumGet(hdrBuf.Ptr, 0x7C, "UChar")  ; entity 0x84
 
-        idBuf := this.Mem.ReadBytes(entityPtr + 0x80, 8)
-        entityId := idBuf ? NumGet(idBuf.Ptr, 0, "UInt") : 0
-        flags    := idBuf ? NumGet(idBuf.Ptr, 4, "UChar") : 0
+        ; ── Inline validation (replaces separate IsEntityLikePointer pre-check) ──
+        ; Same rules as IsEntityLikePointer — but operates on the buffer we already read,
+        ; saving 4 RPM kernel-switches per entity that callers would otherwise spend
+        ; before reaching ReadEntityBasic. Two callers in PoE2MemoryReader skipped this
+        ; pre-check entirely and got garbage entities through; now they get validated for free.
+        if (compVecFirst <= 0 || compVecLast < compVecFirst)
+            return 0
+        totalBytes := compVecLast - compVecFirst
+        if (totalBytes <= 0 || Mod(totalBytes, A_PtrSize) != 0)
+            return 0
+        rawCount := totalBytes // A_PtrSize
+        if (rawCount <= 0 || rawCount > 1024)
+            return 0
+        if !this.IsProbablyValidPointer(entityDetailsPtr)
+            return 0
+        if (entityId <= 0 || entityId >= 0x40000000)
+            return 0
 
-        path := ""
-        if this.IsProbablyValidPointer(entityDetailsPtr)
-            path := this.ReadStdWStringAt(entityDetailsPtr + PoE2Offsets.EntityDetails["Path"], 260)
+        path := this.ReadStdWStringAt(entityDetailsPtr + PoE2Offsets.EntityDetails["Path"], 260)
 
-        componentCount := -1
-        if (compVecFirst > 0 && compVecLast >= compVecFirst)
-        {
-            totalBytes := compVecLast - compVecFirst
-            count := Floor(totalBytes / A_PtrSize)
-            if (count >= 0 && count <= 256)
-                componentCount := count
-        }
+        ; Preserve the original componentCount semantics: clamp to -1 outside 0..256
+        ; so downstream UI fields keep the same diagnostic meaning.
+        componentCount := (rawCount <= 256) ? rawCount : -1
 
         components := this.ReadEntityComponentLookupBasic(entityPtr, this._radarMode ? 64 : 48)
         namedComponentCount := (components && Type(components) = "Array") ? components.Length : 0
@@ -1296,9 +1325,14 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             if !renderAddr
                 continue
 
-            worldX := this.Mem.ReadFloat(renderAddr + PoE2Offsets.Render["CurrentWorldPosition"])
-            worldY := this.Mem.ReadFloat(renderAddr + PoE2Offsets.Render["CurrentWorldPositionY"])
-            worldZ := this.Mem.ReadFloat(renderAddr + PoE2Offsets.Render["CurrentWorldPositionZ"])
+            ; Batch-read the three consecutive position floats (0x138..0x143) in one RPM
+            ; instead of three separate ReadFloat calls.
+            posBuf := this.Mem.ReadBytes(renderAddr + PoE2Offsets.Render["CurrentWorldPosition"], 12)
+            if !posBuf
+                continue
+            worldX := NumGet(posBuf.Ptr, 0, "Float")
+            worldY := NumGet(posBuf.Ptr, 4, "Float")
+            worldZ := NumGet(posBuf.Ptr, 8, "Float")
 
             ; Plausibility check
             if (Abs(worldX) > 200000 || Abs(worldY) > 200000 || Abs(worldZ) > 200000)

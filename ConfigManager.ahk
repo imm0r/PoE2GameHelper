@@ -17,7 +17,7 @@ SaveConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
     global g_panelDetectionEnabled
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
@@ -41,6 +41,7 @@ SaveConfig()
     IniWrite(g_radarShowChests       ? "1" : "0",  f, "Radar",         "showChests")
     IniWrite(g_zoneNavEnabled        ? "1" : "0",  f, "Radar",         "zoneNav")
     IniWrite(g_mapHackEnabled        ? "1" : "0",  f, "Radar",         "mapHack")
+    IniWrite(g_rangeCirclesEnabled   ? "1" : "0",  f, "Radar",         "rangeCircles")
     IniWrite(g_panelDetectionEnabled ? "1" : "0",  f, "PanelDetection", "enabled")
     IniWrite(g_entityShowPlayer      ? "1" : "0",  f, "EntityFilters", "showPlayer")
     IniWrite(g_entityShowMinion      ? "1" : "0",  f, "EntityFilters", "showMinion")
@@ -84,7 +85,7 @@ LoadConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
     global g_panelDetectionEnabled
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
@@ -115,6 +116,7 @@ LoadConfig()
     g_radarShowChests          := _B("Radar",         "showChests",      true)
     g_zoneNavEnabled           := _B("Radar",         "zoneNav",         true)
     g_mapHackEnabled           := _B("Radar",         "mapHack",         true)
+    g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_entityShowPlayer         := _B("EntityFilters", "showPlayer",      true)
     g_entityShowMinion         := _B("EntityFilters", "showMinion",      true)
