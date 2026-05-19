@@ -109,6 +109,20 @@ _DispatchBridgeCall(method, args)
             if (g_radarOverlay)
                 g_radarOverlay._rangeCirclesEnabled := g_rangeCirclesEnabled
             SetTimer(SaveConfig, -100)
+        case "ToggleAutoPilot":
+            global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
+            g_autoPilotEnabled := !g_autoPilotEnabled
+            if !g_autoPilotEnabled
+            {
+                g_autoPilotState  := "idle"
+                g_autoPilotReason := "disabled"
+            }
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
+        case "RequestInventory":
+            ; UI polls this when the Inventory tab is active. Off-snapshot read so
+            ; the per-frame cost is zero when the user isn't looking at the tab.
+            SetTimer(PushInventoryToWebView, -1)
         case "TogglePanelDetection":
             global g_panelDetectionEnabled, g_reader, g_radarLastSnap
             g_panelDetectionEnabled := !g_panelDetectionEnabled

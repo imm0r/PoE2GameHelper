@@ -10,75 +10,37 @@
 ;
 ; Included by InGameStateMonitor.ahk
 
-; ── Timer callback: reads skill snapshot + decides skill usage ─────────────
-; Called every 100ms from UpdateRadarFast when combat automation is enabled.
-; Params: radarSnap - the full radar snapshot from ReadRadarSnapshot()
-TryCombatAutomation(radarSnap)
+; ── Combat tick (called from AutoPilot) ───────────────────────────────────
+; Decides whether the player is currently engaging an enemy and fires skills
+; in priority order. Returns true if combat is active this tick, false otherwise —
+; AutoPilot uses the return value to decide whether to run exploration instead.
+;
+; AutoPilot owns the shared guard chain (window focus, town/hideout, panel-open,
+; player-dead). This function assumes those passed and trusts the gameHwnd it
+; receives. The g_combatAutoEnabled sub-toggle is still honored here so users can
+; turn off combat within AutoPilot without disabling exploration.
+;
+; Params: radarSnap - full radar snapshot
+;         gameHwnd  - resolved PoE2 window handle (must be valid + active)
+; Returns: true if combat engaged this tick, false if idle
+TryCombatAutomation(radarSnap, gameHwnd)
 {
     static _running := false
     if _running
-        return
+        return false
     _running := true
     try
     {
-        global g_combatAutoEnabled, g_updatesPaused, g_reader, g_combatLastReason
+        global g_combatAutoEnabled, g_reader, g_combatLastReason
         global g_combatState, g_combatSkillSlots, g_combatGlobalCooldownMs
         global g_lastSkillUseTime, g_combatRange, g_combatDisengageRange
         global g_combatSkillCooldowns
 
-        if (g_updatesPaused || !g_combatAutoEnabled)
+        if !g_combatAutoEnabled
         {
             g_combatLastReason := "disabled"
             g_combatState := "idle"
-            return
-        }
-
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
-        {
-            g_combatLastReason := "no-game-window"
-            g_combatState := "idle"
-            return
-        }
-        if !WinActive("ahk_id " gameHwnd)
-        {
-            g_combatLastReason := "game-not-focused"
-            g_combatState := "idle"
-            return
-        }
-
-        ; Block in town/hideout
-        wad := radarSnap.Has("worldAreaDat") ? radarSnap["worldAreaDat"] : 0
-        if (wad && IsObject(wad))
-        {
-            if ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))
-            {
-                g_combatLastReason := "town-hideout"
-                g_combatState := "idle"
-                return
-            }
-        }
-
-        ; Block when panel is open
-        panelVis := radarSnap.Has("panelVisibility") ? radarSnap["panelVisibility"] : 0
-        if (panelVis && IsObject(panelVis) && panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
-        {
-            g_combatLastReason := "panel-open"
-            g_combatState := "idle"
-            return
-        }
-
-        ; Block when player is dead
-        pv := radarSnap.Has("playerVitals") ? radarSnap["playerVitals"] : 0
-        if (pv && IsObject(pv) && pv.Has("stats"))
-        {
-            stats := pv["stats"]
-            if (stats.Has("isAlive") && !stats["isAlive"])
-            {
-                g_combatLastReason := "dead"
-                g_combatState := "idle"
-                return
-            }
+            return false
         }
 
         ; ── Combat detection from entity cache ────────────────────────────
@@ -132,14 +94,14 @@ TryCombatAutomation(radarSnap)
             {
                 g_combatState := "idle"
                 g_combatLastReason := "disengage(dist=" Round(terrainDist) " n=" hostileCount ")"
-                return
+                return false
             }
         }
 
         if (g_combatState != "combat")
         {
             g_combatLastReason := "idle(n=" hostileCount " d=" Round(terrainDist) ")"
-            return
+            return false
         }
 
         ; ── Move mouse toward nearest enemy ───────────────────────────────
@@ -184,7 +146,7 @@ TryCombatAutomation(radarSnap)
             if (aimElapsed < 500)
             {
                 g_combatLastReason := "aiming(" aimElapsed "ms)"
-                return
+                return true   ; still in combat — block exploration
             }
             ; Grace period expired — fire anyway
         }
@@ -196,7 +158,7 @@ TryCombatAutomation(radarSnap)
         if (now - g_lastSkillUseTime < g_combatGlobalCooldownMs)
         {
             g_combatLastReason := "gcd(" (g_combatGlobalCooldownMs - (now - g_lastSkillUseTime)) "ms)"
-            return
+            return true   ; still in combat — block exploration
         }
 
         ; ── Read skill cooldowns ──────────────────────────────────────────
@@ -220,7 +182,7 @@ TryCombatAutomation(radarSnap)
         if !_skillCache
         {
             g_combatLastReason := "no-skill-data"
-            return
+            return true   ; still in combat — block exploration
         }
 
         ; ── Store cooldown state for UI ───────────────────────────────────
@@ -259,10 +221,14 @@ TryCombatAutomation(radarSnap)
         {
             g_combatLastReason := "no-ready-skill(n=" hostileCount " d=" Round(nearestDist) ")"
         }
+
+        ; Fell through skill firing while g_combatState == "combat" — still engaged.
+        return true
     }
     catch as ex
     {
         LogError("TryCombatAutomation", ex)
+        return false
     }
     finally
     {

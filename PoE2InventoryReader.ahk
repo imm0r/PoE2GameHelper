@@ -157,6 +157,166 @@ class PoE2InventoryReader extends PoE2PlayerReader
         )
     }
 
+    ; Enumerates every PlayerInventories entry and returns the full item list for each.
+    ; Re-uses ReadInventoryBasic and its existing item-detail decoder — extracts the
+    ; entries array (which ReadServerData discards) so the UI can render grids.
+    ;
+    ; Returns: Array of Maps, each with:
+    ;   inventoryId  — game-internal ID (1=Backpack, 12=Flasks, etc.); used by UI to label
+    ;   address       — inventory struct pointer (diagnostic)
+    ;   totalBoxesX/Y — grid dimensions
+    ;   items         — Array of item Maps (slotStart/End, displayName, rarity, mods, …)
+    ;
+    ; Skips empty inventories. Caller decides if and how to label by inventoryId.
+    ReadAllPlayerInventories(serverDataAddress)
+    {
+        result := []
+        if !this.IsProbablyValidPointer(serverDataAddress)
+            return result
+
+        playerDataVecFirst := this.Mem.ReadInt64(serverDataAddress + PoE2Offsets.ServerData["PlayerServerData"])
+        if (playerDataVecFirst <= 0)
+            return result
+        playerDataPtr := this.Mem.ReadPtr(playerDataVecFirst)
+        if !this.IsProbablyValidPointer(playerDataPtr)
+            return result
+
+        invVecFirst := this.Mem.ReadInt64(playerDataPtr + PoE2Offsets.ServerDataStructure["PlayerInventories"])
+        invVecLast  := this.Mem.ReadInt64(playerDataPtr + PoE2Offsets.ServerDataStructure["PlayerInventoriesLast"])
+        if (invVecFirst <= 0 || invVecLast < invVecFirst)
+            return result
+
+        entrySize := PoE2Offsets.InventoryArray["EntrySize"]
+        count     := Min(Floor((invVecLast - invVecFirst) / entrySize), 128)
+
+        idx := 0
+        while (idx < count)
+        {
+            entryAddr := invVecFirst + (idx * entrySize)
+            invId  := this.Mem.ReadInt(entryAddr + PoE2Offsets.InventoryArray["InventoryId"])
+            invPtr := this.Mem.ReadPtr(entryAddr + PoE2Offsets.InventoryArray["InventoryPtr0"])
+            idx += 1
+
+            if !this.IsProbablyValidPointer(invPtr)
+                continue
+
+            inv := this._ReadInventoryWithItems(invPtr)
+            if !inv
+                continue
+            inv["inventoryId"] := invId
+            result.Push(inv)
+        }
+
+        ; ── Resolve user-given stash tab names ─────────────────────────────
+        ; PoE2 exposes every stash tab as a separate inventory in PlayerInventories
+        ; (IDs outside 1, 2-11, 12). The corresponding tab names live in a separate
+        ; std::vector<ServerStashTab> inside ServerDataStructure. We don't know the
+        ; exact offset for PoE2, so ReadStashTabNames scans for any 0x40-stride
+        ; vector whose entries pass the NativeStringU "Name" validity check.
+        ;
+        ; Correlation: assume the i-th stash inventory (by enumeration order in
+        ; PlayerInventories, filtered to non-player IDs) matches the i-th tab name.
+        ; This is the same assumption upstream tooling uses; works in practice when
+        ; both vectors are populated in DisplayIndex order.
+        stashIdx := []
+        i := 1
+        for entry in result
+        {
+            id := entry["inventoryId"]
+            isPlayer := (id = 1 || id = 12 || (id >= 2 && id <= 11))
+            if !isPlayer
+                stashIdx.Push(i)
+            i += 1
+        }
+        if (stashIdx.Length > 0)
+        {
+            try names := this.ReadStashTabNames(playerDataPtr, 1)
+            catch
+                names := []
+            ; Apply names by position. When the tab-name vector is shorter than
+            ; the stash-inventory list (or vice versa), unmatched tabs are left
+            ; nameless and the UI falls back to "Stash Tab #<id>".
+            nameIdx := 1
+            for _, resultPos in stashIdx
+            {
+                if (nameIdx > names.Length)
+                    break
+                tabName := names[nameIdx]
+                if (tabName != "")
+                    result[resultPos]["tabName"] := tabName
+                nameIdx += 1
+            }
+        }
+
+        return result
+    }
+
+    ; Reads one inventory and returns its full item entries (vs. ReadInventoryBasic
+    ; which discards them and only returns the flask-slot summary).
+    ; Internal helper used by ReadAllPlayerInventories + ReadStashInventories.
+    _ReadInventoryWithItems(inventoryAddress)
+    {
+        if !this.IsProbablyValidPointer(inventoryAddress)
+            return 0
+
+        totalBoxesX := this.Mem.ReadInt(inventoryAddress + PoE2Offsets.Inventory["TotalBoxes"])
+        totalBoxesY := this.Mem.ReadInt(inventoryAddress + PoE2Offsets.Inventory["TotalBoxesY"])
+
+        itemListFirst := this.Mem.ReadInt64(inventoryAddress + PoE2Offsets.Inventory["ItemList"])
+        itemListLast  := this.Mem.ReadInt64(inventoryAddress + PoE2Offsets.Inventory["ItemListLast"])
+
+        ; Plausibility filter — skip pointers that look nothing like an inventory struct.
+        ; Used by the stash heuristic scanner to reject false positives.
+        if (totalBoxesX < 1 || totalBoxesX > 64 || totalBoxesY < 1 || totalBoxesY > 64)
+            return 0
+        if (itemListFirst <= 0 || itemListLast < itemListFirst)
+            return 0
+        totalBytes := itemListLast - itemListFirst
+        if (Mod(totalBytes, A_PtrSize) != 0)
+            return 0
+        entryCount := Floor(totalBytes / A_PtrSize)
+        if (entryCount < 0 || entryCount > 1024)
+            return 0
+
+        items := []
+        maxEntries := Min(entryCount, 256)
+        idx := 0
+        while (idx < maxEntries)
+        {
+            invItemStructPtr := this.Mem.ReadPtr(itemListFirst + (idx * A_PtrSize))
+            idx += 1
+            if !this.IsProbablyValidPointer(invItemStructPtr)
+                continue
+
+            itemEntityPtr := this.Mem.ReadPtr(invItemStructPtr + PoE2Offsets.InventoryItem["Item"])
+            slotStartX := this.Mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotStart"])
+            slotStartY := this.Mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotStartY"])
+            slotEndX   := this.Mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotEnd"])
+            slotEndY   := this.Mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotEndY"])
+
+            itemDetails := this.ReadFlaskItemDetails(itemEntityPtr, false)
+            if !itemDetails
+                continue
+
+            items.Push(Map(
+                "itemEntityPtr", itemEntityPtr,
+                "slotStartX", slotStartX,
+                "slotStartY", slotStartY,
+                "slotEndX",   slotEndX,
+                "slotEndY",   slotEndY,
+                "details",    itemDetails
+            ))
+        }
+
+        return Map(
+            "address",     inventoryAddress,
+            "totalBoxesX", totalBoxesX,
+            "totalBoxesY", totalBoxesY,
+            "entryCount",  entryCount,
+            "items",       items
+        )
+    }
+
     ; Scores how likely an inventory is a flask inventory by counting flask-like items inside it.
     ; Params: maxCheck - max number of item pointers to examine before stopping.
     ; Returns: count of items that pass IsLikelyFlaskItem, or 0 on invalid input.
@@ -530,12 +690,28 @@ class PoE2InventoryReader extends PoE2PlayerReader
         rarityId := (modsInfo && modsInfo.Has("rarityId")) ? modsInfo["rarityId"] : -1
         displayName := this.ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId)
 
+        ; Stack count (for stackable items like scrolls, currency, gold).
+        ; Reads the Stack component's Count field when present; non-stackable
+        ; items don't have this component and report 0 (UI hides the badge).
+        ; Max stack size isn't on the Stack component — it lives on BaseItemTypes.dat
+        ; which isn't schema-mapped yet, so we show only the current count for now.
+        stackCount := 0
+        try
+        {
+            stackPtr := this.FindEntityComponentAddress(itemEntityPtr, "Stack")
+            if this.IsProbablyValidPointer(stackPtr)
+                stackCount := this.Mem.ReadInt(stackPtr + PoE2Offsets.Stack["Count"])
+        }
+        catch
+            stackCount := 0
+
         return Map(
             "metadataPath", metadataPath,
             "baseType", baseType,
             "displayName", displayName,
             "rarityId", rarityId,
             "rarity", this.RarityNameFromId(rarityId),
+            "stackCount", stackCount,
             "modsInfo", modsInfo
         )
     }
@@ -679,7 +855,12 @@ class PoE2InventoryReader extends PoE2PlayerReader
                         if (score > bestScore)
                         {
                             bestScore := score
-                            bestCandidate := Map("componentPtr", componentPtr, "allModsOffset", PoE2Offsets.ObjectMagicProperties["AllMods"], "rarityId", rarityOMP, "sourceType", "ObjectMagicProperties")
+                            bestCandidate := Map(
+                                "componentPtr",         componentPtr,
+                                "allModsOffset",        PoE2Offsets.ObjectMagicProperties["AllMods"],
+                                "statsFromModsOffset", PoE2Offsets.ObjectMagicProperties["StatsFromMods"],
+                                "rarityId",             rarityOMP,
+                                "sourceType",           "ObjectMagicProperties")
                         }
                     }
 
@@ -691,7 +872,12 @@ class PoE2InventoryReader extends PoE2PlayerReader
                         if (score > bestScore)
                         {
                             bestScore := score
-                            bestCandidate := Map("componentPtr", componentPtr, "allModsOffset", PoE2Offsets.Mods["AllMods"], "rarityId", rarityMods, "sourceType", "Mods")
+                            bestCandidate := Map(
+                                "componentPtr",         componentPtr,
+                                "allModsOffset",        PoE2Offsets.Mods["AllMods"],
+                                "statsFromModsOffset", PoE2Offsets.Mods["StatsFromMods"],
+                                "rarityId",             rarityMods,
+                                "sourceType",           "Mods")
                         }
                     }
                 }
@@ -700,7 +886,12 @@ class PoE2InventoryReader extends PoE2PlayerReader
         }
 
         if (bestScore >= 0 && bestCandidate != 0)
-            return this.ReadItemModsDetails(bestCandidate["componentPtr"], bestCandidate["allModsOffset"], bestCandidate["rarityId"], bestCandidate["sourceType"])
+            return this.ReadItemModsDetails(
+                bestCandidate["componentPtr"],
+                bestCandidate["allModsOffset"],
+                bestCandidate["rarityId"],
+                bestCandidate["sourceType"],
+                bestCandidate["statsFromModsOffset"])
 
         return 0
     }
@@ -742,8 +933,11 @@ class PoE2InventoryReader extends PoE2PlayerReader
     }
 
     ; Reads all 5 mod vectors (implicit, explicit, enchant, hellscape, crucible) from a component.
-    ; Returns: Map with per-category arrays, counts, rarityId, rarity string, and merged allModNames.
-    ReadItemModsDetails(componentPtr, allModsBaseOffset, rarityId, sourceType)
+    ; Also reads the aggregated StatsFromMods (statId, statValue) list — the item-level
+    ; flat stat array that drives templated tooltip rendering ("+38 to Spirit" etc).
+    ; Returns: Map with per-category arrays, counts, rarityId, rarity string, merged
+    ; allModNames, and statsFromMods.
+    ReadItemModsDetails(componentPtr, allModsBaseOffset, rarityId, sourceType, statsFromModsOffset := 0)
     {
         implicitMods := this.ReadModArrayFromVector(componentPtr + allModsBaseOffset + (0x18 * 0))
         explicitMods := this.ReadModArrayFromVector(componentPtr + allModsBaseOffset + (0x18 * 1))
@@ -757,6 +951,10 @@ class PoE2InventoryReader extends PoE2PlayerReader
         this.AppendDistinctModNames(allNames, enchantMods)
         this.AppendDistinctModNames(allNames, hellscapeMods)
         this.AppendDistinctModNames(allNames, crucibleMods)
+
+        statsFromMods := []
+        if (statsFromModsOffset > 0)
+            statsFromMods := this.ReadItemStatsFromMods(componentPtr + statsFromModsOffset)
 
         return Map(
             "sourceType", sourceType,
@@ -772,8 +970,225 @@ class PoE2InventoryReader extends PoE2PlayerReader
             "enchantCount", enchantMods.Length,
             "hellscapeCount", hellscapeMods.Length,
             "crucibleCount", crucibleMods.Length,
-            "allModNames", allNames
+            "allModNames", allNames,
+            "statsFromMods", statsFromMods
         )
+    }
+
+    ; ── Stash tab name discovery ─────────────────────────────────────────────
+    ; Reads an MSVC std::wstring (the "NativeStringU" struct from ExileApi).
+    ; Layout (32 bytes):
+    ;   +0x00  buf       — first 8 bytes of SSO buffer OR heap pointer to wide chars
+    ;   +0x08  buf2      — next 8 bytes of SSO buffer (unused when heap)
+    ;   +0x10  size      — uint, wide-char length (excl. null)
+    ;   +0x18  capacity  — uint, wide-char capacity
+    ;
+    ; MSVC SSO threshold: capacity <= 7 -> inline buffer (16 bytes UTF-16 fits 8 chars
+    ; counting null); capacity > 7 -> buf is the heap pointer. ExileApi has this
+    ; backwards in comments but the threshold above matches actual MSVC behaviour.
+    ;
+    ; Returns: the decoded string, "" on any read failure or obviously invalid struct.
+    _ReadNativeStringU(addr)
+    {
+        if !this.IsProbablyValidPointer(addr)
+            return ""
+        buf := this.Mem.ReadBytes(addr, 0x20)
+        if !buf
+            return ""
+
+        size     := NumGet(buf.Ptr, 0x10, "UInt")
+        capacity := NumGet(buf.Ptr, 0x18, "UInt")
+        if (size = 0 || size > 256 || capacity < size)
+            return ""
+
+        raw := ""
+        if (capacity <= 7)
+        {
+            ; SSO: inline 16-byte buffer (8 wide chars including the null terminator).
+            raw := StrGet(buf.Ptr, size, "UTF-16")
+        }
+        else
+        {
+            ; Heap path: dereference buf as a wide-char pointer.
+            heapPtr := NumGet(buf.Ptr, 0x00, "Ptr")
+            if !this.IsProbablyValidPointer(heapPtr)
+                return ""
+            strBuf := this.Mem.ReadBytes(heapPtr, (size + 1) * 2)
+            if !strBuf
+                return ""
+            raw := StrGet(strBuf.Ptr, size, "UTF-16")
+        }
+
+        ; Validate: reject anything that contains NUL or control chars. A real
+        ; user-given tab name is printable text. Garbage memory matching the
+        ; (size, capacity) numeric bounds by chance almost always carries a
+        ; non-printable byte somewhere — this filter cuts those out cleanly.
+        nulPos := InStr(raw, Chr(0))
+        if (nulPos > 0)
+            raw := SubStr(raw, 1, nulPos - 1)
+        if (raw = "")
+            return ""
+        loop StrLen(raw)
+        {
+            c := Ord(SubStr(raw, A_Index, 1))
+            if (c < 0x20)   ; any control char (including NUL we already stripped)
+                return ""
+        }
+        return raw
+    }
+
+    ; Heuristically locates the std::vector<ServerStashTab> inside ServerDataStructure
+    ; and returns the tab names in their natural order.
+    ;
+    ; Intra-entry layout (MSVC-stable across versions):
+    ;   Name (NativeStringU) at +0x08 within each entry.
+    ; Variable across versions:
+    ;   Outer vector position in ServerDataStructure (PoE1: 0x1CB0; PoE2: unknown)
+    ;   Entry stride (PoE1: 0x40; PoE2: possibly different due to added fields)
+    ;
+    ; Strategy: scan a wide window from playerDataPtr looking for NativePtrArray
+    ; triples (First, Last, End) whose entry count is plausible AND where at
+    ; least one entry's Name field reads as a valid wstring. Try several strides;
+    ; pick the candidate that resolves the most names.
+    ;
+    ; Params: playerDataPtr - the dereferenced ServerData[PlayerServerData] pointer
+    ;         minTabs       - minimum non-empty name count required
+    ; Returns: Array of name strings (positionally aligned with that vector's entries).
+    ReadStashTabNames(playerDataPtr, minTabs := 1)
+    {
+        result := []
+        if !this.IsProbablyValidPointer(playerDataPtr)
+            return result
+
+        ; Wide scan window — 96 KB. PoE2 has more inventory metadata than PoE1
+        ; (we see 100+ inventory entries), so the stash-tab vector may have
+        ; shifted far below PoE1's 0x1CB0 offset.
+        scanSize := 0x18000
+        buf := this.Mem.ReadBytes(playerDataPtr, scanSize)
+        if !buf
+            return result
+
+        ; Strides to probe. 0x40 is the PoE1 ServerStashTab size; 0x48 / 0x50 /
+        ; 0x60 cover plausible PoE2 expansions with extra fields.
+        strides := [0x40, 0x48, 0x50, 0x60]
+        bestNames    := []
+        bestNonEmpty := 0
+
+        for _, stride in strides
+        {
+            off := 0
+            while (off <= scanSize - 24)
+            {
+                first := NumGet(buf.Ptr, off,      "Int64")
+                last  := NumGet(buf.Ptr, off + 8,  "Int64")
+                end   := NumGet(buf.Ptr, off + 16, "Int64")
+                off += 8   ; pointer-aligned step
+
+                if !this.IsProbablyValidPointer(first)
+                    continue
+                if (last <= first || end < last)
+                    continue
+                span := last - first
+                if (span <= 0 || Mod(span, stride) != 0)
+                    continue
+                count := span // stride
+                if (count < minTabs || count > 500)
+                    continue
+
+                ; Probe at least the first entry. If it doesn't resolve, try
+                ; entries 1 and 2 — special/system tabs sometimes lead with an
+                ; empty slot before user-named tabs begin.
+                probeOk := false
+                probeI := 0
+                while (probeI < Min(3, count))
+                {
+                    n := this._ReadNativeStringU(first + (probeI * stride) + 0x08)
+                    if (n != "")
+                    {
+                        probeOk := true
+                        break
+                    }
+                    probeI += 1
+                }
+                if !probeOk
+                    continue
+
+                ; Collect all names in order
+                names := []
+                nonEmpty := 0
+                idx := 0
+                while (idx < count)
+                {
+                    n := this._ReadNativeStringU(first + (idx * stride) + 0x08)
+                    names.Push(n)
+                    if (n != "")
+                        nonEmpty += 1
+                    idx += 1
+                }
+                if (nonEmpty < minTabs)
+                    continue
+                if (nonEmpty > bestNonEmpty)
+                {
+                    bestNonEmpty := nonEmpty
+                    bestNames    := names
+                    ; Diagnostic: log which stride+offset+count won — helps narrow
+                    ; the real PoE2 offset later without re-scanning. Single-line
+                    ; structured context string; LogError treats it as freeform.
+                    sample := ""
+                    sIdx := 1
+                    while (sIdx <= Min(5, names.Length))
+                    {
+                        sample .= (sIdx > 1 ? "," : "") . names[sIdx]
+                        sIdx += 1
+                    }
+                    try LogError("StashTabScan stride=" Format("0x{:X}", stride)
+                        . " ofs=" Format("0x{:X}", off - 8)
+                        . " count=" count
+                        . " nonEmpty=" nonEmpty
+                        . " sample=[" sample "]")
+                }
+            }
+        }
+
+        return bestNames
+    }
+
+    ; Reads the StatsFromMods StdVector — a flat list of (statKey, statValue) pairs
+    ; aggregated across all of an item's mods. Same element layout as player stats
+    ; (8-byte StatArrayStruct: int key + int value). Resolves to the same stat IDs
+    ; that stat_desc_map.tsv covers, so the existing FormatStatEntry pipeline can
+    ; produce templated lines like "+38 to Spirit".
+    ;
+    ; Params: vectorAddress - absolute address of the StdVector struct (NOT a pointer to one)
+    ;         maxPairs      - safety cap for runaway vectors
+    ; Returns: Array of Maps with "key" and "value", or [] on invalid input.
+    ReadItemStatsFromMods(vectorAddress, maxPairs := 128)
+    {
+        out := []
+        if !this.IsProbablyValidPointer(vectorAddress)
+            return out
+
+        first := this.Mem.ReadInt64(vectorAddress + PoE2Offsets.StdVector["First"])
+        last  := this.Mem.ReadInt64(vectorAddress + PoE2Offsets.StdVector["Last"])
+        if (first <= 0 || last < first)
+            return out
+
+        pairSize := 8   ; StatArrayStruct = int key (4B) + int value (4B)
+        count    := Floor((last - first) / pairSize)
+        if (count <= 0)
+            return out
+
+        maxRead := Min(count, maxPairs)
+        idx := 0
+        while (idx < maxRead)
+        {
+            addr := first + (idx * pairSize)
+            key  := this.Mem.ReadInt(addr + PoE2Offsets.StatPair["Key"])
+            val  := this.Mem.ReadInt(addr + PoE2Offsets.StatPair["Value"])
+            out.Push(Map("key", key, "value", val))
+            idx += 1
+        }
+        return out
     }
 
     ; Reads a std::vector of mod entries and returns an array of mod Maps (name, value, genType, tierWord).
@@ -799,16 +1214,41 @@ class PoE2InventoryReader extends PoE2PlayerReader
         idx := 0
         while (idx < readCount)
         {
-            entryAddr := first + (idx * entrySize)
-            value0 := this.Mem.ReadInt(entryAddr + PoE2Offsets.ModArray["Value0"])
-            modRowPtr := this.Mem.ReadPtr(entryAddr + PoE2Offsets.ModArray["ModsPtr"])
-            valuesCount := this.ReadStdVectorCount(entryAddr + PoE2Offsets.ModArray["Values"], 0x04, 16)
+            entryAddr   := first + (idx * entrySize)
+            value0Raw   := this.Mem.ReadInt(entryAddr + PoE2Offsets.ModArray["Value0"])
+            modRowPtr   := this.Mem.ReadPtr(entryAddr + PoE2Offsets.ModArray["ModsPtr"])
 
-            value1 := ""
-            if (valuesCount >= 1)
-                value0 := this.Mem.ReadInt(this.Mem.ReadInt64(entryAddr + PoE2Offsets.ModArray["Values"]) + PoE2Offsets.StatPair["Key"])
-            if (valuesCount >= 2)
-                value1 := this.Mem.ReadInt(this.Mem.ReadInt64(entryAddr + PoE2Offsets.ModArray["Values"]) + PoE2Offsets.StatPair["Value"])
+            ; ── Read the mod's Values vector — array of roll values (4 B each) ──
+            ; This is NOT a (key, value) StatPair vector. The stat IDs live on the
+            ; Mods.dat row pointed to by ModsPtr; the per-item vector holds only the
+            ; numeric rolls for those stats. A "+Life and +Mana" mod has 2 values,
+            ; a single "+Strength" mod has 1 value, etc.
+            ;
+            ; Reading the actual stat IDs would require mapping the Mods.dat schema
+            ; (offsets into the dat row for the stat-id columns), which isn't in
+            ; PoE2Offsets.ahk yet — so we can show values but not yet templated text
+            ; like "+38 to Spirit". TODO: add Mods.dat schema and rejoin to
+            ; stat_desc_map for full template rendering.
+            valuesVecAddr := entryAddr + PoE2Offsets.ModArray["Values"]
+            vFirst := this.Mem.ReadInt64(valuesVecAddr + PoE2Offsets.StdVector["First"])
+            vLast  := this.Mem.ReadInt64(valuesVecAddr + PoE2Offsets.StdVector["Last"])
+            values := []
+            vCount := 0
+            if (vFirst > 0 && vLast >= vFirst)
+            {
+                vCount := Min(Floor((vLast - vFirst) / 4), 16)
+                vIdx := 0
+                while (vIdx < vCount)
+                {
+                    values.Push(this.Mem.ReadInt(vFirst + (vIdx * 4)))
+                    vIdx += 1
+                }
+            }
+
+            ; Back-compat fields used by TreeView debug rendering. value0 is the
+            ; first roll value when present, otherwise the Value0 fallback int.
+            value0 := (values.Length >= 1) ? values[1] : value0Raw
+            value1 := (values.Length >= 2) ? values[2] : ""
 
             modName := this.ReadModName(modRowPtr)
             if (modName != "")
@@ -819,9 +1259,10 @@ class PoE2InventoryReader extends PoE2PlayerReader
                     "displayName", modInfo["affix"],
                     "genType", modInfo["genType"],
                     "tierWord", modInfo["tierWord"],
-                    "value0", value0,
-                    "value1", value1,
-                    "valuesCount", valuesCount,
+                    "values", values,         ; preferred — all roll values for this mod
+                    "value0", value0,         ; legacy: first roll value
+                    "value1", value1,         ; legacy: second roll value
+                    "valuesCount", vCount,
                     "modRowPtr", modRowPtr
                 ))
             }

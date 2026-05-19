@@ -94,6 +94,12 @@ g_exploreTargetPercent := 80
 g_exploreCurrentPercent := 0.0
 g_exploreLastReason := "idle"
 
+; AutoPilot — master state machine that arbitrates combat vs exploration.
+; When off, neither combat nor exploration runs regardless of their sub-toggles.
+g_autoPilotEnabled := false
+g_autoPilotState   := "idle"   ; "idle" | "combat" | "explore"
+g_autoPilotReason  := "idle"
+
 ; Radar Entity-Filter
 g_radarShowEnemyNormal := true
 g_radarShowEnemyRare := true
@@ -577,6 +583,7 @@ OnTreeTabChanged(*)
 #Include AutoFlask.ahk
 #Include CombatAutomation.ahk
 #Include ExplorationModule.ahk
+#Include AutoPilot.ahk
 #Include UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.

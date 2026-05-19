@@ -12,6 +12,13 @@ _JsStr(s)
     s := StrReplace(s, "`n", "\n")
     s := StrReplace(s, "`r", "\r")
     s := StrReplace(s, "`t", "\t")
+    ; Strip any remaining control chars (NUL, BEL, ESC, …) that the StrReplace
+    ; pairs above didn't catch — JSON spec forbids unescaped < 0x20 inside
+    ; strings, and WebView2's JSON.parse rejects them, breaking the whole push.
+    ; Rare in user input but happens when stale memory reads sneak garbage past
+    ; the upstream validators (e.g. heuristic stash-name scanner).
+    if RegExMatch(s, "[\x00-\x08\x0B\x0C\x0E-\x1F]")
+        s := RegExReplace(s, "[\x00-\x08\x0B\x0C\x0E-\x1F]", "")
     return '"' s '"'
 }
 
@@ -39,6 +46,7 @@ PushHeaderToWebView()
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled, g_rangeCirclesEnabled, g_panelDetectionEnabled
+    global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
     global g_cfgOpenSections
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
@@ -95,6 +103,9 @@ PushHeaderToWebView()
           . '"rangeCircles":' (g_rangeCirclesEnabled ? "true" : "false") ","
           . '"panelDetection":' (g_panelDetectionEnabled ? "true" : "false") ","
           . '"cfgSections":' _JsStr(g_cfgOpenSections) ","
+          . '"autoPilot":' (g_autoPilotEnabled ? "true" : "false") ","
+          . '"autoPilotState":' _JsStr(g_autoPilotState) ","
+          . '"autoPilotReason":' _JsStr(g_autoPilotReason) ","
           . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
           . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
           . '"combatState":' _JsStr(g_combatState) ","
@@ -559,6 +570,292 @@ _PushSavedPanelOffsets()
     }
     json .= "]"
     try WebViewExec("updateSavedPanelOffsets(" json ")")
+}
+
+; ── Inventory tab push ───────────────────────────────────────────────────
+; Reads all player inventories (Backpack, Flasks, Trinkets, …) + best-effort
+; stash scan, then pushes a JSON dump to the WebView's updateInventory() handler.
+; Triggered on-demand from the UI when the Inventory tab is active — keeps the
+; per-frame snapshot cost zero when the user isn't looking at the tab.
+PushInventoryToWebView()
+{
+    global g_reader, g_radarLastSnap, g_webViewReady
+    if !g_webViewReady
+        return
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+    {
+        try WebViewExec("updateInventory(" _JsStr('{"error":"not-connected"}') ")")
+        return
+    }
+
+    ; Resolve serverData + gameUi pointers on-demand. The Radar snapshot is a slim
+    ; variant that omits both (it's optimized for per-frame entity/panel reads), so
+    ; we walk the same pointer chain ReadAutoFlaskSnapshot uses — four extra RPMs
+    ; that only run when the user has the Inventory tab open.
+    snap     := IsObject(g_radarLastSnap) ? g_radarLastSnap : 0
+    inGs     := (snap && snap.Has("inGameState")) ? snap["inGameState"] : 0
+    area     := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    inGsAddr := (inGs && IsObject(inGs) && inGs.Has("address")) ? inGs["address"] : 0
+    areaAddr := (area && IsObject(area) && area.Has("address")) ? area["address"] : 0
+
+    if (!inGsAddr || !areaAddr)
+    {
+        try WebViewExec("updateInventory(" _JsStr('{"error":"no-server-data"}') ")")
+        return
+    }
+
+    sdPtr  := 0
+    gameUi := 0
+    try
+    {
+        ; serverDataPtr: read raw pointer from playerInfo struct, then resolve via reader's
+        ; own pointer-laundering helper (handles indirections + plausibility checks).
+        playerInfoPtr    := areaAddr + PoE2Offsets.AreaInstance["PlayerInfo"]
+        serverDataRawPtr := g_reader.Mem.ReadPtr(playerInfoPtr + PoE2Offsets.LocalPlayerStruct["ServerDataPtr"])
+        sdPtr            := g_reader.ResolveServerDataPointer(playerInfoPtr, serverDataRawPtr)
+
+        ; gameUiPtr: inGameState → UiRootStruct → GameUiPtr
+        uiRootStructPtr  := g_reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.InGameState["UiRootStructPtr"])
+        if g_reader.IsProbablyValidPointer(uiRootStructPtr)
+            gameUi := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
+    }
+    catch as ex
+        LogError("PushInventoryToWebView/resolve", ex)
+
+    if (!sdPtr)
+    {
+        try WebViewExec("updateInventory(" _JsStr('{"error":"no-server-data"}') ")")
+        return
+    }
+
+    ; ReadAllPlayerInventories already covers everything: backpack (id=1),
+    ; equipped slots (id=2–11), flasks (id=12), and the currently open stash
+    ; tab (id=27 — the game server populates this slot with whichever stash tab
+    ; is visible, so no separate UI traversal is needed). The gameUi pointer is
+    ; resolved above only to mirror future read paths; not used for stash now.
+    invs := []
+    try invs := g_reader.ReadAllPlayerInventories(sdPtr)
+    catch as ex
+        LogError("PushInventoryToWebView/player", ex)
+
+    json := "{"
+          . '"player":' _BuildInventoryArrayJson(invs)
+          . "}"
+    try WebViewExec("updateInventory(" _JsStr(json) ")")
+}
+
+; Serialises an array of inventory Maps (from ReadAllPlayerInventories /
+; ReadStashInventories) into a compact JSON array consumed by the Inventory tab.
+_BuildInventoryArrayJson(invs)
+{
+    json := "["
+    first := true
+    if !(invs && Type(invs) = "Array")
+        return "[]"
+    for _, inv in invs
+    {
+        if !(inv && Type(inv) = "Map")
+            continue
+        if !first
+            json .= ","
+        first := false
+        invId   := inv.Has("inventoryId") ? Integer(inv["inventoryId"]) : -1
+        boxX    := inv.Has("totalBoxesX") ? Integer(inv["totalBoxesX"]) : 0
+        boxY    := inv.Has("totalBoxesY") ? Integer(inv["totalBoxesY"]) : 0
+        source  := inv.Has("source")   ? String(inv["source"])   : ""
+        tabName := inv.Has("tabName")  ? String(inv["tabName"])  : ""
+        items   := inv.Has("items") ? inv["items"] : []
+
+        itemsJson := "["
+        itemFirst := true
+        for _, it in items
+        {
+            if !(it && Type(it) = "Map")
+                continue
+            d := it.Has("details") ? it["details"] : 0
+            if !(d && Type(d) = "Map")
+                continue
+            if !itemFirst
+                itemsJson .= ","
+            itemFirst := false
+            name   := d.Has("displayName") ? String(d["displayName"]) : ""
+            base   := d.Has("baseType")    ? String(d["baseType"])    : ""
+            rarId  := d.Has("rarityId")    ? Integer(d["rarityId"])   : -1
+            stkCnt := d.Has("stackCount")  ? Integer(d["stackCount"]) : 0
+            modsJson := _BuildItemModsJson(d.Has("modsInfo") ? d["modsInfo"] : 0)
+            itemsJson .= "{"
+                . '"sx":'  Integer(it["slotStartX"]) ","
+                . '"sy":'  Integer(it["slotStartY"]) ","
+                . '"ex":'  Integer(it["slotEndX"])   ","
+                . '"ey":'  Integer(it["slotEndY"])   ","
+                . '"n":'   _JsStr(name) ","
+                . '"b":'   _JsStr(base) ","
+                . '"r":'   rarId        ","
+                . '"s":'   stkCnt       ","
+                . '"m":'   modsJson
+                . "}"
+        }
+        itemsJson .= "]"
+
+        json .= "{"
+            . '"id":'    invId  ","
+            . '"bx":'    boxX   ","
+            . '"by":'    boxY   ","
+            . '"src":'   _JsStr(source) ","
+            . '"tn":'    _JsStr(tabName) ","
+            . '"items":' itemsJson
+            . "}"
+    }
+    return json . "]"
+}
+
+; Flattens an item's mod data into a JSON array of { c: category, t: text } objects
+; for the inventory tooltip.
+;
+; PRIMARY path: use the aggregated StatsFromMods (statKey, statValue) list. The
+; component exposes this as a flat (key, value) vector — same shape as player
+; stats — so the existing FormatStatEntry pipeline (stat_desc_map templates +
+; multi-stat sibling resolution) produces lines like "+38 to Spirit" identical
+; to what the GameState tab shows for the player.
+;
+; FALLBACK path: when StatsFromMods is empty (e.g. read failed, or some items
+; with no aggregated stat list), fall back to per-mod affix names + roll values
+; so the user still sees something.
+_BuildItemModsJson(modsInfo)
+{
+    if !(modsInfo && Type(modsInfo) = "Map")
+        return "[]"
+
+    out := "["
+    first := true
+
+    ; ── Primary: aggregated StatsFromMods rendered via stat_desc_map templates ──
+    statsFromMods := modsInfo.Has("statsFromMods") ? modsInfo["statsFromMods"] : 0
+    if (statsFromMods && Type(statsFromMods) = "Array" && statsFromMods.Length > 0)
+    {
+        ; BuildStatSiblingContext populates the global Map FormatStatEntry uses
+        ; for multi-stat templates ("Adds X to Y damage" etc.). Scoping it to
+        ; THIS item's stats means siblings resolve against the right values.
+        BuildStatSiblingContext(statsFromMods)
+        for _, pair in statsFromMods
+        {
+            if !(pair && Type(pair) = "Map" && pair.Has("key") && pair.Has("value"))
+                continue
+            text := FormatStatEntry(pair["key"], pair["value"])
+            if (text = "")
+                continue
+            if !first
+                out .= ","
+            first := false
+            ; All item stats share one category — implicit/explicit grouping
+            ; isn't preserved in the aggregated list, and the in-game tooltip
+            ; renders them as one flat block too.
+            out .= "{"
+                . '"c":' _JsStr("explicit") ","
+                . '"t":' _JsStr(text)
+                . "}"
+        }
+        ClearStatSiblingContext()
+        return out . "]"
+    }
+
+    ; ── Fallback: per-mod affix + roll values when no aggregated stats ──
+    for _, entry in [
+        Map("key", "implicitMods", "cat", "implicit"),
+        Map("key", "enchantMods",  "cat", "enchant"),
+        Map("key", "explicitMods", "cat", "explicit")]
+    {
+        arr := modsInfo.Has(entry["key"]) ? modsInfo[entry["key"]] : 0
+        if !(arr && Type(arr) = "Array")
+            continue
+        for _, m in arr
+        {
+            if !(m && Type(m) = "Map")
+                continue
+            lines := _FormatModLines(m)
+            for _, line in lines
+            {
+                if (line = "")
+                    continue
+                if !first
+                    out .= ","
+                first := false
+                out .= "{"
+                    . '"c":' _JsStr(entry["cat"]) ","
+                    . '"t":' _JsStr(line)
+                    . "}"
+            }
+        }
+    }
+    return out . "]"
+}
+
+; Resolves one mod entry to a single human-readable line.
+; Format: "<tier> <Affix> (val0[, val1[, val2…]])" — uses what's reliably
+; readable from the per-item mod struct: the affix display name, optional tier
+; word, and ALL roll values from the mod's Values vector.
+;
+; Full templated rendering (e.g. "+38 to Spirit") needs the stat-ID list from
+; the Mods.dat row, which isn't in PoE2Offsets yet. See the TODO in
+; PoE2InventoryReader.ReadModArrayFromVector.
+;
+; Returns: Array of strings (currently always 0 or 1 entries — the API supports
+; multiple lines for when template rendering lands later).
+_FormatModLines(m)
+{
+    lines := []
+    affix := m.Has("displayName") ? String(m["displayName"]) : ""
+    tier  := m.Has("tierWord")    ? String(m["tierWord"])    : ""
+    name  := m.Has("name")        ? String(m["name"])        : ""
+
+    label := (tier != "" && affix != "") ? (tier " " affix)
+           : (affix != "")                 ? affix
+           : (tier != "")                  ? tier
+           :                                 name
+    if (label = "")
+        return lines
+
+    ; Build the value annotation from every roll the mod carries.
+    valStr := ""
+    values := m.Has("values") ? m["values"] : 0
+    if (values && Type(values) = "Array" && values.Length > 0)
+    {
+        parts := []
+        for _, v in values
+        {
+            n := _SafeNumStr(v)
+            if (n != "")
+                parts.Push(n)
+        }
+        if (parts.Length > 0)
+        {
+            joined := ""
+            for i, p in parts
+                joined .= (i = 1 ? "" : ", ") . p
+            valStr := " (" joined ")"
+        }
+    }
+    else
+    {
+        ; Legacy single-value fallback for entries that pre-date the values[] field.
+        v0 := _SafeNumStr(m.Has("value0") ? m["value0"] : "")
+        if (v0 != "")
+            valStr := " (" v0 ")"
+    }
+
+    lines.Push(label . valStr)
+    return lines
+}
+
+; Tolerant numeric → string conversion. Used for mod roll values which can be
+; ints from a successful memory read, or empty strings when the slot has no
+; value. Returns "" so the caller can decide whether to skip.
+_SafeNumStr(v)
+{
+    if (Type(v) = "Integer" || Type(v) = "Float")
+        return String(v)
+    s := Trim(String(v))
+    return (s = "" || !RegExMatch(s, "^-?\d+$")) ? "" : s
 }
 
 ; Pushes all four non-tree special tabs (buffs, entities, UI, gameState, skills) to the WebView.

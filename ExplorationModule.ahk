@@ -13,64 +13,38 @@
 ; Globals declared in InGameStateMonitor.ahk:
 ;   g_exploreEnabled, g_exploreTargetPercent, g_exploreCurrentPercent, g_exploreLastReason
 
-; ── Timer callback ────────────────────────────────────────────────────────
-; Called every 50ms from UpdateRadarFast.
-; radarSnap: full radar snapshot from ReadRadarSnapshot()
-TryExploration(radarSnap)
+; ── Exploration tick (called from AutoPilot) ──────────────────────────────
+; Runs one exploration step: tracks visited cells, computes A* path to the
+; nearest unexplored frontier, and click-to-moves toward it.
+;
+; AutoPilot owns the shared guard chain (window focus, town/hideout, panel-open,
+; player-dead) and the combat-vs-explore arbitration. This function trusts the
+; gameHwnd it receives and only checks the g_exploreEnabled sub-toggle.
+;
+; Params: radarSnap - full radar snapshot
+;         gameHwnd  - resolved PoE2 window handle (must be valid + active)
+TryExploration(radarSnap, gameHwnd)
 {
     static _running := false
     if _running
         return
     _running := true
     try
-        _RunExploration(radarSnap)
+        _RunExploration(radarSnap, gameHwnd)
     catch as ex
         LogError("TryExploration", ex)
     finally
         _running := false
 }
 
-_RunExploration(radarSnap)
+_RunExploration(radarSnap, gameHwnd)
 {
     global g_exploreEnabled, g_exploreTargetPercent, g_exploreCurrentPercent
-    global g_exploreLastReason, g_updatesPaused, g_reader
-    global g_combatState
+    global g_exploreLastReason, g_reader
 
-    if (g_updatesPaused || !g_exploreEnabled)
+    if !g_exploreEnabled
     {
         g_exploreLastReason := "disabled"
-        return
-    }
-
-    ; ── Resolve game window ───────────────────────────────────────────
-    gameHwnd := ResolvePoEWindow()
-    if !gameHwnd
-    {
-        g_exploreLastReason := "no-game-window"
-        return
-    }
-    if !WinActive("ahk_id " gameHwnd)
-    {
-        g_exploreLastReason := "game-not-focused"
-        return
-    }
-
-    ; ── Block in town/hideout ─────────────────────────────────────────
-    wad := radarSnap.Has("worldAreaDat") ? radarSnap["worldAreaDat"] : 0
-    if (wad && IsObject(wad))
-    {
-        if ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))
-        {
-            g_exploreLastReason := "town-hideout"
-            return
-        }
-    }
-
-    ; ── Block when panel is open ──────────────────────────────────────
-    panelVis := radarSnap.Has("panelVisibility") ? radarSnap["panelVisibility"] : 0
-    if (panelVis && IsObject(panelVis) && panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
-    {
-        g_exploreLastReason := "panel-open"
         return
     }
 
@@ -379,26 +353,60 @@ _RunExploration(radarSnap)
         }
     }
 
-    ; Pick the waypoint to click toward (look ahead ~3 waypoints for smoother movement)
-    clickWP := 0
+    ; Pick the waypoint to click toward.
+    ; Default look-ahead is +3 from current waypoint for smoother movement. If the
+    ; projected screen position lands on a UI element (minimap, life globe, skill bar,
+    ; flask bar, etc.) the click would be consumed by the UI instead of moving the
+    ; character — so we walk *back* through the path toward the player to find a
+    ; waypoint whose projection clears all known UI rects. Falling back to a closer
+    ; waypoint keeps the same movement direction; a forward LA would push the click
+    ; even deeper into the same UI element.
+    uiBlocks  := _GetUiClickBlockRects(radarSnap, gameHwnd)
+    clickWX   := 0
+    clickWY   := 0
+    screenPos := 0
+    chosenLA  := 0
+
     if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
     {
-        lookAhead := Min(_pathIdx + 3, _pathCoords.Length)
-        clickWP := _pathCoords[lookAhead]
+        startLA := Min(_pathIdx + 3, _pathCoords.Length)
+        la := startLA
+        while (la >= _pathIdx)
+        {
+            wp  := _pathCoords[la]
+            cwx := wp[1] * ratio
+            cwy := wp[2] * ratio
+            sp  := _ExploreWorldToScreen(cwx, cwy, playerWZ, w2sMat, gameHwnd)
+            if (sp && !_IsInUiBlockRect(sp["x"], sp["y"], uiBlocks))
+            {
+                clickWX   := cwx
+                clickWY   := cwy
+                screenPos := sp
+                chosenLA  := la
+                break
+            }
+            la--
+        }
     }
     else
     {
-        ; No path — click directly toward target
-        clickWP := [_targetCX * _STEP, _targetCY * _STEP]
+        ; No path — click directly toward target. Same UI-safety check, but with
+        ; only one candidate there's no fallback besides skipping this tick.
+        clickWX := _targetCX * _STEP * ratio
+        clickWY := _targetCY * _STEP * ratio
+        sp      := _ExploreWorldToScreen(clickWX, clickWY, playerWZ, w2sMat, gameHwnd)
+        if (sp && !_IsInUiBlockRect(sp["x"], sp["y"], uiBlocks))
+            screenPos := sp
     }
 
-    ; Convert grid → world → screen
-    clickWX := clickWP[1] * ratio
-    clickWY := clickWP[2] * ratio
-    screenPos := _ExploreWorldToScreen(clickWX, clickWY, playerWZ, w2sMat, gameHwnd)
     if (!screenPos)
     {
-        g_exploreLastReason := "no-w2s(" g_exploreCurrentPercent "%)"
+        ; Either W2S projection failed, or every candidate waypoint projects onto a
+        ; UI element. Skip the click — character keeps walking from the previous
+        ; click for a moment; next tick has a fresh player position and the
+        ; projection geometry usually shifts off the UI element. Stuck-detection at
+        ; 3 s upstream will reset the target if we end up persistently blocked.
+        g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
         return
     }
 
@@ -411,7 +419,9 @@ _RunExploration(radarSnap)
     DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTUP
     _lastClickTick := now
 
-    g_exploreLastReason := "click(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
+    laTag := (chosenLA > 0 && chosenLA != Min(_pathIdx + 3, _pathCoords.Length))
+        ? " la=" chosenLA : ""
+    g_exploreLastReason := "click(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length laTag ")"
 }
 
 ; ── Find nearest unvisited walkable cell (frontier) ──────────────────────
@@ -501,6 +511,97 @@ _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP)
         }
     }
     return 0
+}
+
+; ── UI click-block rects ─────────────────────────────────────────────────
+; Returns an array of [x, y, w, h] screen-coordinate rectangles where a left
+; click would be consumed by a UI element instead of acting as click-to-move.
+;
+; Two sources of rects:
+;   1. Exact rects derived from the snapshot's importantUiElements (currently the
+;      minimap is the only element with reliable pos+size). When visible, this
+;      uses the same UI-scale math as RadarOverlay (scaleIdx + localMult).
+;   2. Heuristic rects for fixed-position UI that we don't read from memory yet
+;      (skill bar, life globe, mana globe, area banner, quest tracker). These are
+;      proportions of the game window — PoE2 anchors them to fixed corners/edges
+;      and they scale linearly with resolution, so percentages stay accurate.
+;
+; Conservative sizing (slightly oversized) — better to occasionally skip a safe
+; click than to keep firing clicks that the UI eats silently.
+_GetUiClickBlockRects(radarSnap, gameHwnd)
+{
+    rects := []
+    if !gameHwnd
+        return rects
+
+    clientRect := Buffer(16, 0)
+    clientPt   := Buffer(8, 0)
+    DllCall("GetClientRect",  "Ptr", gameHwnd, "Ptr", clientRect)
+    DllCall("ClientToScreen", "Ptr", gameHwnd, "Ptr", clientPt)
+    cX := NumGet(clientPt, 0, "Int"),    cY := NumGet(clientPt, 4, "Int")
+    cW := NumGet(clientRect, 8, "Int"),  cH := NumGet(clientRect, 12, "Int")
+    if (cW < 100 || cH < 100)
+        return rects
+
+    ; 1. Map overlays (minimap + large map) — exact data from snapshot when visible.
+    inGs    := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
+    uiElems := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
+    sfX := cW / 2560.0, sfY := cH / 1600.0
+    for _, mapKey in ["miniMapData", "largeMapData"]
+    {
+        md := (uiElems && IsObject(uiElems) && uiElems.Has(mapKey)) ? uiElems[mapKey] : 0
+        if !(md && IsObject(md) && md.Has("isVisible") && md["isVisible"])
+            continue
+        si := md.Has("scaleIdx")  ? md["scaleIdx"]  : 3
+        lm := md.Has("localMult") ? md["localMult"] : 1.0
+        if      si = 1
+            uiSX := lm * sfX, uiSY := lm * sfX
+        else if si = 2
+            uiSX := lm * sfY, uiSY := lm * sfY
+        else if si = 3
+            uiSX := lm * sfX, uiSY := lm * sfY
+        else
+            uiSX := lm,       uiSY := lm
+        rw := md["sizeW"] * uiSX
+        rh := md["sizeH"] * uiSY
+        rx := md["unscaledPosX"] * uiSX
+        ry := md["unscaledPosY"] * uiSY
+        ; LargeMap stores center coords, MiniMap stores top-left — same convention
+        ; the radar overlay uses. For click-blocking we want the bounding rect.
+        if (mapKey = "largeMapData")
+        {
+            rx -= rw / 2
+            ry -= rh / 2
+        }
+        if (rw > 20 && rh > 20)
+            rects.Push([cX + rx, cY + ry, rw, rh])
+    }
+
+    ; 2. Heuristic UI zones — PoE2's fixed-anchor UI scaled by window proportions.
+    ; Bottom skill bar + center flask bar (middle 50 % horizontal, bottom 14 % vertical)
+    rects.Push([cX + cW * 0.25, cY + cH * 0.86, cW * 0.50, cH * 0.14])
+    ; Bottom-left life globe + left flask bar
+    rects.Push([cX,             cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    ; Bottom-right mana globe + right flask bar
+    rects.Push([cX + cW * 0.87, cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    ; Top-right quest tracker / area info
+    rects.Push([cX + cW * 0.78, cY,             cW * 0.22, cH * 0.12])
+    ; Top-left area-name banner (the minimap above sits below this; both blocked)
+    rects.Push([cX,             cY,             cW * 0.22, cH * 0.06])
+
+    return rects
+}
+
+; Point-in-rect test against the click-block list. Linear scan — at most ~6
+; rects so no spatial index needed.
+_IsInUiBlockRect(sx, sy, rects)
+{
+    for _, r in rects
+    {
+        if (sx >= r[1] && sx < r[1] + r[3] && sy >= r[2] && sy < r[2] + r[4])
+            return true
+    }
+    return false
 }
 
 ; ── World-to-Screen for exploration clicks ───────────────────────────────
