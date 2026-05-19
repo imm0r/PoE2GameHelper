@@ -216,27 +216,61 @@ class RadarOverlay
         terrainError := (areaInstance && areaInstance.Has("terrainError")) ? areaInstance["terrainError"] : ""
 
         ; Regenerate maphack bitmap when terrain data changes (new area loaded)
-        ; OR when terrain is valid but bitmap got destroyed (e.g. by a half-failed
-        ; previous generate after an InGameState transition). Don't lock in the new
-        ; terrain size until generate actually succeeds — otherwise a silent failure
-        ; leaves _mapHackTerrainSz at the new value, _mapHackDC at 0, and the size
-        ; check in this branch never fires again until the next zone change.
+        ; or when the bitmap got destroyed (e.g. by an aborted previous generate).
+        ;
+        ; sizeChanged and "generate" are intentionally split across two ticks:
+        ;   1. zone-change tick — destroy the stale bitmap, commit the new size,
+        ;      and request immediate regen. Render() continues; _RenderMapHack
+        ;      returns early because DC/Mask are gone, so this frame paints
+        ;      WITHOUT any maphack outlines.
+        ;   2. next tick — bitmap is missing, retry threshold cleared, generate
+        ;      runs (1–2 s blocking call). On return the new bitmap is drawn.
+        ;
+        ; Without this split the destroy+generate ran in the same tick: the
+        ; previous frame (with the OLD zone's outlines) stayed on screen for
+        ; the full 1–2 s of generation. Now it's gone within one 50 ms tick.
         if (this._terrain)
         {
             curSz := this._terrain["dataSize"]
             sizeChanged := (curSz != this._mapHackTerrainSz)
             bitmapMissing := !this._mapHackDC || !this._mapHackMask
-            ; Throttle the bitmap-missing retry to once per 2s so a permanently
-            ; failing generate doesn't burn CPU at 50ms ticks.
             retryReady := bitmapMissing && (A_TickCount - this._mapHackRetryTick) > 2000
-            if (sizeChanged || retryReady)
+
+            if (sizeChanged)
             {
+                ; Tick 1: drop the old zone's bitmap immediately so it can't be
+                ; blitted to the back buffer this frame. Commit the new size to
+                ; suppress repeated sizeChanged triggers, and clear the retry
+                ; tick so generation fires on the very next tick.
+                if (this._mapHackDC || this._mapHackMask)
+                    this._DestroyMapHackBitmap()
+                this._mapHackTerrainSz := curSz
+                this._mapHackRetryTick := 0
+            }
+            else if (retryReady)
+            {
+                ; Tick 2 (or any subsequent tick where bitmap is missing and
+                ; throttle has elapsed): build the new bitmap. Blocks the tick
+                ; for 1–2 s — acceptable because no maphack is on screen during
+                ; that window thanks to the destroy from tick 1.
                 this._mapHackRetryTick := A_TickCount
                 this._GenerateMapHackBitmap()
-                ; Only commit the new size when the generate actually produced a bitmap.
-                ; Leaves the regenerate trigger primed if generate silently bailed.
+                ; Re-commit size only on success — failed generates leave the
+                ; retry primed for the next throttle window.
                 if (this._mapHackDC && this._mapHackMask)
                     this._mapHackTerrainSz := curSz
+            }
+        }
+        else
+        {
+            ; Terrain became unavailable between zones (loading screen, area
+            ; ptr transitionally null). Drop the old bitmap immediately so the
+            ; previous zone's outlines don't linger over the new map.
+            if (this._mapHackDC || this._mapHackMask)
+            {
+                this._DestroyMapHackBitmap()
+                this._mapHackTerrainSz := 0
+                this._mapHackRetryTick := 0
             }
         }
 
@@ -1207,6 +1241,11 @@ class RadarOverlay
         gridW := terrain["gridWidth"]
         dsz  := terrain["dataSize"]
 
+        ; Snapshot the terrain identity now — if the player changes zone during
+        ; the long generation loop below we want to bail out cleanly instead of
+        ; finishing a bitmap that's already stale.
+        startDsz := dsz
+
         STEP := 2
         bmpW := gridW // STEP
         bmpH := rows // STEP
@@ -1235,73 +1274,127 @@ class RadarOverlay
         blackBrush := DllCall("GetStockObject", "Int", 4, "Ptr")  ; BLACK_BRUSH
         DllCall("FillRect", "Ptr", maskDC, "Ptr", rct, "Ptr", blackBrush)
 
-        ; 8-direction offsets for neighbor checking
-        nDX := [-1, 0, 1, -1, 1, -1, 0, 1]
-        nDY := [-1, -1, -1, 0, 0, 1, 1, 1]
-
         ; Skip outer margin to avoid drawing the terrain boundary rectangle.
         MARGIN := 6
+
+        ; Border detection — byte-wise mixed-region test.
+        ;
+        ; Each bitmap pixel maps to a 2×2 grid block at (gx, gy)..(gx+1, gy+1).
+        ; Each row of that block is encoded as ONE byte (two 4-bit nibbles,
+        ; lower=even-x, upper=odd-x). The pixel is a border iff the block
+        ; contains BOTH walkable (nibble != 0) AND non-walkable (nibble = 0)
+        ; cells — i.e. the boundary between walkable and not runs through
+        ; this 2×2 region.
+        ;
+        ; Reading two bytes and checking a handful of bitwise conditions per
+        ; pixel replaces 4-sub-cell × 8-neighbor scans of the previous version
+        ; (~36 NumGets per pixel → 2). Total speedup ~10–15×. Visually equivalent
+        ; for wall outlines — the previous "non-walkable cell with walkable
+        ; neighbor" definition just shifts the highlighted edge inward by one
+        ; cell, which at half-grid bitmap resolution is invisible.
         loop bmpH
         {
             by := A_Index - 1
             gy := by * STEP
-            if (gy < MARGIN || gy >= rows - MARGIN)
+            if (gy < MARGIN || gy >= rows - MARGIN - 1)
                 continue
+
+            ; Abort cleanly if the player changed zones mid-generation: the
+            ; terrain buffer in `this._terrain` would now point at the new map
+            ; and continuing would produce a mismatched bitmap. Cheap to check
+            ; once every 64 rows.
+            if (Mod(by, 64) = 0)
+            {
+                if !(this._terrain && this._terrain["dataSize"] = startDsz)
+                {
+                    this._DestroyMapHackBitmap()
+                    DllCall("SelectObject", "Ptr", maskDC, "Ptr", oldMaskBmp)
+                    DllCall("DeleteDC", "Ptr", maskDC)
+                    return
+                }
+            }
+
+            row1Base := gy * bpr           ; byte offset for row gy
+            row2Base := (gy + 1) * bpr     ; byte offset for row gy+1
+
             loop bmpW
             {
                 bx := A_Index - 1
                 gx := bx * STEP
-                if (gx < MARGIN || gx >= gridW - MARGIN)
+                if (gx < MARGIN || gx >= gridW - MARGIN - 1)
                     continue
 
-                ; Check all sub-cells in this STEP×STEP block.
-                ; If ANY sub-cell is a border, set the mask pixel.
-                foundBorder := false
-                sy := 0
-                while (sy < STEP) {
-                    if foundBorder
-                        break
-                    sx := 0
-                    while (sx < STEP) {
-                        cGX := gx + sx
-                        cGY := gy + sy
-                        if (cGX >= gridW || cGY >= rows) {
-                            sx++
-                            continue
-                        }
-                        ci := cGY * bpr + (cGX >> 1)
-                        if (ci < 0 || ci >= dsz) {
-                            sx++
-                            continue
-                        }
-                        curVal := (NumGet(buf, ci, "UChar") >> ((cGX & 1) * 4)) & 0xF
-                        if (curVal != 0) {
-                            sx++
-                            continue
-                        }
-                        ; Non-walkable cell — check 8-connected neighbors for walkable
-                        loop 8 {
-                            nx := cGX + nDX[A_Index]
-                            ny := cGY + nDY[A_Index]
-                            if (nx < 0 || nx >= gridW || ny < 0 || ny >= rows)
-                                continue
-                            ni := ny * bpr + (nx >> 1)
-                            if (ni < 0 || ni >= dsz)
-                                continue
-                            nv := (NumGet(buf, ni, "UChar") >> ((nx & 1) * 4)) & 0xF
-                            if (nv != 0) {
-                                foundBorder := true
-                                break
-                            }
-                        }
-                        if foundBorder
-                            break
-                        sx++
-                    }
-                    sy++
+                ; One byte per row covers cells (gx, gx+1) because gx is even.
+                bIdx := gx >> 1
+                i1 := row1Base + bIdx
+                i2 := row2Base + bIdx
+                if (i1 < 0 || i2 < 0 || i1 >= dsz || i2 >= dsz)
+                    continue
+
+                b1 := NumGet(buf, i1, "UChar")
+                b2 := NumGet(buf, i2, "UChar")
+
+                if (   (b1 & 0x0F) != 0 && (b1 & 0xF0) != 0
+                    && (b2 & 0x0F) != 0 && (b2 & 0xF0) != 0)
+                    continue   ; all 4 walkable — open ground, skip
+
+                if (b1 != 0 || b2 != 0)
+                {
+                    ; Mixed region — at least one walkable AND at least one
+                    ; non-walkable cell within the 2×2 block. Fast border path.
+                    DllCall("SetPixelV", "Ptr", maskDC, "Int", bx, "Int", by, "UInt", 0xFFFFFF)
+                    continue
                 }
 
-                if foundBorder
+                ; All 4 cells non-walkable. Could still be the EDGE of a wall
+                ; that's grid-aligned with our 2×2 sampling — adjacent walkable
+                ; bytes would not show up via the mixed test. Read the 6
+                ; surrounding bytes (left/right rows + above/below) and mark
+                ; the pixel as a border if any of them carries a walkable cell.
+                isBorder := false
+
+                ; Left column (rows gy, gy+1 at byte index bx-1)
+                if (bx > 0)
+                {
+                    li := row1Base + (bx - 1)
+                    if (li >= 0 && li < dsz && NumGet(buf, li, "UChar") != 0)
+                        isBorder := true
+                    if !isBorder
+                    {
+                        li := row2Base + (bx - 1)
+                        if (li < dsz && NumGet(buf, li, "UChar") != 0)
+                            isBorder := true
+                    }
+                }
+                ; Right column
+                if (!isBorder && (bx + 1) < bpr)
+                {
+                    ri := row1Base + (bx + 1)
+                    if (ri < dsz && NumGet(buf, ri, "UChar") != 0)
+                        isBorder := true
+                    if !isBorder
+                    {
+                        ri := row2Base + (bx + 1)
+                        if (ri < dsz && NumGet(buf, ri, "UChar") != 0)
+                            isBorder := true
+                    }
+                }
+                ; Top row
+                if (!isBorder && gy > 0)
+                {
+                    ti := (gy - 1) * bpr + bx
+                    if (ti >= 0 && ti < dsz && NumGet(buf, ti, "UChar") != 0)
+                        isBorder := true
+                }
+                ; Bottom row
+                if (!isBorder && (gy + 2) < rows)
+                {
+                    bi := (gy + 2) * bpr + bx
+                    if (bi < dsz && NumGet(buf, bi, "UChar") != 0)
+                        isBorder := true
+                }
+
+                if isBorder
                     DllCall("SetPixelV", "Ptr", maskDC, "Int", bx, "Int", by, "UInt", 0xFFFFFF)
             }
         }

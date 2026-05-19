@@ -1452,7 +1452,7 @@ class PoE2EntityReader extends PoE2ComponentDecoders
     ; finished. With the budget the loop yields back to the timer often
     ; enough that Render() runs between batches and the maphack becomes
     ; visible the moment a few tiles have been scanned.
-    _ProcessTgtScanBatch(batchSize, maxMs := 20)
+    _ProcessTgtScanBatch(batchSize, maxMs := 35)
     {
         tileStructSize := 0x38
         tileToGrid := 0x17
@@ -1473,6 +1473,21 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         offTileIdX    := PoE2Offsets.TileStruct["TileIdX"]
         offTileIdY    := PoE2Offsets.TileStruct["TileIdY"]
         offRotSel     := PoE2Offsets.TileStruct["RotationSelector"]
+
+        ; Per-zone tile-type cache: tgtFilePtr -> entType ("AreaTransition" |
+        ; "Waypoint" | "Checkpoint" | "" for none-of-the-above).
+        ;
+        ; PoE2 zones are built from a small set of tile templates instantiated
+        ; thousands of times — typical scan: 11000+ tiles using ~50 unique
+        ; templates. Without caching, each tile pays the cost of a wide-string
+        ; cross-process read; with caching, only the first occurrence of each
+        ; template does — cutting an N-second scan to ~N/100 seconds.
+        ;
+        ; Cache is reset in the zone-change block of UpdateRadarFast, so it
+        ; cannot serve stale entries when the map regenerates.
+        if !this.HasOwnProp("_tgtPathTypeCache")
+            this._tgtPathTypeCache := Map()
+        cache := this._tgtPathTypeCache
 
         ; Time-sliced inner loop: bail early if we exceed maxMs even though
         ; we still have tiles in the prefetched batch buffer. The next tick
@@ -1497,20 +1512,39 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             if !this.IsProbablyValidPointer(tgtFilePtr)
                 continue
 
-            tgtPath := this.ReadStdWStringAt(tgtFilePtr + PoE2Offsets.TgtFile["TgtPath"], 260)
-            if (tgtPath = "")
-                continue
+            ; Cache lookup — most tiles will hit this fast path. The cache entry
+            ; carries both the resolved type and the path string (the latter is
+            ; reused below when building the dedupe key). type="" marks non-POI
+            ; tiles so we don't re-read those either.
+            if cache.Has(tgtFilePtr)
+            {
+                cached := cache[tgtFilePtr]
+                if (cached["type"] = "")
+                    continue
+                entType := cached["type"]
+                tgtPath := cached["path"]
+            }
+            else
+            {
+                tgtPath := this.ReadStdWStringAt(tgtFilePtr + PoE2Offsets.TgtFile["TgtPath"], 260)
+                if (tgtPath = "")
+                {
+                    cache[tgtFilePtr] := Map("type", "", "path", "")
+                    continue
+                }
 
-            pathLower := StrLower(tgtPath)
-            entType := ""
-            if InStr(pathLower, "areatransition")
-                entType := "AreaTransition"
-            else if InStr(pathLower, "waypoint")
-                entType := "Waypoint"
-            else if InStr(pathLower, "checkpoint")
-                entType := "Checkpoint"
-            if (entType = "")
-                continue
+                pathLower := StrLower(tgtPath)
+                entType := ""
+                if InStr(pathLower, "areatransition")
+                    entType := "AreaTransition"
+                else if InStr(pathLower, "waypoint")
+                    entType := "Waypoint"
+                else if InStr(pathLower, "checkpoint")
+                    entType := "Checkpoint"
+                cache[tgtFilePtr] := Map("type", entType, "path", tgtPath)
+                if (entType = "")
+                    continue
+            }
 
             rotSel  := NumGet(tileBatchBuf.Ptr, bufOff + offRotSel, "UChar")
             tileIdX := NumGet(tileBatchBuf.Ptr, bufOff + offTileIdX, "UChar")

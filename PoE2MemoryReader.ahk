@@ -120,7 +120,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this._radarTerrainCache := 0
         this._radarTerrainAreaHash := 0xFFFFFFFF   ; sentinel: guarantees read on first tick
         this._radarTerrainRetryTick := 0            ; tick of last failed-read retry attempt
+        this._radarTerrainZoneStartTick := 0        ; when current zone first started waiting for terrain
+        this._radarTerrainAttempts := 0             ; ReadTerrainData attempts in the current zone
         this._terrainLastError := ""           ; last ReadTerrainData failure reason
+        this._terrainLoggedError := ""         ; last error string we wrote to error_log (de-dupe)
         this._terrainDumpAreaHash := 0xFFFFFFFF   ; throttle: terrain hex dump appended at most once per zone
 
         ; World area data cache (town/hideout flags) — re-read on zone change.
@@ -2600,29 +2603,55 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if !this.IsProbablyValidPointer(areaInstanceData)
             return 0
 
-        ; Terrain walkability data — re-read on zone change or retry every 1.5 s after a failed read.
-        ; The previous logic kept (hashChanged || retry-3s) ORed, so as long as the hash differed AND
-        ; ReadTerrainData failed, every 50 ms tick would re-attempt — burning RPM calls and (when the
-        ; struct ptrs are still null) appending a hex dump to terrain_dump.txt 20×/s. After zone change
-        ; the game can take 30-90 s to populate the terrain struct; by locking the new hash immediately
-        ; even on failure we drop the retry rate to once per 1.5 s.
+        ; Terrain walkability data — adaptive retry. After zone change PoE2 populates
+        ; the TerrainStruct asynchronously; the GridWalkableData vector can lag the
+        ; TileDetails vector by tens of seconds on some maps. We retry fast for the
+        ; first 15 s (typical population window) then back off to keep CPU low.
+        ;   first  15 s after zone change → retry every 400 ms (~38 reads max)
+        ;   after  15 s                    → retry every 1500 ms
         currentAreaHash := this.Mem.ReadUInt(areaInstanceData + PoE2Offsets.AreaInstance["CurrentAreaHash"])
         if (currentAreaHash != this._radarTerrainAreaHash)
         {
             this._radarTerrainCache := 0
             this._radarTerrainAreaHash := currentAreaHash
-            this._radarTerrainRetryTick := 0   ; force first attempt immediately
+            this._radarTerrainRetryTick := 0     ; force first attempt immediately
+            this._radarTerrainZoneStartTick := nowTick
+            this._radarTerrainAttempts := 0
         }
-        needsTerrainRead := (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > 1500)
+        elapsedSinceZone := nowTick - (this.HasOwnProp("_radarTerrainZoneStartTick") ? this._radarTerrainZoneStartTick : nowTick)
+        retryIntervalMs  := (elapsedSinceZone < 15000) ? 400 : 1500
+        needsTerrainRead := (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > retryIntervalMs)
         if needsTerrainRead
         {
             this._radarTerrainRetryTick := nowTick
+            this._radarTerrainAttempts += 1
             terrainResult := 0
             try terrainResult := this.ReadTerrainData(areaInstanceData)
             catch
                 terrainResult := 0
             if terrainResult
+            {
                 this._radarTerrainCache := terrainResult
+                ; Diagnostic: how long did it take from zone change until walkable
+                ; data was readable? Logged once per zone so the error log doesn't
+                ; spam. Helps quantify whether further retry tuning matters.
+                try LogError("TerrainReady elapsed=" elapsedSinceZone "ms"
+                    . " attempts=" this._radarTerrainAttempts
+                    . " size=" (terrainResult.Has("dataSize") ? terrainResult["dataSize"] : "?")
+                    . " bpr=" (terrainResult.Has("bytesPerRow") ? terrainResult["bytesPerRow"] : "?")
+                    . " err=" this._terrainLastError)
+                this._terrainLoggedError := ""
+            }
+            else if (this._terrainLastError != "" && this._terrainLastError != this._terrainLoggedError)
+            {
+                ; Log error-state transitions only — gives a full picture of why
+                ; the terrain wasn't readable yet, without spamming the same line
+                ; every 400 ms during a 30 s wait.
+                try LogError("TerrainWait elapsed=" elapsedSinceZone "ms"
+                    . " attempt=" this._radarTerrainAttempts
+                    . " state=" this._terrainLastError)
+                this._terrainLoggedError := this._terrainLastError
+            }
         }
 
         ; World area data (town/hideout flags) — re-read only on zone change (area hash).
@@ -2789,15 +2818,32 @@ class PoE2GameStateReader extends PoE2InventoryReader
         {
             this._radarEntityCache := Map()
             this._radarEntityCacheAreaHash := currentAreaHash
-            ; Schedule zone scanner (terrain tiles are available almost immediately)
+            ; Schedule zone scanner. Earlier code used a 2 s safety delay before
+            ; starting; the TerrainReady diagnostic confirms terrain data is now
+            ; readable on the very first attempt after a zone change, so we kick
+            ; the scan off after 200 ms — just enough to let the snapshot settle.
             this._zoneScanDone := false
-            this._zoneScanScheduledAt := A_TickCount + 2000
+            this._zoneScanScheduledAt := A_TickCount + 200
             this._zoneScanRetries := 0
             this._zoneScanAccumulated := Map()
             this._zoneScanTimingMs := 0
             this._zoneScanStartedAt := A_TickCount
             this._zoneScanFailReason := ""
             this._tgtScanInProgress := false
+            ; Hard-reset the per-scan position counters too. _SetupTgtScan would
+            ; rewrite these on the next setup call, but if a rapid zone-change
+            ; sequence interleaves with a partial batch (very fast zone toggling
+            ; in a hideout etc.), stale values could leak briefly. Cheap to be
+            ; explicit.
+            this._tgtScanTileIdx       := 0
+            this._tgtScanTotalTiles    := 0
+            this._tgtScanTileVecFirst  := 0
+            this._tgtScanTotalTilesX   := 0
+            this._tgtScanPartialResults := Map()
+            ; Drop the tile-template type cache — tgtFilePtr values are heap
+            ; addresses that get recycled when the game generates a new map.
+            if this.HasOwnProp("_tgtPathTypeCache")
+                this._tgtPathTypeCache := Map()
             ; Force fresh BFS on zone change
             this._radarLastBfsTick := 0
             this._radarLastCurrentEntities := 0
