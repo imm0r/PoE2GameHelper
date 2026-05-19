@@ -64,11 +64,8 @@ UpdateRadarFast()
         }
         g_radarLastSnap := radarSnap  ; cache for Dump Entities button
 
-        ; ── Combat Automation (independent of overlay visibility) ─────────
-        TryCombatAutomation(radarSnap)
-
-        ; ── Exploration Module (auto-explore after combat) ────────────────
-        TryExploration(radarSnap)
+        ; ── AutoPilot (state machine: combat → explore, owns shared guards) ──
+        TryAutoPilot(radarSnap)
 
         currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
 
