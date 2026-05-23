@@ -229,25 +229,78 @@
     }
 
     /* TAB BAR */
+    /* CATEGORY BAR — top-level navigation between major groups (Game / RE / Data / Config). */
+    #cat-bar {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0
+    }
+
+    #cat-bar-left { display: flex }
+    #cat-bar-right { margin-left: auto; display: flex }
+
+    .cat {
+      padding: 9px 18px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: var(--subtext);
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      transition: color .15s, border-color .15s, background .15s;
+      display: flex;
+      align-items: center;
+      gap: 7px
+    }
+    .cat:hover { color: var(--text); background: rgba(255,255,255,0.03) }
+    .cat.active { color: #e8c44a; border-bottom-color: #e8c44a }
+    .cat svg {
+      width: 15px; height: 15px; flex-shrink: 0;
+      fill: none; stroke: currentColor; stroke-width: 1.8;
+      stroke-linecap: round; stroke-linejoin: round
+    }
+
+    /* SUB-TAB BAR — one row per category, only the active category's row is visible. */
     #tab-bar {
       display: flex;
-      background: #131d2a;
+      flex-direction: column;
+      background: #0e1623;
       border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
+      flex-shrink: 0
+    }
+    .subtab-row {
+      display: none;
+      align-items: center;
       overflow-x: auto
     }
+    .subtab-row.active { display: flex }
+    /* Single-sub-tab categories (Data, Config) don't need a row — the
+       category button alone implies the destination. */
+    .subtab-row.single-tab.active { display: none }
 
-    #tab-bar-left {
-      display: flex
+    /* Visual grouping inside the RE sub-tab row (Live vs Tools). */
+    .subtab-group-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--subtext);
+      opacity: 0.55;
+      padding: 0 8px 0 14px;
+      align-self: center;
+      user-select: none
     }
-
-    #tab-bar-right {
-      margin-left: auto;
-      display: flex
+    .subtab-divider {
+      width: 1px;
+      align-self: stretch;
+      background: var(--border);
+      margin: 6px 4px
     }
 
     .tab {
-      padding: 7px 16px;
+      padding: 6px 14px;
       cursor: pointer;
       font-size: 11px;
       font-weight: 500;
@@ -265,8 +318,10 @@
     }
 
     .tab.active {
-      color: #e8c44a;
-      border-bottom-color: #e8c44a
+      /* Secondary accent (cool blue) so the sub-tab highlight is visually
+         distinct from the gold primary-category highlight above. */
+      color: #7eb0e0;
+      border-bottom-color: #7eb0e0
     }
 
     .tab svg {
@@ -755,7 +810,7 @@
     .re-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px }
     .re-row     { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
     .re-label   { font-size: 11px; color: var(--subtext) }
-    .re-result  { padding: 8px 12px; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px; max-height: 220px }
+    .re-result  { padding: 8px 12px; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px; flex: 1 }
     .re-run     { border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; background: rgba(255,255,255,0.02) }
     .re-run-head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 4px }
     .re-run-off  { color: var(--accent); font-weight: 600 }
@@ -770,7 +825,7 @@
     .re-decode > .k { color: var(--subtext) }
     .re-decode > .v { color: var(--text); font-family: Consolas, monospace }
     /* ── Dissector ── */
-    .dis-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-top: 2px solid var(--border) }
+    .dis-section { display: flex; flex-direction: column; flex: 1; overflow: hidden }
     .dis-toolbar { padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex-shrink: 0 }
     .dis-addr-input { font-family: Consolas, monospace; font-size: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 3px 7px; border-radius: 3px; width: 200px }
     .dis-table-wrap { flex: 1; overflow-y: auto }
@@ -2221,9 +2276,43 @@
     </div>
   </div>
 
-  <!-- TAB BAR -->
+  <!-- ── CATEGORY BAR (top-level navigation) ── -->
+  <div id="cat-bar">
+    <div id="cat-bar-left">
+      <div class="cat active" data-cat="game" onclick="switchCategory('game')"><svg viewBox="0 0 24 24">
+          <rect x="2" y="6" width="20" height="12" rx="6" />
+          <line x1="7" y1="12" x2="11" y2="12" />
+          <line x1="9" y1="10" x2="9" y2="14" />
+          <circle cx="15.5" cy="11" r="0.8" />
+          <circle cx="17.5" cy="13" r="0.8" />
+        </svg>Game</div>
+      <div class="cat" data-cat="re" onclick="switchCategory('re')"><svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.5" y2="16.5" />
+          <line x1="11" y1="8" x2="11" y2="14" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>RE</div>
+      <div class="cat" data-cat="data" onclick="switchCategory('data')"><svg viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>Data</div>
+    </div>
+    <div id="cat-bar-right">
+      <div class="cat" data-cat="config" onclick="switchCategory('config')"><svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
+        </svg>Config</div>
+    </div>
+  </div>
+
+  <!-- ── SUB-TAB BAR (one row per category, only the active row is visible) ── -->
   <div id="tab-bar">
-    <div id="tab-bar-left">
+
+    <!-- GAME — entities / skills / inventory / watchlist -->
+    <div class="subtab-row active" data-cat="game">
       <div class="tab active" data-tab="entities" onclick="switchTab('entities')"><svg viewBox="0 0 24 24">
           <circle cx="12" cy="8" r="4" />
           <path d="M4 21v-1a6 6 0 0 1 12 0v1" />
@@ -2233,54 +2322,62 @@
       <div class="tab" data-tab="skills" onclick="switchTab('skills')"><svg viewBox="0 0 24 24">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10" />
         </svg>Skills &amp; Buffs</div>
-      <div class="tab" data-tab="ui" onclick="switchTab('ui')"><svg viewBox="0 0 24 24">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M3 9h18" />
-          <path d="M9 21V9" />
-        </svg>UI</div>
-      <div class="tab" data-tab="gamestate" onclick="switchTab('gamestate')"><svg viewBox="0 0 24 24">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg>gameState</div>
-      <div class="tab" data-tab="watchlist" onclick="switchTab('watchlist')"><svg viewBox="0 0 24 24">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>Watchlist <span id="wl-badge"></span></div>
-      <div class="tab" data-tab="tsvs" onclick="switchTab('tsvs')"><svg viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-          <polyline points="10 9 9 9 8 9" />
-        </svg>TSVs</div>
       <div class="tab" data-tab="inventory" onclick="switchTab('inventory')"><svg viewBox="0 0 24 24">
           <rect x="3" y="6" width="18" height="14" rx="1" />
           <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           <line x1="3" y1="11" x2="21" y2="11" />
         </svg>Inventory</div>
+      <div class="tab" data-tab="watchlist" onclick="switchTab('watchlist')"><svg viewBox="0 0 24 24">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>Watchlist <span id="wl-badge"></span></div>
+    </div>
+
+    <!-- RE — live inspection (UI, gameState) | tools (Panel Diff, Memory Diff, Dissector) -->
+    <div class="subtab-row" data-cat="re">
+      <span class="subtab-group-label">Live</span>
+      <div class="tab" data-tab="ui" onclick="switchTab('ui')"><svg viewBox="0 0 24 24">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 9h18" />
+          <path d="M9 21V9" />
+        </svg>UI Browser</div>
+      <div class="tab" data-tab="gamestate" onclick="switchTab('gamestate')"><svg viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>gameState</div>
+      <div class="subtab-divider"></div>
+      <span class="subtab-group-label">Tools</span>
       <div class="tab" data-tab="debug" onclick="switchTab('debug')"><svg viewBox="0 0 24 24">
           <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v1h2" />
           <path d="M18 10h2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4" />
-          <path d="M4 14h2" />
-          <path d="M18 14h2" />
-          <path d="M4 18h2" />
-          <path d="M18 18h2" />
           <rect x="8" y="9" width="8" height="12" rx="2" />
           <path d="M12 9v12" />
-        </svg>Debug</div>
-      <div class="tab" data-tab="re" onclick="switchTab('re')"><svg viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="7" />
-          <line x1="21" y1="21" x2="16.5" y2="16.5" />
-          <line x1="11" y1="8" x2="11" y2="14" />
-          <line x1="8" y1="11" x2="14" y2="11" />
-        </svg>RE</div>
+        </svg>Panel Diff</div>
+      <div class="tab" data-tab="memdiff" onclick="switchTab('memdiff')"><svg viewBox="0 0 24 24">
+          <rect x="3" y="4" width="8" height="16" rx="1" />
+          <rect x="13" y="4" width="8" height="16" rx="1" />
+          <line x1="7" y1="9" x2="7" y2="9.5" />
+          <line x1="7" y1="13" x2="7" y2="13.5" />
+          <line x1="17" y1="11" x2="17" y2="11.5" />
+          <line x1="17" y1="15" x2="17" y2="15.5" />
+        </svg>Memory Diff</div>
+      <div class="tab" data-tab="dissect" onclick="switchTab('dissect')"><svg viewBox="0 0 24 24">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+          <circle cx="8" cy="6" r="1.4" />
+          <circle cx="14" cy="12" r="1.4" />
+          <circle cx="10" cy="18" r="1.4" />
+        </svg>Dissector</div>
     </div>
-    <div id="tab-bar-right">
-      <div class="tab" data-tab="config" onclick="switchTab('config')"><svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
-        </svg>Config</div>
+
+    <!-- DATA / CONFIG — single page each, sub-tab row hidden via CSS. -->
+    <div class="subtab-row single-tab" data-cat="data">
+      <div class="tab" data-tab="tsvs" onclick="switchTab('tsvs')">TSVs</div>
     </div>
+    <div class="subtab-row single-tab" data-cat="config">
+      <div class="tab" data-tab="config" onclick="switchTab('config')">Config</div>
+    </div>
+
   </div>
 
   <!-- CONTENT -->
@@ -2788,10 +2885,8 @@
       </div>
     </div>
 
-    <!-- RE TAB — Reverse-engineering helper: memory snapshot diff + dissector -->
-    <div class="tab-panel" id="panel-re">
-
-      <!-- ── Diff section ── -->
+    <!-- MEMORY DIFF — snapshot a region, do something, snapshot again, diff -->
+    <div class="tab-panel" id="panel-memdiff">
       <div class="re-toolbar">
         <div class="re-row">
           <label class="re-label">Symbol</label>
@@ -2818,11 +2913,12 @@
       <div id="re-result" class="re-result">
         <div class="no-data-msg">Pick a symbol &amp; size, capture <b>Before</b>, do something in-game, then capture <b>After</b>.</div>
       </div>
+    </div>
 
-      <!-- ── Dissector section ── -->
+    <!-- DISSECTOR — Cheat-Engine-style "Dissect Memory" navigator -->
+    <div class="tab-panel" id="panel-dissect">
       <div class="dis-section">
         <div class="dis-toolbar">
-          <span class="re-label" style="font-weight:600;color:var(--text)">🔬 Dissector</span>
           <button class="tree-tbtn" id="dis-back-btn"    onclick="ahkCall('DissectBack')"    disabled title="Back">◀</button>
           <button class="tree-tbtn" id="dis-fwd-btn"     onclick="ahkCall('DissectForward')" disabled title="Forward">▶</button>
           <button class="tree-tbtn"                       onclick="ahkCall('DissectReread')"          title="Refresh">↻</button>
@@ -2869,7 +2965,6 @@
           </table>
         </div>
       </div>
-
     </div>
 
     <!-- INVENTORY TAB — player inventories (Backpack/Flasks/Trinkets) + best-effort stash scan -->
@@ -2942,19 +3037,77 @@
     window.onerror = (msg, src, line) => console.error(`[JS] ${msg} @ ${src}:${line}`);
 
     // ═══════════════════════════════════════════════════════════════════
-    //  TAB SWITCHING
+    //  TAB SWITCHING — two-level (category → sub-tab)
     // ═══════════════════════════════════════════════════════════════════
+    // Sub-tab → category mapping. Used to drive the parent-category highlight
+    // when switchTab() is called directly, and to know which sub-tab row to
+    // show in the second nav bar.
+    const tabCategory = {
+      entities:  'game',
+      skills:    'game',
+      inventory: 'game',
+      watchlist: 'game',
+      ui:        're',
+      gamestate: 're',
+      debug:     're',
+      memdiff:   're',
+      dissect:   're',
+      tsvs:      'data',
+      config:    'config',
+    };
+    // Which sub-tab to activate when the user clicks a category header.
+    // Remembered per-category so navigating away and back returns to the
+    // last view (e.g. Dissector stays sticky inside RE).
+    const lastTabPerCategory = {
+      game:   'entities',
+      re:     'ui',
+      data:   'tsvs',
+      config: 'config',
+    };
+
     // These tabs notify AHK (to switch the AHK tree context)
     const treeTabs = new Set(['config']);
 
     let activeTab = 'entities';
+    let activeCategory = 'game';
+
+    // Click handler for top-level category buttons. Activates that category
+    // (highlights button, shows its sub-tab row) and switches to whichever
+    // sub-tab was last active there.
+    function switchCategory(cat) {
+      activeCategory = cat;
+      document.querySelectorAll('.cat').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+      document.querySelectorAll('.subtab-row').forEach(r => r.classList.toggle('active', r.dataset.cat === cat));
+      const target = lastTabPerCategory[cat];
+      if (target && target !== activeTab)
+        switchTab(target);
+      else if (target)   // already on it — still re-run the side-effects (e.g. MemDiffRequestState)
+        _runTabSideEffects(activeTab, activeTab);
+    }
 
     function switchTab(key) {
+      const prev = activeTab;
       document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === key));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + key));
-      if (activeTab === 'ui' && key !== 'ui')
-        ahkCall('UiBrowserClearHighlight');
+
+      // Sync the parent-category highlight + visible sub-tab row.
+      const cat = tabCategory[key];
+      if (cat) {
+        activeCategory = cat;
+        lastTabPerCategory[cat] = key;
+        document.querySelectorAll('.cat').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+        document.querySelectorAll('.subtab-row').forEach(r => r.classList.toggle('active', r.dataset.cat === cat));
+      }
+
       activeTab = key;
+      _runTabSideEffects(key, prev);
+    }
+
+    // AHK-bridge calls + one-time loaders fired on tab activation. Split out so
+    // switchCategory() can also re-run them when it lands on the same tab.
+    function _runTabSideEffects(key, prev) {
+      if (prev === 'ui' && key !== 'ui')
+        ahkCall('UiBrowserClearHighlight');
       if (treeTabs.has(key))
         ahkCall('SwitchTab', key.charAt(0).toUpperCase() + key.slice(1));
       if (key === 'tsvs' && !_tsvFilesLoaded)
@@ -2965,7 +3118,7 @@
         _invTabActivated();
       else
         _invTabDeactivated();
-      if (key === 're')
+      if (key === 'memdiff')
         ahkCall('MemDiffRequestState');
     }
 
