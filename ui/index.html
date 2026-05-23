@@ -750,6 +750,46 @@
     .inv-tooltip .inv-tt-name { font-weight: 600; margin-bottom: 4px }
     .inv-tooltip .inv-tt-base { color: var(--subtext); font-size: 10px; margin-bottom: 6px }
     .inv-tooltip .inv-tt-mod  { font-size: 10px; line-height: 1.4 }
+
+    /* RE TAB — memory diff */
+    .re-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px }
+    .re-row     { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
+    .re-label   { font-size: 11px; color: var(--subtext) }
+    .re-result  { padding: 8px 12px; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px; max-height: 220px }
+    .re-run     { border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; background: rgba(255,255,255,0.02) }
+    .re-run-head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 4px }
+    .re-run-off  { color: var(--accent); font-weight: 600 }
+    .re-run-len  { color: var(--subtext) }
+    .re-hex      { white-space: pre-wrap; word-break: break-all; line-height: 1.4 }
+    .re-hex-row  { display: flex; gap: 8px; margin: 2px 0 }
+    .re-hex-tag  { color: var(--subtext); width: 50px; flex: 0 0 50px; text-align: right }
+    .re-hex-val  { flex: 1 }
+    .re-hex-val.before { color: #d97777 }
+    .re-hex-val.after  { color: #7ec8e3 }
+    .re-decode   { margin-top: 4px; font-size: 10px; color: var(--subtext); display: grid; grid-template-columns: max-content 1fr; gap: 0 8px; row-gap: 1px }
+    .re-decode > .k { color: var(--subtext) }
+    .re-decode > .v { color: var(--text); font-family: Consolas, monospace }
+    /* ── Dissector ── */
+    .dis-section { display: flex; flex-direction: column; flex: 1; overflow: hidden; border-top: 2px solid var(--border) }
+    .dis-toolbar { padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex-shrink: 0 }
+    .dis-addr-input { font-family: Consolas, monospace; font-size: 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 3px 7px; border-radius: 3px; width: 200px }
+    .dis-table-wrap { flex: 1; overflow-y: auto }
+    .dis-tbl { width: 100%; border-collapse: collapse; font-family: Consolas, monospace; font-size: 11px; table-layout: fixed }
+    .dis-tbl th { position: sticky; top: 0; background: var(--surface); color: var(--subtext); padding: 3px 6px; font-weight: 500; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap }
+    .dis-tbl td { padding: 2px 6px; border-bottom: 1px solid rgba(37,42,69,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+    .dis-tbl tr:hover td { background: rgba(106,143,191,.08) }
+    .dis-off  { color: var(--accent); width: 60px }
+    .dis-adr  { color: var(--subtext); width: 130px }
+    .dis-hex  { color: #a0a8c0; width: 180px }
+    .dis-i32  { color: #c0c8e0; width: 80px }
+    .dis-u32  { color: #c0c8e0; width: 80px }
+    .dis-f32  { color: #b0d0b0; width: 80px }
+    .dis-ptr  { width: 140px }
+    .dis-f64  { color: #b0d0b0; width: 90px }
+    .dis-asc  { color: #888ea8; width: 80px }
+    .dis-ptr-link { color: #7ec8e3; cursor: pointer; text-decoration: underline dotted }
+    .dis-ptr-link:hover { color: #b0e0f5 }
+    .dis-status { font-size: 10px; color: var(--subtext); margin-left: 8px }
     .inv-tooltip .inv-tt-mod.cat-implicit { color: #c397e0 }
     .inv-tooltip .inv-tt-mod.cat-enchant  { color: #ffe077 }
     .inv-tooltip .inv-tt-mod.cat-explicit { color: #8eb3ff }
@@ -2227,6 +2267,12 @@
           <rect x="8" y="9" width="8" height="12" rx="2" />
           <path d="M12 9v12" />
         </svg>Debug</div>
+      <div class="tab" data-tab="re" onclick="switchTab('re')"><svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="7" />
+          <line x1="21" y1="21" x2="16.5" y2="16.5" />
+          <line x1="11" y1="8" x2="11" y2="14" />
+          <line x1="8" y1="11" x2="14" y2="11" />
+        </svg>RE</div>
     </div>
     <div id="tab-bar-right">
       <div class="tab" data-tab="config" onclick="switchTab('config')"><svg viewBox="0 0 24 24">
@@ -2742,12 +2788,100 @@
       </div>
     </div>
 
+    <!-- RE TAB — Reverse-engineering helper: memory snapshot diff + dissector -->
+    <div class="tab-panel" id="panel-re">
+
+      <!-- ── Diff section ── -->
+      <div class="re-toolbar">
+        <div class="re-row">
+          <label class="re-label">Symbol</label>
+          <select id="re-symbol" onchange="reConfigureChanged()">
+            <option value="ServerDataStructure">ServerDataStructure</option>
+            <option value="GameUI">GameUI</option>
+            <option value="AreaInstance">AreaInstance</option>
+            <option value="InGameState">InGameState</option>
+            <option value="Custom">Custom (raw hex)</option>
+          </select>
+          <label class="re-label" id="re-custom-label" style="display:none">Address</label>
+          <input id="re-custom-addr" type="text" placeholder="0x..." value="0x0" style="display:none;width:140px;font-family:monospace" onchange="reConfigureChanged()">
+          <label class="re-label">Size</label>
+          <input id="re-size" type="number" min="16" max="262144" step="16" value="4096" style="width:80px" onchange="reConfigureChanged()">
+          <span class="re-label">bytes</span>
+        </div>
+        <div class="re-row">
+          <button class="tree-tbtn" id="re-before-btn" onclick="ahkCall('MemDiffSnapshotBefore')">📸 Before</button>
+          <button class="tree-tbtn" id="re-after-btn"  onclick="ahkCall('MemDiffSnapshotAfter')"  disabled>📸 After + Diff</button>
+          <button class="tree-tbtn" onclick="ahkCall('MemDiffClear')">🗑 Clear</button>
+          <span id="re-status" class="re-label" style="margin-left:12px">idle</span>
+        </div>
+      </div>
+      <div id="re-result" class="re-result">
+        <div class="no-data-msg">Pick a symbol &amp; size, capture <b>Before</b>, do something in-game, then capture <b>After</b>.</div>
+      </div>
+
+      <!-- ── Dissector section ── -->
+      <div class="dis-section">
+        <div class="dis-toolbar">
+          <span class="re-label" style="font-weight:600;color:var(--text)">🔬 Dissector</span>
+          <button class="tree-tbtn" id="dis-back-btn"    onclick="ahkCall('DissectBack')"    disabled title="Back">◀</button>
+          <button class="tree-tbtn" id="dis-fwd-btn"     onclick="ahkCall('DissectForward')" disabled title="Forward">▶</button>
+          <button class="tree-tbtn"                       onclick="ahkCall('DissectReread')"          title="Refresh">↻</button>
+          <select id="dis-symbol" style="font-size:11px">
+            <option value="ServerDataStructure">ServerDataStructure</option>
+            <option value="GameUI">GameUI</option>
+            <option value="AreaInstance">AreaInstance</option>
+            <option value="InGameState">InGameState</option>
+            <option value="Custom">Custom</option>
+          </select>
+          <button class="tree-tbtn" onclick="dissectSymbolGo()">Go Symbol</button>
+          <input id="dis-addr" class="dis-addr-input" type="text" placeholder="0x... or jump to address" onkeydown="if(event.key==='Enter')dissectGotoInput()">
+          <button class="tree-tbtn" onclick="dissectGotoInput()">Go</button>
+          <select id="dis-size" onchange="ahkCall('DissectSetSize',parseInt(this.value))" style="font-size:11px">
+            <option value="64">64 B (8 rows)</option>
+            <option value="128">128 B (16 rows)</option>
+            <option value="256">256 B (32 rows)</option>
+            <option value="512" selected>512 B (64 rows)</option>
+            <option value="1024">1 KB (128 rows)</option>
+            <option value="2048">2 KB (256 rows)</option>
+            <option value="4096">4 KB (512 rows)</option>
+            <option value="8192">8 KB (1024 rows)</option>
+          </select>
+          <span id="dis-status" class="dis-status">idle</span>
+        </div>
+        <div class="dis-table-wrap">
+          <table class="dis-tbl" id="dis-tbl">
+            <thead>
+              <tr>
+                <th class="dis-off">Offset</th>
+                <th class="dis-adr">Address</th>
+                <th class="dis-hex">Hex (8B)</th>
+                <th class="dis-i32">i32</th>
+                <th class="dis-u32">u32</th>
+                <th class="dis-f32">f32</th>
+                <th class="dis-ptr">Pointer</th>
+                <th class="dis-f64">f64</th>
+                <th class="dis-asc">ASCII</th>
+              </tr>
+            </thead>
+            <tbody id="dis-body">
+              <tr><td colspan="9" style="color:var(--subtext);padding:16px">Enter an address or click a symbol to begin.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
     <!-- INVENTORY TAB — player inventories (Backpack/Flasks/Trinkets) + best-effort stash scan -->
     <div class="tab-panel" id="panel-inventory">
       <div class="inv-toolbar">
         <button class="tree-tbtn" onclick="ahkCall('RequestInventory')">↻ Refresh</button>
         <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--subtext);margin-left:8px">
           <input type="checkbox" id="inv-autorefresh" checked> auto-refresh
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--subtext);margin-left:8px"
+               title="Write the full ServerData → PlayerInventories → items pointer chain to InGameStateMonitor.inventory_chain.log on every refresh. Diagnostic only.">
+          <input type="checkbox" id="inv-chain-dump" onchange="ahkCall('ToggleInventoryChainDump')"> dump chain
         </label>
         <span id="inv-status" style="margin-left:12px;font-size:11px;color:var(--subtext)">— click Refresh —</span>
       </div>
@@ -2831,6 +2965,192 @@
         _invTabActivated();
       else
         _invTabDeactivated();
+      if (key === 're')
+        ahkCall('MemDiffRequestState');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  RE (Reverse-Engineering) TAB — memory snapshot diff
+    // ═══════════════════════════════════════════════════════════════════
+    // Send the current form values to AHK whenever the user changes anything.
+    function reConfigureChanged() {
+      const sym = document.getElementById('re-symbol').value;
+      const customAddr = document.getElementById('re-custom-addr').value || '0x0';
+      const size = parseInt(document.getElementById('re-size').value, 10) || 4096;
+      // Custom-address input is only meaningful for the Custom symbol.
+      const showCustom = sym === 'Custom';
+      document.getElementById('re-custom-label').style.display = showCustom ? '' : 'none';
+      document.getElementById('re-custom-addr').style.display  = showCustom ? '' : 'none';
+      ahkCall('MemDiffConfigure', sym, customAddr, size);
+    }
+
+    // AHK calls this whenever snapshot state changes (Before / Clear / Configure).
+    function updateMemDiffState(jsonStr) {
+      let s;
+      try { s = JSON.parse(jsonStr); }
+      catch (e) { return; }
+      // Reflect AHK-side state back into the form so external resets stay in sync.
+      const sel = document.getElementById('re-symbol');
+      if (sel && sel.value !== s.symbol) sel.value = s.symbol;
+      const custAddr = document.getElementById('re-custom-addr');
+      if (custAddr && custAddr !== document.activeElement) custAddr.value = s.customAddr || '0x0';
+      const sizeEl = document.getElementById('re-size');
+      if (sizeEl && sizeEl !== document.activeElement) sizeEl.value = s.size;
+      const showCustom = s.symbol === 'Custom';
+      document.getElementById('re-custom-label').style.display = showCustom ? '' : 'none';
+      document.getElementById('re-custom-addr').style.display  = showCustom ? '' : 'none';
+
+      // Enable "After" button only when "Before" snapshot exists.
+      const afterBtn = document.getElementById('re-after-btn');
+      if (afterBtn) afterBtn.disabled = !s.beforeReady;
+
+      const statusEl = document.getElementById('re-status');
+      if (statusEl) {
+        const ageSec = s.beforeAge > 0 ? ' · ' + Math.round(s.beforeAge / 1000) + 's ago' : '';
+        statusEl.textContent = (s.status || 'idle') + (s.beforeReady ? ageSec : '');
+      }
+    }
+
+    // AHK calls this after an "After" snapshot + diff compute.
+    function updateMemDiffResult(jsonStr) {
+      const el = document.getElementById('re-result');
+      if (!el) return;
+      let r;
+      try { r = JSON.parse(jsonStr); }
+      catch (e) { el.innerHTML = '<div class="no-data-msg">⚠ Parse error</div>'; return; }
+
+      if (r.error) {
+        el.innerHTML = '<div class="no-data-msg">' + escHtml(r.error) + '</div>';
+        return;
+      }
+      if (!Array.isArray(r.runs) || r.runs.length === 0) {
+        el.innerHTML = '<div class="no-data-msg">No bytes changed between snapshots.</div>';
+        return;
+      }
+
+      let html = '<div style="margin-bottom:8px;color:var(--subtext);font-size:11px">'
+              + r.runCount + ' runs, ' + r.totalChanged + ' bytes changed · base=' + escHtml(r.addrBefore) + '</div>';
+      for (const run of r.runs) {
+        const absAddr = '0x' + (parseInt(r.addrBefore, 16) + run.offset).toString(16).toUpperCase();
+        html += '<div class="re-run">'
+              + '<div class="re-run-head">'
+                + '<span class="re-run-off">+0x' + run.offset.toString(16).toUpperCase() + '</span>'
+                + '<span class="re-run-len">' + run.length + ' B</span>'
+                + '<span class="re-run-len" style="font-family:monospace">@ ' + absAddr + '</span>'
+              + '</div>'
+              + '<div class="re-hex">'
+                + '<div class="re-hex-row"><span class="re-hex-tag">before</span><span class="re-hex-val before">' + escHtml(run.before) + '</span></div>'
+                + '<div class="re-hex-row"><span class="re-hex-tag">after</span><span class="re-hex-val after">'  + escHtml(run.after)  + '</span></div>'
+              + '</div>';
+        // Decode block — render as a key/value grid. Sort by canonical order
+        // so before/after for the same type land on adjacent rows visually.
+        const keys = Object.keys(run.decode || {});
+        if (keys.length > 0) {
+          // Order: u8, u16, u32, i32, flt, i64, ptr — each with before/after pair.
+          const order = ['u8','u16','u32','i32','flt','i64','ptr'];
+          const sortedKeys = keys.sort((a, b) => {
+            const sa = a.split('(')[0], sb = b.split('(')[0];
+            const da = order.indexOf(sa), db = order.indexOf(sb);
+            if (da !== db) return da - db;
+            // before before after
+            return a.includes('(before)') ? -1 : 1;
+          });
+          html += '<div class="re-decode">';
+          for (const k of sortedKeys) {
+            html += '<span class="k">' + escHtml(k) + '</span><span class="v">' + escHtml(String(run.decode[k])) + '</span>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  DISSECTOR TAB
+    // ═══════════════════════════════════════════════════════════════════
+    function dissectGotoInput() {
+      const v = (document.getElementById('dis-addr').value || '').trim();
+      if (v) ahkCall('DissectGoto', v);
+    }
+    function dissectSymbolGo() {
+      const sym = document.getElementById('dis-symbol').value;
+      ahkCall('DissectSymbol', sym, '0x0');
+    }
+    // Called when the user clicks a pointer value in the dissector table.
+    function dissectClickPtr(hexStr) {
+      if (!hexStr) return;
+      document.getElementById('dis-addr').value = hexStr;
+      ahkCall('DissectGoto', hexStr);
+    }
+    // Event delegation: one listener on the tbody, fires when any
+    // .dis-ptr-link inside it (or its child) gets clicked. This avoids the
+    // fragile inline-onclick quoting that was breaking after innerHTML rebuilds.
+    // Attached immediately — this script runs at end-of-body so the element
+    // already exists in the DOM by the time we get here.
+    (function attachDissectClick() {
+      const tbody = document.getElementById('dis-body');
+      if (!tbody) { setTimeout(attachDissectClick, 50); return; }
+      tbody.addEventListener('click', (ev) => {
+        const link = ev.target.closest('.dis-ptr-link');
+        if (link && link.dataset && link.dataset.ptr) dissectClickPtr(link.dataset.ptr);
+      });
+    })();
+
+    // AHK pushes this after every Goto / Back / Forward / Reread.
+    function updateMemDissect(jsonStr) {
+      let d;
+      try { d = JSON.parse(jsonStr); } catch (e) { return; }
+
+      // Status
+      const statusEl = document.getElementById('dis-status');
+      if (statusEl) statusEl.textContent = d.status || 'idle';
+
+      // Address bar (don't overwrite while user is typing)
+      const addrEl = document.getElementById('dis-addr');
+      if (addrEl && addrEl !== document.activeElement && d.addr)
+        addrEl.value = d.addr;
+
+      // Back / Forward buttons
+      const bb = document.getElementById('dis-back-btn');
+      const fb = document.getElementById('dis-fwd-btn');
+      if (bb) bb.disabled = !d.canBack;
+      if (fb) fb.disabled = !d.canFwd;
+
+      // Table
+      const tbody = document.getElementById('dis-body');
+      if (!tbody) return;
+      const rows = d.rows;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="color:var(--subtext);padding:16px">'
+          + escHtml(d.status || 'No data') + '</td></tr>';
+        return;
+      }
+
+      let html = '';
+      for (const row of rows) {
+        const offHex = '+0x' + row.off.toString(16).toUpperCase().padStart(3, '0');
+        let ptrCell;
+        if (row.isPtr) {
+          // Use data attribute + event delegation rather than inline onclick —
+          // avoids quote-escaping issues and survives innerHTML rebuilds.
+          ptrCell = '<span class="dis-ptr-link" data-ptr="' + escAttr(row.ptr) + '" title="Click to follow pointer">' + escHtml(row.ptr) + '</span>';
+        } else {
+          ptrCell = '<span style="color:var(--subtext)">' + escHtml(row.ptr) + '</span>';
+        }
+        html += '<tr>'
+          + '<td class="dis-off">'  + escHtml(offHex)         + '</td>'
+          + '<td class="dis-adr">'  + escHtml(row.addr)       + '</td>'
+          + '<td class="dis-hex">'  + escHtml(row.hex)        + '</td>'
+          + '<td class="dis-i32">'  + escHtml(String(row.i32))+ '</td>'
+          + '<td class="dis-u32">'  + escHtml(String(row.u32))+ '</td>'
+          + '<td class="dis-f32">'  + escHtml(String(row.f32))+ '</td>'
+          + '<td class="dis-ptr">'  + ptrCell                 + '</td>'
+          + '<td class="dis-f64">'  + escHtml(String(row.f64))+ '</td>'
+          + '<td class="dis-asc">'  + escHtml(row.ascii)      + '</td>'
+          + '</tr>';
+      }
+      tbody.innerHTML = html;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -3313,6 +3633,9 @@
         apState.className = 'cfg-status ' + (st === 'combat' ? 'warning' : st === 'explore' ? 'info' : 'idle');
       }
       if (apReason && d.autoPilotReason !== undefined) apReason.textContent = d.autoPilotReason || '—';
+
+      // Inventory diagnostics — chain dump toggle in the Inventory tab toolbar.
+      if (d.invChainDump !== undefined) setChk('inv-chain-dump', d.invChainDump);
 
       // Combat Automation config sync
       const prevCombatEnabled = document.getElementById('tog-combat')?.checked || false;
