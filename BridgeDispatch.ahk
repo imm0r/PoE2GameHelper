@@ -123,6 +123,64 @@ _DispatchBridgeCall(method, args)
             ; UI polls this when the Inventory tab is active. Off-snapshot read so
             ; the per-frame cost is zero when the user isn't looking at the tab.
             SetTimer(PushInventoryToWebView, -1)
+        case "ToggleInventoryChainDump":
+            global g_inventoryChainDumpEnabled
+            g_inventoryChainDumpEnabled := !g_inventoryChainDumpEnabled
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
+
+            ; ── Memory-Diff RE tab ────────────────────────────────────────
+            ; Configure target: args = [symbol, customHex, sizeBytes]
+        case "MemDiffConfigure":
+            global g_memDiffSymbol, g_memDiffCustomAddr, g_memDiffSize
+            g_memDiffSymbol     := (args.Length >= 1) ? String(args[1]) : "ServerDataStructure"
+            customHex           := (args.Length >= 2) ? String(args[2]) : "0"
+            g_memDiffSize       := (args.Length >= 3) ? Max(16, Min(262144, Integer(args[3]))) : 0x1000
+            ; Parse "0x..." or decimal into Int64 — empty / bad input becomes 0
+            parsed := 0
+            try
+            {
+                s := Trim(customHex)
+                if (s != "")
+                {
+                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
+                    {
+                        hex := StrUpper(m[1])
+                        i2 := 1
+                        len2 := StrLen(hex)
+                        while (i2 <= len2)
+                        {
+                            c := SubStr(hex, i2, 1)
+                            asc := Asc(c)
+                            if (asc >= 48 && asc <= 57)
+                                d := asc - 48
+                            else if (asc >= 65 && asc <= 70)
+                                d := asc - 55
+                            else
+                                d := 0
+                            parsed := parsed * 16 + d
+                            i2 += 1
+                        }
+                    }
+                    else
+                        parsed := Integer(s)
+                }
+            }
+            catch
+                parsed := 0
+            g_memDiffCustomAddr := parsed
+            SetTimer(PushMemDiffStateToWebView, -1)
+        case "MemDiffSnapshotBefore":
+            MemDiffSnapshot("before")
+            SetTimer(PushMemDiffStateToWebView, -1)
+        case "MemDiffSnapshotAfter":
+            MemDiffSnapshot("after")
+            SetTimer(PushMemDiffResultToWebView, -1)
+        case "MemDiffClear":
+            MemDiffClear()
+            SetTimer(PushMemDiffStateToWebView, -1)
+        case "MemDiffRequestState":
+            SetTimer(PushMemDiffStateToWebView, -1)
         case "TogglePanelDetection":
             global g_panelDetectionEnabled, g_reader, g_radarLastSnap
             g_panelDetectionEnabled := !g_panelDetectionEnabled
@@ -380,6 +438,45 @@ _DispatchBridgeCall(method, args)
             g_radarOverlay.SetRangeCircles(circles)
 
             ; ── UI Browser ────────────────────────────────────────────────────
+        ; ── Memory Dissector ──────────────────────────────────────────────────
+        ; Jump to an absolute hex address (args[1] = "0x..." string).
+        case "DissectGoto":
+            hex := (args.Length >= 1) ? String(args[1]) : ""
+            try LogError("DissectGoto hex=" hex)
+            if (hex != "")
+            {
+                addr := _ParseHexAddr(hex)
+                try LogError("DissectGoto parsed addr=0x" Format("{:X}", addr))
+                if (addr)
+                    SetTimer(() => _SafeDissect(() => MemDissectGoto(addr), "MemDissectGoto"), -1)
+            }
+        ; Jump to a named symbol (args[1] = symbol name, args[2] = optional custom hex addr).
+        case "DissectSymbol":
+            sym2   := (args.Length >= 1) ? String(args[1]) : "ServerDataStructure"
+            cHex   := (args.Length >= 2) ? String(args[2]) : "0"
+            cAddr2 := _ParseHexAddr(cHex)
+            try LogError("DissectSymbol sym=" sym2 " cAddr=0x" Format("{:X}", cAddr2))
+            SetTimer(() => _SafeDissect(() => MemDissectGotoSymbol(sym2, cAddr2), "MemDissectGotoSymbol"), -1)
+        ; Navigation: go back / forward / re-read.
+        case "DissectBack":
+            try LogError("DissectBack")
+            SetTimer(() => _SafeDissect(() => MemDissectBack(), "MemDissectBack"), -1)
+        case "DissectForward":
+            try LogError("DissectForward")
+            SetTimer(() => _SafeDissect(() => MemDissectForward(), "MemDissectForward"), -1)
+        case "DissectReread":
+            try LogError("DissectReread")
+            SetTimer(() => _SafeDissect(() => MemDissectReread(), "MemDissectReread"), -1)
+        ; Change the read window size (bytes). args[1] = integer.
+        ; Also re-reads the current address so the table immediately reflects
+        ; the new page size — without this the dropdown looks unresponsive.
+        case "DissectSetSize":
+            global g_memDissectSize
+            dSz := (args.Length >= 1) ? args[1] : 0x200
+            g_memDissectSize := Max(0x40, Min(0x2000, Integer(dSz)))
+            try LogError("DissectSetSize sz=" g_memDissectSize)
+            SetTimer(() => _SafeDissect(() => MemDissectReread(), "DissectSetSize/reread"), -1)
+
         case "UiBrowseRoot":
             SetTimer(() => UiBrowseRoot(), -1)
         case "UiBrowseParent":

@@ -18,7 +18,7 @@ SaveConfig()
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
-    global g_panelDetectionEnabled, g_autoPilotEnabled
+    global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -44,6 +44,7 @@ SaveConfig()
     IniWrite(g_rangeCirclesEnabled   ? "1" : "0",  f, "Radar",         "rangeCircles")
     IniWrite(g_panelDetectionEnabled ? "1" : "0",  f, "PanelDetection", "enabled")
     IniWrite(g_autoPilotEnabled      ? "1" : "0",  f, "AutoPilot",      "enabled")
+    IniWrite(g_inventoryChainDumpEnabled ? "1" : "0", f, "Diagnostics", "inventoryChainDump")
     IniWrite(g_entityShowPlayer      ? "1" : "0",  f, "EntityFilters", "showPlayer")
     IniWrite(g_entityShowMinion      ? "1" : "0",  f, "EntityFilters", "showMinion")
     IniWrite(g_entityShowEnemy       ? "1" : "0",  f, "EntityFilters", "showEnemy")
@@ -87,7 +88,7 @@ LoadConfig()
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
-    global g_panelDetectionEnabled, g_autoPilotEnabled
+    global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -120,6 +121,7 @@ LoadConfig()
     g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_autoPilotEnabled         := _B("AutoPilot",     "enabled",         false)
+    g_inventoryChainDumpEnabled := _B("Diagnostics",  "inventoryChainDump", false)
     g_entityShowPlayer         := _B("EntityFilters", "showPlayer",      true)
     g_entityShowMinion         := _B("EntityFilters", "showMinion",      true)
     g_entityShowEnemy          := _B("EntityFilters", "showEnemy",       true)

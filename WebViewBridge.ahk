@@ -47,6 +47,7 @@ PushHeaderToWebView()
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled, g_rangeCirclesEnabled, g_panelDetectionEnabled
     global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
+    global g_inventoryChainDumpEnabled
     global g_cfgOpenSections
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
@@ -106,6 +107,7 @@ PushHeaderToWebView()
           . '"autoPilot":' (g_autoPilotEnabled ? "true" : "false") ","
           . '"autoPilotState":' _JsStr(g_autoPilotState) ","
           . '"autoPilotReason":' _JsStr(g_autoPilotReason) ","
+          . '"invChainDump":' (g_inventoryChainDumpEnabled ? "true" : "false") ","
           . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
           . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
           . '"combatState":' _JsStr(g_combatState) ","
@@ -628,6 +630,31 @@ PushInventoryToWebView()
         return
     }
 
+    ; Diagnostic: dump the full inventory pointer chain. Gated by the toggle
+    ; on the Inventory tab toolbar — off by default because each dump does
+    ; dozens of extra RPM reads, and most users don't care about the trace.
+    ; Throttled to once per 2 s even when enabled.
+    global g_inventoryChainDumpEnabled
+    static _lastInvDump := 0
+    if (g_inventoryChainDumpEnabled && (A_TickCount - _lastInvDump > 2000))
+    {
+        _lastInvDump := A_TickCount
+        dumpResult := ""
+        try
+        {
+            dumpResult := _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUi)
+        }
+        catch as ex
+        {
+            LogError("PushInventoryToWebView/dump", ex)
+            dumpResult := "EXCEPTION: " (ex.HasOwnProp("Message") ? ex.Message : "?")
+        }
+        ; Echo the result to the error log so the user can confirm the dump
+        ; actually ran and find the exact file path. _DumpInventoryPointerChain
+        ; returns the path it wrote to (or an error string if FileOpen failed).
+        try LogError("InventoryChainDump " dumpResult)
+    }
+
     ; ReadAllPlayerInventories already covers everything: backpack (id=1),
     ; equipped slots (id=2–11), flasks (id=12), and the currently open stash
     ; tab (id=27 — the game server populates this slot with whichever stash tab
@@ -642,6 +669,458 @@ PushInventoryToWebView()
           . '"player":' _BuildInventoryArrayJson(invs)
           . "}"
     try WebViewExec("updateInventory(" _JsStr(json) ")")
+}
+
+; ── Memory-Diff RE tab push functions ────────────────────────────────────
+; PushMemDiffStateToWebView — sends the current configuration + snapshot
+; status (which slots are filled, last addresses, etc.). Triggered on every
+; Configure / Before / Clear so the tab UI stays in sync.
+;
+; PushMemDiffResultToWebView — runs the diff and sends the run list to the
+; UI's renderer. Called after an "After" snapshot.
+PushMemDiffStateToWebView()
+{
+    global g_memDiffSymbol, g_memDiffCustomAddr, g_memDiffSize
+    global g_memDiffBeforeBuf, g_memDiffBeforeAddr, g_memDiffBeforeTime
+    global g_memDiffAfterBuf, g_memDiffAfterTime, g_memDiffStatus, g_webViewReady
+    if !g_webViewReady
+        return
+
+    json := "{"
+        . '"symbol":'      _JsStr(g_memDiffSymbol) ","
+        . '"customAddr":'  _JsStr(Format("0x{:X}", g_memDiffCustomAddr)) ","
+        . '"size":'        g_memDiffSize ","
+        . '"beforeReady":' ((g_memDiffBeforeBuf && Type(g_memDiffBeforeBuf) = "Buffer") ? "true" : "false") ","
+        . '"afterReady":'  ((g_memDiffAfterBuf  && Type(g_memDiffAfterBuf)  = "Buffer") ? "true" : "false") ","
+        . '"beforeAddr":'  _JsStr(Format("0x{:X}", g_memDiffBeforeAddr)) ","
+        . '"beforeAge":'   (g_memDiffBeforeTime > 0 ? (A_TickCount - g_memDiffBeforeTime) : 0) ","
+        . '"afterAge":'    (g_memDiffAfterTime  > 0 ? (A_TickCount - g_memDiffAfterTime)  : 0) ","
+        . '"status":'      _JsStr(g_memDiffStatus)
+        . "}"
+    try WebViewExec("updateMemDiffState(" _JsStr(json) ")")
+}
+
+PushMemDiffResultToWebView()
+{
+    global g_webViewReady
+    if !g_webViewReady
+        return
+
+    ; State push first so the result tab knows the snapshot is "after-ok".
+    PushMemDiffStateToWebView()
+
+    result := MemDiffCompute()
+    if (result["error"] != "")
+    {
+        try WebViewExec("updateMemDiffResult(" _JsStr('{"error":' _JsStr(result["error"]) ',"runs":[]}') ")")
+        return
+    }
+
+    runs := result["runs"]
+    runsJson := "["
+    first := true
+    for _, run in runs
+    {
+        if !first
+            runsJson .= ","
+        first := false
+        decodeJson := "{"
+        dFirst := true
+        for k, v in run["decode"]
+        {
+            if !dFirst
+                decodeJson .= ","
+            dFirst := false
+            ; v can be int or string ("0x..." for ptr fields). _JsStr quotes safely;
+            ; for raw numerics we want them as JSON numbers so the UI can format.
+            if (Type(v) = "String")
+                decodeJson .= _JsStr(k) ":" _JsStr(v)
+            else
+                decodeJson .= _JsStr(k) ":" v
+        }
+        decodeJson .= "}"
+
+        runsJson .= "{"
+            . '"offset":' run["offset"] ","
+            . '"length":' run["length"] ","
+            . '"before":' _JsStr(run["before"]) ","
+            . '"after":'  _JsStr(run["after"]) ","
+            . '"decode":' decodeJson
+            . "}"
+    }
+    runsJson .= "]"
+
+    json := "{"
+        . '"error":' _JsStr("") ","
+        . '"totalChanged":' result["totalChanged"] ","
+        . '"addrBefore":' _JsStr(Format("0x{:X}", result["addrBefore"])) ","
+        . '"runCount":' runs.Length ","
+        . '"runs":' runsJson
+        . "}"
+    try WebViewExec("updateMemDiffResult(" _JsStr(json) ")")
+}
+
+; ── Memory Dissector push ─────────────────────────────────────────────────
+; Serializes the current dissector buffer as a JSON row array and calls
+; updateMemDissect() in the WebView. Each row covers 8 bytes at increasing
+; offsets from the base address. Decodes: u8/u16/i32/u32/f32/i64/ptr/f64/ascii.
+; Rows whose ptr value looks like a valid heap address have isPtr=true so the
+; UI can render them as clickable links for dereferencing.
+PushMemDissectToWebView()
+{
+    global g_reader, g_memDissectAddress, g_memDissectSize, g_memDissectBuf
+    global g_memDissectHistory, g_memDissectFwd, g_memDissectStatus, g_webViewReady
+    if !g_webViewReady
+        return
+
+    ; Hard try/catch around the entire serialization — any NumGet on a buffer
+    ; that was concurrently released, a malformed JSON build, or a transient
+    ; reader-state issue must NOT escape into the SetTimer thread, where AHK
+    ; would surface it as a blocking "critical error" dialog. We always send
+    ; a status JSON to the WebView so the UI updates even on failure.
+    try
+    {
+        json := _BuildMemDissectJson()
+    }
+    catch as ex
+    {
+        msg := ex.HasOwnProp("Message") ? ex.Message : "?"
+        try LogError("PushMemDissectToWebView exception: " msg)
+        g_memDissectStatus := "render-exception: " msg
+        ; Build a minimal status-only payload so the UI shows something useful
+        ; rather than going dark when the render path blows up.
+        json := "{"
+            . '"addr":'    _JsStr(g_memDissectAddress ? Format("0x{:X}", g_memDissectAddress) : "") ","
+            . '"size":'    g_memDissectSize ","
+            . '"status":'  _JsStr(g_memDissectStatus) ","
+            . '"canBack":' (g_memDissectHistory.Length > 0 ? "true" : "false") ","
+            . '"canFwd":'  (g_memDissectFwd.Length  > 0 ? "true" : "false") ","
+            . '"rows":[]}'
+    }
+
+    try WebViewExec("updateMemDissect(" _JsStr(json) ")")
+}
+
+; Internal: build the full dissector JSON payload. May throw — the caller is
+; responsible for catching and falling back to a status-only payload.
+_BuildMemDissectJson()
+{
+    global g_reader, g_memDissectAddress, g_memDissectSize, g_memDissectBuf
+    global g_memDissectHistory, g_memDissectFwd, g_memDissectStatus
+
+    baseAddr := g_memDissectAddress
+    buf      := g_memDissectBuf
+    canRead  := (IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+
+    json := "{"
+        . '"addr":'    _JsStr(baseAddr ? Format("0x{:X}", baseAddr) : "") ","
+        . '"size":'    g_memDissectSize ","
+        . '"status":'  _JsStr(g_memDissectStatus) ","
+        . '"canBack":' (g_memDissectHistory.Length > 0 ? "true" : "false") ","
+        . '"canFwd":'  (g_memDissectFwd.Length  > 0 ? "true" : "false") ","
+        . '"rows":['
+
+    if (buf && Type(buf) = "Buffer" && baseAddr && buf.Size >= 8)
+    {
+        bufPtr  := buf.Ptr      ; snapshot Ptr+Size up front so concurrent reassignments
+        bufSize := buf.Size     ;  to g_memDissectBuf can't make us read off the end.
+        stride  := 8
+        maxRows := bufSize // stride
+        first   := true
+        r := 0
+        while (r < maxRows)
+        {
+            off := r * stride
+            if (off + stride > bufSize)
+                break
+
+            ; Each row is wrapped: a single bad NumGet on a freed buffer must
+            ; not cancel the entire push — log it and skip that row.
+            rowOk := true
+            try
+            {
+                ; Raw bytes hex string (8 bytes)
+                rawHex := ""
+                jj := 0
+                while (jj < stride)
+                {
+                    rawHex .= Format("{:02X} ", NumGet(bufPtr, off + jj, "UChar"))
+                    jj += 1
+                }
+                rawHex := RTrim(rawHex)
+
+                ; Numeric decodes
+                u8v   := NumGet(bufPtr, off, "UChar")
+                u16v  := NumGet(bufPtr, off, "UShort")
+                i32v  := NumGet(bufPtr, off, "Int")
+                u32v  := NumGet(bufPtr, off, "UInt")
+                f32v  := Round(NumGet(bufPtr, off, "Float"), 4)
+                i64v  := NumGet(bufPtr, off, "Int64")
+                ptrHex := Format("0x{:X}", i64v & 0xFFFFFFFFFFFFFFFF)
+                f64v  := Round(NumGet(bufPtr, off, "Double"), 6)
+
+                ascii := ""
+                kk := 0
+                while (kk < stride)
+                {
+                    ch := NumGet(bufPtr, off + kk, "UChar")
+                    ascii .= (ch >= 32 && ch < 127) ? Chr(ch) : "."
+                    kk += 1
+                }
+            }
+            catch
+            {
+                rowOk := false
+            }
+            if !rowOk
+            {
+                r += 1
+                continue
+            }
+
+            ; Pointer heuristic — pure range check, NO live RPM read.
+            ; IsProbablyValidPointer was previously called here, but it issues
+            ; an extra ReadProcessMemory per row. When the main update loop
+            ; was already mid-RPM (deep in PoE2EntityReader), the resulting
+            ; concurrent RPM/NumGet pattern occasionally surfaced as a
+            ; Windows SEH "Invalid memory read/write" — uncatchable by AHK
+            ; try/catch. The dereference click handler still validates the
+            ; address fresh when the user actually follows a pointer, so a
+            ; false-positive clickable here at worst yields a "read-failed"
+            ; status on the next page — never a crash.
+            isPtr := "false"
+            ; Windows x64 user-mode heap pointers are typically aligned and
+            ; sit in the 0x000001'00000000 … 0x00007FFF'FFFFFFFF range.
+            if (canRead && i64v > 0x10000 && i64v < 0x00007FFFFFFFFFFF
+                && Mod(i64v, 8) = 0)
+                isPtr := "true"
+
+            if !first
+                json .= ","
+            first := false
+
+            absAddr := Format("0x{:X}", baseAddr + off)
+
+            json .= "{"
+                . '"off":'    off ","
+                . '"addr":'   _JsStr(absAddr) ","
+                . '"hex":'    _JsStr(rawHex) ","
+                . '"u8":'     u8v ","
+                . '"u16":'    u16v ","
+                . '"i32":'    i32v ","
+                . '"u32":'    u32v ","
+                . '"f32":'    f32v ","
+                . '"i64":'    i64v ","
+                . '"ptr":'    _JsStr(ptrHex) ","
+                . '"f64":'    f64v ","
+                . '"ascii":'  _JsStr(ascii) ","
+                . '"isPtr":'  isPtr
+                . "}"
+
+            r += 1
+        }
+    }
+
+    json .= "]}"
+    return json
+}
+
+; ── Inventory pointer-chain diagnostic dump ─────────────────────────────
+; Walks every memory hop the inventory reader uses and writes a hierarchical
+; trace to inventory_chain.log (overwriting on each call). Used as a
+; reference when investigating layout offsets or missing inventories.
+;
+; The dump traverses:
+;   ServerData
+;     → PlayerServerData std::vector (offset 0x48)
+;       → PlayerData[0]
+;         → PlayerInventories std::vector (offset 0x320)
+;           → InventoryArrayStruct (id + ptr0 + ptr1)
+;             → InventoryStruct (totalBoxes + ItemList vec)
+;               → InventoryItemStruct (slot coords + item entity ptr)
+;                 → Entity (EntityDetailsPtr + ComponentsVec + Id/Flags)
+;                   → EntityDetails (Path string)
+;
+; Items capped at 5 per inventory to keep the file readable; a "+N more"
+; suffix indicates additional items not shown.
+_DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
+{
+    global g_reader
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+        return "skipped: reader-not-connected"
+
+    mem := g_reader.Mem
+    out := "=== INVENTORY POINTER CHAIN DUMP @ " FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") " ==="
+    out .= "`n"
+    out .= "`nResolved roots (from snapshot + on-demand resolution):"
+    out .= "`n  InGameState:  " _FmtChainHex(inGsAddr)
+    out .= "`n  AreaInstance: " _FmtChainHex(areaAddr)
+    out .= "`n  ServerData:   " _FmtChainHex(sdPtr) "  (after ResolveServerDataPointer)"
+    out .= "`n  GameUi:       " _FmtChainHex(gameUiPtr)
+    out .= "`n"
+
+    ; ── Step 1: ServerData → PlayerServerData std::vector ──────────────
+    psdOff      := PoE2Offsets.ServerData["PlayerServerData"]
+    psdVecFirst := mem.ReadInt64(sdPtr + psdOff)
+    psdVecLast  := mem.ReadInt64(sdPtr + psdOff + 8)
+    out .= "`n[Step 1] ServerData + 0x" Format("{:X}", psdOff) " → PlayerServerData std::vector"
+    out .= "`n  First: " _FmtChainHex(psdVecFirst)
+    out .= "`n  Last:  " _FmtChainHex(psdVecLast)
+
+    if (psdVecFirst <= 0 || psdVecLast < psdVecFirst)
+        return _WriteChainLog(out . "`n  [bailing — empty / invalid vector]`n")
+
+    ; ── Step 2: PlayerServerData[0] → PlayerData pointer ───────────────
+    playerDataPtr := mem.ReadPtr(psdVecFirst)
+    out .= "`n"
+    out .= "`n[Step 2] PlayerServerData[0] → PlayerData ptr"
+    out .= "`n  " _FmtChainHex(playerDataPtr)
+
+    if !g_reader.IsProbablyValidPointer(playerDataPtr)
+        return _WriteChainLog(out . "`n  [bailing — invalid PlayerData ptr]`n")
+
+    ; ── Step 3: PlayerData → PlayerInventories std::vector ─────────────
+    piOff   := PoE2Offsets.ServerDataStructure["PlayerInventories"]
+    piFirst := mem.ReadInt64(playerDataPtr + piOff)
+    piLast  := mem.ReadInt64(playerDataPtr + piOff + 8)
+    entrySz := PoE2Offsets.InventoryArray["EntrySize"]
+    invCount := (piFirst > 0 && piLast >= piFirst) ? Floor((piLast - piFirst) / entrySz) : 0
+    out .= "`n"
+    out .= "`n[Step 3] PlayerData + 0x" Format("{:X}", piOff) " → PlayerInventories std::vector"
+    out .= "`n  First:    " _FmtChainHex(piFirst)
+    out .= "`n  Last:     " _FmtChainHex(piLast)
+    out .= "`n  EntrySize: 0x" Format("{:X}", entrySz)
+    out .= "`n  Count:    " invCount
+
+    if (invCount <= 0)
+        return _WriteChainLog(out . "`n  [bailing — empty inventories]`n")
+
+    ; ── Step 4+: per-inventory dump ────────────────────────────────────
+    out .= "`n"
+    out .= "`n[Step 4] Iterating InventoryArrayStruct entries (capped at 128):"
+    maxInv := Min(invCount, 128)
+    idx := 0
+    while (idx < maxInv)
+    {
+        entryAddr := piFirst + (idx * entrySz)
+        invId   := mem.ReadInt(entryAddr + PoE2Offsets.InventoryArray["InventoryId"])
+        invPtr0 := mem.ReadPtr(entryAddr + PoE2Offsets.InventoryArray["InventoryPtr0"])
+        invPtr1 := mem.ReadPtr(entryAddr + PoE2Offsets.InventoryArray["InventoryPtr1"])
+
+        out .= "`n"
+        out .= "`n  ── Inventory[" idx "] @ " _FmtChainHex(entryAddr) " ──"
+        out .= "`n    id=" invId
+        out .= "`n    ptr0=" _FmtChainHex(invPtr0)
+        out .= "`n    ptr1=" _FmtChainHex(invPtr1)
+        idx += 1
+
+        if !g_reader.IsProbablyValidPointer(invPtr0)
+        {
+            out .= "`n    [skip — invalid ptr0]"
+            continue
+        }
+
+        ; InventoryStruct fields
+        tbX := mem.ReadInt(invPtr0 + PoE2Offsets.Inventory["TotalBoxes"])
+        tbY := mem.ReadInt(invPtr0 + PoE2Offsets.Inventory["TotalBoxesY"])
+        ilF := mem.ReadInt64(invPtr0 + PoE2Offsets.Inventory["ItemList"])
+        ilL := mem.ReadInt64(invPtr0 + PoE2Offsets.Inventory["ItemListLast"])
+        itemCount := (ilF > 0 && ilL >= ilF) ? Floor((ilL - ilF) / A_PtrSize) : 0
+        out .= "`n    InventoryStruct:"
+        out .= "`n      totalBoxes:   " tbX " × " tbY
+        out .= "`n      ItemList vec: First=" _FmtChainHex(ilF) " Last=" _FmtChainHex(ilL) " count=" itemCount
+
+        if (itemCount <= 0)
+            continue
+
+        ; Per-item dump — first 5 only
+        maxItems := Min(itemCount, 5)
+        itemIdx := 0
+        while (itemIdx < maxItems)
+        {
+            invItemStructPtr := mem.ReadPtr(ilF + (itemIdx * A_PtrSize))
+            out .= "`n      Item[" itemIdx "]: structPtr=" _FmtChainHex(invItemStructPtr)
+
+            if !g_reader.IsProbablyValidPointer(invItemStructPtr)
+            {
+                out .= " [invalid]"
+                itemIdx += 1
+                continue
+            }
+
+            itemEntityPtr := mem.ReadPtr(invItemStructPtr + PoE2Offsets.InventoryItem["Item"])
+            sx := mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotStart"])
+            sy := mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotStartY"])
+            ex2 := mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotEnd"])
+            ey := mem.ReadInt(invItemStructPtr + PoE2Offsets.InventoryItem["SlotEndY"])
+            out .= " slot=(" sx "," sy ")→(" ex2 "," ey ")"
+            out .= "`n        entityPtr: " _FmtChainHex(itemEntityPtr)
+
+            if g_reader.IsProbablyValidPointer(itemEntityPtr)
+            {
+                edPtr   := mem.ReadPtr(itemEntityPtr + PoE2Offsets.Entity["EntityDetailsPtr"])
+                cvFirst := mem.ReadInt64(itemEntityPtr + PoE2Offsets.Entity["ComponentsVec"])
+                cvLast  := mem.ReadInt64(itemEntityPtr + PoE2Offsets.Entity["ComponentsVecLast"])
+                eid     := mem.ReadUInt(itemEntityPtr + PoE2Offsets.Entity["Id"])
+                flags   := mem.ReadUChar(itemEntityPtr + PoE2Offsets.Entity["Flags"])
+                compCnt := (cvFirst > 0 && cvLast >= cvFirst) ? Floor((cvLast - cvFirst) / A_PtrSize) : 0
+                out .= "`n        Entity: id=" eid " flags=0x" Format("{:02X}", flags)
+                out .= "`n          EntityDetailsPtr: " _FmtChainHex(edPtr)
+                out .= "`n          ComponentsVec:    First=" _FmtChainHex(cvFirst) " Last=" _FmtChainHex(cvLast) " count=" compCnt
+
+                if g_reader.IsProbablyValidPointer(edPtr)
+                {
+                    try
+                    {
+                        path := g_reader.ReadStdWStringAt(edPtr + PoE2Offsets.EntityDetails["Path"], 260)
+                        if (path != "")
+                            out .= "`n          path: " path
+                    }
+                }
+            }
+            itemIdx += 1
+        }
+        if (itemCount > maxItems)
+            out .= "`n      … +" (itemCount - maxItems) " more items not shown"
+    }
+
+    out .= "`n"
+    out .= "`n=== END OF DUMP ===`n"
+    return _WriteChainLog(out)
+}
+
+; Helper: pointer formatting for the chain log. "0" for null so the
+; hierarchy stays scannable.
+_FmtChainHex(addr)
+{
+    if (!addr)
+        return "0"
+    return "0x" Format("{:X}", addr)
+}
+
+; Helper: overwrites the chain log file with a fresh snapshot. Returns
+; the absolute path that was written (or an error string) so the caller
+; can echo it into the regular error log — that way the user can locate
+; the dump file even if A_ScriptDir resolved somewhere unexpected.
+;
+; Filename mirrors the error log convention (`InGameStateMonitor.X.log`)
+; so all diagnostic outputs live with the same prefix.
+_WriteChainLog(text)
+{
+    path := A_ScriptDir "\InGameStateMonitor.inventory_chain.log"
+    try
+    {
+        f := FileOpen(path, "w", "UTF-8")
+        if !f
+            return "FileOpen-failed path=" path
+        f.Write(text)
+        f.Close()
+        return "wrote " StrLen(text) " chars to " path
+    }
+    catch as ex
+    {
+        return "FileOpen-exception path=" path " msg=" (ex.HasOwnProp("Message") ? ex.Message : "?")
+    }
 }
 
 ; Serialises an array of inventory Maps (from ReadAllPlayerInventories /
