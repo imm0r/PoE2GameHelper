@@ -330,9 +330,12 @@ class PoE2Offsets
     )
 
     static InventoryArray := Map(
-        "EntrySize", 0x18,
-        "InventoryId", 0x00,
-        "InventoryPtr0", 0x08
+        "EntrySize",     0x18,
+        "InventoryId",   0x00,
+        "InventoryPtr0", 0x08,
+        "InventoryPtr1", 0x10   ; second pointer per upstream layout — usually
+                                ; points 0x10 bytes before InventoryPtr0;
+                                ; only the diagnostic dump reads it.
     )
 
     static Inventory := Map(

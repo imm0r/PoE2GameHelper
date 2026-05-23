@@ -35,6 +35,15 @@ TryCombatAutomation(radarSnap, gameHwnd)
         global g_combatState, g_combatSkillSlots, g_combatGlobalCooldownMs
         global g_lastSkillUseTime, g_combatRange, g_combatDisengageRange
         global g_combatSkillCooldowns
+        global g_radarOverlay
+
+        ; Default: no combat path on the overlay. Each tick clears the carrier
+        ; first; the LoS-blocked branch later in the function overrides it back
+        ; to the freshly-computed path when relevant. This way every early-return
+        ; path (disabled / idle / disengage / aiming / GCD) leaves the overlay
+        ; clean instead of stranding the previous tick's polyline.
+        if (g_radarOverlay)
+            g_radarOverlay._combatPathCoords := []
 
         if !g_combatAutoEnabled
         {
@@ -104,10 +113,105 @@ TryCombatAutomation(radarSnap, gameHwnd)
             return false
         }
 
-        ; ── Move mouse toward nearest enemy ───────────────────────────────
-        ; Always aim the cursor at the closest hostile so the character walks
-        ; toward enemies and skills fire in the right direction.
-        targetScreenPos := _WorldToScreen(combatInfo, gameHwnd)
+        ; ── Aim selection (LoS-aware) ──────────────────────────────────────
+        ; If terrain doesn't block the straight line from player to enemy, aim
+        ; directly at the enemy (fast path, identical to the legacy behavior).
+        ; If terrain DOES block, walk the A* path forward and pick the farthest
+        ; waypoint we still have direct LoS to — that's where the cursor goes,
+        ; so the character moves toward it, rounds the obstacle, and LoS opens
+        ; up on subsequent ticks until we can aim at the enemy itself.
+        WORLD_TO_GRID := 250.0 / 0x17
+        aimWorldX := combatInfo["nearestWorldX"]
+        aimWorldY := combatInfo["nearestWorldY"]
+        aimWorldZ := combatInfo["nearestWorldZ"]
+        aimTag    := "direct"
+
+        ; Path-overlay carrier — written into g_radarOverlay so the radar can
+        ; draw the route as a polyline. Empty by default and cleared explicitly
+        ; below for the direct-LoS / no-path branches so the overlay never
+        ; lingers on a stale path from a previous tick.
+        combatPath := []
+
+        if (_combatPF.HasTerrain()
+            && combatInfo["playerWorldX"] != 0 && combatInfo["nearestWorldX"] != 0)
+        {
+            pGX := Round(combatInfo["playerWorldX"] / WORLD_TO_GRID)
+            pGY := Round(combatInfo["playerWorldY"] / WORLD_TO_GRID)
+            eGX := Round(combatInfo["nearestWorldX"] / WORLD_TO_GRID)
+            eGY := Round(combatInfo["nearestWorldY"] / WORLD_TO_GRID)
+
+            if !_combatPF.HasLineOfSight(pGX, pGY, eGX, eGY)
+            {
+                ; LoS blocked — find a path and aim at the farthest reachable hop.
+                path := _combatPF.FindPath(pGX, pGY, eGX, eGY)
+                if (path && Type(path) = "Array" && path.Length >= 2)
+                {
+                    ; The smoothed path guarantees LoS between adjacent waypoints
+                    ; but NOT from the start to an arbitrary one further along.
+                    ; Walk forward; keep the last waypoint that still has LoS
+                    ; from the player. That's the most aggressive aim we can
+                    ; commit to without crossing into a wall.
+                    bestWp := 0
+                    idx := 1
+                    while (idx <= path.Length)
+                    {
+                        wp := path[idx]
+                        if !(wp && Type(wp) = "Array" && wp.Length >= 2)
+                        {
+                            idx += 1
+                            continue
+                        }
+                        if _combatPF.HasLineOfSight(pGX, pGY, wp[1], wp[2])
+                            bestWp := wp     ; keep advancing as long as LoS holds
+                        else
+                            break             ; first break = limit of straight reach
+                        idx += 1
+                    }
+                    if (bestWp)
+                    {
+                        aimWorldX := bestWp[1] * WORLD_TO_GRID
+                        aimWorldY := bestWp[2] * WORLD_TO_GRID
+                        ; Z usually doesn't matter much for cursor projection on
+                        ; mostly-planar zones; reuse the enemy's Z as a reasonable
+                        ; stand-in. The matrix projection cares far more about
+                        ; XY than Z here.
+                        aimTag := "path(" path.Length "wp,reach=" idx ")"
+                    }
+                    else
+                    {
+                        aimTag := "path-no-los"
+                    }
+                    ; Expose the full path for the radar overlay regardless of
+                    ; which waypoint we ended up aiming at — the user wants to
+                    ; see the route the bot considered, not just the next hop.
+                    combatPath := path
+                }
+                else
+                {
+                    aimTag := "no-path"
+                }
+            }
+        }
+
+        ; Push the path (or empty array, when direct-LoS) onto the radar overlay
+        ; so it can render the polyline on the next frame. The overlay was cleared
+        ; at function entry, so direct-LoS cases (combatPath stays []) leave nothing.
+        if (g_radarOverlay)
+            g_radarOverlay._combatPathCoords := combatPath
+
+        ; ── Move mouse toward aim point ────────────────────────────────────
+        ; Build a thin info Map carrying just the projection-relevant fields so
+        ; _WorldToScreen can stay agnostic to whether we're aiming at the enemy
+        ; or at an A* waypoint.
+        aimInfo := Map(
+            "nearestWorldX", aimWorldX,
+            "nearestWorldY", aimWorldY,
+            "nearestWorldZ", aimWorldZ,
+            "w2sMatrix",     combatInfo["w2sMatrix"],
+            "playerWorldX",  combatInfo["playerWorldX"],
+            "playerWorldY",  combatInfo["playerWorldY"]
+        )
+        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd)
         if (targetScreenPos)
         {
             _MoveMouseToTarget(targetScreenPos)
@@ -115,6 +219,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
             matTag := (mat && Type(mat) = "Array" && mat.Length = 16) ? "mat" : "approx"
             distTag := (terrainDist != nearestDist) ? " td=" Round(terrainDist) : ""
             g_combatLastReason := matTag "→" targetScreenPos["x"] "," targetScreenPos["y"]
+                . " aim=" aimTag
                 . " pw=" Round(combatInfo["playerWorldX"]) "," Round(combatInfo["playerWorldY"])
                 . " ew=" Round(combatInfo["nearestWorldX"]) "," Round(combatInfo["nearestWorldY"])
                 . distTag
@@ -122,6 +227,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
         else
         {
             g_combatLastReason := "no-screen-pos"
+                . " aim=" aimTag
                 . " pw=" Round(combatInfo["playerWorldX"]) "," Round(combatInfo["playerWorldY"])
                 . " ew=" Round(combatInfo["nearestWorldX"]) "," Round(combatInfo["nearestWorldY"])
         }

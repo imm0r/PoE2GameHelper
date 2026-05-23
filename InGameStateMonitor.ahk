@@ -100,6 +100,33 @@ g_autoPilotEnabled := false
 g_autoPilotState   := "idle"   ; "idle" | "combat" | "explore"
 g_autoPilotReason  := "idle"
 
+; Diagnostics: when on, every inventory push writes a pointer-chain dump to
+; InGameStateMonitor.inventory_chain.log. Off by default — opt-in for debugging
+; layout questions, since the dump does dozens of extra RPM reads per cycle.
+g_inventoryChainDumpEnabled := false
+
+; Memory Diff (RE helper). Snapshot a region of memory, do something in-game,
+; snapshot again, diff. See MemoryDiff.ahk.
+g_memDiffSymbol     := "ServerDataStructure"   ; named anchor or "Custom"
+g_memDiffCustomAddr := 0                       ; absolute address when symbol = "Custom"
+g_memDiffAddress    := 0                       ; resolved address from last snapshot
+g_memDiffSize       := 0x1000                  ; 4 KB default — covers most struct ranges
+g_memDiffBeforeBuf  := 0
+g_memDiffBeforeAddr := 0
+g_memDiffBeforeTime := 0
+g_memDiffAfterBuf   := 0
+g_memDiffAfterTime  := 0
+g_memDiffStatus     := "idle"
+
+; Memory Dissector (CE-style Dissect Memory). Navigate from a base address
+; through pointer chains. See MemoryDissect.ahk.
+g_memDissectAddress := 0                ; current base address being viewed
+g_memDissectSize    := 0x200            ; bytes to read per page (64 rows at 8-byte stride)
+g_memDissectBuf     := 0               ; last read Buffer, or 0
+g_memDissectHistory := []              ; back-navigation stack (Array of Int64 addresses)
+g_memDissectFwd     := []              ; forward-navigation stack
+g_memDissectStatus  := "idle"
+
 ; Radar Entity-Filter
 g_radarShowEnemyNormal := true
 g_radarShowEnemyRare := true
@@ -584,6 +611,8 @@ OnTreeTabChanged(*)
 #Include CombatAutomation.ahk
 #Include ExplorationModule.ahk
 #Include AutoPilot.ahk
+#Include MemoryDiff.ahk
+#Include MemoryDissect.ahk
 #Include UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.

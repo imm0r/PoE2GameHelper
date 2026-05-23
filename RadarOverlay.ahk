@@ -118,6 +118,13 @@ class RadarOverlay
         this._navTargetIdx        := -1    ; index in _navTargets of current path target
         this._navPlayerGX         := -999999
         this._navPlayerGY         := -999999
+
+        ; Combat path overlay: written by CombatAutomation when LoS to the
+        ; current target is blocked. Same shape as _navPathCoords — Array of
+        ; [gx, gy] pairs from player to enemy. Rendered as a red polyline so
+        ; the user sees the route the bot has chosen around obstacles. Empty
+        ; when combat is idle OR when direct LoS is available.
+        this._combatPathCoords    := []
         this._navLastComputeTick  := 0
         this._navAreaHash         := 0xFFFFFFFF
         this._navEnabled          := true  ; toggle from config
@@ -921,6 +928,32 @@ class RadarOverlay
             pen    := this._GetPen(navColor, navWidth)
             oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
             DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", navPts, "Int", n)
+            DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+        }
+
+        ; ── Combat path: A* route to the currently targeted enemy ─────────
+        ; Same projection as the nav path. Drawn in red on top so it visually
+        ; dominates if both paths happen to overlap. Empty (and so skipped) when
+        ; combat is idle or LoS to the target is direct.
+        combatCoords := this._combatPathCoords
+        if (combatCoords.Length >= 2)
+        {
+            combatColor := 0x3030FF   ; red (BGR)
+            combatWidth := isLargeMap ? 3 : 2
+            playerGX    := playerWorldX / RadarOverlay.WORLD_TO_GRID_RATIO
+            playerGY    := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
+            cn          := combatCoords.Length
+            combatPts   := Buffer(cn * 8, 0)
+            for i, pt in combatCoords
+            {
+                dGX := pt[1] - playerGX
+                dGY := pt[2] - playerGY
+                NumPut("Int", Round(mapCenterX + (dGX - dGY) * projectionCos), combatPts, (i-1)*8)
+                NumPut("Int", Round(mapCenterY + (0-dGX-dGY) * projectionSin), combatPts, (i-1)*8+4)
+            }
+            pen    := this._GetPen(combatColor, combatWidth)
+            oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+            DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", combatPts, "Int", cn)
             DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
         }
 
