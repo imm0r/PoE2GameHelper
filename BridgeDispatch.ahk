@@ -111,13 +111,25 @@ _DispatchBridgeCall(method, args)
             SetTimer(SaveConfig, -100)
         case "ToggleAutoPilot":
             global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
+            global g_combatAutoEnabled, g_exploreEnabled
+            global g_combatState, g_combatLastReason, g_exploreLastReason
             g_autoPilotEnabled := !g_autoPilotEnabled
+            ; The user-facing toggle is now AutoPilot. Mirror the legacy
+            ; sub-flags so combat + exploration save/load + status displays
+            ; stay consistent. These flags are no longer user-controllable.
+            g_combatAutoEnabled := g_autoPilotEnabled
+            g_exploreEnabled    := g_autoPilotEnabled
             if !g_autoPilotEnabled
             {
-                g_autoPilotState  := "idle"
-                g_autoPilotReason := "disabled"
+                g_autoPilotState   := "idle"
+                g_autoPilotReason  := "disabled"
+                g_combatState      := "idle"
+                g_combatLastReason := "disabled"
+                g_exploreLastReason := "disabled"
             }
             SetTimer(SaveConfig, -100)
+            SetTimer(() => SaveCombatAutoConfig(), -100)
+            SetTimer(() => SaveExplorationConfig(), -100)
             SetTimer(PushHeaderToWebView, -50)
         case "RequestInventory":
             ; UI polls this when the Inventory tab is active. Off-snapshot read so
@@ -365,9 +377,7 @@ _DispatchBridgeCall(method, args)
         case "GetSavedPanelOffsets":
             _PushSavedPanelOffsets()
 
-            ; ── Combat Automation ─────────────────────────────────────────────
-        case "ToggleCombatAuto":
-            SetTimer(_ToggleCombatAuto, -1)
+            ; ── Combat Automation tuning (no separate toggle — managed by ToggleAutoPilot) ─
         case "SetCombatRange":
             global g_combatRange
             val := (args.Length >= 1) ? args[1] : 1500
@@ -392,14 +402,25 @@ _DispatchBridgeCall(method, args)
             ; args: [slotNum, key, priority, skillName, type, cooldownMs, enabled, skillRange]
             _ApplyCombatSlotConfig(args)
 
-            ; ── Exploration Module ────────────────────────────────────────────
-        case "ToggleExploration":
-            global g_exploreEnabled, g_exploreLastReason
-            g_exploreEnabled := !g_exploreEnabled
-            if !g_exploreEnabled
-                g_exploreLastReason := "disabled"
-            SaveExplorationConfig()
-            PushHeaderToWebView()
+            ; ── Loot Pickup rarity filter (no toggle — empty filter = off) ─
+        case "SetLootRarity":
+            ; args: [rarityLabel ("Normal"|"Magic"|"Rare"|"Unique"|"Currency"), bool]
+            global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
+            global g_lootRarityUnique, g_lootRarityCurrency
+            lblRar := (args.Length >= 1) ? String(args[1]) : ""
+            vRar := (args.Length >= 2) ? args[2] : false
+            bvRar := (vRar = "true" || vRar = true || vRar = 1) ? true : false
+            switch lblRar
+            {
+                case "Normal":   g_lootRarityNormal   := bvRar
+                case "Magic":    g_lootRarityMagic    := bvRar
+                case "Rare":     g_lootRarityRare     := bvRar
+                case "Unique":   g_lootRarityUnique   := bvRar
+                case "Currency": g_lootRarityCurrency := bvRar
+            }
+            SetTimer(() => SaveLootPickupConfig(), -100)
+
+            ; ── Exploration tuning (no separate toggle — managed by ToggleAutoPilot) ──
         case "SetExploreTarget":
             global g_exploreTargetPercent
             val := (args.Length >= 1) ? args[1] : 80

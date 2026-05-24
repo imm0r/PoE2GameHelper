@@ -16,9 +16,10 @@
 ; AutoPilot uses the return value to decide whether to run exploration instead.
 ;
 ; AutoPilot owns the shared guard chain (window focus, town/hideout, panel-open,
-; player-dead). This function assumes those passed and trusts the gameHwnd it
-; receives. The g_combatAutoEnabled sub-toggle is still honored here so users can
-; turn off combat within AutoPilot without disabling exploration.
+; player-dead) AND the master enable check. This is a trusted callee — when
+; this function is invoked, we run combat unconditionally. The previous
+; g_combatAutoEnabled gate was removed when combat + exploration were unified
+; under a single AutoPilot toggle.
 ;
 ; Params: radarSnap - full radar snapshot
 ;         gameHwnd  - resolved PoE2 window handle (must be valid + active)
@@ -31,7 +32,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
     _running := true
     try
     {
-        global g_combatAutoEnabled, g_reader, g_combatLastReason
+        global g_reader, g_combatLastReason
         global g_combatState, g_combatSkillSlots, g_combatGlobalCooldownMs
         global g_lastSkillUseTime, g_combatRange, g_combatDisengageRange
         global g_combatSkillCooldowns
@@ -40,17 +41,10 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; Default: no combat path on the overlay. Each tick clears the carrier
         ; first; the LoS-blocked branch later in the function overrides it back
         ; to the freshly-computed path when relevant. This way every early-return
-        ; path (disabled / idle / disengage / aiming / GCD) leaves the overlay
-        ; clean instead of stranding the previous tick's polyline.
+        ; path (idle / disengage / aiming / GCD) leaves the overlay clean
+        ; instead of stranding the previous tick's polyline.
         if (g_radarOverlay)
             g_radarOverlay._combatPathCoords := []
-
-        if !g_combatAutoEnabled
-        {
-            g_combatLastReason := "disabled"
-            g_combatState := "idle"
-            return false
-        }
 
         ; ── Combat detection from entity cache ────────────────────────────
         combatInfo := _DetectCombat(radarSnap)
@@ -114,16 +108,20 @@ TryCombatAutomation(radarSnap, gameHwnd)
         }
 
         ; ── Aim selection (LoS-aware) ──────────────────────────────────────
-        ; If terrain doesn't block the straight line from player to enemy, aim
-        ; directly at the enemy (fast path, identical to the legacy behavior).
-        ; If terrain DOES block, walk the A* path forward and pick the farthest
-        ; waypoint we still have direct LoS to — that's where the cursor goes,
-        ; so the character moves toward it, rounds the obstacle, and LoS opens
-        ; up on subsequent ticks until we can aim at the enemy itself.
+        ; Three possible aim modes:
+        ;   "direct" — straight LoS from player to enemy. Cursor lands on the
+        ;              enemy; we wait for isTargetedByPlayer and fire skills.
+        ;   "walk"   — LoS blocked. Cursor lands on the farthest waypoint we
+        ;              DO have LoS to; we issue an LMB (move command) only —
+        ;              NO skill keys. The character walks until LoS opens,
+        ;              then a later tick flips into "direct".
+        ;   "no-path"— LoS blocked AND no traversable A* path. Nothing safe
+        ;              to do; surface a status and idle this tick.
         WORLD_TO_GRID := 250.0 / 0x17
         aimWorldX := combatInfo["nearestWorldX"]
         aimWorldY := combatInfo["nearestWorldY"]
         aimWorldZ := combatInfo["nearestWorldZ"]
+        aimMode   := "direct"
         aimTag    := "direct"
 
         ; Path-overlay carrier — written into g_radarOverlay so the radar can
@@ -175,11 +173,13 @@ TryCombatAutomation(radarSnap, gameHwnd)
                         ; mostly-planar zones; reuse the enemy's Z as a reasonable
                         ; stand-in. The matrix projection cares far more about
                         ; XY than Z here.
-                        aimTag := "path(" path.Length "wp,reach=" idx ")"
+                        aimMode := "walk"
+                        aimTag  := "walk(" path.Length "wp)"
                     }
                     else
                     {
-                        aimTag := "path-no-los"
+                        aimMode := "no-path"
+                        aimTag  := "path-no-los"
                     }
                     ; Expose the full path for the radar overlay regardless of
                     ; which waypoint we ended up aiming at — the user wants to
@@ -188,7 +188,8 @@ TryCombatAutomation(radarSnap, gameHwnd)
                 }
                 else
                 {
-                    aimTag := "no-path"
+                    aimMode := "no-path"
+                    aimTag  := "no-path"
                 }
             }
         }
@@ -198,6 +199,18 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; at function entry, so direct-LoS cases (combatPath stays []) leave nothing.
         if (g_radarOverlay)
             g_radarOverlay._combatPathCoords := combatPath
+
+        ; ── No-path branch ───────────────────────────────────────────────
+        ; Enemy detected but no traversable route exists. Don't move the
+        ; cursor (would just spam an unreachable corner) and don't fire
+        ; skills (no LoS = wasted cooldown). Stay in "combat" state so
+        ; AutoPilot doesn't fall through to exploration this tick — let the
+        ; enemy come to us or a future tick re-find the path.
+        if (aimMode = "no-path")
+        {
+            g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount ")"
+            return true
+        }
 
         ; ── Move mouse toward aim point ────────────────────────────────────
         ; Build a thin info Map carrying just the projection-relevant fields so
@@ -212,30 +225,65 @@ TryCombatAutomation(radarSnap, gameHwnd)
             "playerWorldY",  combatInfo["playerWorldY"]
         )
         targetScreenPos := _WorldToScreen(aimInfo, gameHwnd)
-        if (targetScreenPos)
-        {
-            _MoveMouseToTarget(targetScreenPos)
-            mat := combatInfo["w2sMatrix"]
-            matTag := (mat && Type(mat) = "Array" && mat.Length = 16) ? "mat" : "approx"
-            distTag := (terrainDist != nearestDist) ? " td=" Round(terrainDist) : ""
-            g_combatLastReason := matTag "→" targetScreenPos["x"] "," targetScreenPos["y"]
-                . " aim=" aimTag
-                . " pw=" Round(combatInfo["playerWorldX"]) "," Round(combatInfo["playerWorldY"])
-                . " ew=" Round(combatInfo["nearestWorldX"]) "," Round(combatInfo["nearestWorldY"])
-                . distTag
-        }
-        else
+        if !targetScreenPos
         {
             g_combatLastReason := "no-screen-pos"
                 . " aim=" aimTag
                 . " pw=" Round(combatInfo["playerWorldX"]) "," Round(combatInfo["playerWorldY"])
                 . " ew=" Round(combatInfo["nearestWorldX"]) "," Round(combatInfo["nearestWorldY"])
+            return true   ; still engaged, just can't project this tick
+        }
+
+        ; ── Avoid-zone guard ─────────────────────────────────────────────
+        ; If the projected screen position lands on a HUD element, minimap,
+        ; or an interactable world entity (transition / portal / waypoint /
+        ; NPC), DO NOT move the cursor there. Clicking those would either
+        ; be swallowed by the UI or trigger a zone change / dialog that
+        ; ends the combat tick badly. Skip the tick — next frame's
+        ; projection geometry usually shifts the aim off the obstacle.
+        avoidRects := GetAvoidZones(radarSnap, gameHwnd)
+        if IsPointInAvoidZone(targetScreenPos["x"], targetScreenPos["y"], avoidRects)
+        {
+            g_combatLastReason := "avoid-zone(" targetScreenPos["x"] "," targetScreenPos["y"] " aim=" aimTag ")"
+            return true   ; engaged, just skipping the click this tick
+        }
+
+        _MoveMouseToTarget(targetScreenPos)
+        mat := combatInfo["w2sMatrix"]
+        matTag := (mat && Type(mat) = "Array" && mat.Length = 16) ? "mat" : "approx"
+        distTag := (terrainDist != nearestDist) ? " td=" Round(terrainDist) : ""
+        g_combatLastReason := matTag "→" targetScreenPos["x"] "," targetScreenPos["y"]
+            . " aim=" aimTag
+            . " pw=" Round(combatInfo["playerWorldX"]) "," Round(combatInfo["playerWorldY"])
+            . " ew=" Round(combatInfo["nearestWorldX"]) "," Round(combatInfo["nearestWorldY"])
+            . distTag
+
+        ; ── Walk-to-engage branch ─────────────────────────────────────────
+        ; LoS blocked → cursor is on a path waypoint, not the enemy. Fire an
+        ; LMB (move command) instead of any skill key. Throttled to avoid
+        ; spamming click events. Skills resume the moment a future tick
+        ; finds direct LoS and flips aimMode back to "direct".
+        if (aimMode = "walk")
+        {
+            static _walkClickTick := 0
+            now := A_TickCount
+            if ((now - _walkClickTick) > 250)
+            {
+                DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LDOWN
+                Sleep(20)
+                DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LUP
+                _walkClickTick := now
+            }
+            g_combatLastReason := "walk-engage(d=" Round(terrainDist) " " aimTag ")"
+            return true   ; engaged — block exploration; skills come back when LoS opens
         }
 
         ; ── Confirm cursor is on target (isTargetedByPlayer) ──────────────
         ; Only fire skills once the game confirms our cursor is on the enemy.
-        ; Grace period: if not targeted within 500ms, fire anyway — projection
-        ; may be slightly off but close enough.
+        ; Grace period: if not targeted within 1500ms, fire anyway — projection
+        ; may be slightly off but close enough. Was 500ms before; bumped up
+        ; because that wasn't enough on slower machines / higher latency to
+        ; let the game's mouse-pick raycast settle on the target.
         static _aimStartTick := 0
         tgtAddr := combatInfo["nearestTargetableAddr"]
         isTargeted := false
@@ -249,7 +297,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
             if (_aimStartTick = 0)
                 _aimStartTick := A_TickCount
             aimElapsed := A_TickCount - _aimStartTick
-            if (aimElapsed < 500)
+            if (aimElapsed < 1500)
             {
                 g_combatLastReason := "aiming(" aimElapsed "ms)"
                 return true   ; still in combat — block exploration
@@ -945,7 +993,27 @@ RegisterCombatHotkey()
     }
 }
 
+; F10 (configurable) now toggles AutoPilot — combat+loot+explore as one unit.
+; Previous behaviour toggled only combat; that toggle is gone since AutoPilot
+; subsumed combat under a single user-facing switch.
 _OnCombatHotkeyPressed(*)
 {
-    _ToggleCombatAuto()
+    global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
+    global g_combatAutoEnabled, g_exploreEnabled
+    global g_combatState, g_combatLastReason, g_exploreLastReason
+    g_autoPilotEnabled := !g_autoPilotEnabled
+    g_combatAutoEnabled := g_autoPilotEnabled
+    g_exploreEnabled    := g_autoPilotEnabled
+    if !g_autoPilotEnabled
+    {
+        g_autoPilotState   := "idle"
+        g_autoPilotReason  := "disabled"
+        g_combatState      := "idle"
+        g_combatLastReason := "disabled"
+        g_exploreLastReason := "disabled"
+    }
+    SetTimer(SaveConfig, -100)
+    SetTimer(() => SaveCombatAutoConfig(), -100)
+    SetTimer(() => SaveExplorationConfig(), -100)
+    SetTimer(PushHeaderToWebView, -50)
 }

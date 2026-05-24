@@ -98,20 +98,11 @@ _ApplyEntityFilter(etype, bval)
     PushHeaderToWebView()
 }
 
-; ── Combat Automation toggle + slot config ────────────────────────────────
-
-_ToggleCombatAuto()
-{
-    global g_combatAutoEnabled, g_combatState, g_combatLastReason
-    g_combatAutoEnabled := !g_combatAutoEnabled
-    if !g_combatAutoEnabled
-    {
-        g_combatState := "idle"
-        g_combatLastReason := "disabled"
-    }
-    SaveCombatAutoConfig()
-    PushHeaderToWebView()
-}
+; ── Combat Automation slot config ────────────────────────────────────────
+; The legacy _ToggleCombatAuto handler was removed when combat + exploration
+; were unified into the single AutoPilot toggle (ToggleAutoPilot in
+; BridgeDispatch). Skill-slot config still lives here because it's the only
+; per-slot UI write path.
 
 ; Applies a skill slot configuration change from the UI.
 ; Args: [slotNum, key, priority, skillName, type, cooldownMs, enabled]
