@@ -52,6 +52,8 @@ PushHeaderToWebView()
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
     global g_exploreEnabled, g_exploreCurrentPercent, g_exploreTargetPercent, g_exploreLastReason
+    global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
+    global g_lootRarityUnique, g_lootRarityCurrency, g_lootCache, g_lootLastReason
 
     poeRunning := (ProcessExist("PathOfExileSteam.exe") || ProcessExist("PathOfExile.exe")) ? "true" : "false"
     slot1Key := g_flaskKeyBySlot.Has(1) ? g_flaskKeyBySlot[1] : "?"
@@ -121,9 +123,40 @@ PushHeaderToWebView()
           . '"explorePct":' Format("{:.1f}", g_exploreCurrentPercent) ","
           . '"exploreTarget":' g_exploreTargetPercent ","
           . '"exploreReason":' _JsStr(g_exploreLastReason) ","
+          . '"lootRarity":' _SerializeLootRarity() ","
+          . '"lootCacheCount":' _GetLootCacheCount() ","
+          . '"lootReason":' _JsStr(_GetLootLastReason()) ","
           . '"zoneScan":' _SerializeZoneScanStatus()
           . "}"
     WebViewExec("updateHeader(" json ")")
+}
+
+; Returns a JSON object with the five rarity-filter bits — the UI uses this
+; to mirror the per-rarity checkboxes back when the header re-syncs (e.g.
+; after a fresh page load).
+_SerializeLootRarity()
+{
+    global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
+    global g_lootRarityUnique, g_lootRarityCurrency
+    return "{"
+        . '"Normal":'   (g_lootRarityNormal   ? "true" : "false") ","
+        . '"Magic":'    (g_lootRarityMagic    ? "true" : "false") ","
+        . '"Rare":'     (g_lootRarityRare     ? "true" : "false") ","
+        . '"Unique":'   (g_lootRarityUnique   ? "true" : "false") ","
+        . '"Currency":' (g_lootRarityCurrency ? "true" : "false")
+        . "}"
+}
+
+_GetLootCacheCount()
+{
+    global g_lootCache
+    return (g_lootCache && Type(g_lootCache) = "Map") ? g_lootCache.Count : 0
+}
+
+_GetLootLastReason()
+{
+    global g_lootLastReason
+    return g_lootLastReason ? g_lootLastReason : "idle"
 }
 
 ; Serialises combat skill slots to a JSON array for the header push.
@@ -1145,6 +1178,15 @@ _BuildInventoryArrayJson(invs)
         tabName := inv.Has("tabName")  ? String(inv["tabName"])  : ""
         items   := inv.Has("items") ? inv["items"] : []
 
+        ; PoE2's inventory ItemList is cell-based: a 2×3 body armor produces
+        ; 6 entries that all point to the same itemEntityPtr with identical
+        ; slotStart/End rectangles. The UI grid renderer happens to overlap
+        ; them visually so it "looks right", but the count in the section
+        ; header reports raw-entry count (9 for 3 items in 9 cells), which
+        ; is misleading. Dedupe here by itemEntityPtr — with a slot-rect
+        ; fallback when ptr is missing — so the JSON we send to the UI has
+        ; one entry per actual item.
+        seenItemKeys := Map()
         itemsJson := "["
         itemFirst := true
         for _, it in items
@@ -1154,6 +1196,15 @@ _BuildInventoryArrayJson(invs)
             d := it.Has("details") ? it["details"] : 0
             if !(d && Type(d) = "Map")
                 continue
+            iep := it.Has("itemEntityPtr") ? it["itemEntityPtr"] : 0
+            isx := it.Has("slotStartX") ? it["slotStartX"] : 0
+            isy := it.Has("slotStartY") ? it["slotStartY"] : 0
+            iex := it.Has("slotEndX")   ? it["slotEndX"]   : isx
+            iey := it.Has("slotEndY")   ? it["slotEndY"]   : isy
+            dedupKey := iep ? ("p:" iep) : ("r:" isx "," isy "," iex "," iey)
+            if seenItemKeys.Has(dedupKey)
+                continue
+            seenItemKeys[dedupKey] := true
             if !itemFirst
                 itemsJson .= ","
             itemFirst := false

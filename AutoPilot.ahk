@@ -6,15 +6,24 @@
 ; State machine:
 ;   idle    → no automation active (paused, disabled, or guard failed)
 ;   combat  → TryCombatAutomation engaged an enemy this tick
-;   explore → no combat target, TryExploration is navigating
+;   loot    → TryLootPickup is collecting a cached ground item
+;   explore → no combat or loot pending, TryExploration is navigating
+;
+; Priority is combat > loot > explore — each sub-routine returns true to
+; claim the tick. The loot module maintains its own cache of filter-passing
+; items so drops noticed during combat aren't forgotten once it's safe.
 ;
 ; Layering:
-;   AutoFlask -> TryAutoPilot -> {TryCombatAutomation, TryExploration}
+;   AutoFlask -> TryAutoPilot -> {TryCombatAutomation, TryLootPickup, TryExploration}
 ;
-; Toggles:
-;   g_autoPilotEnabled   — master switch. When off, neither sub-routine runs.
-;   g_combatAutoEnabled  — sub-toggle. Skip combat tick inside AutoPilot if false.
-;   g_exploreEnabled     — sub-toggle. Skip explore tick inside AutoPilot if false.
+; Toggle:
+;   g_autoPilotEnabled — only user-facing switch. When on, BOTH combat and
+;                        exploration run as a single unified routine; combat
+;                        takes priority and pauses exploration whenever a
+;                        hostile is in engagement range.
+;   g_combatAutoEnabled / g_exploreEnabled are still kept as internal flags
+;   for status display but no longer have separate UI toggles — they mirror
+;   g_autoPilotEnabled at load time and on each AutoPilot toggle.
 ;
 ; Status globals (for UI):
 ;   g_autoPilotState  — "idle" | "combat" | "explore"
@@ -43,7 +52,7 @@ TryAutoPilot(radarSnap)
 _RunAutoPilot(radarSnap)
 {
     global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
-    global g_combatAutoEnabled, g_exploreEnabled, g_updatesPaused
+    global g_updatesPaused
 
     ; Master gate. Updates are paused or master switch is off.
     if (g_updatesPaused || !g_autoPilotEnabled)
@@ -63,30 +72,34 @@ _RunAutoPilot(radarSnap)
     }
     gameHwnd := guard["gameHwnd"]
 
-    ; ── Combat takes priority. If it engaged this tick, skip exploration ─
-    if g_combatAutoEnabled
+    ; ── Priority chain: combat > loot > explore ──────────────────────────
+    ; Each sub-routine returns true to claim the tick (block the rest).
+    ; Combat first — fighting always beats picking up loot or scouting.
+    inCombat := TryCombatAutomation(radarSnap, gameHwnd)
+    if (inCombat)
     {
-        inCombat := TryCombatAutomation(radarSnap, gameHwnd)
-        if (inCombat)
-        {
-            g_autoPilotState  := "combat"
-            g_autoPilotReason := "engaged"
-            return
-        }
-    }
-
-    ; ── No combat target — explore the area ──────────────────────────────
-    if g_exploreEnabled
-    {
-        TryExploration(radarSnap, gameHwnd)
-        g_autoPilotState  := "explore"
-        g_autoPilotReason := "scouting"
+        g_autoPilotState  := "combat"
+        g_autoPilotReason := "engaged"
         return
     }
 
-    ; Neither sub-routine is enabled.
-    g_autoPilotState  := "idle"
-    g_autoPilotReason := "no-sub-enabled"
+    ; Loot next — when no hostiles are engaged. The pickup module also
+    ; refreshes its own cache here so items spotted during combat stay
+    ; remembered, and short-circuits internally when no hostile is near AND
+    ; the cache is empty.
+    inLoot := TryLootPickup(radarSnap, gameHwnd)
+    if (inLoot)
+    {
+        global g_lootLastReason
+        g_autoPilotState  := "loot"
+        g_autoPilotReason := g_lootLastReason
+        return
+    }
+
+    ; Explore last — no fight, no loot pending; scout the area.
+    TryExploration(radarSnap, gameHwnd)
+    g_autoPilotState  := "explore"
+    g_autoPilotReason := "scouting"
 }
 
 ; ── Shared guard chain ────────────────────────────────────────────────────

@@ -2245,13 +2245,9 @@
     <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" title="Toggle AutoFlask">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-combat" onclick="ahkCall('ToggleCombatAuto')"
-      title="Toggle Combat Auto (F10)">
-      <div class="dot"></div><span id="pill-combat-text">Combat OFF</span>
-    </div>
-    <div class="pill inactive clickable" id="pill-explore" onclick="ahkCall('ToggleExploration')"
-      title="Toggle Auto-Explore">
-      <div class="dot"></div><span id="pill-explore-text">Explore OFF</span>
+    <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
+      title="Toggle AutoPilot — unified explore + combat (F10)">
+      <div class="dot"></div><span id="pill-autopilot-text">AutoPilot OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" title="Toggle Radar">
       <div class="dot"></div><span id="pill-radar-text">Radar ON</span>
@@ -2579,110 +2575,122 @@
         </div>
 
         <div class="cfg-section">
-          <details id="det-autopilot" ontoggle="syncCfgSections()" open>
+          <details id="det-autopilot" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)" open>
             <summary>
               <div class="cfg-header">🤖 AutoPilot</div>
             </summary>
             <div class="cfg-subsection">
               <div class="cfg-row"><span class="cfg-label">Enable AutoPilot</span>
                 <label class="toggle"><input type="checkbox" id="tog-autopilot"
-                    onchange="ahkCall('ToggleAutoPilot')"><span
+                    onchange="ahkCall('ToggleAutoPilot'); updateRangeCircleVisibility()"><span
                     class="toggle-slider"></span></label>
               </div>
               <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-autopilot-state"
                   class="cfg-status idle">idle</span></div>
               <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-autopilot-reason"
                   class="cfg-status idle">—</span></div>
-              <div class="cfg-row" style="opacity:.7;font-size:11px;line-height:1.4">
-                Master switch. When on, runs Combat Auto + Exploration as one state
-                machine (combat first, explore otherwise). Sub-toggles below still
-                gate the individual features within AutoPilot.
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <div class="cfg-section">
-          <details id="det-combatauto" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
-            <summary>
-              <div class="cfg-header">⚔ Combat Automation</div>
-            </summary>
-            <div class="cfg-subsection">
-              <div class="cfg-row"><span class="cfg-label">Enable Combat Auto</span>
-                <label class="toggle"><input type="checkbox" id="tog-combat"
-                    onchange="ahkCall('ToggleCombatAuto'); updateRangeCircleVisibility()"><span
-                    class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-row"><span class="cfg-label">Toggle Hotkey</span><span id="cfg-combat-hotkey"
+              <div class="cfg-row"><span class="cfg-label">Hotkey</span><span id="cfg-combat-hotkey"
                   class="cfg-status" style="color:#7ec8e3;font-weight:600">F10</span></div>
-              <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-combat-state"
-                  class="cfg-status idle">idle</span></div>
-              <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-combat-reason"
-                  class="cfg-status idle">—</span></div>
-              <div class="cfg-slider-pair">
-                <div class="cfg-slider-item">
-                  <span class="cfg-label">Engage</span>
-                  <div class="slider-wrap">
-                    <span class="slider-val" id="combat-range-bub">1500</span>
-                    <input type="range" id="inp-combat-range" min="200" max="5000" step="100" value="1500"
-                      oninput="_sb(this,'combat-range-bub',this.value); ahkCall('SetCombatRange', parseInt(this.value)); showCombatRangeCircles()">
-                  </div>
-                </div>
-                <div class="cfg-slider-item">
-                  <span class="cfg-label">Disengage</span>
-                  <div class="slider-wrap">
-                    <span class="slider-val" id="combat-disengage-bub">2500</span>
-                    <input type="range" id="inp-combat-disengage" min="500" max="8000" step="100" value="2500"
-                      oninput="_sb(this,'combat-disengage-bub',this.value); ahkCall('SetCombatDisengageRange', parseInt(this.value)); showCombatRangeCircles()">
-                  </div>
-                </div>
+              <div class="cfg-row"><span class="cfg-label">Combat</span><span id="cfg-combat-state"
+                  class="cfg-status idle">idle</span><span id="cfg-combat-reason"
+                  class="cfg-status idle" style="margin-left:8px;opacity:.8">—</span></div>
+              <div class="cfg-row"><span class="cfg-label">Explore</span><span id="cfg-explore-pct" class="cfg-status"
+                  style="color:#7ec8e3;font-weight:600">0%</span><span id="cfg-explore-reason"
+                  class="cfg-status idle" style="margin-left:8px;opacity:.8">idle</span></div>
+              <div class="cfg-row" style="opacity:.7;font-size:11px;line-height:1.4;margin-top:4px">
+                Single switch. While on: explores the area; whenever a hostile is in
+                engage range, pauses exploration and engages (LoS-gated skill firing,
+                avoids transitions/portals/UI).
               </div>
-              <div class="cfg-slider-pair">
-                <div class="cfg-slider-item">
-                  <span class="cfg-label">GCD (ms)</span>
-                  <div class="slider-wrap">
-                    <span class="slider-val" id="combat-gcd-bub">120</span>
-                    <input type="range" id="inp-combat-gcd" min="50" max="2000" step="10" value="120"
-                      oninput="_sb(this,'combat-gcd-bub',this.value); ahkCall('SetCombatGCD', parseInt(this.value))">
-                  </div>
-                </div>
-                <div class="cfg-slider-item">
-                  <span class="cfg-label">W2S Scale</span>
-                  <div class="slider-wrap">
-                    <span class="slider-val" id="combat-w2s-bub">0.20</span>
-                    <input type="range" id="inp-combat-w2s" min="0.05" max="1.00" step="0.01" value="0.20"
-                      oninput="_sb(this,'combat-w2s-bub',parseFloat(this.value).toFixed(2)); ahkCall('SetCombatW2S', parseFloat(this.value))">
-                  </div>
-                </div>
-              </div>
-              <div style="margin-top:8px;font-size:12px;color:var(--accent);font-weight:600">Skill Slots</div>
-              <div id="combat-slots-cfg" style="margin-top:4px"></div>
-            </div>
-          </details>
-        </div>
 
-        <div class="cfg-section">
-          <details id="det-explore" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
-            <summary>
-              <div class="cfg-header">🧭 Exploration</div>
-            </summary>
-            <div class="cfg-subsection">
-              <div class="cfg-row"><span class="cfg-label">Enable Auto-Explore</span>
-                <label class="toggle"><input type="checkbox" id="tog-explore"
-                    onchange="ahkCall('ToggleExploration')"><span class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-row"><span class="cfg-label">Progress</span><span id="cfg-explore-pct" class="cfg-status"
-                  style="color:#7ec8e3;font-weight:600">0%</span></div>
-              <div class="cfg-row"><span class="cfg-label">Status</span><span id="cfg-explore-reason"
-                  class="cfg-status idle">idle</span></div>
-              <div class="cfg-slider-row">
-                <span class="cfg-label">Target %</span>
-                <div class="slider-wrap">
-                  <span class="slider-val" id="explore-target-bub">80%</span>
-                  <input type="range" id="inp-explore-target" min="10" max="99" step="1" value="80"
-                    oninput="_sb(this,'explore-target-bub',this.value+'%'); ahkCall('SetExploreTarget', parseInt(this.value))">
+              <!-- Hidden legacy toggles — kept in DOM so the existing setChk()
+                   helpers in updateHeader don't blow up. Always mirror the
+                   AutoPilot state via JS but never visible to the user. -->
+              <input type="checkbox" id="tog-combat"  style="display:none">
+              <input type="checkbox" id="tog-explore" style="display:none">
+
+              <!-- ── Advanced tuning ──────────────────────────────────── -->
+              <details id="det-autopilot-adv" style="margin-top:10px" ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)">
+                <summary style="cursor:pointer;font-size:12px;color:var(--subtext);padding:4px 0">
+                  ⚙ Erweiterte Einstellungen
+                </summary>
+                <div style="margin-top:8px;padding:6px 0 0 4px;border-top:1px dashed var(--border)">
+                  <div class="cfg-slider-pair">
+                    <div class="cfg-slider-item">
+                      <span class="cfg-label">Engage</span>
+                      <div class="slider-wrap">
+                        <span class="slider-val" id="combat-range-bub">1500</span>
+                        <input type="range" id="inp-combat-range" min="200" max="5000" step="100" value="1500"
+                          oninput="_sb(this,'combat-range-bub',this.value); ahkCall('SetCombatRange', parseInt(this.value)); showCombatRangeCircles()">
+                      </div>
+                    </div>
+                    <div class="cfg-slider-item">
+                      <span class="cfg-label">Disengage</span>
+                      <div class="slider-wrap">
+                        <span class="slider-val" id="combat-disengage-bub">2500</span>
+                        <input type="range" id="inp-combat-disengage" min="500" max="8000" step="100" value="2500"
+                          oninput="_sb(this,'combat-disengage-bub',this.value); ahkCall('SetCombatDisengageRange', parseInt(this.value)); showCombatRangeCircles()">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="cfg-slider-pair">
+                    <div class="cfg-slider-item">
+                      <span class="cfg-label">GCD (ms)</span>
+                      <div class="slider-wrap">
+                        <span class="slider-val" id="combat-gcd-bub">120</span>
+                        <input type="range" id="inp-combat-gcd" min="50" max="2000" step="10" value="120"
+                          oninput="_sb(this,'combat-gcd-bub',this.value); ahkCall('SetCombatGCD', parseInt(this.value))">
+                      </div>
+                    </div>
+                    <div class="cfg-slider-item">
+                      <span class="cfg-label">W2S Scale</span>
+                      <div class="slider-wrap">
+                        <span class="slider-val" id="combat-w2s-bub">0.20</span>
+                        <input type="range" id="inp-combat-w2s" min="0.05" max="1.00" step="0.01" value="0.20"
+                          oninput="_sb(this,'combat-w2s-bub',parseFloat(this.value).toFixed(2)); ahkCall('SetCombatW2S', parseFloat(this.value))">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="cfg-slider-row">
+                    <span class="cfg-label">Explore Ziel %</span>
+                    <div class="slider-wrap">
+                      <span class="slider-val" id="explore-target-bub">80%</span>
+                      <input type="range" id="inp-explore-target" min="10" max="99" step="1" value="80"
+                        oninput="_sb(this,'explore-target-bub',this.value+'%'); ahkCall('SetExploreTarget', parseInt(this.value))">
+                    </div>
+                  </div>
+
+                  <!-- ── Loot Pickup ───────────────────────────────────── -->
+                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">💎 Loot Pickup</div>
+                  <div class="cfg-row" style="margin-top:4px">
+                    <span class="cfg-label">Status</span>
+                    <span id="cfg-loot-status" class="cfg-status idle">idle</span>
+                    <span style="margin-left:8px;color:var(--subtext);font-size:11px">
+                      Cache: <span id="cfg-loot-cache-count">0</span>
+                    </span>
+                  </div>
+                  <div class="filter-row" id="loot-rarity-filter" style="margin-top:4px">
+                    <label class="filter-pill"><input type="checkbox" id="loot-rar-normal"
+                        onchange="ahkCall('SetLootRarity','Normal',this.checked)"> Normal</label>
+                    <label class="filter-pill"><input type="checkbox" id="loot-rar-magic"
+                        onchange="ahkCall('SetLootRarity','Magic',this.checked)" checked> Magic</label>
+                    <label class="filter-pill"><input type="checkbox" id="loot-rar-rare"
+                        onchange="ahkCall('SetLootRarity','Rare',this.checked)" checked> Rare</label>
+                    <label class="filter-pill"><input type="checkbox" id="loot-rar-unique"
+                        onchange="ahkCall('SetLootRarity','Unique',this.checked)" checked> Unique</label>
+                    <label class="filter-pill"><input type="checkbox" id="loot-rar-currency"
+                        onchange="ahkCall('SetLootRarity','Currency',this.checked)" checked> Currency</label>
+                  </div>
+                  <div style="margin-top:4px;font-size:11px;color:var(--subtext);line-height:1.4">
+                    Picks up ground items matching the selected rarities. Cached
+                    items persist across ticks — drops noticed during combat
+                    are collected once the area is safe.
+                  </div>
+
+                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">Skill Slots</div>
+                  <div id="combat-slots-cfg" style="margin-top:4px"></div>
                 </div>
-              </div>
+              </details>
             </div>
           </details>
         </div>
@@ -3640,22 +3648,22 @@
         pillFlask.className = 'pill clickable ' + (on ? 'active' : 'inactive');
         document.getElementById('pill-flask-text').textContent = 'AutoFlask ' + (on ? 'ON' : 'OFF');
       }
-      const pillCombat = document.getElementById('pill-combat');
-      if (pillCombat) {
-        const on = d.combatAuto === true || d.combatAuto === 'true';
-        const state = d.combatState || 'idle';
-        const inCombat = state === 'combat';
-        const hk = d.combatHotkey || 'F10';
-        pillCombat.className = 'pill clickable ' + (on ? (inCombat ? 'warning' : 'active') : 'inactive');
-        pillCombat.title = 'Toggle Combat Auto (' + hk + ')';
-        document.getElementById('pill-combat-text').textContent = 'Combat ' + (on ? (inCombat ? '⚔' : 'ON') : 'OFF');
-      }
-      const pillExplore = document.getElementById('pill-explore');
-      if (pillExplore) {
-        const on = d.exploreEnabled === true || d.exploreEnabled === 'true';
+      // Unified AutoPilot pill — replaces the previous separate Combat + Explore
+      // pills. State is a 3-state badge: idle / combat (⚔) / explore + %.
+      const pillAp = document.getElementById('pill-autopilot');
+      if (pillAp) {
+        const on = d.autoPilot === true || d.autoPilot === 'true';
+        const state = d.autoPilotState || 'idle';
         const pct = d.explorePct !== undefined ? parseFloat(d.explorePct).toFixed(0) : '0';
-        pillExplore.className = 'pill clickable ' + (on ? 'active' : 'inactive');
-        document.getElementById('pill-explore-text').textContent = 'Explore ' + (on ? pct + '%' : 'OFF');
+        const hk = d.combatHotkey || 'F10';
+        let label, cls;
+        if (!on) { label = 'AutoPilot OFF'; cls = 'inactive'; }
+        else if (state === 'combat') { label = 'AutoPilot ⚔'; cls = 'warning'; }
+        else if (state === 'explore') { label = 'AutoPilot ' + pct + '%'; cls = 'active'; }
+        else { label = 'AutoPilot ON'; cls = 'active'; }
+        pillAp.className = 'pill clickable ' + cls;
+        pillAp.title = 'Toggle AutoPilot (' + hk + ') — unified explore + combat';
+        document.getElementById('pill-autopilot-text').textContent = label;
       }
       const pillRadar = document.getElementById('pill-radar');
       if (pillRadar) {
@@ -3835,6 +3843,29 @@
         const el = document.getElementById('inp-explore-target');
         if (el && el !== document.activeElement) { el.value = d.exploreTarget; _sbSync(el, 'explore-target-bub', d.exploreTarget + '%'); }
       }
+
+      // ── Loot Pickup sync ───────────────────────────────────────────────────
+      // Rarity-filter checkboxes are echoed back from g_lootRarity*. Only push
+      // the value if the user isn't actively editing that particular box —
+      // setChk's idempotency check handles the no-flicker case for us.
+      if (d.lootRarity && typeof d.lootRarity === 'object') {
+        const r = d.lootRarity;
+        setChk('loot-rar-normal',   r.Normal);
+        setChk('loot-rar-magic',    r.Magic);
+        setChk('loot-rar-rare',     r.Rare);
+        setChk('loot-rar-unique',   r.Unique);
+        setChk('loot-rar-currency', r.Currency);
+      }
+      const lootStatus = document.getElementById('cfg-loot-status');
+      if (lootStatus && d.lootReason !== undefined) {
+        const reason = d.lootReason || 'idle';
+        lootStatus.textContent = reason;
+        // Subtle colour cue: pickup/walking → highlight; idle/empty → muted
+        const active = reason.indexOf('pickup') === 0 || reason.indexOf('walking') === 0;
+        lootStatus.className = 'cfg-status ' + (active ? 'warning' : 'idle');
+      }
+      const lootCache = document.getElementById('cfg-loot-cache-count');
+      if (lootCache && d.lootCacheCount !== undefined) lootCache.textContent = d.lootCacheCount;
 
       if (d.cfgSections !== undefined && !_cfgSectionsLoaded) {
         _cfgSectionsLoaded = true;

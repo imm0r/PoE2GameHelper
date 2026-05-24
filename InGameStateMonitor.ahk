@@ -94,11 +94,35 @@ g_exploreTargetPercent := 80
 g_exploreCurrentPercent := 0.0
 g_exploreLastReason := "idle"
 
-; AutoPilot — master state machine that arbitrates combat vs exploration.
-; When off, neither combat nor exploration runs regardless of their sub-toggles.
+; AutoPilot — master state machine that arbitrates combat / loot / exploration.
+; When off, none of the sub-routines run.
 g_autoPilotEnabled := false
-g_autoPilotState   := "idle"   ; "idle" | "combat" | "explore"
+g_autoPilotState   := "idle"   ; "idle" | "combat" | "loot" | "explore"
 g_autoPilotReason  := "idle"
+
+; Loot Pickup — ground-item collection inside AutoPilot. Five rarity bits
+; gate which items the bot will pick up. Cache persists across ticks so an
+; item that dropped mid-fight stays remembered until the path is clear.
+g_lootRarityNormal   := false
+g_lootRarityMagic    := true
+g_lootRarityRare     := true
+g_lootRarityUnique   := true
+g_lootRarityCurrency := true
+g_lootCache          := Map()  ; entityAddr → Map(worldX, worldY, worldZ, rarity, …)
+g_lootLastReason     := "idle"
+; Backpack free-cell cache — recomputed on demand by LootPickup, refreshed
+; every ~3 s. The free-cell count gates pickup so the bot stops clicking when
+; the inventory is full. -1 means "not yet computed / unavailable".
+g_lootInvFreeCells     := -1
+g_lootInvLastCheckTick := 0
+g_lootInvForceRefresh  := false
+g_lootInvDiag          := ""   ; debug snapshot of last inv-read (raw counts)
+; Occupancy grid for the backpack. Array of arrays of 0/1 (1 = occupied).
+; Indexed [y][x+1] (1-based inner). Used by _CanFitInBackpack to check
+; that a target item's footprint actually has contiguous free space.
+g_lootInvGrid          := 0
+g_lootInvGridX         := 0
+g_lootInvGridY         := 0
 
 ; Diagnostics: when on, every inventory push writes a pointer-chain dump to
 ; InGameStateMonitor.inventory_chain.log. Off by default — opt-in for debugging
@@ -192,6 +216,16 @@ g_offsetTableSortDesc := false
 LoadConfig()
 LoadCombatAutoConfig()
 LoadExplorationConfig()
+LoadLootPickupConfig()
+ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
+
+; AutoPilot is now the only user-facing toggle for combat+explore; the
+; sub-flags are kept for status display and config persistence but must
+; mirror AutoPilot at startup so a freshly-loaded session can't end up
+; with AutoPilot enabled while a sub-routine is silently disabled (or
+; vice-versa from a stale config from before the unification).
+g_combatAutoEnabled := g_autoPilotEnabled
+g_exploreEnabled    := g_autoPilotEnabled
 RegisterCombatHotkey()
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
@@ -608,7 +642,10 @@ OnTreeTabChanged(*)
 #Include BridgeDispatch.ahk
 
 #Include AutoFlask.ahk
+#Include AvoidZones.ahk
 #Include CombatAutomation.ahk
+#Include ItemSizeRegistry.ahk
+#Include LootPickup.ahk
 #Include ExplorationModule.ahk
 #Include AutoPilot.ahk
 #Include MemoryDiff.ahk
