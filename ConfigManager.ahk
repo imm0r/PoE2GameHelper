@@ -265,9 +265,14 @@ LoadPanelOffsetsFromConfig()
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", m)
+                    ; AHK v2 RegExMatch requires the output var to be passed by
+                    ; reference (`&m`) and capture groups are accessed via the
+                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
+                    ; was tolerated in some uncompiled paths but fails hard in
+                    ; compiled .exe with "local variable has not been assigned".
+                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
                     {
-                        hex := StrUpper(m1)
+                        hex := StrUpper(m[1])
                         offVal := 0
                         i2 := 1
                         len2 := StrLen(hex)
@@ -288,13 +293,9 @@ LoadPanelOffsetsFromConfig()
                     else
                     {
                         try
-                    {
-                        offVal := Integer(s)
-                    }
-                    catch
-                    {
-                        offVal := 0
-                    }
+                            offVal := Integer(s)
+                        catch
+                            offVal := 0
                     }
                 }
                 if (offVal > 0)
@@ -319,9 +320,14 @@ LoadPanelOffsetsFromConfig()
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", m)
+                    ; AHK v2 RegExMatch requires the output var to be passed by
+                    ; reference (`&m`) and capture groups are accessed via the
+                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
+                    ; was tolerated in some uncompiled paths but fails hard in
+                    ; compiled .exe with "local variable has not been assigned".
+                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
                     {
-                        hex := StrUpper(m1)
+                        hex := StrUpper(m[1])
                         offVal := 0
                         i2 := 1
                         len2 := StrLen(hex)
@@ -342,13 +348,9 @@ LoadPanelOffsetsFromConfig()
                     else
                     {
                         try
-                    {
-                        offVal := Integer(s)
-                    }
-                    catch
-                    {
-                        offVal := 0
-                    }
+                            offVal := Integer(s)
+                        catch
+                            offVal := 0
                     }
                 }
                 if (offVal > 0)

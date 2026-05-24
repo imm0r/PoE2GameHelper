@@ -1,5 +1,6 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
+#Warn All, Off
 
 SetWorkingDir(A_ScriptDir)
 #Include Lib/WebViewToo.ahk
@@ -24,6 +25,34 @@ Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen u
 */
 
 GAMEHELPER_VERSION := "0.4.11.2"
+
+; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
+; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
+; resolves it relative to A_LineFile + Lib/<bitness>bit/. When the script is
+; compiled to .exe via Ahk2Exe, A_LineFile points at the .exe (not the source
+; tree) so that fallback fails — surfaces as "Failed to load DLL" the first
+; time CreateCoreWebView2EnvironmentWithOptions is invoked.
+;
+; Fix: at startup, FileInstall the matching-bitness DLL next to the .exe so
+; the library's primary check ("WebView2Loader.dll" relative to A_WorkingDir,
+; which equals A_ScriptDir for compiled runs) succeeds.
+;
+; Uncompiled runs short-circuit on A_IsCompiled and keep using the source
+; tree's Lib/<bitness>bit/ DLL via the library's existing fallback.
+if A_IsCompiled
+{
+    wvDll := A_ScriptDir "\WebView2Loader.dll"
+    if !FileExist(wvDll)
+    {
+        ; FileInstall requires literal source paths so we branch on bitness
+        ; explicitly. Ahk2Exe embeds both blobs (~200 KB each); only the one
+        ; matching the compile target's bitness is extracted at runtime.
+        if (A_PtrSize = 8)
+            FileInstall("Lib\64bit\WebView2Loader.dll", wvDll, true)
+        else
+            FileInstall("Lib\32bit\WebView2Loader.dll", wvDll, true)
+    }
+}
 
 ; Tray icon
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
@@ -97,32 +126,32 @@ g_exploreLastReason := "idle"
 ; AutoPilot — master state machine that arbitrates combat / loot / exploration.
 ; When off, none of the sub-routines run.
 g_autoPilotEnabled := false
-g_autoPilotState   := "idle"   ; "idle" | "combat" | "loot" | "explore"
-g_autoPilotReason  := "idle"
+g_autoPilotState := "idle"   ; "idle" | "combat" | "loot" | "explore"
+g_autoPilotReason := "idle"
 
 ; Loot Pickup — ground-item collection inside AutoPilot. Five rarity bits
 ; gate which items the bot will pick up. Cache persists across ticks so an
 ; item that dropped mid-fight stays remembered until the path is clear.
-g_lootRarityNormal   := false
-g_lootRarityMagic    := true
-g_lootRarityRare     := true
-g_lootRarityUnique   := true
+g_lootRarityNormal := false
+g_lootRarityMagic := true
+g_lootRarityRare := true
+g_lootRarityUnique := true
 g_lootRarityCurrency := true
-g_lootCache          := Map()  ; entityAddr → Map(worldX, worldY, worldZ, rarity, …)
-g_lootLastReason     := "idle"
+g_lootCache := Map()  ; entityAddr → Map(worldX, worldY, worldZ, rarity, …)
+g_lootLastReason := "idle"
 ; Backpack free-cell cache — recomputed on demand by LootPickup, refreshed
 ; every ~3 s. The free-cell count gates pickup so the bot stops clicking when
 ; the inventory is full. -1 means "not yet computed / unavailable".
-g_lootInvFreeCells     := -1
+g_lootInvFreeCells := -1
 g_lootInvLastCheckTick := 0
-g_lootInvForceRefresh  := false
-g_lootInvDiag          := ""   ; debug snapshot of last inv-read (raw counts)
+g_lootInvForceRefresh := false
+g_lootInvDiag := ""   ; debug snapshot of last inv-read (raw counts)
 ; Occupancy grid for the backpack. Array of arrays of 0/1 (1 = occupied).
 ; Indexed [y][x+1] (1-based inner). Used by _CanFitInBackpack to check
 ; that a target item's footprint actually has contiguous free space.
-g_lootInvGrid          := 0
-g_lootInvGridX         := 0
-g_lootInvGridY         := 0
+g_lootInvGrid := 0
+g_lootInvGridX := 0
+g_lootInvGridY := 0
 
 ; Diagnostics: when on, every inventory push writes a pointer-chain dump to
 ; InGameStateMonitor.inventory_chain.log. Off by default — opt-in for debugging
@@ -131,25 +160,25 @@ g_inventoryChainDumpEnabled := false
 
 ; Memory Diff (RE helper). Snapshot a region of memory, do something in-game,
 ; snapshot again, diff. See MemoryDiff.ahk.
-g_memDiffSymbol     := "ServerDataStructure"   ; named anchor or "Custom"
+g_memDiffSymbol := "ServerDataStructure"   ; named anchor or "Custom"
 g_memDiffCustomAddr := 0                       ; absolute address when symbol = "Custom"
-g_memDiffAddress    := 0                       ; resolved address from last snapshot
-g_memDiffSize       := 0x1000                  ; 4 KB default — covers most struct ranges
-g_memDiffBeforeBuf  := 0
+g_memDiffAddress := 0                       ; resolved address from last snapshot
+g_memDiffSize := 0x1000                  ; 4 KB default — covers most struct ranges
+g_memDiffBeforeBuf := 0
 g_memDiffBeforeAddr := 0
 g_memDiffBeforeTime := 0
-g_memDiffAfterBuf   := 0
-g_memDiffAfterTime  := 0
-g_memDiffStatus     := "idle"
+g_memDiffAfterBuf := 0
+g_memDiffAfterTime := 0
+g_memDiffStatus := "idle"
 
 ; Memory Dissector (CE-style Dissect Memory). Navigate from a base address
 ; through pointer chains. See MemoryDissect.ahk.
 g_memDissectAddress := 0                ; current base address being viewed
-g_memDissectSize    := 0x200            ; bytes to read per page (64 rows at 8-byte stride)
-g_memDissectBuf     := 0               ; last read Buffer, or 0
+g_memDissectSize := 0x200            ; bytes to read per page (64 rows at 8-byte stride)
+g_memDissectBuf := 0               ; last read Buffer, or 0
 g_memDissectHistory := []              ; back-navigation stack (Array of Int64 addresses)
-g_memDissectFwd     := []              ; forward-navigation stack
-g_memDissectStatus  := "idle"
+g_memDissectFwd := []              ; forward-navigation stack
+g_memDissectStatus := "idle"
 
 ; Radar Entity-Filter
 g_radarShowEnemyNormal := true
@@ -225,11 +254,41 @@ ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 ; with AutoPilot enabled while a sub-routine is silently disabled (or
 ; vice-versa from a stale config from before the unification).
 g_combatAutoEnabled := g_autoPilotEnabled
-g_exploreEnabled    := g_autoPilotEnabled
+g_exploreEnabled := g_autoPilotEnabled
 RegisterCombatHotkey()
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
 g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , { DefaultWidth: g_winW, DefaultHeight: g_winH })
+
+; Override WebViewToo's compiled-mode behaviour.
+; The library auto-calls BrowseExe() when A_IsCompiled is true, which sets
+; up a catch-all WebResourceRequested route that reads HTML/CSS/JS via
+; FindResource against Windows resources embedded in the .exe. We don't
+; embed those resources — we ship ui/, data/, etc. as files next to the
+; .exe — so every request returns empty content and the WebView renders
+; a blank page.
+;
+; Fix: remove the catch-all filter installed by BrowseExe, drop the
+; compiled-routes record for the default host, and install a folder
+; mapping instead (same call uncompiled runs use). After this the
+; WebView resolves https://ahk.localhost/ui/index.html against
+; <exe_dir>/ui/index.html on disk — identical to uncompiled behaviour.
+if A_IsCompiled
+{
+    try
+    {
+        _wvHost := "ahk.localhost"
+        _wvCtrl := g_webGui.Control
+        try _wvCtrl.wv.RemoveWebResourceRequestedFilter("http://" _wvHost "/*", 0)
+        try _wvCtrl.wv.RemoveWebResourceRequestedFilter("https://" _wvHost "/*", 0)
+        if (IsObject(_wvCtrl._CompiledRoutes) && _wvCtrl._CompiledRoutes.Has(_wvHost))
+            _wvCtrl._CompiledRoutes.Delete(_wvHost)
+        _wvCtrl.BrowseFolder(A_ScriptDir, _wvHost)
+    }
+    catch as _wvEx
+        try LogError("WebView2 compiled BrowseFolder override", _wvEx)
+}
+
 g_webGui.OnEvent("Close", (*) => ExitApp())
 g_webGui.OnEvent("Size", OnWebGuiSize)
 g_webGui.Show()

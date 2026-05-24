@@ -449,11 +449,13 @@ class WebViewCtrl extends Gui.Custom {
         WebViewCtrl.ActiveHwnds[this.Hwnd] := this.wvc
         this.wv.InjectAhkComponent().await()
         this.wvc.IsVisible := 1
-        if (A_IsCompiled) {
-            this.BrowseExe()
-        } else {
-            this.BrowseFolder(A_WorkingDir)
-        }
+        ; Always serve from the working directory — both compiled and
+        ; uncompiled. The original library used BrowseExe() in compiled
+        ; mode, which routes everything via FindResource against Windows
+        ; resources embedded in the .exe. We ship ui/, data/, etc. as
+        ; files next to the .exe (not embedded resources), so folder
+        ; serving is the correct path for both modes.
+        this.BrowseFolder(A_WorkingDir)
 
         this.wv.add_NavigationStarting(InstallGlobal)
         InstallGlobal(ICoreWebView2, Args) {
