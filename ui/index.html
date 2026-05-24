@@ -3478,6 +3478,10 @@
                 <label class="toggle"><input type="checkbox" id="tog-player-hud" onchange="ahkCall('TogglePlayerHud')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-row"><span class="cfg-label">Status Text on Overlay</span>
+                <label class="toggle"><input type="checkbox" id="tog-overlay-status" onchange="ahkCall('ToggleOverlayStatusText')"
+                    checked><span class="toggle-slider"></span></label>
+              </div>
               <div id="radar-filters" class="filter-row">
                 <label class="filter-pill"><input type="checkbox" id="rf-normal"
                     onchange="setRadarFilter('normal',  this.checked)" checked> Normal</label>
@@ -4513,6 +4517,7 @@
       setChk('tog-npcsync', d.npcSync);
       setChk('tog-radar', d.radarEnabled !== undefined ? d.radarEnabled : true);
       setChk('tog-player-hud', d.playerHud !== undefined ? d.playerHud : true);
+      setChk('tog-overlay-status', d.overlayStatusText !== undefined ? d.overlayStatusText : true);
 
       const radarFilters = document.getElementById('radar-filters');
       if (radarFilters) radarFilters.style.opacity = (d.radarEnabled === false || d.radarEnabled === 'false') ? '0.4' : '1';

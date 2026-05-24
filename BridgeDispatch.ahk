@@ -140,6 +140,14 @@ _DispatchBridgeCall(method, args)
             g_inventoryChainDumpEnabled := !g_inventoryChainDumpEnabled
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
+        case "ToggleOverlayStatusText":
+            ; Toggle the on-screen automation status block drawn by the
+            ; radar overlay. State is persisted to Radar.statusText in
+            ; the INI so it survives across sessions.
+            global g_overlayStatusTextEnabled
+            g_overlayStatusTextEnabled := !g_overlayStatusTextEnabled
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
 
             ; ── Memory-Diff RE tab ────────────────────────────────────────
             ; Configure target: args = [symbol, customHex, sizeBytes]

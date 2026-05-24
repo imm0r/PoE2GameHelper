@@ -484,7 +484,103 @@ class RadarOverlay
             }
         }
 
+        ; Status text block — automation summary drawn on the game overlay.
+        ; Off when g_overlayStatusTextEnabled is false; user-toggleable
+        ; from Config > Radar > "Status Text on Overlay".
+        this._RenderStatusOverlay(gameWindowWidth, gameWindowHeight)
+
         this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+    }
+
+    ; ── Status overlay ────────────────────────────────────────────────────
+    ; Draws a compact codex-styled block of automation status lines onto
+    ; the game overlay. Shows the AutoPilot summary always, plus contextual
+    ; sub-lines for whichever sub-routine is currently active (combat /
+    ; loot / explore). User can toggle off via Config > Radar > "Status
+    ; Text on Overlay".
+    ;
+    ; Position: bottom-left of the game viewport, just above the skill bar,
+    ; clear of the life globe and the radar minimap. Colour palette in BGR
+    ; matches the codex WebView theme: gold for labels, ivory for values,
+    ; blood-red for combat, dim brass for inactive states.
+    _RenderStatusOverlay(gameWindowWidth, gameWindowHeight)
+    {
+        global g_overlayStatusTextEnabled
+        global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
+        global g_combatState, g_combatLastReason
+        global g_lootLastReason, g_lootCache
+        global g_exploreCurrentPercent, g_exploreLastReason
+        global g_autoFlaskEnabled, g_autoFlaskLastReason
+
+        if !g_overlayStatusTextEnabled
+            return
+        if (gameWindowWidth < 200 || gameWindowHeight < 200)
+            return
+
+        ; ── Layout ──────────────────────────────────────────────────────
+        ; Anchor at ~14% from left (just past bottom-left life globe) and
+        ; ~62% from top (well clear of bottom skill/flask bar at ~86%).
+        baseX := Round(gameWindowWidth  * 0.14)
+        baseY := Round(gameWindowHeight * 0.62)
+        linePitch := 16
+
+        ; Codex palette in BGR (the _DrawText helper takes BGR ints)
+        COL_GOLD_HI := 0x8AD6F0   ; #f0d68a — primary gold for labels
+        COL_GOLD    := 0x5AA8C8   ; #c8a85a — muted gold for value text
+        COL_IVORY   := 0xB8DCE8   ; #e8dcb8 — main text colour
+        COL_DIM     := 0x648A9C   ; #9c8a64 — dim text for "off" / sub-info
+        COL_BLOOD   := 0x4848C5   ; #c54848 — blood red for combat warning
+        COL_AMBER   := 0x43A0D4   ; #d4a043 — burnished bronze for active
+
+        lines := []   ; each entry: [text, colorBGR]
+
+        ; Line 1: AutoPilot master state
+        if !g_autoPilotEnabled
+        {
+            lines.Push(["AUTOPILOT  OFF", COL_DIM])
+        }
+        else
+        {
+            stUp := StrUpper(g_autoPilotState)
+            stCol := (g_autoPilotState = "combat") ? COL_BLOOD
+                  : (g_autoPilotState = "explore" || g_autoPilotState = "loot") ? COL_AMBER
+                  : COL_GOLD_HI
+            lines.Push(["AUTOPILOT  " stUp, stCol])
+            if (g_autoPilotReason && g_autoPilotReason != "" && g_autoPilotReason != "idle")
+                lines.Push(["  " g_autoPilotReason, COL_IVORY])
+        }
+
+        ; Contextual sub-lines for the active automation
+        if g_autoPilotEnabled
+        {
+            if (g_combatState = "combat" && g_combatLastReason != "" && g_combatLastReason != "idle")
+                lines.Push(["  combat: " g_combatLastReason, COL_IVORY])
+
+            cacheCount := (g_lootCache && Type(g_lootCache) = "Map") ? g_lootCache.Count : 0
+            if (cacheCount > 0 || (g_autoPilotState = "loot"))
+                lines.Push(["  loot: " g_lootLastReason " · " cacheCount " cached", COL_IVORY])
+
+            if (g_autoPilotState = "explore" || g_exploreCurrentPercent > 0)
+            {
+                pctTxt := Format("{:.0f}%", g_exploreCurrentPercent)
+                rsn := (g_exploreLastReason != "" && g_exploreLastReason != "idle")
+                    ? (" · " g_exploreLastReason) : ""
+                lines.Push(["  explore: " pctTxt rsn, COL_IVORY])
+            }
+        }
+
+        if (g_autoFlaskEnabled && g_autoFlaskLastReason != "" && g_autoFlaskLastReason != "idle")
+            lines.Push(["FLASK  " g_autoFlaskLastReason, COL_GOLD])
+
+        ; Queue the text lines into the existing batch — flushes in
+        ; _FlushBatch (called from _BlitWithHighlight) so the lines land
+        ; on top of the radar / entity dots already rendered.
+        y := baseY
+        for _, ln in lines
+        {
+            this._DrawText(baseX, y, ln[1], ln[2])
+            y += linePitch
+        }
     }
 
     ; Draws UI Browser highlight (if active) then blits the back-buffer to screen.

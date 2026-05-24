@@ -214,17 +214,26 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
-    ; ── Navigation: find frontier and click-to-move ───────────────────
+    ; ── Navigation: precomputed plan + click-to-move ──────────────────
     static _targetCX := -1, _targetCY := -1
     static _pathCoords := []
     static _pathIdx := 0
     static _lastClickTick := 0
-    static _lastFrontierTick := 0
+    static _lastTargetTick := 0   ; was _lastFrontierTick — generalised
     static _stuckCheckTick := 0
     static _stuckPGX := 0, _stuckPGY := 0
     static _areaResetDone := 0
     static _doorClickTick := 0
     static _doorClickCounts := Map()  ; entityAddr → clickCount
+
+    ; Precomputed exploration plan — built once per area from the (already
+    ; fully-known) walkable terrain grid. ~50-80 sample waypoints in a
+    ; sparse grid pattern, ordered by greedy-nearest-from-start TSP,
+    ; AreaTransitions appended last so the bot exits the zone at the end.
+    ; See _BuildExplorationPlan at the bottom of the module for details.
+    static _plan := []
+    static _planIdx := 1
+    static _planBuilt := false
 
     ; Reset navigation when area changes
     if (!_areaResetDone)
@@ -234,12 +243,15 @@ _RunExploration(radarSnap, gameHwnd)
         _pathCoords := []
         _pathIdx := 0
         _lastClickTick := 0
-        _lastFrontierTick := 0
+        _lastTargetTick := 0
         _stuckCheckTick := 0
         _stuckPGX := 0
         _stuckPGY := 0
         _doorClickTick := 0
         _doorClickCounts := Map()
+        _plan := []
+        _planIdx := 1
+        _planBuilt := false
         _areaResetDone := 1
     }
 
@@ -285,29 +297,79 @@ _RunExploration(radarSnap, gameHwnd)
         }
     }
 
-    ; Stuck detection: if player hasn't moved in 3s, re-target
+    ; Stuck detection: if player hasn't moved in 3 s, the current waypoint
+    ; is probably unreachable from here — rebuild the plan from the new
+    ; position. The greedy-nearest-from-start ordering will skip the dead
+    ; corner naturally on the next attempt.
     if (_stuckCheckTick = 0 || (now - _stuckCheckTick) > 3000)
     {
         if (Abs(pGX - _stuckPGX) < 5 && Abs(pGY - _stuckPGY) < 5 && _targetCX >= 0)
         {
             _targetCX := -1
             _pathCoords := []
+            _planBuilt := false   ; rebuild plan from current position
         }
         _stuckPGX := pGX
         _stuckPGY := pGY
         _stuckCheckTick := now
     }
 
-    ; Recompute frontier target every 2s or when no target
-    if (_targetCX < 0 || (now - _lastFrontierTick) > 2000)
+    ; ── Plan-driven target selection ──────────────────────────────────
+    ; First, build the plan if we haven't yet. Terrain + player position
+    ; are guaranteed available at this point — both were validated above.
+    if (!_planBuilt)
     {
+        _plan := _BuildExplorationPlan(terrain, radarSnap, pGX, pGY)
+        _planIdx := 1
+        _planBuilt := true
+        _targetCX := -1   ; force fresh A* on first plan waypoint
+    }
+
+    ; Skip plan waypoints whose coarse cell has already been marked visited
+    ; by the vision sweep — we'd just walk in place if we kept them. This
+    ; loop naturally short-circuits once the next "real" waypoint is found.
+    while (_planIdx <= _plan.Length)
+    {
+        wp := _plan[_planIdx]
+        wcX := wp[1] // _STEP
+        wcY := wp[2] // _STEP
+        if (wcX < 0 || wcX >= _coarseW || wcY < 0 || wcY >= _coarseH)
+        {
+            _planIdx++
+            continue
+        }
+        if (NumGet(_visited.Ptr, wcY * _coarseW + wcX, "UChar") = 1)
+        {
+            _targetCX := -1   ; force fresh path on next waypoint
+            _planIdx++
+            continue
+        }
+        break
+    }
+
+    ; Pick the target: next plan waypoint, or frontier search as a fallback
+    ; when the plan is exhausted (catches any leftover unvisited corners
+    ; that the sparse sampling missed).
+    if (_planIdx <= _plan.Length && _targetCX < 0)
+    {
+        wp := _plan[_planIdx]
+        tGX := wp[1]
+        tGY := wp[2]
+        _targetCX := tGX // _STEP
+        _targetCY := tGY // _STEP
+        _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
+        _pathIdx := 1
+        _lastTargetTick := now
+    }
+    else if (_planIdx > _plan.Length && (_targetCX < 0 || (now - _lastTargetTick) > 2000))
+    {
+        ; Plan exhausted — fall back to greedy frontier search.
         frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
                                           buf, _bpr, _rows, dsz, _STEP)
         if (frontier)
         {
             _targetCX := frontier[1]
             _targetCY := frontier[2]
-            ; Compute A* path to frontier target
             tGX := _targetCX * _STEP
             tGY := _targetCY * _STEP
             _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
@@ -315,19 +377,22 @@ _RunExploration(radarSnap, gameHwnd)
         }
         else
         {
-            ; No frontier found — area fully explored or unreachable
             _targetCX := -1
-            g_exploreLastReason := "no-frontier(" g_exploreCurrentPercent "%)"
+            g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
             return
         }
-        _lastFrontierTick := now
+        _lastTargetTick := now
     }
 
     ; ── Follow path: click toward next waypoint ──────────────────────
     ; Throttle clicks to every 400ms
     if ((now - _lastClickTick) < 400)
     {
-        g_exploreLastReason := "moving(" g_exploreCurrentPercent "% → " Round(_targetCX * _STEP * ratio) "," Round(_targetCY * _STEP * ratio) ")"
+        planTag := (_plan.Length > 0)
+            ? (" wp=" _planIdx "/" _plan.Length)
+            : " frontier"
+        g_exploreLastReason := "moving(" g_exploreCurrentPercent "%" planTag
+            . " → " Round(_targetCX * _STEP * ratio) "," Round(_targetCY * _STEP * ratio) ")"
         return
     }
 
@@ -691,6 +756,256 @@ _FindNearbyInteractable(radarSnap, playerWX, playerWY, playerWZ, clickCounts)
 }
 
 ; ── Config: Load/Save exploration settings ────────────────────────────────
+; ── Precomputed exploration plan ─────────────────────────────────────────
+; Builds an ordered list of waypoints covering the (known-at-zone-load)
+; walkable terrain. Replaces the old "find nearest frontier each tick"
+; greedy loop which tended to backtrack across the zone.
+;
+; Strategy:
+;   1. Sample walkable cells in a regular spaced grid. Target ~60 samples,
+;      computed from the area's total size so dense zones still get
+;      reasonable coverage and tiny zones don't get bloated.
+;   2. Greedy-nearest-from-start TSP over the samples — pick the closest
+;      unvisited sample to the current position, repeat until all chosen.
+;      O(n²) is fine for n≈60.
+;   3. Append known AreaTransition entity positions LAST. The bot
+;      naturally walks toward the zone exit at the end of the route. If
+;      there are multiple, they're also sorted nearest-from-last-waypoint.
+;
+; The plan is rebuilt:
+;   - On every area change (via _areaResetDone flag)
+;   - When stuck-detection fires (player hasn't moved in 3 s) — likely the
+;     current waypoint is unreachable, so re-plan from the new position
+;
+; Returns: Array of [gridX, gridY, kind] tuples. Empty array on failure.
+_BuildExplorationPlan(terrain, radarSnap, startGX, startGY)
+{
+    plan := []
+    if !(terrain && IsObject(terrain))
+        return plan
+
+    buf      := terrain["data"]
+    dsz      := terrain["dataSize"]
+    bpr      := terrain["bytesPerRow"]
+    rows     := terrain["totalRows"]
+    gridW    := terrain["gridWidth"]
+    if (gridW <= 0 || rows <= 0)
+        return plan
+
+    ; ── Sample walkable cells in a regular grid ─────────────────────
+    ; Spacing chosen to land ~SAMPLE_TARGET points across the zone. Min
+    ; 20 cells so individual waypoints stay visually distinct.
+    SAMPLE_TARGET := 60
+    area := gridW * rows
+    spacing := Max(20, Round(Sqrt(area / SAMPLE_TARGET)))
+    half := spacing // 2
+
+    samples := []
+    cy := half
+    while (cy < rows)
+    {
+        cx := half
+        while (cx < gridW)
+        {
+            ; Walkability: 4-bit nibble per cell, packed two per byte.
+            tIdx := cy * bpr + (cx >> 1)
+            if (tIdx < dsz)
+            {
+                byt := NumGet(buf.Ptr, tIdx, "UChar")
+                if (((byt >> ((cx & 1) * 4)) & 0xF) != 0)
+                    samples.Push([cx, cy])
+            }
+            cx += spacing
+        }
+        cy += spacing
+    }
+
+    ; ── Collect AreaTransition positions ────────────────────────────
+    ; These become the FINAL plan stops — the bot heads to the exit at
+    ; the end of the route. Read entity worldPositions from the radar
+    ; snapshot and convert to grid coords via WORLD_TO_GRID_RATIO.
+    transitions := []
+    ratio := TerrainPathfinder.WORLD_TO_GRID_RATIO
+    inGs   := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
+    area2  := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    awake  := (area2 && IsObject(area2) && area2.Has("awakeEntities")) ? area2["awakeEntities"] : 0
+    sample := (awake && IsObject(awake) && awake.Has("sample")) ? awake["sample"] : []
+    if (sample && Type(sample) = "Array")
+    {
+        for _, entry in sample
+        {
+            if !(entry && IsObject(entry))
+                continue
+            entity := entry.Has("entity") ? entry["entity"] : 0
+            if !(entity && IsObject(entity))
+                continue
+            path := entity.Has("path") ? entity["path"] : ""
+            if (path = "" || !InStr(StrLower(path), "areatransition"))
+                continue
+            decoded := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
+            if !(decoded && IsObject(decoded))
+                continue
+            render := decoded.Has("render") ? decoded["render"] : 0
+            if !(render && IsObject(render) && render.Has("worldPosition"))
+                continue
+            wp := render["worldPosition"]
+            wx := wp.Has("x") ? wp["x"] : 0
+            wy := wp.Has("y") ? wp["y"] : 0
+            if (wx = 0 && wy = 0)
+                continue
+            transitions.Push([Round(wx / ratio), Round(wy / ratio)])
+        }
+    }
+
+    ; ── Greedy nearest-from-start + 2-opt local search over samples ────
+    ; Greedy alone tends to leave obvious "X" crossings in the tour. A
+    ; couple of 2-opt passes irons those out — typically 10-20% shorter
+    ; total travel distance, at ~5 ms for n≈60.
+    cur := [startGX, startGY]
+    plan := _GreedyTspOrder(samples, cur, "sample")
+    _TwoOptOptimize(plan, startGX, startGY)
+
+    ; ── Append transitions (same greedy + 2-opt from last plan stop) ──
+    if (transitions.Length > 0)
+    {
+        last := plan.Length > 0
+            ? [plan[plan.Length][1], plan[plan.Length][2]]
+            : [startGX, startGY]
+        transTour := _GreedyTspOrder(transitions, last, "transition")
+        _TwoOptOptimize(transTour, last[1], last[2])
+        for _, t in transTour
+            plan.Push(t)
+    }
+
+    return plan
+}
+
+; ── 2-opt local-search tour optimisation ─────────────────────────────────
+; Iteratively reverses sub-sequences of the tour when doing so shortens
+; the total path. Operates IN-PLACE on the tour array. The "tour" here is
+; an open path (not a cycle) — start is a fixed origin (startGX/startGY)
+; and the path simply ends at the last element (no return-to-start edge).
+;
+; Convergence: usually 3-8 full passes for n ≤ 100. Iteration cap of 20
+; bounds the worst case in pathological inputs. For n ≈ 60 the whole
+; routine completes in ~5 ms.
+;
+; Why open-tour 2-opt: we want the bot to TRAVERSE the waypoints, not
+; return to the player start. The standard closed-cycle formulation
+; would penalise long "return" edges that don't exist in our scenario.
+_TwoOptOptimize(tour, startGX, startGY)
+{
+    n := tour.Length
+    if (n < 4)
+        return   ; trivial — no swap can improve a < 4-stop tour
+
+    maxIter := 20
+    iter := 0
+    while (iter < maxIter)
+    {
+        improved := false
+        i := 1
+        while (i < n)
+        {
+            j := i + 1
+            while (j <= n)
+            {
+                ; Cost of the two edges that change if we reverse tour[i..j]:
+                ;   before reversal: (i-1)→i and j→(j+1)
+                ;   after  reversal: (i-1)→j and i→(j+1)
+                ;
+                ; The interior of the reversed segment keeps the same edge
+                ; weights (just traversed in opposite direction), so the
+                ; total tour delta depends only on those two endpoint edges.
+                prevX := (i = 1) ? startGX : tour[i - 1][1]
+                prevY := (i = 1) ? startGY : tour[i - 1][2]
+
+                tiX := tour[i][1], tiY := tour[i][2]
+                tjX := tour[j][1], tjY := tour[j][2]
+
+                if (j < n)
+                {
+                    nextX := tour[j + 1][1]
+                    nextY := tour[j + 1][2]
+                    dCurr := _Hypot(prevX - tiX, prevY - tiY) + _Hypot(tjX - nextX, tjY - nextY)
+                    dProp := _Hypot(prevX - tjX, prevY - tjY) + _Hypot(tiX - nextX, tiY - nextY)
+                }
+                else
+                {
+                    ; Open tour — j is the last stop; only the leading
+                    ; edge (i-1)→i changes to (i-1)→j. There's no trailing
+                    ; edge to compensate, so this becomes a pure "should
+                    ; we put node j here instead of node i" check that
+                    ; happens to reverse the suffix.
+                    dCurr := _Hypot(prevX - tiX, prevY - tiY)
+                    dProp := _Hypot(prevX - tjX, prevY - tjY)
+                }
+
+                ; Strict-better with a tiny epsilon avoids equal-cost swap
+                ; thrashing in regular grids.
+                if (dProp + 0.00001 < dCurr)
+                {
+                    ; In-place reverse of tour[i..j]
+                    a := i, b := j
+                    while (a < b)
+                    {
+                        tmp := tour[a]
+                        tour[a] := tour[b]
+                        tour[b] := tmp
+                        a += 1
+                        b -= 1
+                    }
+                    improved := true
+                }
+                j += 1
+            }
+            i += 1
+        }
+        if !improved
+            break
+        iter += 1
+    }
+}
+
+_Hypot(dx, dy)
+{
+    return Sqrt(dx * dx + dy * dy)
+}
+
+; Greedy-nearest TSP: starting from `start` [gx, gy], repeatedly picks
+; the closest unvisited point, returning the ordered list with each
+; entry tagged with `kind`. Uses squared distance so no sqrt per
+; comparison.
+_GreedyTspOrder(points, start, kind)
+{
+    ordered := []
+    remaining := points.Clone()
+    cur := [start[1], start[2]]
+    while (remaining.Length > 0)
+    {
+        bestIdx := 0
+        bestDist := 999999999
+        for i, p in remaining
+        {
+            dx := p[1] - cur[1]
+            dy := p[2] - cur[2]
+            d := dx * dx + dy * dy
+            if (d < bestDist)
+            {
+                bestDist := d
+                bestIdx := i
+            }
+        }
+        if (bestIdx = 0)
+            break
+        chosen := remaining[bestIdx]
+        remaining.RemoveAt(bestIdx)
+        ordered.Push([chosen[1], chosen[2], kind])
+        cur := [chosen[1], chosen[2]]
+    }
+    return ordered
+}
+
 LoadExplorationConfig()
 {
     global g_exploreEnabled, g_exploreTargetPercent

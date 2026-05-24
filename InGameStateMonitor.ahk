@@ -72,6 +72,7 @@ g_pinnedNodePaths := []
 g_lastSnapshotForUi := 0
 g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
+g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions"  ; comma-separated open detail sections
 g_radarOverlay := 0   ; lazy-init beim ersten Render-Aufruf
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
