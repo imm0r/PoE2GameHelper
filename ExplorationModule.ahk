@@ -824,6 +824,15 @@ _BuildExplorationPlan(terrain, radarSnap, startGX, startGY)
     ; These become the FINAL plan stops — the bot heads to the exit at
     ; the end of the route. Read entity worldPositions from the radar
     ; snapshot and convert to grid coords via WORLD_TO_GRID_RATIO.
+    ;
+    ; Important: AreaTransition entity anchors very often sit on blocked
+    ; doorway-prop geometry (frames, archways, decorative pillars), not
+    ; on a walkable cell. Pushing those raw coords causes A* to fail and
+    ; the bot to repeatedly click into a wall, stuck-replan, click again,
+    ; … and stall near the end of exploration. Each candidate is therefore
+    ; nudged to the nearest walkable cell within a 16-cell radius before
+    ; being added; transitions with no walkable cell anywhere in that
+    ; halo are dropped from the plan entirely.
     transitions := []
     ratio := TerrainPathfinder.WORLD_TO_GRID_RATIO
     inGs   := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -853,7 +862,11 @@ _BuildExplorationPlan(terrain, radarSnap, startGX, startGY)
             wy := wp.Has("y") ? wp["y"] : 0
             if (wx = 0 && wy = 0)
                 continue
-            transitions.Push([Round(wx / ratio), Round(wy / ratio)])
+            rawGX := Round(wx / ratio)
+            rawGY := Round(wy / ratio)
+            nudged := _NudgeToWalkableCell(rawGX, rawGY, buf, dsz, bpr, gridW, rows, 16)
+            if nudged
+                transitions.Push(nudged)
         }
     }
 
@@ -970,6 +983,71 @@ _TwoOptOptimize(tour, startGX, startGY)
 _Hypot(dx, dy)
 {
     return Sqrt(dx * dx + dy * dy)
+}
+
+; ── Walkability nudge ─────────────────────────────────────────────────────
+; Returns the nearest walkable grid cell within `maxRadius` of (gx, gy), or
+; 0 if no walkable cell exists in that halo. Used to keep AreaTransition
+; waypoints off blocked geometry (doorway frames, decorative pillars):
+; the entity world position often anchors on the prop itself, not on a
+; walkable cell, so we pre-resolve the closest valid cell before adding
+; the transition to the exploration plan.
+;
+; Search pattern: spiral perimeter at increasing radius. First walkable
+; cell found wins (Chebyshev-distance closest, not Euclidean — close
+; enough for nudge purposes and lets us early-out without scanning the
+; full halo).
+;
+; Walkability uses the same 4-bit-per-cell nibble layout the maphack scan
+; consumes elsewhere in this module.
+_NudgeToWalkableCell(gx, gy, buf, dsz, bpr, gridW, rows, maxRadius)
+{
+    if _IsGridCellWalkable(gx, gy, buf, dsz, bpr, gridW, rows)
+        return [gx, gy]
+
+    r := 1
+    while (r <= maxRadius)
+    {
+        ; Scan only the perimeter at this radius (corners + edges).
+        dy := -r
+        while (dy <= r)
+        {
+            ; On the top/bottom rows we sweep the full x-range;
+            ; on the side rows we only check the two end-columns to
+            ; avoid re-scanning interior cells covered at smaller r.
+            if (dy = -r || dy = r)
+            {
+                dx := -r
+                while (dx <= r)
+                {
+                    if _IsGridCellWalkable(gx + dx, gy + dy, buf, dsz, bpr, gridW, rows)
+                        return [gx + dx, gy + dy]
+                    dx++
+                }
+            }
+            else
+            {
+                if _IsGridCellWalkable(gx - r, gy + dy, buf, dsz, bpr, gridW, rows)
+                    return [gx - r, gy + dy]
+                if _IsGridCellWalkable(gx + r, gy + dy, buf, dsz, bpr, gridW, rows)
+                    return [gx + r, gy + dy]
+            }
+            dy++
+        }
+        r++
+    }
+    return 0
+}
+
+_IsGridCellWalkable(cx, cy, buf, dsz, bpr, gridW, rows)
+{
+    if (cx < 0 || cx >= gridW || cy < 0 || cy >= rows)
+        return false
+    tIdx := cy * bpr + (cx >> 1)
+    if (tIdx >= dsz)
+        return false
+    byt := NumGet(buf.Ptr, tIdx, "UChar")
+    return (((byt >> ((cx & 1) * 4)) & 0xF) != 0)
 }
 
 ; Greedy-nearest TSP: starting from `start` [gx, gy], repeatedly picks
