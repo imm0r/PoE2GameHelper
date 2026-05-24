@@ -24,14 +24,12 @@ __pycache__/
 offset_history.json
 last_known_patch.txt
 gamehelper_config.ini
+desktop.ini
 
 # Dev notes (not for repo)
 NEXT_STEPS.md
 QUICKSTART.md
 STAT_EXTRACTION_README.md
-
-# Built binaries
-tools/poe_data_tools.exe
 
 # Raw extraction output (regenerated from game files)
 data/raw_csv/
