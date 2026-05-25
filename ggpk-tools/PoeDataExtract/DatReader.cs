@@ -1,0 +1,126 @@
+using System.Text;
+
+namespace PoeDataExtract;
+
+/// <summary>
+/// Minimal reader for PoE's <c>.dat64</c> binary table format.
+///
+/// Layout (as of PoE2 0.x — same as PoE1's .dat64):
+///   <list type="bullet">
+///     <item>uint32  rowCount</item>
+///     <item>rowCount × rowSize bytes (fixed-width row records)</item>
+///     <item>8-byte boundary marker: 0xBBBBBBBBBBBBBBBB</item>
+///     <item>variable-length "data section" — referenced from rows by
+///           (length, offset) pairs for strings/arrays</item>
+///   </list>
+///
+/// We do not infer schemas from .dat64 alone — caller passes the row
+/// size + column offsets it expects. Schema discovery lives in
+/// DAT-Schema mirror data baked into the individual extractors.
+/// </summary>
+internal sealed class DatReader
+{
+    private const ulong BoundaryMarker = 0xBBBBBBBBBBBBBBBB;
+
+    public int RowCount { get; }
+    public int RowSize { get; }
+
+    private readonly byte[] _rows;     // RowCount * RowSize bytes
+    private readonly byte[] _data;     // variable-section, indexed by row offsets
+
+    /// <summary>
+    /// Open a .dat64 / .datc64 file. If <paramref name="rowSize"/> is
+    /// non-null, validate against the BB marker at that exact position.
+    /// If null, auto-detect rowSize by scanning for the marker (at any
+    /// 4-byte aligned offset after the header) and deriving
+    /// <c>rowSize = (markerOffset - 4) / rowCount</c>.
+    /// </summary>
+    public DatReader(ReadOnlySpan<byte> file, int? rowSize = null)
+    {
+        if (file.Length < 4)
+            throw new InvalidDataException("dat64 file too small");
+
+        RowCount = BitConverter.ToInt32(file[..4]);
+        const int headerLen = 4;
+
+        int markerOff;
+        if (rowSize is int rs)
+        {
+            markerOff = headerLen + RowCount * rs;
+            if (markerOff + 8 > file.Length)
+                throw new InvalidDataException(
+                    $"dat64 truncated: header+rows+marker > file ({markerOff + 8} > {file.Length})");
+            ulong marker = BitConverter.ToUInt64(file.Slice(markerOff, 8));
+            if (marker != BoundaryMarker)
+                throw new InvalidDataException(
+                    $"boundary marker mismatch at offset 0x{markerOff:X}: got 0x{marker:X16} — wrong rowSize?");
+            RowSize = rs;
+        }
+        else
+        {
+            // Scan in 4-byte steps. PoE2 BaseItemTypes marker is at
+            // 0x141028 which is NOT 8-aligned-from-offset-4, so an
+            // 8-step scan misses it.
+            int? found = null;
+            for (int off = headerLen; off + 8 <= file.Length; off += 4)
+            {
+                if (BitConverter.ToUInt64(file.Slice(off, 8)) == BoundaryMarker)
+                {
+                    int candidateLen = off - headerLen;
+                    if (RowCount > 0 && candidateLen % RowCount == 0)
+                    {
+                        found = off;
+                        break;
+                    }
+                }
+            }
+            if (found is null)
+                throw new InvalidDataException("no 0xBB boundary marker found anywhere in file");
+            markerOff = found.Value;
+            RowSize = (markerOff - headerLen) / RowCount;
+        }
+
+        _rows = file.Slice(headerLen, markerOff - headerLen).ToArray();
+        _data = file[(markerOff + 8)..].ToArray();
+    }
+
+    public ReadOnlySpan<byte> Row(int index)
+    {
+        if ((uint)index >= (uint)RowCount)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        return _rows.AsSpan(index * RowSize, RowSize);
+    }
+
+    /// <summary>Read a little-endian int32 at the given offset inside row.</summary>
+    public int RowI32(int index, int offset) =>
+        BitConverter.ToInt32(Row(index)[offset..(offset + 4)]);
+
+    /// <summary>
+    /// Read a string ref (int64) and decode the target as a UTF-16
+    /// zero-terminated string.
+    ///
+    /// PoE1 .dat64 reserved the first 8 bytes of the data section as a
+    /// "null/empty" sentinel — actual strings lived at offset 8 onwards
+    /// and refs were absolute byte offsets. PoE2 .datc64 packs the
+    /// first real string immediately at byte 0, but KEPT the original
+    /// ref encoding: <c>ref = actual_byte_offset + 8</c>. So we
+    /// subtract 8 here to land on string content.
+    /// Special values:
+    ///   <list type="bullet">
+    ///     <item><c>ref == 0</c>  → null/empty string (returns "")</item>
+    ///     <item><c>ref &lt; 0</c> (e.g. 0xFEFEFEFEFEFEFEFE) → null sentinel</item>
+    ///   </list>
+    /// </summary>
+    public string RowString(int index, int offset)
+    {
+        long dataOff = BitConverter.ToInt64(Row(index)[offset..(offset + 8)]);
+        if (dataOff <= 0) return "";        // 0 = null/empty; negative = FE sentinel
+        long actualOff = dataOff - 8;       // strip the legacy-sentinel 8-byte bias
+        if (actualOff < 0 || actualOff + 2 > _data.Length) return "";
+        // Find UTF-16 null terminator.
+        int end = (int)actualOff;
+        while (end + 1 < _data.Length && !(_data[end] == 0 && _data[end + 1] == 0))
+            end += 2;
+        return Encoding.Unicode.GetString(_data, (int)actualOff, end - (int)actualOff);
+    }
+}

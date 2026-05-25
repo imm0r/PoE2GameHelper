@@ -1,0 +1,35 @@
+<Project>
+  <!--
+    Shared build properties for every project in this directory.
+
+    - .NET 8: required by LibGGPK3's modern C# usage + native AOT support
+    - Nullable: opt-in (it's almost-2026, we're not writing C# 7 code here)
+    - ImplicitUsings: keeps the per-file using-statements small
+    - LangVersion latest: lets us use file-scoped namespaces, raw strings,
+      collection expressions etc. throughout the codebase
+    - PublishAot: each project opts in individually; common case is to
+      publish as a single-file AOT binary so the user doesn't need to
+      install a .NET runtime
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Authors>PoE2GameHelper contributors</Authors>
+    <Copyright>AGPL-3.0 — see ggpk-tools/LICENSE</Copyright>
+  </PropertyGroup>
+
+  <!--
+    Hard reference to the LibGGPK3 source tree. Expect it at the
+    location described in README ("../external/LibGGPK3" by default).
+    The .csproj files in each tool reference the three sub-projects
+    individually so you can swap any one of them without touching
+    the others.
+  -->
+  <PropertyGroup>
+    <LibGGPK3Root>$(MSBuildThisFileDirectory)..\external\LibGGPK3</LibGGPK3Root>
+  </PropertyGroup>
+</Project>
