@@ -36,7 +36,9 @@ class GgpkToolBridge
             return this._Fail("PoE2 not running — start the game once so we can locate the install path.")
 
         exe := this._FindExe("PoeDataExtract")
-        if (exe.path = "")
+        ; AHK v2 Maps are indexed with [], NOT . — dot access throws
+        ; "no property named X" at runtime. Burned by this twice.
+        if (exe["path"] = "")
             return this._Fail("poe-data-extract.exe not found. Build it once via:`n"
                 . "    cd ggpk-tools && dotnet publish PoeDataExtract -c Release -r win-x64 --self-contained -p:PublishAot=true")
 
@@ -47,17 +49,18 @@ class GgpkToolBridge
         try FileDelete(tmpPath)
         try FileDelete(stderr)
 
-        cmd := exe.invoke
+        cmd := exe["invoke"]
             . ' extract --ggpk "' indexPath '" --table BaseItemTypes --output "' tmpPath '"'
 
         ; RunWait blocks the GUI; the extract typically completes in
         ; under a second on a warm cache. The UI button shows a
         ; "Refreshing..." status before calling so the user has a hint
         ; this is intentional.
+        exit := 0
         try
         {
             ; "Hide" keeps the console window from flashing.
-            exit := RunWait(A_ComSpec ' /c ' cmd ' 2> "' stderr '"', exe.workDir, "Hide")
+            exit := RunWait(A_ComSpec ' /c ' cmd ' 2> "' stderr '"', exe["workDir"], "Hide")
         }
         catch as ex
         {
