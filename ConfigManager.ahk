@@ -191,20 +191,11 @@ SavePanelOffsetsToConfig()
     f := _ConfigPath()
     offsets := PoE2Offsets.DiscoveredPanelOffsets
 
-    ; Read current patch version from file
-    patchFile := A_ScriptDir "\last_known_patch.txt"
-    patchVer := ""
-    if FileExist(patchFile)
-    {
-        try
-        {
-            patchVer := Trim(FileRead(patchFile), " `t`r`n")
-        }
-        catch
-        {
-            patchVer := ""
-        }
-    }
+    ; Read current patch version. Source of truth lives in the same
+    ; INI under [General] lastKnownPatch (populated by PatchChecker).
+    ; GetLastKnownPoeVersion handles legacy last_known_patch.txt
+    ; migration transparently if the txt file is still around.
+    patchVer := GetLastKnownPoeVersion()
     IniWrite(patchVer, f, "PanelOffsets", "patchVersion")
 
     ; Clear old entries first — delete and recreate section
@@ -231,20 +222,8 @@ LoadPanelOffsetsFromConfig()
     if !FileExist(f)
         return false
 
-    ; Check patch version
-    patchFile := A_ScriptDir "\last_known_patch.txt"
-    currentPatch := ""
-    if FileExist(patchFile)
-    {
-        try
-        {
-            currentPatch := Trim(FileRead(patchFile), " `t`r`n")
-        }
-        catch
-        {
-            currentPatch := ""
-        }
-    }
+    ; Check patch version — same single source of truth as the save path.
+    currentPatch := GetLastKnownPoeVersion()
     savedPatch := IniRead(f, "PanelOffsets", "patchVersion", "")
     if (savedPatch = "" || savedPatch != currentPatch)
         return false

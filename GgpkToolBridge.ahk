@@ -52,6 +52,16 @@ class GgpkToolBridge
         cmd := exe["invoke"]
             . ' extract --ggpk "' indexPath '" --table BaseItemTypes --output "' tmpPath '"'
 
+        ; Wrap the whole thing in outer quotes so cmd.exe's /c parser
+        ; treats it as a single command — without this, the multiple
+        ; quoted args inside cmd get mis-parsed when the first character
+        ; after /c is a quote (the infamous "first quote stripped" rule).
+        fullCmd := A_ComSpec ' /c "' cmd ' 2> "' stderr '""'
+
+        ; Log the exact command we're about to run so we can debug
+        ; quoting / arg-splitting issues from the error log.
+        try LogError("GgpkTools/Refresh cmd: " fullCmd)
+
         ; RunWait blocks the GUI; the extract typically completes in
         ; under a second on a warm cache. The UI button shows a
         ; "Refreshing..." status before calling so the user has a hint
@@ -60,7 +70,7 @@ class GgpkToolBridge
         try
         {
             ; "Hide" keeps the console window from flashing.
-            exit := RunWait(A_ComSpec ' /c ' cmd ' 2> "' stderr '"', exe["workDir"], "Hide")
+            exit := RunWait(fullCmd, exe["workDir"], "Hide")
         }
         catch as ex
         {
@@ -70,6 +80,7 @@ class GgpkToolBridge
         if (exit != 0)
         {
             tail := this._ReadTail(stderr, 6)
+            try LogError("GgpkTools/Refresh exited " exit (tail = "" ? "" : " stderr=" tail))
             return this._Fail("poe-data-extract exited with code " exit (tail = "" ? "" : ":`n" tail))
         }
 
