@@ -1,19 +1,23 @@
 ; ItemSizeRegistry.ahk
 ; Loads inventory dimensions (width × height) for every PoE2 base item from
-; the pre-built TSV at data/base_item_sizes.tsv. The source data comes from
-; https://repoe-fork.github.io/poe2/base_items.json — we strip it down to
-; just the three columns we need at preprocessing time so AHK doesn't have
-; to JSON-parse 5.8 MB at startup.
+; the pre-built TSV at data/base_item_sizes.tsv.
+;
+; Two sources are supported:
+;   * **Legacy 3-col format** (id\twidth\theight) — produced from
+;     https://repoe-fork.github.io/poe2/base_items.json by a one-shot
+;     preprocessing step. Used to be the only source.
+;   * **Native 4-col format** (id\tname\twidth\theight) — produced by our
+;     own `ggpk-tools/PoeDataExtract` reading the user's local PoE2 install
+;     directly. Refreshable from inside the helper via the Config tab.
 ;
 ; Lookup is case-insensitive — both the TSV keys and the lookup path are
-; lowercased. Ground-item entity paths usually match the base-type key
-; exactly; for the rare cases that don't, the caller falls back to the
-; rarity-based heuristic in LootPickup.
+; lowercased at parse / query time. Ground-item entity paths usually match
+; the base-type key exactly; for the rare cases that don't, the caller
+; falls back to the rarity-based heuristic in LootPickup.
 ;
-; Format of base_item_sizes.tsv:
-;   metadata/items/currency/currencyweaponquality<TAB>1<TAB>1
-;   metadata/items/armours/bodyarmours/bodydexint5<TAB>2<TAB>3
-;   …
+; Example rows of either format:
+;   metadata/items/currency/currencyweaponquality<TAB>1<TAB>1                                  (3-col)
+;   Metadata/Items/Currency/CurrencyWeaponQuality<TAB>Blacksmith's Whetstone<TAB>1<TAB>1       (4-col)
 ;
 ; Included by InGameStateMonitor.ahk; call ItemSizeRegistry.Load() once after
 ; load-config + reader-construction so the data is in memory before the first
@@ -50,6 +54,7 @@ class ItemSizeRegistry
                 this.Loaded := true
                 return
             }
+            firstLine := true
             while !f.AtEOF
             {
                 line := f.ReadLine()
@@ -63,15 +68,32 @@ class ItemSizeRegistry
                     skipped += 1
                     continue
                 }
+                ; Auto-detect column layout from the parts count:
+                ;   3 cols → id, w, h            (legacy repoe-fork dump)
+                ;   4 cols → id, name, w, h      (our PoeDataExtract output)
+                ; Width/height are always the last two columns.
                 key := parts[1]
-                w   := Integer(parts[2])
-                h   := Integer(parts[3])
+                w   := Integer(parts[parts.Length - 1])
+                h   := Integer(parts[parts.Length])
+                ; First non-empty line of the new 4-col format is a
+                ; header row ("id\tname\twidth\theight") — skip it.
+                if (firstLine && StrLower(parts[1]) = "id"
+                    && (parts.Length >= 4 ? StrLower(parts[2]) = "name" : true))
+                {
+                    firstLine := false
+                    continue
+                }
+                firstLine := false
                 if (w <= 0 || w > 16 || h <= 0 || h > 16)
                 {
                     skipped += 1
                     continue
                 }
-                this.Sizes[key] := Map("w", w, "h", h)
+                ; Lowercase the key at parse time so Get() doesn't have
+                ; to do it on every call AND so 4-col output (mixed-case
+                ; "Metadata/Items/...") interops with 3-col data
+                ; (already lowercase).
+                this.Sizes[StrLower(key)] := Map("w", w, "h", h)
                 entries += 1
             }
             f.Close()
@@ -96,6 +118,8 @@ class ItemSizeRegistry
             this.Load()
         if (metadataPath = "")
             return 0
+        ; Keys are already lowercased at parse time (see Load()) so this
+        ; is just normalising the query side.
         key := StrLower(metadataPath)
         if this.Sizes.Has(key)
             return this.Sizes[key]

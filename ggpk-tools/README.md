@@ -24,9 +24,12 @@ stays scoped to this directory.
   path: `../external/LibGGPK3`). The `.csproj` files reference its
   sub-projects via the `$(LibGGPK3Root)` MSBuild property defined in
   `Directory.Build.props`.
-- **Oodle decompression DLL** — `oo2core_9_win64.dll`, placed next to
-  the compiled executables (or anywhere on `PATH` / the working
-  directory). PoE2 statically links Oodle so the DLL is **not** in the
+- **Oodle decompression DLL** — placed next to the compiled
+  executables (or anywhere on `PATH` / the working directory).
+  LibBundle3 imports it via `DllImport("oo2core")`, so on Windows the
+  file must be named **`oo2core.dll`** (no version suffix). If you
+  pulled a copy named `oo2core_9_win64.dll` from a game install, just
+  rename it. PoE2 statically links Oodle so the DLL is **not** in the
   PoE2 install folder. Legitimate sources:
   - a Path of Exile **1** install root (free Steam download — but check
     the `Redist/` subfolder if the root looks empty)
@@ -55,7 +58,8 @@ dotnet publish PoePatcher     -c Release -r win-x64 --self-contained -p:PublishA
 ```
 
 Output binaries land in `*/bin/Release/net8.0/win-x64/publish/`. Drop
-`oo2core_9_win64.dll` next to each `.exe`.
+`oo2core.dll` next to each `.exe` (rename from `oo2core_9_win64.dll`
+if your source has the versioned name).
 
 ## Usage
 

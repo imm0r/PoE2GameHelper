@@ -5,10 +5,36 @@
 ; Protocol: TCP connect to patch.pathofexile.com:12995, send [0x01, 0x06],
 ; read response. The patch version string is UTF-16LE starting at byte 35,
 ; with length (in chars) at byte 34.
+;
+; Storage: persisted in the main config INI under [General] lastKnownPatch.
+; Older builds stashed it in `last_known_patch.txt`; if that file exists
+; we migrate its contents into the INI once and then delete the file.
+
+; Migrate legacy last_known_patch.txt into the INI exactly once.
+; Safe to call multiple times — short-circuits when there's nothing to do.
+_PatchChecker_MigrateLegacyFile()
+{
+    legacy := A_ScriptDir "\last_known_patch.txt"
+    if (!FileExist(legacy))
+        return
+    iniFile := _ConfigPath()
+    existing := IniRead(iniFile, "General", "lastKnownPatch", "")
+    if (existing = "")
+    {
+        try
+        {
+            content := Trim(FileRead(legacy))
+            if (content != "")
+                IniWrite(content, iniFile, "General", "lastKnownPatch")
+        }
+    }
+    try FileDelete(legacy)
+}
 
 CheckPoePatchVersion()
 {
-    versionFile := A_ScriptDir "\last_known_patch.txt"
+    _PatchChecker_MigrateLegacyFile()
+    iniFile     := _ConfigPath()
     tempOut     := A_Temp "\poe_patch_out_" A_TickCount ".txt"
     tempScript  := A_Temp "\poe_patch_" A_TickCount ".ps1"
 
@@ -53,14 +79,10 @@ CheckPoePatchVersion()
         return
 
     currentPatch := raw
-    lastPatch    := FileExist(versionFile) ? Trim(FileRead(versionFile)) : ""
+    lastPatch    := IniRead(iniFile, "General", "lastKnownPatch", "")
 
     ; Always persist the latest known version
-    try {
-        fh := FileOpen(versionFile, "w", "UTF-8")
-        fh.Write(currentPatch)
-        fh.Close()
-    }
+    IniWrite(currentPatch, iniFile, "General", "lastKnownPatch")
 
     if (lastPatch = "")
         return  ; First run — silently store, no popup
@@ -79,8 +101,10 @@ CheckPoePatchVersion()
 }
 
 ; Returns the last known patch version string, or "" if never checked.
+; Reads from the INI ([General] lastKnownPatch), migrating the legacy
+; last_known_patch.txt if it's still lying around.
 GetLastKnownPoeVersion()
 {
-    versionFile := A_ScriptDir "\last_known_patch.txt"
-    return FileExist(versionFile) ? Trim(FileRead(versionFile)) : ""
+    _PatchChecker_MigrateLegacyFile()
+    return IniRead(_ConfigPath(), "General", "lastKnownPatch", "")
 }

@@ -524,5 +524,33 @@ _DispatchBridgeCall(method, args)
             SetTimer(() => UiBrowseSearch(q), -1)
         case "UiBrowserClearHighlight":
             SetTimer(() => UiBrowserClearHighlight(), -1)
+        case "RefreshItemSizes":
+            ; Shell out to ggpk-tools/PoeDataExtract on a timer — runs
+            ; ~200 ms..2 s end-to-end and pumps a status message back
+            ; to the UI via the standard WebViewExec channel.
+            SetTimer(() => GgpkToolBridgeUi_Refresh(), -1)
     }
+}
+
+; UI-side wrapper around GgpkToolBridge.RefreshItemSizes that pushes
+; the result back to the WebView via updateGgpkToolStatus(json).
+GgpkToolBridgeUi_Refresh()
+{
+    result := GgpkToolBridge.RefreshItemSizes()
+    json := '{"ok":' (result["ok"] ? "true" : "false")
+        . ',"msg":' _BridgeJsonEscape(result["msg"])
+        . ',"rows":' result["rows"] '}'
+    try WebViewExec("updateGgpkToolStatus(" _JsStr(json) ")")
+}
+
+; Minimal JSON-string escaper for status messages — handles the few
+; characters we actually need to quote inside the msg field.
+_BridgeJsonEscape(s)
+{
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
+    s := StrReplace(s, "`r", "")
+    s := StrReplace(s, "`n", "\n")
+    s := StrReplace(s, "`t", "\t")
+    return '"' s '"'
 }

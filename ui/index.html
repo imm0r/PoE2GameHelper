@@ -3223,6 +3223,18 @@
         <button class="cfg-btn tsv-log-toggle" id="tsv-log-toggle" onclick="toggleTsvLog()" style="display:none">▾
           Log</button>
       </div>
+      <!--
+        Standalone "Refresh base_item_sizes.tsv from local GGPK" button —
+        bypasses the external download pipeline above by reading the
+        user's installed PoE2 (Bundles2/_.index.bin) via the AGPL-fenced
+        ggpk-tools/PoeDataExtract.exe. Runs in ~half a second once the
+        tool has been published; useful when GGG patches and the
+        externally hosted JSON dumps haven't caught up yet.
+      -->
+      <div class="tsv-gen-bar" style="margin-top:6px">
+        <button class="cfg-btn" id="ggpk-refresh-btn" onclick="ggpkRefreshItemSizes()" title="Re-extract data/base_item_sizes.tsv directly from your local PoE2 install via ggpk-tools/PoeDataExtract.exe. Requires the tool to be built (see ggpk-tools/README.md).">⟳ Refresh item sizes from local GGPK</button>
+        <span id="ggpk-refresh-status" class="tsv-gen-status"></span>
+      </div>
       <div id="tsv-gen-log" class="tsv-gen-log" style="display:none"></div>
       <div class="tsv-toolbar">
         <select id="tsv-file-select" onchange="onTsvFileSelected(this.value)">
@@ -6024,6 +6036,40 @@
       if (success) {
         _tsvFilesLoaded = false;
         ahkCall('ListTsvFiles');
+      }
+    }
+
+    // -------- ggpk-tools / PoeDataExtract refresh --------
+    // The button disables itself while AHK shells out so we don't queue
+    // up duplicate refreshes; AHK pushes the result back via
+    // updateGgpkToolStatus(json).
+    let _ggpkRefreshing = false;
+    function ggpkRefreshItemSizes() {
+      if (_ggpkRefreshing) return;
+      _ggpkRefreshing = true;
+      const btn = document.getElementById('ggpk-refresh-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Reading local GGPK…';
+      const status = document.getElementById('ggpk-refresh-status');
+      status.className = 'tsv-gen-status running';
+      status.textContent = '';
+      ahkCall('RefreshItemSizes');
+    }
+    function updateGgpkToolStatus(json) {
+      let r;
+      try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }
+      _ggpkRefreshing = false;
+      const btn = document.getElementById('ggpk-refresh-btn');
+      btn.disabled = false;
+      btn.textContent = '⟳ Refresh item sizes from local GGPK';
+      const status = document.getElementById('ggpk-refresh-status');
+      status.className = 'tsv-gen-status ' + (r.ok ? 'success' : 'error');
+      status.textContent = r.msg || (r.ok ? 'Done.' : 'Failed.');
+      // If we just refreshed and the TSV list is visible, reload it so
+      // the new file size + mtime show up.
+      if (r.ok) {
+        _tsvFilesLoaded = false;
+        if (activeTab === 'tsvs') ahkCall('ListTsvFiles');
       }
     }
 

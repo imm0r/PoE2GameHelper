@@ -2,6 +2,21 @@
 #SingleInstance Force
 #Warn All, Off
 
+; #Warn Unreachable, Off
+;   AHK v2's unreachable-code analysis is notoriously confused by
+;   classes / functions declared across #Include boundaries — it treats
+;   a `return` inside a top-level function as if it ended the auto-
+;   execute section, then flags the next #Include'd class declaration
+;   as "won't execute". Every reload pops a popup per offending file,
+;   which gets old fast in a multi-module project like this one.
+; #Warn LocalSameAsGlobal, Off
+;   We use class-level static state heavily (e.g. ItemSizeRegistry,
+;   GgpkToolBridge) and a few intentionally-shadowing locals; the
+;   diagnostics are too noisy to be useful for our coding style.
+; Real-bug warnings (VarUnset, etc.) stay ON.
+#Warn Unreachable, Off
+#Warn LocalSameAsGlobal, Off
+
 SetWorkingDir(A_ScriptDir)
 #Include Lib/WebViewToo.ahk
 #Include PoE2MemoryReader.ahk
@@ -248,6 +263,14 @@ LoadCombatAutoConfig()
 LoadExplorationConfig()
 LoadLootPickupConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
+
+; Schedule an auto-refresh check shortly after startup. Runs on a
+; background timer so it doesn't block the GUI: PoE2 may not be open
+; yet, the user may not have published the ggpk-tools binary, etc. —
+; MaybeAutoRefresh handles all those cases gracefully (logs + retries
+; / skips). The 8-second delay gives the WebView a chance to attach
+; first, so the status callback has somewhere to land.
+SetTimer(() => GgpkToolBridge.MaybeAutoRefresh(), -8000)
 
 ; AutoPilot is now the only user-facing toggle for combat+explore; the
 ; sub-flags are kept for status display and config persistence but must
@@ -700,6 +723,7 @@ OnTreeTabChanged(*)
 #Include DebugDump.ahk
 #Include ToggleHandlers.ahk
 #Include BridgeDispatch.ahk
+#Include GgpkToolBridge.ahk
 
 #Include AutoFlask.ahk
 #Include AvoidZones.ahk
