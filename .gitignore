@@ -22,7 +22,7 @@ __pycache__/
 
 # Runtime-generated (user-specific)
 offset_history.json
-last_known_patch.txt
+last_known_patch.txt  # legacy — PatchChecker now stores this in the config INI
 gamehelper_config.ini
 desktop.ini
 

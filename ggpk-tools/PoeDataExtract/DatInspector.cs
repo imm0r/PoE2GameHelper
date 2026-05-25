@@ -366,14 +366,11 @@ internal static class DatInspector
 
     private static int? FindMarker(ReadOnlySpan<byte> bytes, byte sentinelByte)
     {
-        // The marker lives at offset 4 + rowCount * rowSize. rowSize can
-        // be any multiple of 4, so the marker may land at any 4-byte
-        // aligned offset — NOT 8-aligned-from-4. We have to step by 4.
-        // (Earlier bug: we stepped by 8 from offset 4 and missed the
-        //  PoE2 BaseItemTypes marker at 0x141028 — that's 8-aligned
-        //  from 0, not from 4.)
+        // step=1 — PoE2's rs may be odd (Mods table) so the marker
+        // can land at any byte offset. See DatReader.cs for the same
+        // change + table-by-table alignment notes.
         ulong needle = (ulong)sentinelByte * 0x0101010101010101UL;
-        for (int off = 4; off + 8 <= bytes.Length; off += 4)
+        for (int off = 4; off + 8 <= bytes.Length; off++)
         {
             if (BitConverter.ToUInt64(bytes.Slice(off, 8)) == needle)
                 return off;

@@ -36,9 +36,10 @@ internal static class Program
         {
             return verb switch
             {
-                "extract" => RunExtract(rest),
-                "inspect" => RunInspect(rest),
-                "ls"      => RunLs(rest),
+                "extract"     => RunExtract(rest),
+                "extract-all" => RunExtractAll(rest),
+                "inspect"     => RunInspect(rest),
+                "ls"          => RunLs(rest),
                 _ => Fail($"Unknown verb: {verb}", 1),
             };
         }
@@ -66,14 +67,86 @@ internal static class Program
         if (!File.Exists(opts.GgpkPath)) { Console.Error.WriteLine($"GGPK not found: {opts.GgpkPath}"); return 2; }
 
         using var ggpk = GgpkOpener.Open(opts.GgpkPath);
-        IExtractor extractor = opts.Table switch
+        // Table names are case-insensitive — the AHK shell-out has historically
+        // used PascalCase; some consumers pass snake_case. Normalise here so
+        // the bridge doesn't have to care.
+        IExtractor extractor = opts.Table.ToLowerInvariant() switch
         {
-            "BaseItemTypes" => new BaseItemSizes(),
+            "baseitemtypes"  or "baseitemsizes"      => new BaseItemSizes(),
+            "monsternames"   or "monstervarieties"   => new MonsterNames(),
+            "statnames"      or "stats"              => new StatNames(),
+            "mods"           or "modnamemap"         => new Mods(),
+            "uniquenames"    or "uniqueitemnamemap"  => new UniqueNames(),
             _ => throw new ArgumentException($"Unknown table: {opts.Table}"),
         };
         extractor.Run(ggpk.Index, opts.OutputPath);
         Console.Out.WriteLine($"OK — wrote {opts.OutputPath}");
         return 0;
+    }
+
+    /// <summary>
+    /// Refreshes every TSV the helper consumes in one shell-out. Opens
+    /// the GGPK once and runs each extractor against it — saves the
+    /// ~300 ms .NET-startup cost of invoking the tool 5x.
+    ///
+    /// Usage: poe-data-extract extract-all --ggpk &lt;path&gt; --output-dir &lt;dir&gt;
+    ///
+    /// Each extractor writes a fixed filename inside output-dir:
+    ///     base_item_sizes.tsv          (BaseItemSizes)
+    ///     base_item_name_map.tsv       (BaseItemNames)
+    ///     monster_name_map.tsv         (MonsterNames)
+    ///     stat_name_map.tsv            (StatNames)
+    ///     mod_name_map.tsv             (Mods)
+    /// UniqueNames is NOT in the all-set (placeholder — throws if invoked).
+    /// </summary>
+    private static int RunExtractAll(ReadOnlySpan<string> args)
+    {
+        string? ggpkPath = null, outDir = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--ggpk":       if (++i < args.Length) ggpkPath = args[i]; break;
+                case "--output-dir": if (++i < args.Length) outDir   = args[i]; break;
+            }
+        }
+        if (ggpkPath is null || outDir is null) { PrintUsage(); return 1; }
+        if (!File.Exists(ggpkPath)) { Console.Error.WriteLine($"GGPK not found: {ggpkPath}"); return 2; }
+
+        Directory.CreateDirectory(outDir);
+        using var ggpk = GgpkOpener.Open(ggpkPath);
+
+        // (extractor, output-filename) pairs — ordered cheapest-first
+        // so a failure on a later one still leaves something useful.
+        var tasks = new (IExtractor extractor, string filename, string label)[]
+        {
+            // BaseItemSizes carries Id + Name + Width + Height in one
+            // TSV — base_item_name_map.tsv would be a strict subset, so
+            // the helper just reads names from base_item_sizes.tsv too.
+            (new StatNames(),     "stat_name_map.tsv",    "stat names"),
+            (new BaseItemSizes(), "base_item_sizes.tsv",  "base item sizes + names"),
+            (new MonsterNames(),  "monster_name_map.tsv", "monster names"),
+            (new Mods(),          "mod_name_map.tsv",     "mod names"),
+            // UniqueNames intentionally omitted — placeholder
+        };
+
+        int ok = 0, fail = 0;
+        foreach (var t in tasks)
+        {
+            string outPath = Path.Combine(outDir, t.filename);
+            try
+            {
+                t.extractor.Run(ggpk.Index, outPath);
+                ok++;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"FAIL {t.label}: {ex.Message}");
+                fail++;
+            }
+        }
+        Console.Out.WriteLine($"extract-all: {ok} ok, {fail} failed");
+        return fail == 0 ? 0 : 4;
     }
 
     private static int RunInspect(ReadOnlySpan<string> args)

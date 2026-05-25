@@ -64,9 +64,9 @@ internal static class Program
 
             return verb.ToLowerInvariant() switch
             {
-                "apply"  => RunApply (ggpk, backups, patch),
-                "revert" => RunRevert(ggpk, backups, patch),
-                _ => Fail("Unknown verb (expected apply|revert|list)", 1),
+                "apply"  => RunApply (ggpk, backups, patch, opts.DryRun, opts.GgpkPath),
+                "revert" => RunRevert(ggpk, backups, patch, opts.DryRun, opts.GgpkPath),
+                _ => Fail("Unknown verb (expected apply|revert|list|extract)", 1),
             };
         }
         catch (FileNotFoundException ex)
@@ -81,15 +81,22 @@ internal static class Program
         }
     }
 
-    private static int RunApply(GgpkOpener ggpk, BackupManager backups, IPatch patch)
+    private static int RunApply(GgpkOpener ggpk, BackupManager backups, IPatch patch, bool dryRun, string ggpkPath)
     {
         patch.Apply(ggpk.Index, backups);
+        if (dryRun)
+        {
+            Console.Out.WriteLine($"DRY-RUN — '{patch.Name}' applied in memory, NO disk writes.");
+            Console.Out.WriteLine($"          (shader marker matches confirmed, safe to re-run without --dry-run)");
+            return 0;
+        }
+        SnapshotIndexFile(ggpkPath, backups, patch.Name);
         ggpk.Save();
-        Console.Out.WriteLine($"OK — applied '{patch.Name}'");
+        Console.Out.WriteLine($"OK — applied '{patch.Name}' (backups under <ggpkdir>/backups/{patch.Name}/)");
         return 0;
     }
 
-    private static int RunRevert(GgpkOpener ggpk, BackupManager backups, IPatch patch)
+    private static int RunRevert(GgpkOpener ggpk, BackupManager backups, IPatch patch, bool dryRun, string ggpkPath)
     {
         if (!backups.HasBackupsFor(patch.Name))
         {
@@ -97,9 +104,32 @@ internal static class Program
             return 4;
         }
         patch.Revert(ggpk.Index, backups);
+        if (dryRun)
+        {
+            Console.Out.WriteLine($"DRY-RUN — '{patch.Name}' reverted in memory, NO disk writes.");
+            return 0;
+        }
         ggpk.Save();
         Console.Out.WriteLine($"OK — reverted '{patch.Name}'");
         return 0;
+    }
+
+    /// <summary>
+    /// Defense-in-depth: before any <c>Index.Save()</c> that mutates the
+    /// bundle index, copy the current <c>_.index.bin</c> verbatim into
+    /// the backup directory. If our own per-file backup machinery
+    /// somehow fails to round-trip cleanly, the user can manually
+    /// restore the snapshot to undo any structural index corruption.
+    /// </summary>
+    private static void SnapshotIndexFile(string ggpkPath, BackupManager backups, string patchName)
+    {
+        // Only applies to the bare-index form; for legacy Content.ggpk
+        // there's nothing useful to snapshot at this layer.
+        if (!ggpkPath.EndsWith(".index.bin", StringComparison.OrdinalIgnoreCase)) return;
+        var dst = Path.Combine(backups.RootDirectory, patchName, "_index_snapshot.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
+        if (!File.Exists(dst))  // first-apply only; don't clobber the pristine snapshot
+            File.Copy(ggpkPath, dst);
     }
 
     /// <summary>
@@ -141,21 +171,23 @@ internal static class Program
         return 0;
     }
 
-    private sealed record Options(string GgpkPath, string PatchName);
+    private sealed record Options(string GgpkPath, string PatchName, bool DryRun);
 
     private static Options? ParseArgs(ReadOnlySpan<string> args)
     {
         string? ggpk = null, patch = null;
+        bool dryRun = false;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--ggpk":  if (++i < args.Length) ggpk  = args[i]; break;
-                case "--patch": if (++i < args.Length) patch = args[i]; break;
+                case "--ggpk":    if (++i < args.Length) ggpk  = args[i]; break;
+                case "--patch":   if (++i < args.Length) patch = args[i]; break;
+                case "--dry-run": dryRun = true; break;
             }
         }
         if (ggpk is null || patch is null) return null;
-        return new Options(ggpk, patch);
+        return new Options(ggpk, patch, dryRun);
     }
 
     private static int Fail(string msg, int code)
@@ -166,8 +198,12 @@ internal static class Program
 
     private static void PrintUsage()
     {
-        Console.Error.WriteLine("usage: poe-patcher <apply|revert> --ggpk <Content.ggpk> --patch <name>");
-        Console.Error.WriteLine("       poe-patcher extract --ggpk <Content.ggpk> --path <internal/path> --output <out>");
+        Console.Error.WriteLine("usage: poe-patcher <apply|revert> --ggpk <path> --patch <name> [--dry-run]");
+        Console.Error.WriteLine("       poe-patcher extract --ggpk <path> --path <internal/path> --output <out>");
         Console.Error.WriteLine("       poe-patcher list");
+        Console.Error.WriteLine();
+        Console.Error.WriteLine("  <path>     = Content.ggpk or Bundles2/_.index.bin");
+        Console.Error.WriteLine("  --dry-run  = apply the patch in memory only — verifies marker matches,");
+        Console.Error.WriteLine("               does NOT call Index.Save() so no disk writes happen.");
     }
 }
