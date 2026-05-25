@@ -21,6 +21,14 @@ internal sealed class BackupManager
 {
     private readonly string _root;
 
+    /// <summary>
+    /// Root directory where per-patch backups live. Exposed so the
+    /// orchestrator can stash extra defense-in-depth artefacts
+    /// (e.g. a verbatim copy of _.index.bin) next to the per-file
+    /// backups.
+    /// </summary>
+    public string RootDirectory => _root;
+
     public BackupManager(string ggpkPath)
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(ggpkPath))

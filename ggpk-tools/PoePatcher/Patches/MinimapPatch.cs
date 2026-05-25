@@ -9,26 +9,31 @@ namespace PoePatcher.Patches;
 /// Reveals the entire minimap by patching the two shader files that
 /// gate visibility on the per-cell explored flag.
 ///
-/// PoE2 0.x shader analysis (May 2026):
+/// PoE2 0.x shader analysis (verified May 2026):
 ///
-/// <c>shaders/minimap_visibility_pixel.hlsl</c> writes the explored mask
-/// (red channel of <c>curr_visibility_sampler</c>). The line
-/// <c>res_color = max(res_color, 0.180);</c> clamps to a 0.18 minimum
-/// floor on already-explored cells. Bumping that floor to <c>1.000</c>
-/// makes every cell render as fully explored regardless of the actual
-/// reveal ratio.
+/// <c>shaders/minimap_visibility_pixel.hlsl</c> writes the explored
+/// mask (red channel of <c>curr_visibility_sampler</c>). It computes
+/// a <c>ratio</c> from distance to the explored tile, then writes
+/// <c>(ratio, 0, 0, 1)</c>. Forcing <c>ratio = 1.0</c> at its source
+/// makes every cell render as fully explored.
 ///
 /// <c>shaders/minimap_blending_pixel.hlsl</c> reads <c>visibility</c>
 /// from <c>walkability_sample.g</c> and uses it to multiply the
-/// rendered geometry/walkability alpha. Hardcoding <c>visibility = 1</c>
-/// makes the blending pass draw the geometry at full strength even on
-/// never-explored cells.
+/// rendered geometry / walkability alpha. Hardcoding
+/// <c>visibility = 1</c> makes the blending pass draw the geometry
+/// at full strength even on never-explored cells.
 ///
-/// Together these two changes reveal the whole minimap without
-/// touching network code or shader-compile-time conditional branches.
-/// Find strings are deliberately specific so a future patch that
-/// rewrites either shader fails loud (<c>"Marker not found"</c>) rather
-/// than silently corrupting the file.
+/// The blending shader edit is the load-bearing one — alone it should
+/// reveal everything. The visibility shader edit is belt-and-braces:
+/// keeps the explored mask "filled in" so other systems that sample
+/// the visibility texture (compass markers, map-overlay UI) also
+/// behave as if everything had been visited.
+///
+/// History: an earlier version of this patch targeted a
+/// <c>res_color = max(res_color, 0.180);</c> line in the visibility
+/// shader; GGG removed that line in a patch around May 25 2026.
+/// We now target <c>ratio</c> directly, which is structurally more
+/// stable (the function HAS to compute a visibility ratio somehow).
 /// </summary>
 internal sealed class MinimapPatch : IPatch
 {
@@ -39,13 +44,13 @@ internal sealed class MinimapPatch : IPatch
     {
         (
             "shaders/minimap_visibility_pixel.hlsl",
-            "res_color = max(res_color, 0.180);",
-            "res_color = max(res_color, 1.000); // PoE2GameHelper: forced-reveal"
+            "float ratio = saturate((1.0f - dist / visibility_radius) * 2.0f);",
+            "float ratio = 1.0f; // PoE2GameHelper: forced-reveal"
         ),
         (
             "shaders/minimap_blending_pixel.hlsl",
             "float visibility = saturate(walkability_sample.g * 2.0f);",
-            "float visibility = 1.0f; // PoE2GameHelper: forced-reveal (was: saturate(walkability_sample.g * 2.0f))"
+            "float visibility = 1.0f; // PoE2GameHelper: forced-reveal"
         ),
     };
 
