@@ -73,6 +73,12 @@ if A_IsCompiled
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
 
 g_reader := PoE2GameStateReader("PathOfExileSteam.exe")
+; Connection state — flipped by EnsureConnected(). When false, the
+; game-tick timers (radar, flask, ReadAndShow) short-circuit so we
+; don't spam ReadProcessMemory failures against a dead handle.
+g_isConnected := false
+g_lastConnectedPid := 0   ; tracks whether the PID changed between checks
+                          ; so PID-rotation (Steam restart) refreshes module addresses
 g_debugMode := false
 g_updatesPaused := false
 g_autoFlaskEnabled := false
@@ -222,6 +228,12 @@ g_skillBuffBlacklist := []
 ; Zone navigation toggle
 g_zoneNavEnabled := true
 g_mapHackEnabled := true
+; Maphack source: "memory" = render an overlay on top of the unexplored
+; minimap cells (requires PoE2 attached + the radar reading working);
+; "ggpk" = patch the visibility shader so the game itself draws every
+; cell as explored (requires the game to be closed for the apply step,
+; survives until the user reverts).
+g_maphackSource := "memory"
 g_rangeCirclesEnabled := true
 g_panelDetectionEnabled := true
 
@@ -359,20 +371,104 @@ LoadFlaskHotkeysFromConfig(g_flaskConfigPath)
 CheckPoePatchVersion()
 UpdateStatusBar()
 
-if !g_reader.Connect()
+; ── Connection state machine ─────────────────────────────────────────────
+; The helper no longer bails when PoE2 isn't running at startup. Instead
+; it boots into a "disconnected" state, schedules all the game-tick
+; timers (which short-circuit while disconnected), and polls every 2 s
+; for the process. When PoE2 appears we attach + push a fresh snapshot;
+; if the process dies later we transition back to waiting.
+;
+; This unblocks two workflows:
+;   - User launches the helper before the game (or via the "Launch PoE2"
+;     button) and the helper hooks itself once login finishes.
+;   - GGPK-maphack apply/revert: the user closes the game to patch, then
+;     starts it again — the helper auto-reconnects to the fresh PID.
+InitializeErrorLog()
+g_isConnected := false
+; Show a friendly placeholder until EnsureConnected attaches.
+try
 {
     g_valueTree.Delete()
-    g_valueTree.Add("Konnte PathOfExileSteam.exe oder GameStates-Adresse nicht auflösen.")
-    g_valueTree.Add("Starte das Skript als Admin, falls nötig.")
-    return
+    g_valueTree.Add("Waiting for PoE2 process…")
+    g_valueTree.Add("Start the game (Steam or via the Launch button below).")
 }
-
-InitializeErrorLog()
-SetTimer(TryAutoFlaskFast, 150)
-SetTimer(UpdateRadarFast, 50)
-SetTimer(ReadAndShow, 2000)
-ReadAndShow()
+SetTimer(TryAutoFlaskFast,  150)
+SetTimer(UpdateRadarFast,    50)
+SetTimer(ReadAndShow,      2000)
+SetTimer(EnsureConnected,  2000)
+EnsureConnected()  ; immediate first attempt
 return
+
+; Drives the PoE2 connection state machine. Called every 2 s by a
+; SetTimer plus once immediately at startup. Cheap when PoE2 is
+; already attached (single ProcessExist call), more work only on
+; the actual connect/disconnect transitions.
+;
+; Side effects on the global state:
+;   - g_isConnected:        bool toggled on each transition
+;   - g_lastConnectedPid:   resets g_reader's caches when the PID
+;                           rotates (e.g. Steam restarts the game,
+;                           or the user restarts via the Launch button)
+;   - g_valueTree:          shows a "Waiting for PoE2..." stub while
+;                           disconnected, so the user knows the helper
+;                           is alive and waiting (not crashed)
+;   - WebView header push:  surfaces connection state in the title bar
+EnsureConnected()
+{
+    global g_reader, g_isConnected, g_lastConnectedPid, g_valueTree
+
+    pid := ProcessExist("PathOfExileSteam.exe")
+    if (!pid)
+        pid := ProcessExist("PathOfExile_x64Steam.exe")
+    if (!pid)
+        pid := ProcessExist("PathOfExile.exe")
+    if (!pid)
+        pid := ProcessExist("PathOfExile_x64.exe")
+
+    if (!pid)
+    {
+        ; Process gone. If we were connected, transition to waiting.
+        if (g_isConnected)
+        {
+            g_isConnected := false
+            g_lastConnectedPid := 0
+            try g_reader.Mem.Close()
+            try
+            {
+                g_valueTree.Delete()
+                g_valueTree.Add("Waiting for PoE2 process…")
+                g_valueTree.Add("Start the game (Steam or via the Launch button below).")
+            }
+            try LogError("Helper disconnected — PoE2 process is gone")
+        }
+        return
+    }
+
+    ; PID exists. If we were already connected to THIS pid, nothing to do.
+    if (g_isConnected && g_lastConnectedPid = pid)
+        return
+
+    ; New pid (fresh launch OR Steam restart) — drop stale state and re-connect.
+    if (g_lastConnectedPid && g_lastConnectedPid != pid)
+        try LogError("Helper: PoE2 PID rotated " g_lastConnectedPid " → " pid " (restart?). Re-attaching.")
+
+    try g_reader.Mem.Close()
+    if (!g_reader.Connect())
+    {
+        ; Process exists but we couldn't resolve GameStates. This usually
+        ; means PoE2 is still loading (pre-login splash). Stay disconnected
+        ; and the next poll will retry.
+        try LogError("Helper: PoE2 found (pid=" pid ") but Connect() failed — will retry")
+        return
+    }
+
+    g_isConnected := true
+    g_lastConnectedPid := pid
+    try LogError("Helper connected to PoE2 (pid=" pid ")")
+    ; Push a snapshot immediately so the UI tree refreshes without
+    ; waiting for the next 2 s ReadAndShow tick.
+    try ReadAndShow()
+}
 
 ; Updates the status bar text and pushes it to the WebView.
 UpdateStatusBar()
@@ -455,8 +551,13 @@ ReadAndShow(forceTreeRefresh := false)
     static _readLastMs := 0
     static _treeLastMs := 0
     static _totalLastMs := 0
-    global g_readAndShowRunning
+    global g_readAndShowRunning, g_isConnected
     if g_readAndShowRunning
+        return
+    ; Skip the snapshot while not attached. The tree shows a
+    ; "Waiting for PoE2…" stub already (set by EnsureConnected),
+    ; so we don't even need to repaint here.
+    if (IsSet(g_isConnected) && !g_isConnected)
         return
     g_readAndShowRunning := true
     totalStart := A_TickCount

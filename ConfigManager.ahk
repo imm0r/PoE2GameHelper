@@ -17,7 +17,7 @@ SaveConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_cfgOpenSections
@@ -42,6 +42,7 @@ SaveConfig()
     IniWrite(g_radarShowChests       ? "1" : "0",  f, "Radar",         "showChests")
     IniWrite(g_zoneNavEnabled        ? "1" : "0",  f, "Radar",         "zoneNav")
     IniWrite(g_mapHackEnabled        ? "1" : "0",  f, "Radar",         "mapHack")
+    IniWrite(g_maphackSource,                      f, "Radar",         "maphackSource")
     IniWrite(g_rangeCirclesEnabled   ? "1" : "0",  f, "Radar",         "rangeCircles")
     IniWrite(g_panelDetectionEnabled ? "1" : "0",  f, "PanelDetection", "enabled")
     IniWrite(g_autoPilotEnabled      ? "1" : "0",  f, "AutoPilot",      "enabled")
@@ -89,7 +90,7 @@ LoadConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_cfgOpenSections
@@ -121,6 +122,11 @@ LoadConfig()
     g_radarShowChests          := _B("Radar",         "showChests",      true)
     g_zoneNavEnabled           := _B("Radar",         "zoneNav",         true)
     g_mapHackEnabled           := _B("Radar",         "mapHack",         true)
+    ; Default "memory" — the legacy behaviour. "ggpk" requires the user
+    ; to have built ggpk-tools/PoePatcher.exe + oo2core.dll, so we don't
+    ; flip it on without their explicit choice.
+    rawSrc := IniRead(f, "Radar", "maphackSource", "memory")
+    g_maphackSource := (rawSrc = "ggpk") ? "ggpk" : "memory"
     g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_autoPilotEnabled         := _B("AutoPilot",     "enabled",         false)

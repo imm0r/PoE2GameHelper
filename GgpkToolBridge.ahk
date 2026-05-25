@@ -80,6 +80,11 @@ class GgpkToolBridge
             rows := ItemSizeRegistry.LoadStats["entries"]
         }
 
+        ; Persist the path under [GgpkTools] lastIndexPath so the GGPK
+        ; maphack apply/revert (which run while the game is CLOSED, so
+        ; _ResolveGameDataPath would return nothing) can find the index.
+        try IniWrite(indexPath, _ConfigPath(), "GgpkTools", "lastIndexPath")
+
         return Map("ok", true, "msg", "Refreshed all TSVs (item sizes: " rows " entries).", "rows", rows)
     }
 
@@ -258,6 +263,81 @@ class GgpkToolBridge
         {
             try LogError("GgpkTools/MaybeAutoRefresh", ex)
         }
+    }
+
+    ; ────────────────────────────────────────────────────────────────
+    ; Minimap maphack — patch / revert PoE2's two minimap shader files
+    ; in place. Both operations require the game to be CLOSED (the
+    ; bundle files are open + cached by PoE2 while it runs, so any
+    ; write would be silently discarded or worse).
+    ;
+    ; Both functions return Map("ok", bool, "msg", string).
+    ; ────────────────────────────────────────────────────────────────
+
+    static ApplyMinimapPatch()
+    {
+        return this._RunPatchVerb("apply")
+    }
+
+    static RevertMinimapPatch()
+    {
+        return this._RunPatchVerb("revert")
+    }
+
+    static _RunPatchVerb(verb)
+    {
+        ; Hard pre-flight: refuse if PoE2 is running. The UI also
+        ; disables the buttons but this is defense in depth.
+        if (ProcessExist("PathOfExileSteam.exe")
+            || ProcessExist("PathOfExile_x64Steam.exe")
+            || ProcessExist("PathOfExile.exe")
+            || ProcessExist("PathOfExile_x64.exe"))
+        {
+            return this._Fail("PoE2 is still running — close the game first.")
+        }
+
+        ; We can't use _ResolveGameDataPath() (it walks the running
+        ; process). Instead, look up the install path in the INI from
+        ; the last successful auto-refresh — we cache it there for
+        ; exactly this situation.
+        iniFile := _ConfigPath()
+        indexPath := IniRead(iniFile, "GgpkTools", "lastIndexPath", "")
+        if (indexPath = "" || !FileExist(indexPath))
+            return this._Fail("PoE2 install path not known yet. Start the game once so the helper can record it (Bundles2/_.index.bin path is persisted under [GgpkTools] lastIndexPath).")
+
+        exe := this._FindExe("PoePatcher")
+        if (exe["path"] = "")
+            return this._Fail("poe-patcher.exe not found. Build it once via:`n"
+                . "    cd ggpk-tools && dotnet publish PoePatcher -c Release -r win-x64 --self-contained -p:PublishAot=true")
+
+        stderr := A_Temp "\poe-patcher.stderr.txt"
+        try FileDelete(stderr)
+
+        cmd := exe["invoke"] . ' ' verb ' --ggpk "' indexPath '" --patch minimap'
+        fullCmd := A_ComSpec ' /c "' cmd ' 2> "' stderr '""'
+
+        try LogError("GgpkTools/" verb " cmd: " fullCmd)
+
+        exit := 0
+        try
+        {
+            exit := RunWait(fullCmd, exe["workDir"], "Hide")
+        }
+        catch as ex
+        {
+            return this._Fail("RunWait failed: " ex.Message)
+        }
+
+        tail := this._ReadTail(stderr, 6)
+        if (exit != 0)
+        {
+            try LogError("GgpkTools/" verb " exited " exit (tail = "" ? "" : " stderr=" tail))
+            return this._Fail("poe-patcher " verb " exited with code " exit (tail = "" ? "" : ":`n" tail))
+        }
+
+        return Map("ok", true, "msg", (verb = "apply"
+            ? "Minimap patch applied. Start PoE2 to see the full minimap."
+            : "Minimap patch reverted. Vanilla shaders restored."), "rows", 0)
     }
 
     ; ---- internals ----

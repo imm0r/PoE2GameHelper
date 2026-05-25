@@ -3516,6 +3516,42 @@
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <!--
+                Maphack source picker. "Memory" = the legacy overlay
+                that paints the unexplored cells on top of the game
+                (cheap, reverts the moment the helper exits). "GGPK" =
+                shader patch via ggpk-tools/PoePatcher (the game itself
+                draws every cell as explored — survives until reverted,
+                but requires the game to be closed for apply/revert).
+                -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
+                <span class="cfg-label" style="color:var(--subtext)">↳ Source</span>
+                <div style="display:flex;gap:8px;font-size:12px">
+                  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="maphack-source" value="memory"
+                      onchange="ahkCall('SetMaphackSource','memory')" checked>
+                    Memory (overlay)
+                  </label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="maphack-source" value="ggpk"
+                      onchange="ahkCall('SetMaphackSource','ggpk')">
+                    GGPK (shader patch)
+                  </label>
+                </div>
+              </div>
+              <!-- GGPK apply/revert — only shown when source=ggpk -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none">
+                <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ahkCall('GgpkMaphackApply')"
+                    title="Patch PoE2's minimap shaders so the in-game minimap renders as fully explored. Game must be closed."
+                    disabled>Apply</button>
+                  <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ahkCall('GgpkMaphackRevert')"
+                    title="Restore the original shaders. Game must be closed."
+                    disabled>Revert</button>
+                  <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px">—</span>
+                </div>
+              </div>
               <div class="cfg-row"><span class="cfg-label">Range Circles</span>
                 <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
                     checked><span class="toggle-slider"></span></label>
@@ -4560,6 +4596,29 @@
 
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+      // Maphack source — radio sync + GGPK action row visibility.
+      // The actual "PoE2 is closed → buttons enabled" gating runs on
+      // every header push (PoE state is in d.isConnected / d.poeRunning).
+      const mhSource = d.maphackSource || 'memory';
+      const mhMemRadio = document.querySelector('input[name="maphack-source"][value="memory"]');
+      const mhGgpkRadio = document.querySelector('input[name="maphack-source"][value="ggpk"]');
+      if (mhMemRadio) mhMemRadio.checked  = (mhSource === 'memory');
+      if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
+      const ggpkRow = document.getElementById('row-maphack-ggpk');
+      if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      // Enable Apply/Revert only when PoE2 is NOT running — modifying
+      // the bundle index while the game has it open is a corruption risk.
+      const poeIsRunning = (d.poeRunning === true) || (d.isConnected === true);
+      const applyBtn  = document.getElementById('ggpk-maphack-apply');
+      const revertBtn = document.getElementById('ggpk-maphack-revert');
+      if (applyBtn)  applyBtn.disabled  = poeIsRunning;
+      if (revertBtn) revertBtn.disabled = poeIsRunning;
+      const ggpkStatus = document.getElementById('ggpk-maphack-status');
+      if (ggpkStatus) {
+        ggpkStatus.textContent = poeIsRunning
+          ? 'Close PoE2 first to apply/revert.'
+          : 'Ready — close PoE2 not required (already closed).';
+      }
       setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
 
@@ -6055,6 +6114,17 @@
       status.textContent = '';
       ahkCall('RefreshItemSizes');
     }
+    // Maphack apply/revert result lands on its own Config-tab row so
+    // it doesn't get confused with the TSV refresh status in Data tab.
+    function updateGgpkMaphackStatus(json) {
+      let r;
+      try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }
+      const el = document.getElementById('ggpk-maphack-status');
+      if (!el) return;
+      el.style.color = r.ok ? 'var(--accent, #8aff8a)' : 'var(--err, #ff8a8a)';
+      el.textContent = r.msg || (r.ok ? 'Done.' : 'Failed.');
+    }
+
     function updateGgpkToolStatus(json) {
       let r;
       try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }
