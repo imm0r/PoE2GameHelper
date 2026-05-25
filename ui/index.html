@@ -3232,7 +3232,7 @@
         externally hosted JSON dumps haven't caught up yet.
       -->
       <div class="tsv-gen-bar" style="margin-top:6px">
-        <button class="cfg-btn" id="ggpk-refresh-btn" onclick="ggpkRefreshItemSizes()" title="Re-extract data/base_item_sizes.tsv directly from your local PoE2 install via ggpk-tools/PoeDataExtract.exe. Requires the tool to be built (see ggpk-tools/README.md).">⟳ Refresh item sizes from local GGPK</button>
+        <button class="cfg-btn" id="ggpk-refresh-btn" onclick="ggpkRefreshItemSizes()" title="Re-extract all GGPK-derived TSVs (base item sizes + names, monster names, stat names, mod ids) directly from your local PoE2 install via ggpk-tools/PoeDataExtract.exe. Requires the tool to be built (see ggpk-tools/README.md).">⟳ Refresh all TSVs from local GGPK</button>
         <span id="ggpk-refresh-status" class="tsv-gen-status"></span>
       </div>
       <div id="tsv-gen-log" class="tsv-gen-log" style="display:none"></div>
@@ -6061,7 +6061,7 @@
       _ggpkRefreshing = false;
       const btn = document.getElementById('ggpk-refresh-btn');
       btn.disabled = false;
-      btn.textContent = '⟳ Refresh item sizes from local GGPK';
+      btn.textContent = '⟳ Refresh all TSVs from local GGPK';
       const status = document.getElementById('ggpk-refresh-status');
       status.className = 'tsv-gen-status ' + (r.ok ? 'success' : 'error');
       status.textContent = r.msg || (r.ok ? 'Done.' : 'Failed.');

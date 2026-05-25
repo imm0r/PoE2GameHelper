@@ -532,11 +532,13 @@ _DispatchBridgeCall(method, args)
     }
 }
 
-; UI-side wrapper around GgpkToolBridge.RefreshItemSizes that pushes
+; UI-side wrapper around GgpkToolBridge.RefreshAllTsvs that pushes
 ; the result back to the WebView via updateGgpkToolStatus(json).
+; Refreshes all GGPK-derived TSVs (item sizes, names, mods, monsters,
+; stats) in a single shell-out, not just item sizes.
 GgpkToolBridgeUi_Refresh()
 {
-    result := GgpkToolBridge.RefreshItemSizes()
+    result := GgpkToolBridge.RefreshAllTsvs()
     json := '{"ok":' (result["ok"] ? "true" : "false")
         . ',"msg":' _BridgeJsonEscape(result["msg"])
         . ',"rows":' result["rows"] '}'

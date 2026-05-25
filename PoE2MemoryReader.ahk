@@ -170,7 +170,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this.BaseItemNameMap := Map()
         this.UniqueItemNameMap := Map()
         this.LoadModNameMap(A_ScriptDir "\\data\\mod_name_map.tsv")
-        this.LoadBaseItemNameMap(A_ScriptDir "\\data\\base_item_name_map.tsv")
+        ; base_item_sizes.tsv has 4 cols (id, name, width, height); the
+        ; LoadBaseItemNameMap reader only consumes the first two, so one
+        ; TSV feeds both ItemSizeRegistry and BaseItemNameMap. The old
+        ; data/base_item_name_map.tsv is obsolete (was a strict subset of
+        ; base_item_sizes.tsv) and is no longer generated.
+        this.LoadBaseItemNameMap(A_ScriptDir "\\data\\base_item_sizes.tsv")
         this.LoadUniqueItemNameMap(A_ScriptDir "\\data\\unique_item_name_map.tsv")
     }
 

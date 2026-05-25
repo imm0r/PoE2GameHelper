@@ -25,6 +25,64 @@ class GgpkToolBridge
 {
     ; ---- public surface ----
 
+    ; Re-extract ALL TSVs the helper consumes in one shell-out:
+    ;   base_item_sizes.tsv, base_item_name_map.tsv, monster_name_map.tsv,
+    ;   stat_name_map.tsv, mod_name_map.tsv.
+    ; Saves ~300 ms × 5 .NET-startup cost vs invoking the tool per-table.
+    ; Returns Map("ok", bool, "msg", string, "rows", int).
+    static RefreshAllTsvs()
+    {
+        indexPath := this._ResolveGameDataPath()
+        if (indexPath = "")
+            return this._Fail("PoE2 not running — start the game once so we can locate the install path.")
+
+        exe := this._FindExe("PoeDataExtract")
+        if (exe["path"] = "")
+            return this._Fail("poe-data-extract.exe not found. Build it once via:`n"
+                . "    cd ggpk-tools && dotnet publish PoeDataExtract -c Release -r win-x64 --self-contained -p:PublishAot=true")
+
+        outDir := A_ScriptDir "\data"
+        stderr := A_Temp "\poe-data-extract.stderr.txt"
+        try FileDelete(stderr)
+
+        cmd := exe["invoke"] . ' extract-all --ggpk "' indexPath '" --output-dir "' outDir '"'
+        fullCmd := A_ComSpec ' /c "' cmd ' 2> "' stderr '""'
+
+        try LogError("GgpkTools/RefreshAll cmd: " fullCmd)
+
+        exit := 0
+        try
+        {
+            exit := RunWait(fullCmd, exe["workDir"], "Hide")
+        }
+        catch as ex
+        {
+            return this._Fail("RunWait failed: " ex.Message)
+        }
+
+        tail := this._ReadTail(stderr, 8)
+        if (exit != 0)
+        {
+            try LogError("GgpkTools/RefreshAll exited " exit (tail = "" ? "" : " stderr=" tail))
+            return this._Fail("poe-data-extract extract-all exited with code " exit (tail = "" ? "" : ":`n" tail))
+        }
+
+        ; Reload the in-memory ItemSize registry so the next AutoPilot
+        ; tick uses fresh data. Other TSVs (mods/stats/monsters) are
+        ; lazily reloaded by their consumers via file-mtime caching, so
+        ; no explicit reload needed there.
+        rows := 0
+        try
+        {
+            ItemSizeRegistry.Loaded := false
+            ItemSizeRegistry.Sizes := Map()
+            ItemSizeRegistry.Load()
+            rows := ItemSizeRegistry.LoadStats["entries"]
+        }
+
+        return Map("ok", true, "msg", "Refreshed all TSVs (item sizes: " rows " entries).", "rows", rows)
+    }
+
     ; Re-extract data/base_item_sizes.tsv from the user's local PoE2
     ; install. Returns Map("ok", bool, "msg", string, "rows", int).
     ; On success the new TSV replaces data/base_item_sizes.tsv in
@@ -180,7 +238,9 @@ class GgpkToolBridge
                 return
 
             try LogError("GgpkTools: auto-refresh triggered (" reason ")")
-            result := this.RefreshItemSizes()
+            ; Refresh all the TSVs the helper consumes, not just item
+            ; sizes — keeps the whole data pack in sync with patches.
+            result := this.RefreshAllTsvs()
             if (result["ok"])
             {
                 IniWrite(currentVer, iniFile, "GgpkTools", "lastRefreshedAtPatch")

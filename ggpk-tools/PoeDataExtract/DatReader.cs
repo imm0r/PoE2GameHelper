@@ -58,11 +58,17 @@ internal sealed class DatReader
         }
         else
         {
-            // Scan in 4-byte steps. PoE2 BaseItemTypes marker is at
-            // 0x141028 which is NOT 8-aligned-from-offset-4, so an
-            // 8-step scan misses it.
+            // Scan byte-by-byte. PoE2 lets rowSize be effectively any
+            // value, and with rowCount * rowSize feeding the marker
+            // position we can't assume 2- or 4-byte alignment:
+            //   - BaseItemTypes: rs=308 → marker 4-aligned
+            //   - MonsterVarieties: rs=974 → marker 2-aligned
+            //   - Stats: rs=106 → marker 2-aligned
+            //   - Mods: rs is odd (14841 rows × odd → odd marker offset)
+            // step=1 over 12 MB is still <20 ms in practice (one ulong
+            // compare per iteration), and runs once per refresh.
             int? found = null;
-            for (int off = headerLen; off + 8 <= file.Length; off += 4)
+            for (int off = headerLen; off + 8 <= file.Length; off += 1)
             {
                 if (BitConverter.ToUInt64(file.Slice(off, 8)) == BoundaryMarker)
                 {
