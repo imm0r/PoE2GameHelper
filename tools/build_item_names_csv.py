@@ -310,6 +310,14 @@ def main():
 
     csv_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.join(data_dir, "raw_csv", "data", "balance")
 
+    # Validate user-provided path is within the expected project data root.
+    data_dir_real = os.path.realpath(data_dir)
+    csv_dir_real = os.path.realpath(csv_dir)
+    if os.path.commonpath([data_dir_real, csv_dir_real]) != data_dir_real:
+        print(f"ERROR: CSV directory must be inside '{data_dir_real}', got: {csv_dir}")
+        sys.exit(1)
+    csv_dir = csv_dir_real
+
     # Check that at least one expected CSV exists
     test_csv = os.path.join(csv_dir, "Words.csv")
     if not os.path.isfile(test_csv):
