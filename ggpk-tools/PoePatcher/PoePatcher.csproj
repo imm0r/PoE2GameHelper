@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PoePatcher</RootNamespace>
+    <AssemblyName>poe-patcher</AssemblyName>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(LibGGPK3Root)\LibGGPK3\LibGGPK3.csproj" />
+    <ProjectReference Include="$(LibGGPK3Root)\LibBundle3\LibBundle3.csproj" />
+    <ProjectReference Include="$(LibGGPK3Root)\LibBundledGGPK3\LibBundledGGPK3.csproj" />
+  </ItemGroup>
+
+</Project>

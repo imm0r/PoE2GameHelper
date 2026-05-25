@@ -1,0 +1,33 @@
+                    GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+ Everything in this `ggpk-tools/` directory (and its subdirectories) is
+ licensed under the GNU Affero General Public License v3.0 because it
+ links against LibGGPK3 (https://github.com/aianlinb/LibGGPK3), which
+ is itself AGPL-3.0.
+
+ The rest of the PoE2GameHelper project (everything OUTSIDE `ggpk-tools/`)
+ remains under the MIT License. The two licensing regimes are kept
+ separate by a strict file-IO boundary — the AHK host never links
+ against any binary built from this directory; it only invokes the
+ compiled CLI executables and reads the TSV / JSON files they produce.
+
+ ────────────────────────────────────────────────────────────────────────
+ The full AGPL-3.0 text is REQUIRED for redistribution. Before you
+ publish a release containing binaries built from this directory,
+ replace this header with the canonical license text from:
+
+     https://www.gnu.org/licenses/agpl-3.0.txt
+
+ ────────────────────────────────────────────────────────────────────────
+
+ Summary of obligations (informal — NOT a substitute for the full text):
+   * If you distribute binaries built from this directory, you must
+     also distribute (or offer) the corresponding source code under
+     AGPL-3.0.
+   * If you run a modified version of these tools as a network service,
+     you must offer the modified source to all users of that service.
+   * You may not impose further restrictions on recipients beyond
+     what AGPL-3.0 allows.
+
+ Copyright (C) PoE2GameHelper contributors. See git history for authors.

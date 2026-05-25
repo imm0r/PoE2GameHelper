@@ -1,0 +1,83 @@
+using System.Text;
+using LibBundle3;
+using Index = LibBundle3.Index;
+using LibBundle3.Nodes;
+
+namespace PoeDataExtract.Extractors;
+
+/// <summary>
+/// Reads <c>Data/BaseItemTypes.dat64</c> and writes a TSV with
+/// <c>id \t width \t height</c> rows, suitable for the AHK host's
+/// <c>data/base_item_sizes.tsv</c> file used by the Ground Item Pickup
+/// inventory-fit check.
+///
+/// SCHEMA WARNING — this is the row layout as of PoE2 0.x. If GGG
+/// reshuffles columns in a future patch, the offsets below break and
+/// you'll see either a boundary-marker mismatch (DatReader throws) or
+/// garbage values. Cross-check against DAT-Schema when in doubt:
+///     https://github.com/poe-tool-dev/dat-schema/blob/main/dat-schema/base-item-types.json
+/// </summary>
+internal sealed class BaseItemSizes : IExtractor
+{
+    // PoE2 0.x verified (May 2026, via inspect against live GGPK):
+    //   rowSize = 308 (auto-detected via BB marker scan in DatReader)
+    //   @0x00  int64  string-ref → Id    ("Metadata/Items/Currency/...")
+    //   @0x18  int32             → InventoryWidth   (verified 1..2)
+    //   @0x1C  int32             → InventoryHeight  (verified 1..4)
+    //   @0x20  int64  string-ref → Name  ("Blacksmith's Whetstone", ...)
+    //
+    // String refs use legacy PoE1 encoding: ref = actual_offset + 8
+    // (DatReader.RowString handles this transparently — see the doc
+    //  comment there for the historical reason).
+    private const int OffsetId      = 0x00;
+    private const int OffsetWidth   = 0x18;
+    private const int OffsetHeight  = 0x1C;
+    private const int OffsetName    = 0x20;
+
+    public void Run(Index index, string outputTsvPath)
+    {
+        // PoE2 layout (verified May 2026): data/balance/baseitemtypes.datc64.
+        // Byte format is unchanged from PoE1 .dat64 — the 'c' suffix
+        // does NOT mean compressed (no Oodle wrapper).
+        string[] candidates = { "data/balance/baseitemtypes.datc64", "Data/BaseItemTypes.dat64" };
+        FileNode? fileNode = null;
+        foreach (var c in candidates)
+        {
+            if (index.TryFindNode(c, out var node) && node is FileNode fn) { fileNode = fn; break; }
+        }
+        if (fileNode is null)
+            throw new FileNotFoundException(string.Join(" / ", candidates));
+
+        var bytes = fileNode.Record.Read();
+        // Auto-detect rowSize via the BB-marker scan — survives patches
+        // that shuffle columns without changing the table structure.
+        var dat = new DatReader(bytes.Span);
+        Console.Out.WriteLine($"opened {candidates[0]}: rowCount={dat.RowCount} rowSize={dat.RowSize}");
+
+        var sb = new StringBuilder(capacity: dat.RowCount * 64);
+        sb.Append("id\tname\twidth\theight\n");
+        for (int i = 0; i < dat.RowCount; i++)
+        {
+            string id   = dat.RowString(i, OffsetId);
+            string name = dat.RowString(i, OffsetName);
+            int w = dat.RowI32(i, OffsetWidth);
+            int h = dat.RowI32(i, OffsetHeight);
+            // Skip rows with neither an Id nor a Name (DAT padding /
+            // removed entries / placeholder slots).
+            if (string.IsNullOrEmpty(id) && string.IsNullOrEmpty(name)) continue;
+            sb.Append(id).Append('\t').Append(name)
+              .Append('\t').Append(w).Append('\t').Append(h).Append('\n');
+        }
+
+        // Skip CreateDirectory when path is bare-filename (no directory
+        // component) — GetDirectoryName returns "" and that crashes.
+        var dir = Path.GetDirectoryName(outputTsvPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        // Atomic-ish write: tmp file + move, so a crashed extract doesn't
+        // leave the caller with a half-written TSV.
+        string tmp = outputTsvPath + ".tmp";
+        File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        if (File.Exists(outputTsvPath)) File.Delete(outputTsvPath);
+        File.Move(tmp, outputTsvPath);
+    }
+}
