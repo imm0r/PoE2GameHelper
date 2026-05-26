@@ -17,7 +17,7 @@ SaveConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_cfgOpenSections
@@ -42,6 +42,7 @@ SaveConfig()
     IniWrite(g_radarShowChests       ? "1" : "0",  f, "Radar",         "showChests")
     IniWrite(g_zoneNavEnabled        ? "1" : "0",  f, "Radar",         "zoneNav")
     IniWrite(g_mapHackEnabled        ? "1" : "0",  f, "Radar",         "mapHack")
+    IniWrite(g_maphackSource,                      f, "Radar",         "maphackSource")
     IniWrite(g_rangeCirclesEnabled   ? "1" : "0",  f, "Radar",         "rangeCircles")
     IniWrite(g_panelDetectionEnabled ? "1" : "0",  f, "PanelDetection", "enabled")
     IniWrite(g_autoPilotEnabled      ? "1" : "0",  f, "AutoPilot",      "enabled")
@@ -89,7 +90,7 @@ LoadConfig()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
-    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
+    global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_cfgOpenSections
@@ -121,6 +122,11 @@ LoadConfig()
     g_radarShowChests          := _B("Radar",         "showChests",      true)
     g_zoneNavEnabled           := _B("Radar",         "zoneNav",         true)
     g_mapHackEnabled           := _B("Radar",         "mapHack",         true)
+    ; Default "memory" — the legacy behaviour. "ggpk" requires the user
+    ; to have built ggpk-tools/PoePatcher.exe + oo2core.dll, so we don't
+    ; flip it on without their explicit choice.
+    rawSrc := IniRead(f, "Radar", "maphackSource", "memory")
+    g_maphackSource := (rawSrc = "ggpk") ? "ggpk" : "memory"
     g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_autoPilotEnabled         := _B("AutoPilot",     "enabled",         false)
@@ -243,43 +249,18 @@ LoadPanelOffsetsFromConfig()
             offStr := IniRead(f, "PanelOffsets", "offset" idx, "")
             if (name != "" && offStr != "")
             {
-                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                ; AHK v2's Integer() parses both decimal and "0x..." hex
+                ; natively — no need for the manual digit-by-digit loop
+                ; this used to run, which threw "local var asc has not
+                ; been assigned" in some uninitialised-path edge cases.
                 offVal := 0
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    ; AHK v2 RegExMatch requires the output var to be passed by
-                    ; reference (`&m`) and capture groups are accessed via the
-                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
-                    ; was tolerated in some uncompiled paths but fails hard in
-                    ; compiled .exe with "local variable has not been assigned".
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
-                    {
-                        hex := StrUpper(m[1])
+                    try
+                        offVal := Integer(s)
+                    catch
                         offVal := 0
-                        i2 := 1
-                        len2 := StrLen(hex)
-                        while (i2 <= len2)
-                        {
-                            c := SubStr(hex, i2, 1)
-                            asc := Asc(c)
-                            if (asc >= 48 && asc <= 57)
-                                d := asc - 48
-                            else if (asc >= 65 && asc <= 70)
-                                d := asc - 55
-                            else
-                                d := 0
-                            offVal := offVal * 16 + d
-                            i2 += 1
-                        }
-                    }
-                    else
-                    {
-                        try
-                            offVal := Integer(s)
-                        catch
-                            offVal := 0
-                    }
                 }
                 if (offVal > 0)
                     offsets[name] := offVal
@@ -298,43 +279,18 @@ LoadPanelOffsetsFromConfig()
                 break
             if (name != "" && offStr != "")
             {
-                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                ; AHK v2's Integer() parses both decimal and "0x..." hex
+                ; natively — no need for the manual digit-by-digit loop
+                ; this used to run, which threw "local var asc has not
+                ; been assigned" in some uninitialised-path edge cases.
                 offVal := 0
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    ; AHK v2 RegExMatch requires the output var to be passed by
-                    ; reference (`&m`) and capture groups are accessed via the
-                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
-                    ; was tolerated in some uncompiled paths but fails hard in
-                    ; compiled .exe with "local variable has not been assigned".
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
-                    {
-                        hex := StrUpper(m[1])
+                    try
+                        offVal := Integer(s)
+                    catch
                         offVal := 0
-                        i2 := 1
-                        len2 := StrLen(hex)
-                        while (i2 <= len2)
-                        {
-                            c := SubStr(hex, i2, 1)
-                            asc := Asc(c)
-                            if (asc >= 48 && asc <= 57)
-                                d := asc - 48
-                            else if (asc >= 65 && asc <= 70)
-                                d := asc - 55
-                            else
-                                d := 0
-                            offVal := offVal * 16 + d
-                            i2 += 1
-                        }
-                    }
-                    else
-                    {
-                        try
-                            offVal := Integer(s)
-                        catch
-                            offVal := 0
-                    }
                 }
                 if (offVal > 0)
                     offsets[name] := offVal

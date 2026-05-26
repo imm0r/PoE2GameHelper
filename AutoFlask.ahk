@@ -14,6 +14,12 @@ UpdateRadarFast()
     static _running := false
     if _running
         return
+    ; Skip all reads while not attached to PoE2. The poll timer
+    ; (EnsureConnected) handles reattachment; running this loop without
+    ; a valid handle just spams ReadProcessMemory failures.
+    global g_isConnected
+    if (IsSet(g_isConnected) && !g_isConnected)
+        return
     _running := true
     try
     {
@@ -415,6 +421,9 @@ TryAutoFlaskFast()
 {
     static _running := false
     if _running
+        return
+    global g_isConnected
+    if (IsSet(g_isConnected) && !g_isConnected)
         return
     _running := true
     try

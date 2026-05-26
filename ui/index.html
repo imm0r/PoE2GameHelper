@@ -1432,16 +1432,20 @@
        the centre) and tightly layered so item cards behind never bleed
        through. The codex-ink base layer guarantees opacity even if the
        parchment gradient renders thin at small sizes. */
-    .inv-tooltip {
+    /* ── CODEX TOOLTIP — shared styling for any branded hover popup ─────
+       Used both for the rich item tooltips in the inventory tab AND
+       (via the auto-bind on [data-tip]) for short text tooltips that
+       used to live in native `data-tip="..."` attributes — the browser
+       default tooltip looks wildly out of place against the codex
+       theme. `.inv-tooltip` adds the per-item layout on top of this
+       base; `.codex-tooltip-text` is the slim text-only variant. */
+    .codex-tooltip {
       position: fixed;
       z-index: 9999;
-      max-width: 380px;
-      min-width: 220px;
-      padding: 16px 18px;
       font-family: var(--codex-serif);
       font-size: 13px;
       color: var(--codex-text);
-      background-color: #1a100a;  /* solid base — keeps tooltip readable on any backdrop */
+      background-color: #1a100a;
       background-image:
         linear-gradient(180deg, var(--codex-parchment) 0%, var(--codex-vellum) 100%);
       border: 1px solid var(--codex-gold);
@@ -1455,15 +1459,42 @@
       line-height: 1.55
     }
     /* Decorative corner fleurons via SVG diamonds inset at each corner. */
-    .inv-tooltip::before, .inv-tooltip::after {
+    .codex-tooltip::before, .codex-tooltip::after {
       content: "";
       position: absolute;
       width: 11px; height: 11px;
       background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><path d='M5 1 L9 5 L5 9 L1 5 Z' fill='%23f0d68a'/></svg>") center / contain no-repeat;
       opacity: 0.85
     }
-    .inv-tooltip::before { top: 5px;    left: 5px }
-    .inv-tooltip::after  { bottom: 5px; right: 5px }
+    .codex-tooltip::before { top: 5px;    left: 5px }
+    .codex-tooltip::after  { bottom: 5px; right: 5px }
+
+    /* Inventory item tooltip — adds the size box used for full item
+       cards on top of the shared codex base. */
+    .inv-tooltip {
+      max-width: 380px;
+      min-width: 220px;
+      padding: 16px 18px;
+    }
+
+    /* Slim text-only variant — short paragraphs / single-line hints. */
+    .codex-tooltip-text {
+      max-width: 340px;
+      padding: 10px 16px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--codex-text)
+    }
+
+    /* Disabled buttons normally drop pointer-events, which means our
+       data-tip hover listener never fires — exactly the wrong moment,
+       because that's when the "why is this disabled?" tooltip is
+       most useful. Re-enable pointer events while still keeping the
+       click suppressed (the browser handles that off `disabled`). */
+    button[disabled][data-tip] {
+      pointer-events: auto;
+      cursor: not-allowed;
+    }
 
     .inv-tooltip .inv-tt-name {
       font-family: var(--codex-display);
@@ -2305,6 +2336,22 @@
       gap: 10px
     }
 
+    /* Sub-rows (rendered indented under a parent toggle, like
+       "↳ Source" beneath the Map Hack switch) sit left-aligned next
+       to their label rather than getting flushed against the right
+       edge. The default space-between layout looked scattered on
+       wide windows because each sub-row's content floated to the
+       window edge independently. */
+    .cfg-sub-row {
+      justify-content: flex-start;
+      gap: 16px;
+    }
+
+    .cfg-sub-row .cfg-label {
+      min-width: 90px;
+      flex-shrink: 0;
+    }
+
     .cfg-label {
       color: var(--codex-text);
       font-family: var(--codex-serif);
@@ -3004,27 +3051,27 @@
     <div class="pill disconnected" id="pill-connect">
       <div class="dot"></div><span id="pill-connect-text">Disconnected</span>
     </div>
-    <div class="pill active" id="pill-updates" onclick="ahkCall('TogglePause')" title="Toggle Pause"
+    <div class="pill active" id="pill-updates" onclick="ahkCall('TogglePause')" data-tip="Toggle Pause"
       style="cursor:pointer">
       <div class="dot"></div><span id="pill-updates-text">Live</span>
     </div>
-    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" title="Toggle Debug">
+    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" title="Toggle AutoFlask">
+    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
-      title="Toggle AutoPilot — unified explore + combat (F10)">
+      data-tip="Toggle AutoPilot — unified explore + combat (F10)">
       <div class="dot"></div><span id="pill-autopilot-text">AutoPilot OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" title="Toggle Radar">
+    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" data-tip="Toggle Radar">
       <div class="dot"></div><span id="pill-radar-text">Radar ON</span>
     </div>
-    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" title="Toggle Player HUD">
+    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD">
       <div class="dot"></div><span id="pill-hud-text">HUD ON</span>
     </div>
-    <div class="pill inactive" id="pill-maphack" title="Maphack / Zone Scanner">
+    <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner">
       <div class="dot"></div><span id="pill-maphack-text">Map —</span>
     </div>
     <div class="pill inactive" id="pill-fps">
@@ -3035,9 +3082,9 @@
       <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
     </div>
     <div id="wm-btns">
-      <button class="wm-btn" onclick="ahkCall('WinMinimize')" title="Minimize">&#x2013;</button>
-      <button class="wm-btn" id="wm-maximize" onclick="ahkCall('WinMaximize')" title="Maximize">&#x25a1;</button>
-      <button class="wm-btn wm-close" onclick="ahkCall('WinClose')" title="Close">&#x2715;</button>
+      <button class="wm-btn" onclick="ahkCall('WinMinimize')" data-tip="Minimize">&#x2013;</button>
+      <button class="wm-btn" id="wm-maximize" onclick="ahkCall('WinMaximize')" data-tip="Maximize">&#x25a1;</button>
+      <button class="wm-btn wm-close" onclick="ahkCall('WinClose')" data-tip="Close">&#x2715;</button>
     </div>
   </div>
 
@@ -3171,11 +3218,11 @@
         <div id="uib-breadcrumb"></div>
         <div id="uib-idx-path" style="display:none;font-family:Consolas,monospace;font-size:11px;color:#9adff7;padding:2px 6px;"></div>
         <div id="uib-nav-btns">
-          <button class="uib-btn" onclick="ahkCall('UiBrowseParent')" title="Parent">↑ Parent</button>
-          <button class="uib-btn" onclick="ahkCall('UiBrowseBack')" title="Back">← Back</button>
-          <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" title="Root">⌂ Root</button>
-          <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" title="GameUI">⊞ GameUI</button>
-          <button class="uib-btn" onclick="uibCopyInfo()" title="Copy element info as text">📋 Copy Info</button>
+          <button class="uib-btn" onclick="ahkCall('UiBrowseParent')" data-tip="Parent">↑ Parent</button>
+          <button class="uib-btn" onclick="ahkCall('UiBrowseBack')" data-tip="Back">← Back</button>
+          <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" data-tip="Root">⌂ Root</button>
+          <button class="uib-btn" onclick="ahkCall('UiBrowseRoot')" data-tip="GameUI">⊞ GameUI</button>
+          <button class="uib-btn" onclick="uibCopyInfo()" data-tip="Copy element info as text">📋 Copy Info</button>
         </div>
         <div id="uib-search-row">
           <input id="uib-search-input" type="text" placeholder="Search StringId…"
@@ -3232,7 +3279,7 @@
         externally hosted JSON dumps haven't caught up yet.
       -->
       <div class="tsv-gen-bar" style="margin-top:6px">
-        <button class="cfg-btn" id="ggpk-refresh-btn" onclick="ggpkRefreshItemSizes()" title="Re-extract all GGPK-derived TSVs (base item sizes + names, monster names, stat names, mod ids) directly from your local PoE2 install via ggpk-tools/PoeDataExtract.exe. Requires the tool to be built (see ggpk-tools/README.md).">⟳ Refresh all TSVs from local GGPK</button>
+        <button class="cfg-btn" id="ggpk-refresh-btn" onclick="ggpkRefreshItemSizes()" data-tip="Re-extract all GGPK-derived TSVs (base item sizes + names, monster names, stat names, mod ids) directly from your local PoE2 install via ggpk-tools/PoeDataExtract.exe. Requires the tool to be built (see ggpk-tools/README.md).">⟳ Refresh all TSVs from local GGPK</button>
         <span id="ggpk-refresh-status" class="tsv-gen-status"></span>
       </div>
       <div id="tsv-gen-log" class="tsv-gen-log" style="display:none"></div>
@@ -3242,9 +3289,9 @@
         </select>
         <input id="tsv-search" type="text" placeholder="Filter rows…" oninput="filterTsvRows(this.value)" disabled>
         <div id="tsv-pager" class="tsv-pager" style="display:none">
-          <button class="tsv-pg-btn" onclick="tsvPageNav(-1)" id="tsv-prev" title="Previous page">◀</button>
+          <button class="tsv-pg-btn" onclick="tsvPageNav(-1)" id="tsv-prev" data-tip="Previous page">◀</button>
           <span id="tsv-page-info" class="tsv-page-info"></span>
-          <button class="tsv-pg-btn" onclick="tsvPageNav(1)" id="tsv-next" title="Next page">▶</button>
+          <button class="tsv-pg-btn" onclick="tsvPageNav(1)" id="tsv-next" data-tip="Next page">▶</button>
         </div>
         <span id="tsv-info" class="tsv-info"></span>
       </div>
@@ -3516,6 +3563,64 @@
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <!--
+                Maphack source picker. "Memory" = the legacy overlay
+                that paints the unexplored cells on top of the game
+                (cheap, reverts the moment the helper exits). "GGPK" =
+                shader patch via ggpk-tools/PoePatcher (the game itself
+                draws every cell as explored — survives until reverted,
+                but requires the game to be closed for apply/revert).
+                -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
+                <span class="cfg-label" style="color:var(--subtext)">↳ Source</span>
+                <div style="display:flex;gap:8px;font-size:12px">
+                  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="maphack-source" value="memory"
+                      onchange="ahkCall('SetMaphackSource','memory')" checked>
+                    Memory (overlay)
+                  </label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="radio" name="maphack-source" value="ggpk"
+                      onchange="ahkCall('SetMaphackSource','ggpk')">
+                    GGPK (shader patch)
+                  </label>
+                </div>
+              </div>
+              <!-- GGPK apply/revert — only shown when source=ggpk.
+                   The inner state machine (see updateConfigToggles)
+                   exposes three exclusive UIs: a path-entry hint when
+                   we haven't recorded the install yet, Apply when the
+                   patch isn't applied, Revert when it is. Buttons
+                   disable themselves (with a tooltip) while PoE2 is
+                   running so the user can't corrupt the bundle index. -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none;align-items:flex-start">
+                <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
+                      style="display:none">Apply</button>
+                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
+                      style="display:none">Revert</button>
+                    <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
+                  </div>
+                  <!-- Path-unknown panel: input + save + auto-hint.
+                       Hidden by default; updateConfigToggles flips it
+                       on when ggpkInstallPathKnown is false. -->
+                  <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
+                    <div style="margin-bottom:6px;line-height:1.4">
+                      The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
+                      and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
+                      the path to <code>Bundles2\_.index.bin</code> manually below.
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                      <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
+                        style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
+                        onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
+                      <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="cfg-row"><span class="cfg-label">Range Circles</span>
                 <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
                     checked><span class="toggle-slider"></span></label>
@@ -3621,7 +3726,7 @@
             </summary>
             <div style="padding:4px 0 6px;display:flex;gap:8px">
               <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px"
-                title="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
+                data-tip="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
                 first!)</button>
             </div>
             <div class="cfg-body" id="debug-panels-live">
@@ -3712,9 +3817,9 @@
     <div class="tab-panel" id="panel-dissect">
       <div class="dis-section">
         <div class="dis-toolbar">
-          <button class="tree-tbtn" id="dis-back-btn"    onclick="ahkCall('DissectBack')"    disabled title="Back">◀</button>
-          <button class="tree-tbtn" id="dis-fwd-btn"     onclick="ahkCall('DissectForward')" disabled title="Forward">▶</button>
-          <button class="tree-tbtn"                       onclick="ahkCall('DissectReread')"          title="Refresh">↻</button>
+          <button class="tree-tbtn" id="dis-back-btn"    onclick="ahkCall('DissectBack')"    disabled data-tip="Back">◀</button>
+          <button class="tree-tbtn" id="dis-fwd-btn"     onclick="ahkCall('DissectForward')" disabled data-tip="Forward">▶</button>
+          <button class="tree-tbtn"                       onclick="ahkCall('DissectReread')"          data-tip="Refresh">↻</button>
           <select id="dis-symbol" style="font-size:11px">
             <option value="ServerDataStructure">ServerDataStructure</option>
             <option value="GameUI">GameUI</option>
@@ -3775,7 +3880,7 @@
         <!-- Dump chain as a stateful button (was a checkbox). Mirrors checkbox
              state for setChk('inv-chain-dump', …) from the header sync. -->
         <button id="inv-chain-dump-btn" class="inv-tog-pill" type="button"
-                title="Write the full ServerData → PlayerInventories → items pointer chain to InGameStateMonitor.inventory_chain.log on every refresh. Diagnostic only."
+                data-tip="Write the full ServerData → PlayerInventories → items pointer chain to InGameStateMonitor.inventory_chain.log on every refresh. Diagnostic only."
                 onclick="(function(b){var c=document.getElementById('inv-chain-dump');c.checked=!c.checked;b.classList.toggle('active',c.checked);ahkCall('ToggleInventoryChainDump');})(this)">
           Dump Chain
         </button>
@@ -4089,7 +4194,7 @@
         if (row.isPtr) {
           // Use data attribute + event delegation rather than inline onclick —
           // avoids quote-escaping issues and survives innerHTML rebuilds.
-          ptrCell = '<span class="dis-ptr-link" data-ptr="' + escAttr(row.ptr) + '" title="Click to follow pointer">' + escHtml(row.ptr) + '</span>';
+          ptrCell = '<span class="dis-ptr-link" data-ptr="' + escAttr(row.ptr) + '" data-tip="Click to follow pointer">' + escHtml(row.ptr) + '</span>';
         } else {
           ptrCell = '<span style="color:var(--subtext)">' + escHtml(row.ptr) + '</span>';
         }
@@ -4350,7 +4455,7 @@
     function _invShowTip(ev, b64) {
       if (!_invTipEl) {
         _invTipEl = document.createElement('div');
-        _invTipEl.className = 'inv-tooltip';
+        _invTipEl.className = 'codex-tooltip inv-tooltip';
         document.body.appendChild(_invTipEl);
       }
       let p;
@@ -4391,6 +4496,59 @@
     function _invHideTip() {
       if (_invTipEl) _invTipEl.style.display = 'none';
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CODEX TOOLTIP — generic [data-tip] auto-bind
+    // ═══════════════════════════════════════════════════════════════════
+    // Any element with a `data-tip="..."` attribute gets a branded
+    // codex-styled tooltip on hover instead of the OS-level title-bar
+    // popup. Use this instead of `data-tip="..."` for any user-visible
+    // tooltip — the native one breaks the theme. Strings only; for
+    // rich item tooltips keep using the inv-tooltip path.
+    let _codexTipEl = null;
+    function _codexTipShow(ev) {
+      const el = ev.target && ev.target.closest ? ev.target.closest('[data-tip]') : null;
+      if (!el) return;
+      const text = el.getAttribute('data-tip');
+      if (!text) return;
+      if (!_codexTipEl) {
+        _codexTipEl = document.createElement('div');
+        _codexTipEl.className = 'codex-tooltip codex-tooltip-text';
+        document.body.appendChild(_codexTipEl);
+      }
+      _codexTipEl.textContent = text;
+      _codexTipEl.style.display = 'block';
+      _codexTipPosition(ev);
+    }
+    function _codexTipPosition(ev) {
+      if (!_codexTipEl || _codexTipEl.style.display !== 'block') return;
+      const pad = 14;
+      let x = ev.clientX + pad, y = ev.clientY + pad;
+      const w = _codexTipEl.offsetWidth, h = _codexTipEl.offsetHeight;
+      if (x + w > window.innerWidth)  x = ev.clientX - w - pad;
+      if (y + h > window.innerHeight) y = ev.clientY - h - pad;
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      _codexTipEl.style.left = x + 'px';
+      _codexTipEl.style.top  = y + 'px';
+    }
+    function _codexTipHide(ev) {
+      const el = ev.target && ev.target.closest ? ev.target.closest('[data-tip]') : null;
+      // Only hide if we're leaving the element that owned the tip.
+      if (!el) return;
+      if (_codexTipEl) _codexTipEl.style.display = 'none';
+    }
+    // Event delegation off document — captures hovers on dynamically-
+    // added elements without us having to re-bind. Negligible cost
+    // since we early-return for events that don't hit a [data-tip].
+    document.addEventListener('mouseover',  _codexTipShow,    true);
+    document.addEventListener('mousemove',  _codexTipPosition, true);
+    document.addEventListener('mouseout',   _codexTipHide,    true);
+    // Hide on blur / scroll / tab-switch — the OS-level events the
+    // browser uses for native data-tip="..." popups don't reach us here,
+    // so we drop the tooltip on anything that breaks pointer flow.
+    window.addEventListener('blur',   () => { if (_codexTipEl) _codexTipEl.style.display = 'none'; });
+    window.addEventListener('scroll', () => { if (_codexTipEl) _codexTipEl.style.display = 'none'; }, true);
 
     // ═══════════════════════════════════════════════════════════════════
     //  STATUS BAR
@@ -4456,7 +4614,7 @@
         else if (state === 'explore') { label = 'AutoPilot ' + pct + '%'; cls = 'active'; }
         else { label = 'AutoPilot ON'; cls = 'active'; }
         pillAp.className = 'pill clickable ' + cls;
-        pillAp.title = 'Toggle AutoPilot (' + hk + ') — unified explore + combat';
+        pillAp.setAttribute('data-tip', 'Toggle AutoPilot (' + hk + ') — unified explore + combat');
         document.getElementById('pill-autopilot-text').textContent = label;
       }
       const pillRadar = document.getElementById('pill-radar');
@@ -4494,15 +4652,15 @@
         }
         if (done) {
           pillMap.className = 'pill active';
-          pillMap.title = 'Maphack ready — ' + tiles + ' POIs in ' + secs + 's\n' + diag;
+          pillMap.setAttribute('data-tip', 'Maphack ready — ' + tiles + ' POIs in ' + secs + 's\n' + diag);
           document.getElementById('pill-maphack-text').textContent = 'Map ✓ ' + tiles;
         } else if (inProg || elapsed > 0) {
           pillMap.className = 'pill scanning';
-          pillMap.title = 'Scanning… ' + tiles + ' found, ' + secs + 's\n' + diag;
+          pillMap.setAttribute('data-tip', 'Scanning… ' + tiles + ' found, ' + secs + 's\n' + diag);
           document.getElementById('pill-maphack-text').textContent = 'Map ⟳ ' + tiles + ' · ' + secs + 's';
         } else {
           pillMap.className = 'pill inactive';
-          pillMap.title = 'Maphack idle' + (fail ? '\n' + fail : '');
+          pillMap.setAttribute('data-tip', 'Maphack idle' + (fail ? '\n' + fail : ''));
           document.getElementById('pill-maphack-text').textContent = 'Map —';
         }
       }
@@ -4560,6 +4718,61 @@
 
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+      // Maphack source — radio sync + GGPK action row visibility.
+      // The actual "PoE2 is closed → buttons enabled" gating runs on
+      // every header push (PoE state is in d.isConnected / d.poeRunning).
+      const mhSource = d.maphackSource || 'memory';
+      const mhMemRadio = document.querySelector('input[name="maphack-source"][value="memory"]');
+      const mhGgpkRadio = document.querySelector('input[name="maphack-source"][value="ggpk"]');
+      if (mhMemRadio) mhMemRadio.checked  = (mhSource === 'memory');
+      if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
+      const ggpkRow = document.getElementById('row-maphack-ggpk');
+      if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      // GGPK panel has three exclusive states:
+      //   (a) install path not yet known      → buttons hidden, info hint shown
+      //   (b) path known, patch NOT applied   → only Apply visible
+      //   (c) path known, patch IS applied    → only Revert visible
+      // Either button greys out (with explanatory tooltip) while PoE2
+      // is running — writing to the bundle index mid-session would
+      // corrupt it.
+      const poeIsRunning  = (d.poeRunning === true) || (d.isConnected === true);
+      const isApplied     = (d.ggpkMaphackApplied === true);
+      const pathKnown     = (d.ggpkInstallPathKnown === true);
+      const applyBtn      = document.getElementById('ggpk-maphack-apply');
+      const revertBtn     = document.getElementById('ggpk-maphack-revert');
+      const ggpkStatus    = document.getElementById('ggpk-maphack-status');
+      const pathEntry = document.getElementById('ggpk-path-entry');
+      // Note: we deliberately DON'T touch ggpkStatus here. It's owned
+      // by updateGgpkMaphackStatus + ggpkSavePathManually's response;
+      // resetting it on every header push would wipe success messages
+      // immediately after the action that produced them.
+      if (!pathKnown) {
+        if (applyBtn)  applyBtn.style.display  = 'none';
+        if (revertBtn) revertBtn.style.display = 'none';
+        if (pathEntry) pathEntry.style.display = '';
+      } else if (_ggpkMaphackBusy) {
+        // A click is in flight — leave the buttons disabled + the
+        // status text alone. updateGgpkMaphackStatus will reset
+        // _ggpkMaphackBusy when the operation completes.
+        if (pathEntry) pathEntry.style.display = 'none';
+      } else {
+        if (pathEntry) pathEntry.style.display = 'none';
+        if (applyBtn) {
+          applyBtn.style.display = isApplied ? 'none' : '';
+          applyBtn.disabled      = poeIsRunning;
+          applyBtn.setAttribute('data-tip', poeIsRunning
+            ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+            : 'Patch PoE2 minimap shaders so every cell renders as explored.');
+        }
+        if (revertBtn) {
+          revertBtn.style.display = isApplied ? '' : 'none';
+          revertBtn.disabled      = poeIsRunning;
+          revertBtn.setAttribute('data-tip', poeIsRunning
+            ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+            : 'Restore the original minimap shaders.');
+        }
+        // Don't auto-clear ggpkStatus here — see note above.
+      }
       setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
 
@@ -4678,7 +4891,7 @@
       if (wmMax) {
         const isMax = d.isMaximized === true || d.isMaximized === 'true';
         wmMax.textContent = isMax ? '\u2750' : '\u25a1';
-        wmMax.title = isMax ? 'Restore' : 'Maximize';
+        wmMax.setAttribute('data-tip', isMax ? 'Restore' : 'Maximize');
       }
     }
 
@@ -4846,20 +5059,20 @@
     <span style="color:var(--accent);width:16px;font-weight:600">S${i}</span>
     <input type="text" class="combat-slot-key" placeholder="—" value="${_esc(s.key)}" style="width:42px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 4px;font-size:11px;text-align:center" onchange="saveCombatSlot(${i})">
     <select class="combat-slot-name" style="flex:1;min-width:80px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px 4px;font-size:11px" onchange="onSkillPicked(${i})">${skillOpts}</select>
-    <span class="combat-slot-cd-live" style="width:54px;text-align:center;font-size:10px;color:var(--subtext);font-family:monospace" title="Live cooldown from game memory">—</span>
-    <button type="button" class="combat-slot-adv-toggle" onclick="toggleSlotAdvanced(${i})" style="width:18px;height:18px;background:transparent;border:none;color:var(--subtext);cursor:pointer;padding:0;font-size:12px" title="Advanced (type / priority / overrides)">▾</button>
+    <span class="combat-slot-cd-live" style="width:54px;text-align:center;font-size:10px;color:var(--subtext);font-family:monospace" data-tip="Live cooldown from game memory">—</span>
+    <button type="button" class="combat-slot-adv-toggle" onclick="toggleSlotAdvanced(${i})" style="width:18px;height:18px;background:transparent;border:none;color:var(--subtext);cursor:pointer;padding:0;font-size:12px" data-tip="Advanced (type / priority / overrides)">▾</button>
   </div>
   <div class="combat-slot-adv-row" data-slot="${i}" style="display:none;gap:6px;align-items:center;padding:4px 0 8px 20px;font-size:10px;color:var(--subtext);border-bottom:1px solid var(--border);flex-wrap:wrap">
-    <span title="aoe = require ≥2 enemies; buff = long cooldown skill; movement = traversal">Type</span>
+    <span data-tip="aoe = require ≥2 enemies; buff = long cooldown skill; movement = traversal">Type</span>
     <select class="combat-slot-type" style="background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px;font-size:10px" onchange="saveCombatSlot(${i})">${typeOpts}</select>
-    <span title="Lower = fires first">Prio</span>
+    <span data-tip="Lower = fires first">Prio</span>
     <input type="number" class="combat-slot-prio" min="1" max="99" value="${prio}" style="width:32px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:2px;font-size:10px;text-align:center" onchange="saveCombatSlot(${i})">
-    <span title="Override cooldown (ms, 0=use live game cooldown)">CD</span>
+    <span data-tip="Override cooldown (ms, 0=use live game cooldown)">CD</span>
     <span class="slider-wrap combat-slot-cd-wrap" style="flex:1;min-width:80px">
       <span class="slider-val">${cdOv}</span>
       <input type="range" class="combat-slot-cd" min="0" max="5000" step="100" value="${cdOv}" oninput="_sbInline(this); saveCombatSlot(${i})">
     </span>
-    <span title="Override range (world units, 0=auto from castType)">Range</span>
+    <span data-tip="Override range (world units, 0=auto from castType)">Range</span>
     <span class="slider-wrap combat-slot-range-wrap" style="flex:1;min-width:80px">
       <span class="slider-val">${rngOv}</span>
       <input type="range" class="combat-slot-range" min="0" max="5000" step="50" value="${rngOv}" oninput="_sbInline(this); saveCombatSlot(${i}); updateRangeCircleVisibility()" onfocus="updateRangeCircleVisibility()">
@@ -5189,7 +5402,7 @@
           const pct = Math.max(0, Math.min(100, Number(timer) / Number(total) * 100));
           barHtml = `<div class="buff-bar-wrap"><div class="buff-bar"><div class="buff-bar-fill${pct < 25 ? ' low' : ''}" style="width:${pct.toFixed(1)}%"></div></div></div>`;
         }
-        return `<div class="buff-card" onclick="blacklistAdd('${escAttr(raw)}')" title="Click to hide"><div class="buff-name" style="display:flex;align-items:center;gap:4px">${ic}<span>${nm}</span></div>${meta}${barHtml}</div>`;
+        return `<div class="buff-card" onclick="blacklistAdd('${escAttr(raw)}')" data-tip="Click to hide"><div class="buff-name" style="display:flex;align-items:center;gap:4px">${ic}<span>${nm}</span></div>${meta}${barHtml}</div>`;
       }).join('');
       el.innerHTML = `<div class="buff-section-title">${filtered.length} active buff${filtered.length !== 1 ? 's' : ''}</div><div class="buff-grid">${cards}</div>`;
     }
@@ -5236,7 +5449,7 @@
         const displayName = escHtml(e.name || e.path || '?');
         const isTracked = e.path && e.path === _trackedEntityPath;
         const cbHtml = `<td class="track-td" onclick="event.stopPropagation()"><input type="checkbox" class="track-cb" ${isTracked ? 'checked' : ''} onchange="trackEntity(this,'${escAttr(e.path || '')}')"></td>`;
-        return `<tr class="${cls}" onclick="entityRowClick(event,'${escAttr(e.path || '')}')">${cbHtml}<td title="${escHtml(e.path || '')}">${icon}${typeBadge}${displayName}</td><td class="${rarClass}">${escHtml(String(e.rarity || 'Normal'))}</td><td>${lifeHtml}</td><td>${e.dist >= 0 ? e.dist + 'm' : '—'}</td></tr>`;
+        return `<tr class="${cls}" onclick="entityRowClick(event,'${escAttr(e.path || '')}')">${cbHtml}<td data-tip="${escHtml(e.path || '')}">${icon}${typeBadge}${displayName}</td><td class="${rarClass}">${escHtml(String(e.rarity || 'Normal'))}</td><td>${lifeHtml}</td><td>${e.dist >= 0 ? e.dist + 'm' : '—'}</td></tr>`;
       };
       const rows = [...alive.map(e => makeRow(e, '')), ...dead.map(e => makeRow(e, 'dead')), ...sleeping.map(e => makeRow(e, 'entity-sleep'))].join('');
       const sleepLabel = sleeping.length > 0 ? ` · ${sleeping.length} sleeping` : '';
@@ -5272,7 +5485,7 @@
         if (i === bc.length - 1)
           return `<span class="uib-crumb current">${escHtml(label)}</span>`;
         return `<span class="uib-crumb" onclick="ahkCall('UiBrowseAddress','${escAttr(b.ptr)}')"
-                  title="${escAttr(b.ptr)}">${escHtml(label)}</span>`
+                  data-tip="${escAttr(b.ptr)}">${escHtml(label)}</span>`
           + `<span class="uib-crumb-sep">›</span>`;
       }).join('');
       // Index path "[1] > [41] > [1] > *"
@@ -5296,7 +5509,7 @@
           const sid = c.stringId || '';
           const label = sid ? escHtml(sid) : `<span class="no-id">[${c.idx}]</span>`;
           const ccTxt = c.childCount > 0 ? `<span class="uib-child-cc">${c.childCount}▸</span>` : '';
-          return `<div class="uib-child-row" onclick="ahkCall('UiBrowseChild',${c.idx})" title="${escAttr(c.ptr)}">
+          return `<div class="uib-child-row" onclick="ahkCall('UiBrowseChild',${c.idx})" data-tip="${escAttr(c.ptr)}">
                 <span class="uib-child-idx">[${c.idx}]</span>
                 <span class="uib-child-vis ${c.isVisible ? 'visible' : 'hidden'}"></span>
                 <span class="uib-child-sid">${label}</span>
@@ -5410,7 +5623,7 @@
       document.getElementById('uib-search-results-list').innerHTML = results.length === 0
         ? `<div class="uib-empty">Keine Treffer für "${escHtml(query)}"</div>`
         : results.map(r =>
-          `<div class="uib-sr-row" onclick="ahkCall('UiBrowseAddress','${escAttr(r.ptr)}')" title="${escAttr(r.ptr)}">
+          `<div class="uib-sr-row" onclick="ahkCall('UiBrowseAddress','${escAttr(r.ptr)}')" data-tip="${escAttr(r.ptr)}">
            <span class="uib-child-vis ${r.isVisible ? 'visible' : 'hidden'}"></span>
            <span style="flex:1;font-size:11px">${escHtml(r.stringId)}</span>
            <span style="font-size:10px;color:var(--subtext)">${escHtml(r.ptr)}</span>
@@ -5711,7 +5924,7 @@
             html += `<div style="padding-left:16px;color:#ef4444;font-size:10px">${escHtml(ch)}</div>`;
           });
           html += `</div>`;
-          html += `<button onclick="promptSavePanelOffset('${escHtml(e.off)}')" style="font-size:9px;padding:2px 6px;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--accent);white-space:nowrap;margin-left:8px" title="Save this offset as a known panel">💾 Save</button>`;
+          html += `<button onclick="promptSavePanelOffset('${escHtml(e.off)}')" style="font-size:9px;padding:2px 6px;cursor:pointer;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--accent);white-space:nowrap;margin-left:8px" data-tip="Save this offset as a known panel">💾 Save</button>`;
           html += `</div>`;
         });
         html += `</div>`;
@@ -5771,7 +5984,7 @@
         html += `<div style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-family:monospace;font-size:10px">`;
         html += `<span style="color:#4ade80">${escHtml(p.name)}</span>`;
         html += `<span style="color:#888">${escHtml(p.offset)}</span>`;
-        html += `<button onclick="ahkCall('RemovePanelOffset','${escHtml(p.name)}')" style="font-size:9px;cursor:pointer;background:none;border:none;color:#ef4444;padding:0 2px" title="Remove">✕</button>`;
+        html += `<button onclick="ahkCall('RemovePanelOffset','${escHtml(p.name)}')" style="font-size:9px;cursor:pointer;background:none;border:none;color:#ef4444;padding:0 2px" data-tip="Remove">✕</button>`;
         html += `</div>`;
       });
       html += `</div>`;
@@ -5834,7 +6047,7 @@
         const cdPct = (s.mu > 0 && s.ac > 0) ? Math.min(100, s.ac / s.mu * 100) : 0;
         const cdBar = s.mu > 0 ? `<div class="skill-cd-bar"><div class="skill-cd-fill" style="width:${cdPct}%"></div></div>` : '';
         const ctName = typeof animName === 'function' ? animName(s.ct) : s.ct;
-        return `<tr style="cursor:pointer" onclick="blacklistAdd('${escAttr(rawName)}')" title="Click to hide"><td title="${nm}">${icImg}${dn}</td><td class="${statusCls}">${statusTxt}</td><td>${cdText}</td><td>${usesText} ${cdBar}</td><td>${s.tu}</td><td title="ID: ${s.ct} / EquipID: ${escHtml(s.eq)}">${escHtml(ctName)}</td></tr>`;
+        return `<tr style="cursor:pointer" onclick="blacklistAdd('${escAttr(rawName)}')" data-tip="Click to hide"><td data-tip="${nm}">${icImg}${dn}</td><td class="${statusCls}">${statusTxt}</td><td>${cdText}</td><td>${usesText} ${cdBar}</td><td>${s.tu}</td><td data-tip="ID: ${s.ct} / EquipID: ${escHtml(s.eq)}">${escHtml(ctName)}</td></tr>`;
       }).join('');
       el.innerHTML = `<div class="skill-header"><span class="skill-count">${usable.length} usable · ${blocked.length} on cooldown · ${filtered.length} total</span><span class="skill-debug" style="opacity:0.5;font-size:0.85em;margin-left:1em">ActiveSkill offset: ${asOff}</span></div><table class="skill-table"><thead><tr><th>Skill</th><th>Status</th><th>Cooldown</th><th>Uses</th><th>Total Uses</th><th>Cast Type</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
@@ -5861,7 +6074,7 @@
       }
       body.innerHTML = filtered.map(r => {
         const sel = r.path === _wlSelectedPath ? ' selected' : '';
-        return `<tr class="${sel}" onclick="wlSelect('${escHtml(r.path)}')"><td title="${escHtml(r.path)}">${escHtml(r.path)}</td><td>${escHtml(String(r.value ?? ''))}</td></tr>`;
+        return `<tr class="${sel}" onclick="wlSelect('${escHtml(r.path)}')"><td data-tip="${escHtml(r.path)}">${escHtml(r.path)}</td><td>${escHtml(String(r.value ?? ''))}</td></tr>`;
       }).join('');
     }
 
@@ -5954,7 +6167,7 @@
         ahkCall('HighlightEntity', _entityCtxPath);
         // Check the matching row's checkbox
         document.querySelectorAll('#tab-entities-content .track-cb').forEach(c => {
-          c.checked = (c.closest('tr')?.querySelector('[title]')?.title === _entityCtxPath);
+          c.checked = (c.closest('tr')?.querySelector('[data-tip]')?.getAttribute('data-tip') === _entityCtxPath);
         });
       }
       document.getElementById('entity-ctx').style.display = 'none';
@@ -6055,6 +6268,58 @@
       status.textContent = '';
       ahkCall('RefreshItemSizes');
     }
+    // GGPK apply/revert click wrapper. Immediately disables both
+    // buttons + posts an "in progress" status, so the user gets
+    // feedback during the multi-second shell-out instead of staring
+    // at a still-active button and wondering whether the click
+    // registered. updateConfigToggles checks _ggpkMaphackBusy and
+    // skips its own Apply/Revert refresh while a run is pending,
+    // so the disabled state can't be flipped back accidentally.
+    let _ggpkMaphackBusy = false;
+    function ggpkMaphackRun(verb) {
+      if (_ggpkMaphackBusy) return;
+      _ggpkMaphackBusy = true;
+      const applyBtn  = document.getElementById('ggpk-maphack-apply');
+      const revertBtn = document.getElementById('ggpk-maphack-revert');
+      if (applyBtn)  applyBtn.disabled  = true;
+      if (revertBtn) revertBtn.disabled = true;
+      const status = document.getElementById('ggpk-maphack-status');
+      if (status) {
+        status.style.color = 'var(--subtext)';
+        status.textContent = (verb === 'apply')
+          ? 'GGPK modification in progress — this will take a few seconds…'
+          : 'Restoring vanilla shaders — this will take a few seconds…';
+      }
+      ahkCall(verb === 'apply' ? 'GgpkMaphackApply' : 'GgpkMaphackRevert');
+    }
+
+    // Manually persist the PoE2 install index path (when auto-discovery
+    // via running process hasn't happened yet). AHK validates the path
+    // before writing — bad paths produce a status message but don't
+    // corrupt the INI.
+    function ggpkSavePathManually() {
+      const inp = document.getElementById('ggpk-path-input');
+      if (!inp) return;
+      const path = (inp.value || '').trim();
+      if (!path) return;
+      ahkCall('SetGgpkInstallPath', path);
+    }
+
+    // Maphack apply/revert result lands on its own Config-tab row so
+    // it doesn't get confused with the TSV refresh status in Data tab.
+    function updateGgpkMaphackStatus(json) {
+      let r;
+      try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }
+      // Operation finished — let the next header push touch the
+      // buttons again (it'll switch between Apply / Revert / disabled
+      // based on the resulting ggpkMaphackApplied + poeRunning state).
+      _ggpkMaphackBusy = false;
+      const el = document.getElementById('ggpk-maphack-status');
+      if (!el) return;
+      el.style.color = r.ok ? 'var(--accent, #8aff8a)' : 'var(--err, #ff8a8a)';
+      el.textContent = r.msg || (r.ok ? 'Done.' : 'Failed.');
+    }
+
     function updateGgpkToolStatus(json) {
       let r;
       try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }

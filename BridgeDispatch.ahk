@@ -103,6 +103,19 @@ _DispatchBridgeCall(method, args)
             if (g_radarOverlay)
                 g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
+        case "SetMaphackSource":
+            ; args[1] = "memory" | "ggpk". Anything else falls back to memory.
+            global g_maphackSource, g_radarOverlay, g_mapHackEnabled
+            newSrc := (args.Length >= 1 && args[1] = "ggpk") ? "ggpk" : "memory"
+            g_maphackSource := newSrc
+            ; The overlay only renders the memory-based maphack when its
+            ; mode is "memory" AND the toggle is on. Mirror state down so
+            ; switching the source instantly stops drawing the overlay.
+            if (g_radarOverlay)
+                g_radarOverlay._mapHackEnabled := (g_mapHackEnabled && newSrc = "memory")
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "ToggleRangeCircles":
             global g_rangeCirclesEnabled
             g_rangeCirclesEnabled := !g_rangeCirclesEnabled
@@ -529,7 +542,78 @@ _DispatchBridgeCall(method, args)
             ; ~200 ms..2 s end-to-end and pumps a status message back
             ; to the UI via the standard WebViewExec channel.
             SetTimer(() => GgpkToolBridgeUi_Refresh(), -1)
+        case "GgpkMaphackApply":
+            SetTimer(() => GgpkMaphackUi_Apply(), -1)
+        case "GgpkMaphackRevert":
+            SetTimer(() => GgpkMaphackUi_Revert(), -1)
+        case "SetGgpkInstallPath":
+            ; args[1] is the user-entered path. Validate + persist on a
+            ; background timer so the WebView message thread stays
+            ; responsive.
+            pathArg := (args.Length >= 1) ? String(args[1]) : ""
+            if (pathArg != "")
+                SetTimer(() => GgpkInstallPathUi_Save(pathArg), -1)
     }
+}
+
+; Validates + persists a manually-entered PoE2 install index path
+; (Bundles2\_.index.bin OR Content.ggpk). After a successful save,
+; pushes a fresh header so the GGPK Apply/Revert UI flips out of
+; "path unknown" state immediately.
+GgpkInstallPathUi_Save(rawPath)
+{
+    path := Trim(rawPath, ' "`t')
+    result := Map("ok", false, "msg", "")
+    if (path = "")
+    {
+        result["msg"] := "Empty path."
+    }
+    else if (!FileExist(path))
+    {
+        result["msg"] := "File not found: " path
+    }
+    else if (!RegExMatch(path, "i)\.(index\.bin|ggpk)$"))
+    {
+        result["msg"] := "Path must point at Bundles2\_.index.bin or Content.ggpk."
+    }
+    else
+    {
+        ; Validated — persist and (politely) tell the UI to re-render.
+        try IniWrite(path, _ConfigPath(), "GgpkTools", "lastIndexPath")
+        result["ok"] := true
+        result["msg"] := "Saved. Apply/Revert buttons should appear."
+    }
+    json := '{"ok":' (result["ok"] ? "true" : "false")
+        . ',"msg":' _BridgeJsonEscape(result["msg"]) '}'
+    try WebViewExec("updateGgpkMaphackStatus(" _JsStr(json) ")")
+    SetTimer(PushHeaderToWebView, -50)
+}
+
+; UI-side wrappers for the GGPK maphack patch/revert. Both shell out
+; to ggpk-tools/PoePatcher and surface the result via the same
+; updateGgpkToolStatus envelope the manual refresh button uses.
+GgpkMaphackUi_Apply()
+{
+    result := GgpkToolBridge.ApplyMinimapPatch()
+    _PushGgpkToolStatus(result)
+}
+GgpkMaphackUi_Revert()
+{
+    result := GgpkToolBridge.RevertMinimapPatch()
+    _PushGgpkToolStatus(result)
+}
+_PushGgpkToolStatus(result)
+{
+    ; Maphack apply/revert get their own status function so the
+    ; message lands on the Config-tab row (#ggpk-maphack-status),
+    ; not on the data-tab refresh row (#ggpk-refresh-status). Same
+    ; envelope shape — different sink.
+    json := '{"ok":' (result["ok"] ? "true" : "false")
+        . ',"msg":' _BridgeJsonEscape(result["msg"]) '}'
+    try WebViewExec("updateGgpkMaphackStatus(" _JsStr(json) ")")
+    ; Refresh the header so the Apply/Revert button visibility flips
+    ; immediately (the new `ggpkMaphackApplied` flag rides on it).
+    SetTimer(PushHeaderToWebView, -50)
 }
 
 ; UI-side wrapper around GgpkToolBridge.RefreshAllTsvs that pushes

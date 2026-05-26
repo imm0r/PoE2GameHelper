@@ -80,6 +80,11 @@ class GgpkToolBridge
             rows := ItemSizeRegistry.LoadStats["entries"]
         }
 
+        ; Persist the path under [GgpkTools] lastIndexPath so the GGPK
+        ; maphack apply/revert (which run while the game is CLOSED, so
+        ; _ResolveGameDataPath would return nothing) can find the index.
+        try IniWrite(indexPath, _ConfigPath(), "GgpkTools", "lastIndexPath")
+
         return Map("ok", true, "msg", "Refreshed all TSVs (item sizes: " rows " entries).", "rows", rows)
     }
 
@@ -258,6 +263,244 @@ class GgpkToolBridge
         {
             try LogError("GgpkTools/MaybeAutoRefresh", ex)
         }
+    }
+
+    ; ────────────────────────────────────────────────────────────────
+    ; Minimap maphack — patch / revert PoE2's two minimap shader files
+    ; in place. Both operations require the game to be CLOSED (the
+    ; bundle files are open + cached by PoE2 while it runs, so any
+    ; write would be silently discarded or worse).
+    ;
+    ; Both functions return Map("ok", bool, "msg", string).
+    ; ────────────────────────────────────────────────────────────────
+
+    static ApplyMinimapPatch()
+    {
+        return this._RunPatchVerb("apply")
+    }
+
+    static RevertMinimapPatch()
+    {
+        return this._RunPatchVerb("revert")
+    }
+
+    ; Returns true when we have a cached install path AND the file
+    ; still exists on disk. The Apply/Revert UI hides itself when this
+    ; is false. Three paths populate the cache:
+    ;   1) RefreshAllTsvs after a TSV refresh against a running game
+    ;   2) EnsureConnected the moment the helper attaches
+    ;   3) HasCachedIndexPath itself — falls back to a Steam registry
+    ;      lookup so the workflow can succeed even on a fresh install
+    ;      where PoE2 has never been running while the helper was up.
+    static HasCachedIndexPath()
+    {
+        indexPath := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+        if (indexPath != "" && FileExist(indexPath))
+            return true
+        ; Cache miss — try to derive it from Steam's own bookkeeping.
+        autoPath := this._FindIndexPathFromSteam()
+        if (autoPath != "")
+        {
+            try IniWrite(autoPath, _ConfigPath(), "GgpkTools", "lastIndexPath")
+            return true
+        }
+        return false
+    }
+
+    ; Steam-based PoE2 install discovery (no running process required).
+    ; Chain:
+    ;   1) Find Steam itself via HKLM\Software\WOW6432Node\Valve\Steam.
+    ;   2) Parse <steam>\steamapps\libraryfolders.vdf to enumerate every
+    ;      library folder (Steam may have several across drives).
+    ;   3) In each library, look for appmanifest_2694490.acf (PoE2's
+    ;      Steam app id) and read the "installdir" key. The game folder
+    ;      isn't always literally "Path of Exile 2" — users sometimes
+    ;      rename it, so we always defer to the manifest.
+    ;   4) Build <library>\steamapps\common\<installdir>\Bundles2\_.index.bin
+    ;      and verify it exists.
+    ; Returns the path on hit, "" on any miss.
+    static _FindIndexPathFromSteam()
+    {
+        static APP_ID := "2694490"
+        try
+        {
+            steamRoot := RegRead("HKLM\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath", "")
+            if (steamRoot = "")
+                steamRoot := RegRead("HKLM\SOFTWARE\Valve\Steam", "InstallPath", "")
+            if (steamRoot = "" || !DirExist(steamRoot))
+                return ""
+
+            vdf := steamRoot "\steamapps\libraryfolders.vdf"
+            if (!FileExist(vdf))
+                return ""
+
+            libraries := this._ParseSteamLibraryPaths(vdf)
+            ; Always include the default library — older Steam VDFs
+            ; sometimes omit the install root itself.
+            if (steamRoot != "" && !this._ListContains(libraries, steamRoot))
+                libraries.Push(steamRoot)
+
+            for _, lib in libraries
+            {
+                manifest := lib "\steamapps\appmanifest_" APP_ID ".acf"
+                if (!FileExist(manifest))
+                    continue
+                installDir := this._ParseAcfKey(manifest, "installdir")
+                if (installDir = "")
+                    continue
+                cand := lib "\steamapps\common\" installDir "\Bundles2\_.index.bin"
+                if (FileExist(cand))
+                    return cand
+                ; PoE2 beta builds had a Content.ggpk alongside the
+                ; bundle index; check that as a fallback so legacy
+                ; installs aren't left out.
+                cand := lib "\steamapps\common\" installDir "\Content.ggpk"
+                if (FileExist(cand))
+                    return cand
+            }
+        }
+        catch as ex
+        {
+            try LogError("GgpkTools/_FindIndexPathFromSteam", ex)
+        }
+        return ""
+    }
+
+    ; libraryfolders.vdf is Valve's KeyValues text format. We just need
+    ; the `"path"  "<dir>"` entries — there's at most one per library
+    ; and they live at the top level under each numeric index. A naive
+    ; regex over the whole file is enough for that.
+    static _ParseSteamLibraryPaths(vdfFile)
+    {
+        out := []
+        try
+        {
+            content := FileRead(vdfFile, "UTF-8")
+            ; Steam stores Windows paths with doubled backslashes inside
+            ; the VDF ("C:\\Program Files (x86)\\Steam"). Unescape here
+            ; so the path we hand to FileExist actually works.
+            pos := 1
+            while (pos := RegExMatch(content, 'i)"path"\s+"((?:[^"\\]|\\.)*)"', &m, pos))
+            {
+                raw := m[1]
+                raw := StrReplace(raw, "\\", "\")
+                raw := StrReplace(raw, '\"', '"')
+                if (raw != "")
+                    out.Push(raw)
+                pos += m.Len
+            }
+        }
+        catch
+        {
+            ; Malformed VDF or unreadable file — just return whatever we
+            ; collected so far (likely empty). Callers handle the
+            ; no-libraries case fine.
+        }
+        return out
+    }
+
+    ; Pulls a single string value out of an ACF manifest. Same
+    ; KeyValues format as VDF but the keys we care about (installdir,
+    ; name, etc.) sit inside the top-level "AppState" block, so a
+    ; flat regex match is good enough.
+    static _ParseAcfKey(acfFile, keyName)
+    {
+        try
+        {
+            content := FileRead(acfFile, "UTF-8")
+            pattern := 'i)"' keyName '"\s+"((?:[^"\\]|\\.)*)"'
+            if (RegExMatch(content, pattern, &m))
+            {
+                val := m[1]
+                val := StrReplace(val, "\\", "\")
+                val := StrReplace(val, '\"', '"')
+                return val
+            }
+        }
+        return ""
+    }
+
+    static _ListContains(list, needle)
+    {
+        for _, v in list
+            if (v = needle)
+                return true
+        return false
+    }
+
+    ; Returns true when PoePatcher's backup directory for the minimap
+    ; patch exists and contains the snapshot file we drop on apply.
+    ;
+    ; BackupManager.Save creates `<ggpkdir>/backups/<patch>/...` on
+    ; apply; PoePatcher.Program.SnapshotIndexFile drops
+    ; `_index_snapshot.bin` next to the per-file backups (first apply
+    ; only). On revert, BackupManager.Clear() recursively deletes the
+    ; whole directory, so its presence is a reliable "currently
+    ; applied" signal — independent of whether the game is running.
+    static IsMaphackApplied()
+    {
+        indexPath := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+        if (indexPath = "" || !FileExist(indexPath))
+            return false
+        SplitPath(indexPath, , &dir)
+        backupDir := dir "\backups\minimap"
+        return DirExist(backupDir) ? true : false
+    }
+
+    static _RunPatchVerb(verb)
+    {
+        ; Hard pre-flight: refuse if PoE2 is running. The UI also
+        ; disables the buttons but this is defense in depth.
+        if (ProcessExist("PathOfExileSteam.exe")
+            || ProcessExist("PathOfExile_x64Steam.exe")
+            || ProcessExist("PathOfExile.exe")
+            || ProcessExist("PathOfExile_x64.exe"))
+        {
+            return this._Fail("PoE2 is still running — close the game first.")
+        }
+
+        ; We can't use _ResolveGameDataPath() (it walks the running
+        ; process). Instead, look up the install path in the INI from
+        ; the last successful auto-refresh — we cache it there for
+        ; exactly this situation.
+        iniFile := _ConfigPath()
+        indexPath := IniRead(iniFile, "GgpkTools", "lastIndexPath", "")
+        if (indexPath = "" || !FileExist(indexPath))
+            return this._Fail("PoE2 install path not known yet. Start the game once so the helper can record it (Bundles2/_.index.bin path is persisted under [GgpkTools] lastIndexPath).")
+
+        exe := this._FindExe("PoePatcher")
+        if (exe["path"] = "")
+            return this._Fail("poe-patcher.exe not found. Build it once via:`n"
+                . "    cd ggpk-tools && dotnet publish PoePatcher -c Release -r win-x64 --self-contained -p:PublishAot=true")
+
+        stderr := A_Temp "\poe-patcher.stderr.txt"
+        try FileDelete(stderr)
+
+        cmd := exe["invoke"] . ' ' verb ' --ggpk "' indexPath '" --patch minimap'
+        fullCmd := A_ComSpec ' /c "' cmd ' 2> "' stderr '""'
+
+        try LogError("GgpkTools/" verb " cmd: " fullCmd)
+
+        exit := 0
+        try
+        {
+            exit := RunWait(fullCmd, exe["workDir"], "Hide")
+        }
+        catch as ex
+        {
+            return this._Fail("RunWait failed: " ex.Message)
+        }
+
+        tail := this._ReadTail(stderr, 6)
+        if (exit != 0)
+        {
+            try LogError("GgpkTools/" verb " exited " exit (tail = "" ? "" : " stderr=" tail))
+            return this._Fail("poe-patcher " verb " exited with code " exit (tail = "" ? "" : ":`n" tail))
+        }
+
+        return Map("ok", true, "msg", (verb = "apply"
+            ? "Minimap patch applied. Start PoE2 to see the full minimap."
+            : "Minimap patch reverted. Vanilla shaders restored."), "rows", 0)
     }
 
     ; ---- internals ----
