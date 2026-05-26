@@ -101,6 +101,10 @@ internal sealed class DatReader
     public int RowI32(int index, int offset) =>
         BitConverter.ToInt32(Row(index)[offset..(offset + 4)]);
 
+    /// <summary>Read a single byte at the given offset inside row.
+    /// PoE encodes `bool` as 1 byte (0 = false, anything else = true).</summary>
+    public bool RowBool(int index, int offset) => Row(index)[offset] != 0;
+
     /// <summary>
     /// Read a variable-length array column. PoE encodes arrays as a
     /// 16-byte (count: u64, dataOffset: u64) pair in the row; the
