@@ -249,43 +249,18 @@ LoadPanelOffsetsFromConfig()
             offStr := IniRead(f, "PanelOffsets", "offset" idx, "")
             if (name != "" && offStr != "")
             {
-                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                ; AHK v2's Integer() parses both decimal and "0x..." hex
+                ; natively — no need for the manual digit-by-digit loop
+                ; this used to run, which threw "local var asc has not
+                ; been assigned" in some uninitialised-path edge cases.
                 offVal := 0
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    ; AHK v2 RegExMatch requires the output var to be passed by
-                    ; reference (`&m`) and capture groups are accessed via the
-                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
-                    ; was tolerated in some uncompiled paths but fails hard in
-                    ; compiled .exe with "local variable has not been assigned".
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
-                    {
-                        hex := StrUpper(m[1])
+                    try
+                        offVal := Integer(s)
+                    catch
                         offVal := 0
-                        i2 := 1
-                        len2 := StrLen(hex)
-                        while (i2 <= len2)
-                        {
-                            c := SubStr(hex, i2, 1)
-                            asc := Asc(c)
-                            if (asc >= 48 && asc <= 57)
-                                d := asc - 48
-                            else if (asc >= 65 && asc <= 70)
-                                d := asc - 55
-                            else
-                                d := 0
-                            offVal := offVal * 16 + d
-                            i2 += 1
-                        }
-                    }
-                    else
-                    {
-                        try
-                            offVal := Integer(s)
-                        catch
-                            offVal := 0
-                    }
                 }
                 if (offVal > 0)
                     offsets[name] := offVal
@@ -304,43 +279,18 @@ LoadPanelOffsetsFromConfig()
                 break
             if (name != "" && offStr != "")
             {
-                ; parse offStr -> offVal (supports 0xHEX and decimal)
+                ; AHK v2's Integer() parses both decimal and "0x..." hex
+                ; natively — no need for the manual digit-by-digit loop
+                ; this used to run, which threw "local var asc has not
+                ; been assigned" in some uninitialised-path edge cases.
                 offVal := 0
                 s := Trim(offStr)
                 if (s != "")
                 {
-                    ; AHK v2 RegExMatch requires the output var to be passed by
-                    ; reference (`&m`) and capture groups are accessed via the
-                    ; Match object (`m[1]`), not v1-style `m1`. The old syntax
-                    ; was tolerated in some uncompiled paths but fails hard in
-                    ; compiled .exe with "local variable has not been assigned".
-                    if RegExMatch(s, "i)^\s*0x([0-9A-Fa-f]+)\s*$", &m)
-                    {
-                        hex := StrUpper(m[1])
+                    try
+                        offVal := Integer(s)
+                    catch
                         offVal := 0
-                        i2 := 1
-                        len2 := StrLen(hex)
-                        while (i2 <= len2)
-                        {
-                            c := SubStr(hex, i2, 1)
-                            asc := Asc(c)
-                            if (asc >= 48 && asc <= 57)
-                                d := asc - 48
-                            else if (asc >= 65 && asc <= 70)
-                                d := asc - 55
-                            else
-                                d := 0
-                            offVal := offVal * 16 + d
-                            i2 += 1
-                        }
-                    }
-                    else
-                    {
-                        try
-                            offVal := Integer(s)
-                        catch
-                            offVal := 0
-                    }
                 }
                 if (offVal > 0)
                     offsets[name] := offVal
