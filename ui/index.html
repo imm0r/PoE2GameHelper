@@ -3540,18 +3540,38 @@
                 </div>
               </div>
               <!-- GGPK apply/revert — only shown when source=ggpk.
-                   Apply vs Revert are mutually exclusive: which one
-                   shows depends on `ggpkMaphackApplied` from the header
-                   push. Buttons disable themselves (with a tooltip)
-                   while PoE2 is running. -->
-              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none">
+                   The inner state machine (see updateConfigToggles)
+                   exposes three exclusive UIs: a path-entry hint when
+                   we haven't recorded the install yet, Apply when the
+                   patch isn't applied, Revert when it is. Buttons
+                   disable themselves (with a tooltip) while PoE2 is
+                   running so the user can't corrupt the bundle index. -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none;align-items:flex-start">
                 <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
-                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                  <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ahkCall('GgpkMaphackApply')"
-                    style="display:none">Apply</button>
-                  <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ahkCall('GgpkMaphackRevert')"
-                    style="display:none">Revert</button>
-                  <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ahkCall('GgpkMaphackApply')"
+                      style="display:none">Apply</button>
+                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ahkCall('GgpkMaphackRevert')"
+                      style="display:none">Revert</button>
+                    <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
+                  </div>
+                  <!-- Path-unknown panel: input + save + auto-hint.
+                       Hidden by default; updateConfigToggles flips it
+                       on when ggpkInstallPathKnown is false. -->
+                  <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
+                    <div style="margin-bottom:6px;line-height:1.4">
+                      The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
+                      and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
+                      the path to <code>Bundles2\_.index.bin</code> manually below.
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                      <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
+                        style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
+                        onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
+                      <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="cfg-row"><span class="cfg-label">Range Circles</span>
@@ -4621,17 +4641,17 @@
       const applyBtn      = document.getElementById('ggpk-maphack-apply');
       const revertBtn     = document.getElementById('ggpk-maphack-revert');
       const ggpkStatus    = document.getElementById('ggpk-maphack-status');
+      const pathEntry = document.getElementById('ggpk-path-entry');
+      // Note: we deliberately DON'T touch ggpkStatus here. It's owned
+      // by updateGgpkMaphackStatus + ggpkSavePathManually's response;
+      // resetting it on every header push would wipe success messages
+      // immediately after the action that produced them.
       if (!pathKnown) {
-        // Don't even tease buttons that would crash. Tell the user
-        // exactly what to do to unblock the workflow.
         if (applyBtn)  applyBtn.style.display  = 'none';
         if (revertBtn) revertBtn.style.display = 'none';
-        if (ggpkStatus) {
-          ggpkStatus.textContent =
-            'Start PoE2 once + click "Refresh all TSVs from local GGPK" in the Data tab so the helper records your install path. Then Apply/Revert show up here.';
-          ggpkStatus.style.color = 'var(--subtext)';
-        }
+        if (pathEntry) pathEntry.style.display = '';
       } else {
+        if (pathEntry) pathEntry.style.display = 'none';
         if (applyBtn) {
           applyBtn.style.display = isApplied ? 'none' : '';
           applyBtn.disabled      = poeIsRunning;
@@ -4646,12 +4666,7 @@
             ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
             : 'Restore the original minimap shaders.';
         }
-        if (ggpkStatus) {
-          // Reserved for transient action results (filled by
-          // updateGgpkMaphackStatus after a click). Reset on each
-          // header push so old messages don't linger forever.
-          ggpkStatus.textContent = '';
-        }
+        // Don't auto-clear ggpkStatus here — see note above.
       }
       setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
@@ -6148,6 +6163,18 @@
       status.textContent = '';
       ahkCall('RefreshItemSizes');
     }
+    // Manually persist the PoE2 install index path (when auto-discovery
+    // via running process hasn't happened yet). AHK validates the path
+    // before writing — bad paths produce a status message but don't
+    // corrupt the INI.
+    function ggpkSavePathManually() {
+      const inp = document.getElementById('ggpk-path-input');
+      if (!inp) return;
+      const path = (inp.value || '').trim();
+      if (!path) return;
+      ahkCall('SetGgpkInstallPath', path);
+    }
+
     // Maphack apply/revert result lands on its own Config-tab row so
     // it doesn't get confused with the TSV refresh status in Data tab.
     function updateGgpkMaphackStatus(json) {

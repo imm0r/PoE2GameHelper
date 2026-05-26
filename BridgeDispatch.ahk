@@ -546,7 +546,47 @@ _DispatchBridgeCall(method, args)
             SetTimer(() => GgpkMaphackUi_Apply(), -1)
         case "GgpkMaphackRevert":
             SetTimer(() => GgpkMaphackUi_Revert(), -1)
+        case "SetGgpkInstallPath":
+            ; args[1] is the user-entered path. Validate + persist on a
+            ; background timer so the WebView message thread stays
+            ; responsive.
+            pathArg := (args.Length >= 1) ? String(args[1]) : ""
+            if (pathArg != "")
+                SetTimer(() => GgpkInstallPathUi_Save(pathArg), -1)
     }
+}
+
+; Validates + persists a manually-entered PoE2 install index path
+; (Bundles2\_.index.bin OR Content.ggpk). After a successful save,
+; pushes a fresh header so the GGPK Apply/Revert UI flips out of
+; "path unknown" state immediately.
+GgpkInstallPathUi_Save(rawPath)
+{
+    path := Trim(rawPath, ' "`t')
+    result := Map("ok", false, "msg", "")
+    if (path = "")
+    {
+        result["msg"] := "Empty path."
+    }
+    else if (!FileExist(path))
+    {
+        result["msg"] := "File not found: " path
+    }
+    else if (!RegExMatch(path, "i)\.(index\.bin|ggpk)$"))
+    {
+        result["msg"] := "Path must point at Bundles2\_.index.bin or Content.ggpk."
+    }
+    else
+    {
+        ; Validated — persist and (politely) tell the UI to re-render.
+        try IniWrite(path, _ConfigPath(), "GgpkTools", "lastIndexPath")
+        result["ok"] := true
+        result["msg"] := "Saved. Apply/Revert buttons should appear."
+    }
+    json := '{"ok":' (result["ok"] ? "true" : "false")
+        . ',"msg":' _BridgeJsonEscape(result["msg"]) '}'
+    try WebViewExec("updateGgpkMaphackStatus(" _JsStr(json) ")")
+    SetTimer(PushHeaderToWebView, -50)
 }
 
 ; UI-side wrappers for the GGPK maphack patch/revert. Both shell out
