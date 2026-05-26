@@ -284,6 +284,25 @@ class GgpkToolBridge
         return this._RunPatchVerb("revert")
     }
 
+    ; Returns true when PoePatcher's backup directory for the minimap
+    ; patch exists and contains the snapshot file we drop on apply.
+    ;
+    ; BackupManager.Save creates `<ggpkdir>/backups/<patch>/...` on
+    ; apply; PoePatcher.Program.SnapshotIndexFile drops
+    ; `_index_snapshot.bin` next to the per-file backups (first apply
+    ; only). On revert, BackupManager.Clear() recursively deletes the
+    ; whole directory, so its presence is a reliable "currently
+    ; applied" signal — independent of whether the game is running.
+    static IsMaphackApplied()
+    {
+        indexPath := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+        if (indexPath = "" || !FileExist(indexPath))
+            return false
+        SplitPath(indexPath, , &dir)
+        backupDir := dir "\backups\minimap"
+        return DirExist(backupDir) ? true : false
+    }
+
     static _RunPatchVerb(verb)
     {
         ; Hard pre-flight: refuse if PoE2 is running. The UI also

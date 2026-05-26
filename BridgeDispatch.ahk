@@ -571,6 +571,9 @@ _PushGgpkToolStatus(result)
     json := '{"ok":' (result["ok"] ? "true" : "false")
         . ',"msg":' _BridgeJsonEscape(result["msg"]) '}'
     try WebViewExec("updateGgpkMaphackStatus(" _JsStr(json) ")")
+    ; Refresh the header so the Apply/Revert button visibility flips
+    ; immediately (the new `ggpkMaphackApplied` flag rides on it).
+    SetTimer(PushHeaderToWebView, -50)
 }
 
 ; UI-side wrapper around GgpkToolBridge.RefreshAllTsvs that pushes

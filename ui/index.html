@@ -3539,17 +3539,19 @@
                   </label>
                 </div>
               </div>
-              <!-- GGPK apply/revert — only shown when source=ggpk -->
+              <!-- GGPK apply/revert — only shown when source=ggpk.
+                   Apply vs Revert are mutually exclusive: which one
+                   shows depends on `ggpkMaphackApplied` from the header
+                   push. Buttons disable themselves (with a tooltip)
+                   while PoE2 is running. -->
               <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none">
                 <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
                 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                   <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ahkCall('GgpkMaphackApply')"
-                    title="Patch PoE2's minimap shaders so the in-game minimap renders as fully explored. Game must be closed."
-                    disabled>Apply</button>
+                    style="display:none">Apply</button>
                   <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ahkCall('GgpkMaphackRevert')"
-                    title="Restore the original shaders. Game must be closed."
-                    disabled>Revert</button>
-                  <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px">—</span>
+                    style="display:none">Revert</button>
+                  <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
                 </div>
               </div>
               <div class="cfg-row"><span class="cfg-label">Range Circles</span>
@@ -4606,18 +4608,35 @@
       if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
       const ggpkRow = document.getElementById('row-maphack-ggpk');
       if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
-      // Enable Apply/Revert only when PoE2 is NOT running — modifying
-      // the bundle index while the game has it open is a corruption risk.
+      // Show whichever GGPK button is actually useful right now: Apply
+      // if the patch is NOT currently applied, Revert if it IS. Both
+      // disable themselves with an explanatory tooltip while PoE2 is
+      // running (writing to the bundle index mid-session corrupts it).
       const poeIsRunning = (d.poeRunning === true) || (d.isConnected === true);
+      const isApplied    = (d.ggpkMaphackApplied === true);
       const applyBtn  = document.getElementById('ggpk-maphack-apply');
       const revertBtn = document.getElementById('ggpk-maphack-revert');
-      if (applyBtn)  applyBtn.disabled  = poeIsRunning;
-      if (revertBtn) revertBtn.disabled = poeIsRunning;
+      if (applyBtn) {
+        applyBtn.style.display = isApplied ? 'none' : '';
+        applyBtn.disabled      = poeIsRunning;
+        applyBtn.title         = poeIsRunning
+          ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+          : 'Patch PoE2 minimap shaders so every cell renders as explored.';
+      }
+      if (revertBtn) {
+        revertBtn.style.display = isApplied ? '' : 'none';
+        revertBtn.disabled      = poeIsRunning;
+        revertBtn.title         = poeIsRunning
+          ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+          : 'Restore the original minimap shaders.';
+      }
       const ggpkStatus = document.getElementById('ggpk-maphack-status');
       if (ggpkStatus) {
-        ggpkStatus.textContent = poeIsRunning
-          ? 'Close PoE2 first to apply/revert.'
-          : 'Ready — close PoE2 not required (already closed).';
+        // Only surface text when we have something meaningful to say.
+        // The Apply/Revert label itself already tells the story; the
+        // status row is for transient action results (filled in by
+        // updateGgpkMaphackStatus after a click).
+        ggpkStatus.textContent = '';
       }
       setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
