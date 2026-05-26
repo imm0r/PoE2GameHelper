@@ -27,11 +27,20 @@ namespace PoePatcher.Patches;
 ///
 /// The blending shader also has two literal <c>float4(...)</c>
 /// colors that paint walkable areas: an interior "background" tint
-/// (originally <c>(1,1,1,0.01)</c> — a near-invisible white wash
-/// that becomes a visible gray veil once we force visibility=1),
-/// and an "outline" color at walkable-to-wall transitions (originally
-/// <c>(0.5,0.5,1,0.5)</c>). We swap both for caller-provided RGBA
-/// values so the user can tune the look.
+/// (<c>float4(1.0f, 1.0f, 1.0f, 0.01f)</c> — a near-invisible white
+/// wash that becomes a visible gray veil once we force visibility=1),
+/// and an "outline" color at walkable-to-wall transitions
+/// (<c>float4(0.5f, 0.5f, 1.0f, 0.5f)</c> — periwinkle at half alpha,
+/// the second arg to a lerp from the wash up to the wall ridge).
+/// We swap both for caller-provided RGBA values so the user can tune
+/// the look.
+///
+/// CAREFUL when bumping these markers: HLSL accepts both <c>1.0f</c>
+/// and <c>1.000</c> as float literals and different shader copies in
+/// the wild use different styles, so the marker string has to match
+/// the live shader byte-for-byte. Always cross-check against a fresh
+/// extraction (<c>poe-data-extract cat --path shaders/...</c>) before
+/// changing — an older worktree copy may not match what GGG ships now.
 ///
 /// History: an earlier version of this patch targeted a
 /// <c>res_color = max(res_color, 0.180);</c> line in the visibility
@@ -53,6 +62,10 @@ internal sealed class MinimapPatch : IPatch
     public (float R, float G, float B, float A) OutlineColor    { get; set; } = (0.5f, 0.5f, 1.0f, 0.8f);
     public (float R, float G, float B, float A) BackgroundColor { get; set; } = (0.4f, 1.0f, 0.4f, 0.10f);
 
+    // Markers must match the shader byte-for-byte, including the literal
+    // formatting (`1.0f` vs `1.000` — the shader uses both styles in
+    // different places). Verified against a live extraction of the
+    // current minimap_blending_pixel.hlsl via `poe-data-extract cat`.
     private const string OutlineMarker    = "float4(0.5f, 0.5f, 1.0f, 0.5f)";
     private const string BackgroundMarker = "float4(1.0f, 1.0f, 1.0f, 0.01f)";
 
@@ -65,18 +78,36 @@ internal sealed class MinimapPatch : IPatch
             "float ratio = saturate((1.0f - dist / visibility_radius) * 2.0f);",
             "float ratio = 1.0f; // PoE2GameHelper: forced-reveal");
 
-        // 2) Blending shader — three coupled edits in one file. We do
-        //    these in a single read/write so we never half-patch the
-        //    shader and leave it in a bad intermediate state.
+        // 2) Blending shader — color swaps only. We deliberately do NOT
+        //    force `visibility = 1.0f` here even though it looks like
+        //    the obvious "force reveal" knob.
+        //
+        //    Why: minimap_blending_pixel.hlsl is a fullscreen pass. It
+        //    reads visibility from walkability_sample.g, which is the
+        //    .g channel written by minimap_pixel.hlsl::RenderWalkability.
+        //    That render-pass has a `discard` guarded by render_circle
+        //    (line ~184 in the live shader) — meaning .g is non-zero
+        //    only inside the actual minimap quad / big-map diamond, and
+        //    stays 0 outside. Pixels outside the diamond hit the
+        //    blending shader with walkability_sample.g = 0, so the
+        //    `* float4(1,1,1,visibility)` factor zeros their alpha and
+        //    nothing renders.
+        //
+        //    Forcing the local `visibility` to 1 bypasses that natural
+        //    mask, so the blending shader paints the background colour
+        //    fullscreen — what produced the green wash bleed.
+        //
+        //    The reveal still works because the visibility-pixel patch
+        //    above writes ratio=1.0 into visibility_sampler, which
+        //    RenderWalkability reads and forwards into walkability_sample.g
+        //    INSIDE the diamond. Blending then naturally sees visibility=1
+        //    where it should, 0 where it shouldn't.
         const string blendPath = "shaders/minimap_blending_pixel.hlsl";
         var blendFile = ResolveFile(index, blendPath);
         var original = blendFile.Record.Read();
         backups.Save(Name, blendPath, original.Span);
         string text = Encoding.UTF8.GetString(original.Span);
 
-        text = ReplaceOnce(text, blendPath,
-            "float visibility = saturate(walkability_sample.g * 2.0f);",
-            "float visibility = 1.0f; // PoE2GameHelper: forced-reveal");
         text = ReplaceOnce(text, blendPath,
             OutlineMarker,
             FormatColor(OutlineColor) + " /* PoE2GameHelper: outline */");
