@@ -90,19 +90,42 @@
        ═══════════════════════════════════════════════════════════════════ */
     #header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
-      padding: 7px 14px;
+      /* Right padding reserved for the absolutely-positioned wm-btns
+         block (3 × 28px + gaps + a little air). Keeps any pills that
+         wrap onto a second row from sliding under the close button. */
+      padding: 7px 110px 7px 14px;
       background:
         radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,168,90,0.06), transparent 70%),
         linear-gradient(180deg, #16100a 0%, #1f1610 55%, #14100a 100%);
       border-bottom: 1px solid var(--codex-rule);
       flex-shrink: 0;
-      flex-wrap: wrap;
+      /* No wrap at the top level — only #header-pills (below) wraps so
+         the logo column stays a single rigid left column, and any
+         overflow pills wrap into a second row to its right, never
+         underneath it. */
+      flex-wrap: nowrap;
       cursor: default;
       user-select: none;
       position: relative;
       color: var(--codex-text)
+    }
+
+    /* Right-of-logo container: every pill + the Snap/PoE2 buttons live
+       in here. Wraps to a second (or more) row when the window is
+       narrow, but always stays in the column right of the logo block.
+       align-content keeps the wrapped rows top-aligned with the logo. */
+    #header-pills {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-content: flex-start;
+      gap: 8px;
+      row-gap: 6px;
+      padding-top: 2px;
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
        toolbar's signature so the whole top of the app reads as one frame. */
@@ -131,7 +154,10 @@
       align-items: flex-start;
       padding-right: 12px;
       border-right: 1px solid rgba(90,62,34,0.5);
-      position: relative
+      position: relative;
+      /* Rigid left column — never compress to make room for pills.
+         The #header-pills container next door owns all the wrapping. */
+      flex-shrink: 0
     }
     #logo-wrap::after {
       /* Gold hair-line companion to the brown rule */
@@ -402,13 +428,17 @@
     }
 
     #wm-btns {
+      /* Pinned to the top-right corner of the header so window-resize
+         reflowing can never push it down into a wrapped pill row.
+         The #header itself reserves padding-right to keep wrapped
+         content from sliding underneath these buttons. */
+      position: absolute;
+      top: 6px;
+      right: 8px;
       display: flex;
       gap: 2px;
       align-items: center;
-      margin-left: 10px;
       flex-shrink: 0;
-      padding-left: 10px;
-      border-left: 1px solid rgba(90,62,34,0.5)
     }
 
     .wm-btn {
@@ -3278,6 +3308,12 @@
         <div class="ver-gh" id="ver-gh">v—</div>
       </div>
     </div>
+    <!-- Pills + header-right buttons live in their own flex-wrap row
+         so when the window is narrow they wrap UNDER themselves (next
+         to the logo column), not under the logo block. #wm-btns is
+         absolutely-positioned in the top-right corner so it stays
+         there no matter how the rest reflows. -->
+    <div id="header-pills">
     <div class="pill disconnected" id="pill-connect">
       <div class="dot"></div><span id="pill-connect-text">Disconnected</span>
     </div>
@@ -3311,6 +3347,7 @@
       <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
       <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
     </div>
+    </div><!-- /header-pills -->
     <div id="wm-btns">
       <button class="wm-btn" onclick="ahkCall('WinMinimize')" data-tip="Minimize">&#x2013;</button>
       <button class="wm-btn" id="wm-maximize" onclick="ahkCall('WinMaximize')" data-tip="Maximize">&#x25a1;</button>
