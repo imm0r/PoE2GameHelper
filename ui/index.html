@@ -1432,16 +1432,20 @@
        the centre) and tightly layered so item cards behind never bleed
        through. The codex-ink base layer guarantees opacity even if the
        parchment gradient renders thin at small sizes. */
-    .inv-tooltip {
+    /* ── CODEX TOOLTIP — shared styling for any branded hover popup ─────
+       Used both for the rich item tooltips in the inventory tab AND
+       (via the auto-bind on [data-tip]) for short text tooltips that
+       used to live in native `title="..."` attributes — the browser
+       default tooltip looks wildly out of place against the codex
+       theme. `.inv-tooltip` adds the per-item layout on top of this
+       base; `.codex-tooltip-text` is the slim text-only variant. */
+    .codex-tooltip {
       position: fixed;
       z-index: 9999;
-      max-width: 380px;
-      min-width: 220px;
-      padding: 16px 18px;
       font-family: var(--codex-serif);
       font-size: 13px;
       color: var(--codex-text);
-      background-color: #1a100a;  /* solid base — keeps tooltip readable on any backdrop */
+      background-color: #1a100a;
       background-image:
         linear-gradient(180deg, var(--codex-parchment) 0%, var(--codex-vellum) 100%);
       border: 1px solid var(--codex-gold);
@@ -1455,15 +1459,42 @@
       line-height: 1.55
     }
     /* Decorative corner fleurons via SVG diamonds inset at each corner. */
-    .inv-tooltip::before, .inv-tooltip::after {
+    .codex-tooltip::before, .codex-tooltip::after {
       content: "";
       position: absolute;
       width: 11px; height: 11px;
       background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'><path d='M5 1 L9 5 L5 9 L1 5 Z' fill='%23f0d68a'/></svg>") center / contain no-repeat;
       opacity: 0.85
     }
-    .inv-tooltip::before { top: 5px;    left: 5px }
-    .inv-tooltip::after  { bottom: 5px; right: 5px }
+    .codex-tooltip::before { top: 5px;    left: 5px }
+    .codex-tooltip::after  { bottom: 5px; right: 5px }
+
+    /* Inventory item tooltip — adds the size box used for full item
+       cards on top of the shared codex base. */
+    .inv-tooltip {
+      max-width: 380px;
+      min-width: 220px;
+      padding: 16px 18px;
+    }
+
+    /* Slim text-only variant — short paragraphs / single-line hints. */
+    .codex-tooltip-text {
+      max-width: 340px;
+      padding: 10px 16px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--codex-text)
+    }
+
+    /* Disabled buttons normally drop pointer-events, which means our
+       data-tip hover listener never fires — exactly the wrong moment,
+       because that's when the "why is this disabled?" tooltip is
+       most useful. Re-enable pointer events while still keeping the
+       click suppressed (the browser handles that off `disabled`). */
+    button[disabled][data-tip] {
+      pointer-events: auto;
+      cursor: not-allowed;
+    }
 
     .inv-tooltip .inv-tt-name {
       font-family: var(--codex-display);
@@ -4424,7 +4455,7 @@
     function _invShowTip(ev, b64) {
       if (!_invTipEl) {
         _invTipEl = document.createElement('div');
-        _invTipEl.className = 'inv-tooltip';
+        _invTipEl.className = 'codex-tooltip inv-tooltip';
         document.body.appendChild(_invTipEl);
       }
       let p;
@@ -4465,6 +4496,59 @@
     function _invHideTip() {
       if (_invTipEl) _invTipEl.style.display = 'none';
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CODEX TOOLTIP — generic [data-tip] auto-bind
+    // ═══════════════════════════════════════════════════════════════════
+    // Any element with a `data-tip="..."` attribute gets a branded
+    // codex-styled tooltip on hover instead of the OS-level title-bar
+    // popup. Use this instead of `title="..."` for any user-visible
+    // tooltip — the native one breaks the theme. Strings only; for
+    // rich item tooltips keep using the inv-tooltip path.
+    let _codexTipEl = null;
+    function _codexTipShow(ev) {
+      const el = ev.target && ev.target.closest ? ev.target.closest('[data-tip]') : null;
+      if (!el) return;
+      const text = el.getAttribute('data-tip');
+      if (!text) return;
+      if (!_codexTipEl) {
+        _codexTipEl = document.createElement('div');
+        _codexTipEl.className = 'codex-tooltip codex-tooltip-text';
+        document.body.appendChild(_codexTipEl);
+      }
+      _codexTipEl.textContent = text;
+      _codexTipEl.style.display = 'block';
+      _codexTipPosition(ev);
+    }
+    function _codexTipPosition(ev) {
+      if (!_codexTipEl || _codexTipEl.style.display !== 'block') return;
+      const pad = 14;
+      let x = ev.clientX + pad, y = ev.clientY + pad;
+      const w = _codexTipEl.offsetWidth, h = _codexTipEl.offsetHeight;
+      if (x + w > window.innerWidth)  x = ev.clientX - w - pad;
+      if (y + h > window.innerHeight) y = ev.clientY - h - pad;
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      _codexTipEl.style.left = x + 'px';
+      _codexTipEl.style.top  = y + 'px';
+    }
+    function _codexTipHide(ev) {
+      const el = ev.target && ev.target.closest ? ev.target.closest('[data-tip]') : null;
+      // Only hide if we're leaving the element that owned the tip.
+      if (!el) return;
+      if (_codexTipEl) _codexTipEl.style.display = 'none';
+    }
+    // Event delegation off document — captures hovers on dynamically-
+    // added elements without us having to re-bind. Negligible cost
+    // since we early-return for events that don't hit a [data-tip].
+    document.addEventListener('mouseover',  _codexTipShow,    true);
+    document.addEventListener('mousemove',  _codexTipPosition, true);
+    document.addEventListener('mouseout',   _codexTipHide,    true);
+    // Hide on blur / scroll / tab-switch — the OS-level events the
+    // browser uses for native title="..." popups don't reach us here,
+    // so we drop the tooltip on anything that breaks pointer flow.
+    window.addEventListener('blur',   () => { if (_codexTipEl) _codexTipEl.style.display = 'none'; });
+    window.addEventListener('scroll', () => { if (_codexTipEl) _codexTipEl.style.display = 'none'; }, true);
 
     // ═══════════════════════════════════════════════════════════════════
     //  STATUS BAR
@@ -4676,16 +4760,16 @@
         if (applyBtn) {
           applyBtn.style.display = isApplied ? 'none' : '';
           applyBtn.disabled      = poeIsRunning;
-          applyBtn.title         = poeIsRunning
+          applyBtn.setAttribute('data-tip', poeIsRunning
             ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
-            : 'Patch PoE2 minimap shaders so every cell renders as explored.';
+            : 'Patch PoE2 minimap shaders so every cell renders as explored.');
         }
         if (revertBtn) {
           revertBtn.style.display = isApplied ? '' : 'none';
           revertBtn.disabled      = poeIsRunning;
-          revertBtn.title         = poeIsRunning
+          revertBtn.setAttribute('data-tip', poeIsRunning
             ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
-            : 'Restore the original minimap shaders.';
+            : 'Restore the original minimap shaders.');
         }
         // Don't auto-clear ggpkStatus here — see note above.
       }
