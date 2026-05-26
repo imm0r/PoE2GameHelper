@@ -126,8 +126,8 @@ internal static class Program
             (new StatNames(),     "stat_name_map.tsv",    "stat names"),
             (new BaseItemSizes(), "base_item_sizes.tsv",  "base item sizes + names"),
             (new MonsterNames(),  "monster_name_map.tsv", "monster names"),
-            (new Mods(),          "mod_name_map.tsv",     "mod names"),
-            // UniqueNames intentionally omitted — placeholder
+            (new Mods(),          "mod_name_map.tsv",          "mod names"),
+            (new UniqueNames(),   "unique_item_name_map.tsv",  "unique item names"),
         };
 
         int ok = 0, fail = 0;

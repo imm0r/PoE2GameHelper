@@ -102,6 +102,31 @@ internal sealed class DatReader
         BitConverter.ToInt32(Row(index)[offset..(offset + 4)]);
 
     /// <summary>
+    /// Read a foreign-key row index from inside a row. PoE schema types
+    /// `row` (8 bytes) and `foreignrow` (16 bytes, second half is
+    /// usually a table identifier or unused) both encode the target
+    /// row as a u64 starting at <paramref name="offset"/> — we read
+    /// only that first u64. Returns -1 for null sentinels (FE-pattern
+    /// or all-FF, which PoE uses to mean "no reference"), otherwise
+    /// the row index. Callers should bounds-check the result against
+    /// the target table's RowCount.
+    /// </summary>
+    public long RowFk(int index, int offset)
+    {
+        ulong raw = BitConverter.ToUInt64(Row(index)[offset..(offset + 8)]);
+        // 0xFFFF...FFFF and 0xFEFE...FEFE both show up in practice as
+        // "no foreign key set"; treat both as invalid.
+        if (raw == 0xFFFFFFFFFFFFFFFFUL || raw == 0xFEFEFEFEFEFEFEFEUL)
+            return -1;
+        // Anything above ~10M rows is clearly nonsense too — let the
+        // caller catch out-of-range against the real row count, but
+        // defend against signed-overflow weirdness by capping here.
+        if (raw > (ulong)int.MaxValue)
+            return -1;
+        return (long)raw;
+    }
+
+    /// <summary>
     /// Read a string ref (int64) and decode the target as a UTF-16
     /// zero-terminated string.
     ///
