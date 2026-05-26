@@ -49,11 +49,13 @@ SaveConfig()
     global g_configSubTab
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
+    global g_alwaysOnTop
 
     f := _ConfigPath()
     IniWrite(g_debugMode             ? "1" : "0",  f, "General",       "debugMode")
     IniWrite(g_updatesPaused         ? "1" : "0",  f, "General",       "updatesPaused")
     IniWrite(g_npcWatchAutoSync      ? "1" : "0",  f, "General",       "npcWatchAutoSync")
+    IniWrite(g_alwaysOnTop           ? "1" : "0",  f, "General",       "alwaysOnTop")
     IniWrite(g_lifeThresholdPercent,               f, "General",       "lifeThreshold")
     IniWrite(g_manaThresholdPercent,               f, "General",       "manaThreshold")
     IniWrite(g_autoFlaskEnabled      ? "1" : "0",  f, "AutoFlask",     "enabled")
@@ -130,6 +132,7 @@ LoadConfig()
     global g_configSubTab
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
+    global g_alwaysOnTop
 
     f := _ConfigPath()
     if !FileExist(f)
@@ -142,6 +145,7 @@ LoadConfig()
     g_debugMode                := _B("General",       "debugMode",       false)
     g_updatesPaused            := _B("General",       "updatesPaused",   false)
     g_npcWatchAutoSync         := _B("General",       "npcWatchAutoSync",false)
+    g_alwaysOnTop              := _B("General",       "alwaysOnTop",     true)
     g_lifeThresholdPercent     := Integer(_Ini("General",   "lifeThreshold",   55))
     g_manaThresholdPercent     := Integer(_Ini("General",   "manaThreshold",   35))
     g_autoFlaskEnabled         := _B("AutoFlask",     "enabled",         false)

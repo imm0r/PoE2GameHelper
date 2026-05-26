@@ -316,6 +316,13 @@ _DispatchBridgeCall(method, args)
             SetTimer(ToggleTreePaneVisibility, -1)
         case "StartGame":
             try Run("steam://rungameid/2694490")
+        case "OpenUrl":
+            ; Open an http(s) URL in the user's default browser via the
+            ; shell. Whitelisted scheme so a malformed call can't shell
+            ; out to arbitrary paths.
+            url := (args.Length >= 1) ? args[1] : ""
+            if (InStr(url, "https://") = 1) || (InStr(url, "http://") = 1)
+                try Run(url)
         case "StartDrag":
             DllCall("ReleaseCapture")
             PostMessage(0xA1, 2, , , "ahk_id " g_webGui.Hwnd)
@@ -330,6 +337,12 @@ _DispatchBridgeCall(method, args)
             SetTimer(PushHeaderToWebView, -50)
         case "WinClose":
             ExitApp()
+        case "ToggleAlwaysOnTop":
+            global g_alwaysOnTop, g_webGui
+            g_alwaysOnTop := !g_alwaysOnTop
+            try WinSetAlwaysOnTop(g_alwaysOnTop ? 1 : 0, "ahk_id " g_webGui.Hwnd)
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "BlacklistAdd":
             name := (args.Length >= 1) ? args[1] : ""
             if (name != "")

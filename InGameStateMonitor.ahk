@@ -122,6 +122,7 @@ g_activeTreeTabIdx := 1
 g_webViewReady := false
 g_bridge := 0
 g_webGui := 0
+g_alwaysOnTop := true   ; main window AoT — toggle via header pin button
 g_selectedNodePath := ""
 g_flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
 g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
@@ -342,6 +343,11 @@ g_webGui.Show()
 WinMove(g_winX, g_winY, g_winW, g_winH, "ahk_id " g_webGui.Hwnd)
 if g_winMaximized
     g_webGui.Maximize()
+
+; Apply persisted AlwaysOnTop AFTER Show — calling WinSetAlwaysOnTop on
+; a not-yet-shown window is a silent no-op, which left the WS_EX_TOPMOST
+; from the +AlwaysOnTop creation flag in place regardless of preference.
+try WinSetAlwaysOnTop(g_alwaysOnTop ? 1 : 0, "ahk_id " g_webGui.Hwnd)
 
 ; Save window geometry on exit and after move/resize
 OnExit((*) => (_CaptureWindowGeometry(), SaveConfig(), SaveCombatAutoConfig()))

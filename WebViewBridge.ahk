@@ -47,7 +47,7 @@ PushHeaderToWebView()
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled, g_maphackSource, g_isConnected, g_rangeCirclesEnabled, g_panelDetectionEnabled
     global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
-    global g_inventoryChainDumpEnabled, g_overlayStatusTextEnabled
+    global g_inventoryChainDumpEnabled, g_overlayStatusTextEnabled, g_alwaysOnTop
     global g_cfgOpenSections
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
@@ -84,6 +84,7 @@ PushHeaderToWebView()
           . '"playerHud":'      (g_playerHudEnabled ? "true" : "false") ","
           . '"radarAlpha":'     g_radarAlpha ","
           . '"isMaximized":'    isMaximized ","
+          . '"alwaysOnTop":'    (g_alwaysOnTop ? "true" : "false") ","
           . '"entityFilter":{'
           . '"player":'    (g_entityShowPlayer    ? "true" : "false") ","
           . '"minion":'    (g_entityShowMinion    ? "true" : "false") ","

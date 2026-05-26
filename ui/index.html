@@ -93,9 +93,10 @@
       align-items: flex-start;
       gap: 8px;
       /* Right padding reserved for the absolutely-positioned wm-btns
-         block (3 × 28px + gaps + a little air). Keeps any pills that
-         wrap onto a second row from sliding under the close button. */
-      padding: 7px 110px 7px 14px;
+         block (4 × 28px + gaps + a little air — pin/min/max/close).
+         Keeps any pills that wrap onto a second row from sliding
+         under the buttons. */
+      padding: 7px 140px 7px 14px;
       background:
         radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,168,90,0.06), transparent 70%),
         linear-gradient(180deg, #16100a 0%, #1f1610 55%, #14100a 100%);
@@ -122,8 +123,6 @@
        not the viewport. Means the breakpoints behave correctly even
        if the logo width changes or padding-right is re-tuned. */
     #header-pills {
-      container-type: inline-size;
-      container-name: pills;
       flex: 1 1 auto;
       min-width: 0;
       display: flex;
@@ -135,49 +134,62 @@
       padding-top: 2px;
     }
 
-    /* ── Compact stage 1: ≤ 900px wide ─────────────────────────────────
-       The default pill size assumes a fairly wide window. When the
-       pills container has to wrap to a second row at typical 1100-px
-       window widths, we shrink font / padding / gap so 9 pills + 2
-       buttons can usually fit in one or two compact rows. Still fully
-       legible — just denser. */
-    @container pills (max-width: 900px) {
-      .pill {
-        padding: 2px 8px;
-        font-size: 9px;
-        letter-spacing: 0.08em;
-        gap: 4px;
+    /* ── Compact stage 1: ≤ 1300px viewport width ─────────────────────
+       Triggers EARLY so a typical "narrow but not tiny" window (think
+       1000-1300 px wide) gets the denser pill style. The cuts here
+       have to be visibly distinct from "normal" — earlier iterations
+       trimmed only 1-2 px and the stage looked identical to normal,
+       so users perceived a jump straight from normal → stage 2.
+       Using @media (viewport) instead of @container — container
+       queries on a flex:1 1 auto item were not measuring reliably. */
+    @media (max-width: 1300px) {
+      #header-pills .pill {
+        padding: 1px 6px;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        gap: 3px;
       }
-      .pill .dot {
-        width: 6px;
-        height: 6px;
+      #header-pills .pill .dot {
+        width: 5px;
+        height: 5px;
       }
       #header-pills {
-        gap: 5px;
-        row-gap: 4px;
+        gap: 4px;
+        row-gap: 3px;
       }
-      .hbtn {
-        padding: 3px 9px;
-        font-size: 10px;
-        letter-spacing: 0.08em;
+      #header-pills .hbtn {
+        padding: 2px 7px;
+        font-size: 9px;
+        letter-spacing: 0.06em;
       }
     }
 
-    /* ── Compact stage 2: ≤ 650px wide ─────────────────────────────────
+    /* ── Compact stage 2: ≤ 850px viewport ─────────────────────────────
        Falls beyond what stage 1 can handle (very narrow window): drop
        the text labels entirely, render pills as colored status dots
        only. The existing data-tip attributes on each pill still surface
        the label on hover, so info is one tooltip away — not lost. */
-    @container pills (max-width: 650px) {
-      .pill > span {
+    @media (max-width: 850px) {
+      #header-pills .pill > span {
         display: none;
       }
-      .pill {
-        padding: 4px 5px;
+      #header-pills .pill {
+        padding: 3px 6px;
+        gap: 4px;
       }
-      .pill .dot {
-        width: 8px;
-        height: 8px;
+      #header-pills .pill .dot {
+        width: 6px;
+        height: 6px;
+      }
+      /* Per-pill glyph stands in for the text label. Pulled from
+         data-icon so the HTML stays the source of truth and a new
+         pill just adds one attribute to opt in. */
+      #header-pills .pill[data-icon]::after {
+        content: attr(data-icon);
+        font-family: 'Segoe UI Symbol', 'Segoe UI Emoji', var(--codex-display);
+        font-size: 12px;
+        line-height: 1;
+        letter-spacing: 0;
       }
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
@@ -191,59 +203,134 @@
       opacity: 0.55
     }
 
-    #header-logo {
-      height: 32px;
-      width: auto;
-      border-radius: 2px;
-      flex-shrink: 0;
-      margin-right: 6px;
-      filter: drop-shadow(0 0 4px rgba(200,168,90,0.25))
-    }
-
-    #logo-wrap {
+    /* ═══════════════════════════════════════════════════════════════════
+       TOPBAR — outermost frame above the content. Logo lives in a
+       full-height rail on the left; pills/window-controls, main tabs,
+       and sub-tabs stack on the right. Letting the logo span all three
+       rows turns it into the visual anchor of the whole app. */
+    #topbar {
       display: flex;
-      gap: 6px;
-      margin-right: 12px;
-      align-items: flex-start;
-      padding-right: 12px;
-      border-right: 1px solid rgba(90,62,34,0.5);
-      position: relative;
-      /* Rigid left column — never compress to make room for pills.
-         The #header-pills container next door owns all the wrapping. */
-      flex-shrink: 0
+      flex-shrink: 0;
+      background:
+        radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,168,90,0.05), transparent 70%),
+        linear-gradient(180deg, #16100a 0%, #1d140c 100%);
     }
-    #logo-wrap::after {
-      /* Gold hair-line companion to the brown rule */
+    /* Fixed-width rail reserving a slot for the logo. Width is the only
+       thing this element contributes to layout — its height is purely
+       inherited from the topbar, which itself is sized by the stack on
+       the right. That keeps the logo from forcing the topbar taller
+       than the three rows of pills + cat-bar + sub-tabs combined. */
+    #topbar-logo {
+      position: relative;
+      width: 110px;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(90,62,34,0.5);
+      /* Bottom rule matches the codex border closing the cat-bar /
+         tab-bar to the right, so the logo rail tucks under the same
+         horizontal line instead of bleeding straight into the content. */
+      border-bottom: 1px solid var(--codex-rule);
+    }
+    #topbar-logo::after {
+      /* Gold hair-line companion to the brown rule on the divider */
       content: "";
       position: absolute;
-      right: 0; top: 15%; bottom: 15%;
+      right: 0; top: 10%; bottom: 10%;
       width: 1px;
       background: linear-gradient(180deg, transparent, var(--codex-gold) 50%, transparent);
-      opacity: 0.55
+      opacity: 0.55;
     }
-
-    #logo-left {
+    #topbar-stack {
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      align-items: flex-start
     }
 
-    #logo-right {
+    /* Logo cell — absolutely positioned inside the rail so the image's
+       intrinsic size never feeds into flex sizing. The image inside
+       fills the cell via object-fit: contain, so logo bottom aligns
+       with the bottom of the sub-tab bar (last row of the stack). */
+    #logo-cell {
+      position: absolute;
+      /* Tight inset so the artwork fills the rail — the original 6/12 px
+         padding left visible empty bands above and below. Right side
+         needs a little more breathing room because of the gold-rule
+         divider sitting on the rail's right edge. */
+      inset: 2px 8px 2px 4px;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end
+      align-items: center;
+      justify-content: center;
     }
 
-    /* Brand name set in Cinzel small caps to anchor the codex vocabulary. */
-    .logo-part {
+    #header-logo {
+      width: 100%;
+      height: 100%;
+      border-radius: 2px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 4px rgba(200,168,90,0.25));
+      transition: filter .15s;
+      cursor: default;
+    }
+    #logo-cell:hover #header-logo {
+      filter: drop-shadow(0 0 7px rgba(240,214,138,0.55));
+    }
+
+    /* Hover popover surfacing the brand name + game/app version strings
+       that used to sit beside the logo. Anchored to the logo cell, fades
+       in on hover, never interferes with layout. */
+    .logo-pop {
+      position: absolute;
+      left: 0;
+      top: calc(100% + 6px);
+      z-index: 100;
+      padding: 10px 14px 9px;
+      background: linear-gradient(180deg, rgba(28,18,10,0.97), rgba(20,12,6,0.97));
+      border: 1px solid var(--codex-gold);
+      border-radius: 3px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity .15s, transform .15s;
+    }
+    #logo-cell:hover .logo-pop {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .logo-pop-name {
       font-family: var(--codex-display);
       font-weight: 700;
       font-size: 14px;
       letter-spacing: .14em;
+      text-transform: uppercase;
       line-height: 1.1;
-      white-space: nowrap;
-      text-transform: uppercase
     }
+    .logo-pop-vers {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 5px;
+      font-family: var(--codex-mono-serif);
+      font-size: 10px;
+      color: var(--codex-text-dim);
+      letter-spacing: .08em;
+    }
+    /* Hint that the logo is clickable — sits below the version row in
+       the hover popover and matches its quiet engraved aesthetic. */
+    .logo-pop-hint {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(90,62,34,0.5);
+      font-family: var(--codex-mono-serif);
+      font-size: 9px;
+      color: var(--codex-gold);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: center;
+      opacity: 0.85;
+    }
+    #logo-cell { cursor: pointer; }
 
     .logo-poe { color: var(--codex-text) }
     .logo-gh  {
@@ -251,24 +338,11 @@
       text-shadow: 0 0 6px rgba(240,214,138,0.4), 0 1px 0 rgba(0,0,0,0.6)
     }
 
-    /* Version numbers rendered in IM Fell English SC for that engraved-on-the-
-       spine feel — small but proudly typeset. */
-    .ver-game,
-    .ver-gh {
-      font-family: var(--codex-mono-serif);
-      font-size: 10px;
-      color: var(--codex-text-dim);
-      letter-spacing: .08em;
-      line-height: 1.2
-    }
-
     /* ─── STATUS PILLS — codex cartouches ──────────────────────────────
        Each pill is an inscribed brass tag rather than a rounded chip:
          · Cinzel small-caps text in ivory
          · Brown gradient fill with subtle gold inner-rim on hover/active
-         · The "dot" is recoloured to codex palette (no more bright green)
-       AutoPilot has its own .pill#pill-autopilot rules below for the
-       cockpit-feature presentation. */
+         · The "dot" is recoloured to codex palette (no more bright green) */
     .pill {
       display: flex;
       align-items: center;
@@ -321,16 +395,28 @@
 
     .pill.inactive .dot { background: #4a3424 }
 
-    /* Disconnected → blood crimson dot for the "something's wrong" beats. */
+    /* Disconnected → blood crimson "something's wrong" treatment. Shares
+       the slow attention-pulse rhythm with .pill.paused (2.4s ease-in-out)
+       so the two read as the same family of "user intervention needed";
+       only the colour distinguishes the cause (red = lost link, copper =
+       deliberately stopped). */
     .pill.disconnected {
       color: #d68a8a;
-      border-color: rgba(139,42,42,0.7)
+      border-color: rgba(139,42,42,0.85);
+      background:
+        radial-gradient(ellipse at center, rgba(139,42,42,0.18), transparent 70%),
+        linear-gradient(180deg, rgba(60,14,14,0.85), rgba(28,6,6,0.95));
+      animation: codex-pulse-disconnected 2.4s ease-in-out infinite
     }
     .pill.disconnected .dot {
       background: var(--codex-blood-hi);
       box-shadow:
         inset 0 0 0 1px rgba(0,0,0,0.55),
-        0 0 5px rgba(197,72,72,0.55)
+        0 0 8px rgba(197,72,72,0.85)
+    }
+    @keyframes codex-pulse-disconnected {
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(139,42,42,0.20), 0 0  8px -3px rgba(197,72,72,0.40) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(139,42,42,0.55), 0 0 18px -2px rgba(197,72,72,0.85) }
     }
 
     /* Warning — burnished copper. */
@@ -343,6 +429,31 @@
       box-shadow:
         inset 0 0 0 1px rgba(0,0,0,0.5),
         0 0 7px rgba(232,160,64,0.7)
+    }
+
+    /* Paused — used by the Live/Paused pill when updates are halted.
+       Has to read as "attention required" because a paused helper looks
+       superficially fine to the user. Warmer copper than the AutoPilot
+       combat-red, slower pulse (2.4s vs combat's 1.4s) so the two reads
+       as distinct: one is a calm "you stopped me", the other is an
+       urgent "I'm fighting". */
+    .pill.paused {
+      color: #f0b870;
+      border-color: rgba(212,140,52,0.85);
+      background:
+        radial-gradient(ellipse at center, rgba(212,140,52,0.16), transparent 70%),
+        linear-gradient(180deg, rgba(60,32,12,0.85), rgba(28,14,6,0.95));
+      animation: codex-pulse-paused 2.4s ease-in-out infinite
+    }
+    .pill.paused .dot {
+      background: #e8a040;
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,0.5),
+        0 0 8px rgba(232,160,64,0.85)
+    }
+    @keyframes codex-pulse-paused {
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(212,140,52,0.20), 0 0  8px -3px rgba(232,160,64,0.40) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(212,140,52,0.55), 0 0 18px -2px rgba(232,160,64,0.85) }
     }
 
     /* Connected — same gold language as active, slightly cooler. */
@@ -372,63 +483,16 @@
       50%      { opacity: 0.55; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55), 0 0 12px rgba(240,214,138,1.0) }
     }
 
-    /* ─── AUTOPILOT PILL — the cockpit. ─────────────────────────────────
-       It's the user's primary status during gameplay so it earns more
-       presence: wider, taller, separator-segmented (left = label, right =
-       state badge), and state-coloured glow that's distinct enough to
-       recognise at a glance during combat. */
+    /* AUTOPILOT PILL — used to be a wider "cockpit" with diamond dot,
+       inflated padding, and a unique active glow. Visual outlier next to
+       the other pills, so it's now normalised: same shape, same circle
+       dot, same active/warning treatment. State variations come purely
+       through .active / .warning which all pills share. */
     #pill-autopilot {
-      padding: 4px 14px 4px 16px;
-      gap: 10px;
-      font-size: 11px;
-      letter-spacing: .14em;
-      min-width: 130px;
       position: relative
     }
-    /* Inner gilded inset border — replaces the .pill.active blanket shadow
-       for this specific pill so the cockpit feels carved. */
-    #pill-autopilot::before {
-      content: "";
-      position: absolute;
-      inset: 2px;
-      border: 1px solid rgba(240,214,138,0.0);
-      pointer-events: none;
-      transition: border-color .2s
-    }
-    #pill-autopilot:hover::before { border-color: rgba(240,214,138,0.30) }
-
-    /* Diamond-shape "dot" — it's a small inscribed gem in the cockpit context. */
-    #pill-autopilot .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 0;
-      transform: rotate(45deg);
-      flex-shrink: 0
-    }
-
-    /* OFF state — quiet. */
-    #pill-autopilot.inactive {
-      color: var(--codex-text-dim)
-    }
-    #pill-autopilot.inactive .dot {
-      background: rgba(90,62,34,0.7);
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5)
-    }
-
-    /* ON / Exploring (active) — steady gold glow, percentage in the text. */
-    #pill-autopilot.active {
-      color: var(--codex-gold-hi);
-      border-color: var(--codex-gold-hi);
-      box-shadow:
-        inset 0 0 0 1px rgba(240,214,138,0.15),
-        0 0 14px -2px rgba(240,214,138,0.5)
-    }
-    #pill-autopilot.active .dot {
-      background: var(--codex-gold-hi);
-      box-shadow: 0 0 8px rgba(240,214,138,0.85)
-    }
-
-    /* Combat — blood-red urgency, faster pulse than the scanning beat. */
+    /* Combat — keep the urgent red treatment from before, applied to
+       the normalised pill silhouette. */
     #pill-autopilot.warning {
       color: #ff9696;
       border-color: var(--codex-blood-hi);
@@ -437,16 +501,16 @@
         linear-gradient(180deg, rgba(80,18,18,0.85), rgba(30,8,8,0.95));
       box-shadow:
         inset 0 0 0 1px rgba(197,72,72,0.25),
-        0 0 18px -3px rgba(197,72,72,0.65);
+        0 0 14px -3px rgba(197,72,72,0.55);
       animation: codex-pulse-combat 1.4s ease-in-out infinite
     }
     #pill-autopilot.warning .dot {
       background: var(--codex-blood-hi);
-      box-shadow: 0 0 10px rgba(197,72,72,1.0)
+      box-shadow: 0 0 7px rgba(197,72,72,1.0)
     }
     @keyframes codex-pulse-combat {
-      0%, 100% { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.25), 0 0 12px -3px rgba(197,72,72,0.45) }
-      50%      { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.55), 0 0 24px -2px rgba(197,72,72,0.95) }
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.25), 0 0 10px -3px rgba(197,72,72,0.45) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.55), 0 0 18px -2px rgba(197,72,72,0.85) }
     }
 
     #header-right {
@@ -513,6 +577,41 @@
       background: rgba(200,168,90,0.10);
       color: var(--codex-gold-hi)
     }
+
+    /* Cat-bar companion button — lives next to the Config category.
+       Same vertical rhythm as .cat (10/11 px padding) so the bottom
+       edge aligns with the category underline. Distinct shape from a
+       category tab: smaller font and no underline, so the eye still
+       reads it as a utility, not navigation. */
+    .cat-btn {
+      background: transparent;
+      border: none;
+      color: var(--codex-text-dim);
+      padding: 10px 14px 11px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color .15s, background .15s, opacity .15s, transform .15s;
+      opacity: 0.45;
+      /* Inactive default — washed-out and slightly tilted so the pin
+         glyph reads as "loose". Going active straightens + brightens it. */
+      transform: rotate(-25deg);
+    }
+    .cat-btn:hover {
+      color: var(--codex-gold-hi);
+      background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(200,168,90,0.08), transparent 70%);
+      opacity: 0.85;
+    }
+    .cat-btn.active {
+      color: var(--codex-gold-hi);
+      text-shadow: 0 0 7px rgba(240,214,138,0.7);
+      opacity: 1;
+      transform: rotate(0deg);
+    }
     .wm-close:hover {
       background: var(--codex-blood) !important;
       color: #fff !important
@@ -526,6 +625,7 @@
        so the eye lands on it immediately without it being garish.
        ═══════════════════════════════════════════════════════════════════ */
     #cat-bar {
+      position: relative;
       display: flex;
       background:
         radial-gradient(ellipse 80% 100% at 50% 100%, rgba(200,168,90,0.04), transparent 70%),
@@ -536,6 +636,53 @@
 
     #cat-bar-left { display: flex }
     #cat-bar-right { margin-left: auto; display: flex }
+
+    /* ─── Sliding active-tab marker ───────────────────────────────────
+       One absolutely-positioned indicator per bar. JS measures the
+       active tab's bounding rect against the bar and writes transform
+       + width — CSS transitions handle the glide. The diamond fleuron
+       rides on top of the marker so it travels with the rule. */
+    .bar-marker {
+      position: absolute;
+      pointer-events: none;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      transform: translateX(0);
+      transition: transform .28s cubic-bezier(.6,.2,.2,1),
+                  width .28s cubic-bezier(.6,.2,.2,1),
+                  opacity .15s;
+      z-index: 2;
+    }
+    .bar-marker.cat-marker {
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--codex-gold-hi) 15%, var(--codex-gold-hi) 85%, transparent);
+      box-shadow: 0 0 10px rgba(240,214,138,0.45);
+    }
+    .bar-marker.cat-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%; bottom: -5px;
+      width: 8px; height: 8px;
+      transform: translateX(-50%) rotate(45deg);
+      background: var(--codex-gold-hi);
+      box-shadow: 0 0 6px rgba(240,214,138,0.7);
+    }
+    .bar-marker.tab-marker {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #b8852f 20%, #b8852f 80%, transparent);
+    }
+    .bar-marker.tab-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%; bottom: -3px;
+      width: 5px; height: 5px;
+      transform: translateX(-50%) rotate(45deg);
+      background: #d4a043;
+      box-shadow: 0 0 4px rgba(212,160,67,0.7);
+    }
+    /* Hide marker before first measurement so it doesn't flash at 0,0 */
+    .bar-marker:not(.measured) { opacity: 0 }
 
     .cat {
       padding: 10px 22px 11px;
@@ -559,23 +706,11 @@
       background:
         radial-gradient(ellipse 80% 60% at 50% 100%, rgba(200,168,90,0.08), transparent 70%)
     }
-    /* Active category: gilded text, layered gold rule below with a tiny
-       center fleuron that anchors the eye. */
+    /* Active category: gilded text — the underline + diamond fleuron
+       are drawn by .bar-marker.cat-marker which slides between tabs. */
     .cat.active {
       color: var(--codex-gold-hi);
-      border-bottom-color: var(--codex-gold);
       text-shadow: 0 0 6px rgba(240,214,138,0.45), 0 1px 0 rgba(0,0,0,0.6)
-    }
-    .cat.active::after {
-      /* Center diamond fleuron sitting on the active underline */
-      content: "";
-      position: absolute;
-      left: 50%; bottom: -5px;
-      width: 8px; height: 8px;
-      transform: translateX(-50%) rotate(45deg);
-      background: var(--codex-gold-hi);
-      box-shadow: 0 0 6px rgba(240,214,138,0.7);
-      z-index: 2
     }
     .cat svg {
       width: 15px; height: 15px; flex-shrink: 0;
@@ -598,8 +733,14 @@
       flex-shrink: 0
     }
     .subtab-row {
+      position: relative;
       display: none;
       align-items: center;
+      min-width: 0;
+      /* Wrap so a narrow window can't push items off the row's left edge
+         into the logo rail (Config's right-aligned row is especially
+         prone to that since flex-end packs from the right). */
+      flex-wrap: wrap;
       /* Must stay `visible`: the active-tab pin marker (.tab.active::after)
          is positioned with `bottom: -3px`, intentionally hanging below
          the row. `overflow-x: auto` or `hidden` here would treat that
@@ -658,21 +799,12 @@
       color: var(--codex-text);
       background: rgba(200,168,90,0.04)
     }
-    /* Active sub-tab — burnished bronze (lighter than the cat-bar's full
-       gold) with a tiny pin marker under the rule. */
+    /* Active sub-tab — burnished bronze text. The underline rule + pin
+       diamond are drawn by .bar-marker.tab-marker so they animate
+       between tabs instead of jumping. */
     .tab.active {
       color: #d4a043;
-      border-bottom-color: #b8852f;
       text-shadow: 0 1px 0 rgba(0,0,0,0.6)
-    }
-    .tab.active::after {
-      content: "";
-      position: absolute;
-      left: 50%; bottom: -3px;
-      width: 5px; height: 5px;
-      transform: translateX(-50%) rotate(45deg);
-      background: #d4a043;
-      box-shadow: 0 0 4px rgba(212,160,67,0.7)
     }
 
     .tab svg {
@@ -3354,57 +3486,66 @@
 
 <body>
 
-  <!-- HEADER -->
-  <div id="header" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
-    <img id="header-logo" src="logo.png" alt="">
-    <div id="logo-wrap">
-      <div id="logo-left">
-        <div class="logo-part logo-poe">PoE2</div>
-        <div class="ver-game" id="ver-game">v—</div>
-      </div>
-      <div id="logo-right">
-        <div class="logo-part logo-gh">GameHelper</div>
-        <div class="ver-gh" id="ver-gh">v—</div>
+  <!-- TOPBAR — logo rail on the left, three stacked rows on the right
+       (pills + window controls, then main category bar, then sub-tab bar).
+       Logo grows to the full height of the topbar so it reads as an anchor. -->
+  <div id="topbar">
+    <div id="topbar-logo">
+      <div id="logo-cell" onclick="ahkCall('OpenUrl','https://github.com/imm0r/PoE2GameHelper')">
+        <img id="header-logo" src="logo.png" alt="">
+        <div class="logo-pop">
+          <div class="logo-pop-name"><span class="logo-poe">PoE2</span> <span class="logo-gh">GameHelper</span></div>
+          <div class="logo-pop-vers">
+            <span>Game <span id="ver-game">v—</span></span>
+            <span>App <span id="ver-gh">v—</span></span>
+          </div>
+          <div class="logo-pop-hint">Click to visit</div>
+        </div>
       </div>
     </div>
+    <div id="topbar-stack">
+  <div id="header" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
     <!-- Pills + header-right buttons live in their own flex-wrap row
          so when the window is narrow they wrap UNDER themselves (next
          to the logo column), not under the logo block. #wm-btns is
          absolutely-positioned in the top-right corner so it stays
          there no matter how the rest reflows. -->
     <div id="header-pills">
-    <div class="pill disconnected" id="pill-connect">
+    <div class="pill disconnected" id="pill-connect" data-icon="⚡">
       <div class="dot"></div><span id="pill-connect-text">Disconnected</span>
     </div>
     <div class="pill active" id="pill-updates" onclick="ahkCall('TogglePause')" data-tip="Toggle Pause"
-      style="cursor:pointer">
+      style="cursor:pointer" data-icon="❚❚">
       <div class="dot"></div><span id="pill-updates-text">Live</span>
     </div>
-    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug">
+    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask">
+    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
-      data-tip="Toggle AutoPilot — unified explore + combat (F10)">
+      data-tip="Toggle AutoPilot — unified explore + combat (F10)" data-icon="✈">
       <div class="dot"></div><span id="pill-autopilot-text">AutoPilot OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" data-tip="Toggle Radar">
+    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" data-tip="Toggle Radar" data-icon="◎">
       <div class="dot"></div><span id="pill-radar-text">Radar ON</span>
     </div>
-    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD">
+    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD" data-icon="♥">
       <div class="dot"></div><span id="pill-hud-text">HUD ON</span>
     </div>
-    <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner">
+    <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner" data-icon="🗺">
       <div class="dot"></div><span id="pill-maphack-text">Map —</span>
     </div>
-    <div class="pill inactive" id="pill-fps">
+    <div class="pill inactive" id="pill-fps" data-icon="⏱">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
     </div>
     <div id="header-right">
-      <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
-      <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
+      <!-- Same slot does double duty: when PoE2 is running it acts as
+           "Snap" (refresh the tree from the live game). When PoE2 is not
+           running it morphs into "Start PoE2" via Steam. UI sets text +
+           handler from header push (d.poeRunning). -->
+      <button class="hbtn" id="btn-snap-or-start" onclick="snapOrStartPoe()">↺ Snap</button>
     </div>
     </div><!-- /header-pills -->
     <div id="wm-btns">
@@ -3443,7 +3584,9 @@
           <path
             d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
         </svg>Config</div>
+      <button class="cat-btn" id="wm-aot" onclick="ahkCall('ToggleAlwaysOnTop')" data-tip="Always on top">&#x1F4CC;</button>
     </div>
+    <div class="bar-marker cat-marker"></div>
   </div>
 
   <!-- ── SUB-TAB BAR (one row per category, only the active row is visible) ── -->
@@ -3469,6 +3612,7 @@
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>Watchlist <span id="wl-badge"></span></div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
     <!-- RE — live inspection (UI, gameState) | tools (Panel Diff, Memory Diff, Dissector) -->
@@ -3504,11 +3648,13 @@
           <circle cx="14" cy="12" r="1.4" />
           <circle cx="10" cy="18" r="1.4" />
         </svg>Dissector</div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
     <!-- DATA — single page, sub-tab row hidden via CSS. -->
     <div class="subtab-row single-tab" data-cat="data">
       <div class="tab" data-tab="tsvs" onclick="switchTab('tsvs')">TSVs</div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
     <!-- CONFIG — six sub-tabs, mirrors the Game/RE category structure.
@@ -3532,9 +3678,12 @@
       <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
       <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
       <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
-  </div>
+  </div><!-- /tab-bar -->
+    </div><!-- /topbar-stack -->
+  </div><!-- /topbar -->
 
   <!-- CONTENT -->
   <div id="content">
@@ -4489,6 +4638,61 @@
       try { window.chrome.webview.postMessage({ method, args }); } catch (e) { }
     }
 
+    // Snap / Start dual-button click handler. The button's data-mode is
+    // set by updateHeader() based on whether PoE2 is running, so a single
+    // click does the right thing without the user needing two buttons.
+    function snapOrStartPoe() {
+      const btn = document.getElementById('btn-snap-or-start');
+      const mode = btn ? btn.dataset.mode : 'snap';
+      ahkCall(mode === 'start' ? 'StartGame' : 'TreeRefresh');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  SLIDING TAB MARKERS
+    // ═══════════════════════════════════════════════════════════════════
+    // Each bar (#cat-bar + each .subtab-row) has one .bar-marker element
+    // that's absolutely positioned. updateBarMarker measures the active
+    // tab inside the bar, then sets the marker's transform + width so a
+    // CSS transition glides it into place. Called on every tab switch,
+    // window resize, and once on load (after fonts settle).
+    function updateBarMarker(barEl) {
+      if (!barEl) return;
+      const marker = barEl.querySelector(':scope > .bar-marker');
+      if (!marker) return;
+      const active = barEl.querySelector('.cat.active, .tab.active');
+      if (!active || barEl.offsetParent === null) {
+        // No active tab, or the bar itself is hidden (e.g. an inactive
+        // subtab-row). Leave the marker wherever it was — next time the
+        // bar becomes visible we'll re-measure.
+        return;
+      }
+      const barRect = barEl.getBoundingClientRect();
+      const aRect   = active.getBoundingClientRect();
+      const left    = aRect.left - barRect.left;
+      marker.style.transform = `translateX(${left}px)`;
+      marker.style.width     = `${aRect.width}px`;
+      marker.classList.add('measured');
+    }
+    function updateAllBarMarkers() {
+      updateBarMarker(document.getElementById('cat-bar'));
+      const activeRow = document.querySelector('.subtab-row.active');
+      if (activeRow) updateBarMarker(activeRow);
+    }
+    // rAF wrapper so the call happens AFTER the class-toggle the caller
+    // just did has been applied to the DOM and laid out.
+    function scheduleMarkerUpdate() {
+      requestAnimationFrame(() => requestAnimationFrame(updateAllBarMarkers));
+    }
+    window.addEventListener('resize', updateAllBarMarkers);
+    window.addEventListener('load', () => {
+      // Fonts can still be loading when 'load' fires; once they settle
+      // the active-tab width changes, so re-measure.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateAllBarMarkers);
+      }
+      updateAllBarMarkers();
+    });
+
     function escHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
@@ -4535,6 +4739,7 @@
         t.classList.toggle('active', t.dataset.cfgtab === name));
       document.querySelectorAll('.cfg-subpanel').forEach(p =>
         p.classList.toggle('active', p.dataset.cfgtab === name));
+      scheduleMarkerUpdate();
       // Tell AHK so the choice survives a restart. Bridge is a no-op if
       // the handler doesn't exist yet (graceful degradation during dev).
       try { ahkCall('SetConfigSubTab', name); } catch (e) {}
@@ -4562,6 +4767,7 @@
       activeCategory = cat;
       document.querySelectorAll('.cat').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
       document.querySelectorAll('.subtab-row').forEach(r => r.classList.toggle('active', r.dataset.cat === cat));
+      scheduleMarkerUpdate();
       const target = lastTabPerCategory[cat];
       if (target && target !== activeTab)
         switchTab(target);
@@ -4584,6 +4790,7 @@
       }
 
       activeTab = key;
+      scheduleMarkerUpdate();
       _runTabSideEffects(key, prev);
 
       // When switching INTO Config, re-apply whichever sub-tab was
@@ -5175,7 +5382,10 @@
       const pillPause = document.getElementById('pill-updates');
       if (pillPause) {
         const paused = d.paused === true || d.paused === 'true';
-        pillPause.className = 'pill ' + (paused ? 'inactive' : 'active');
+        // Paused gets the loud copper-amber pulse so a stopped helper
+        // can't masquerade as a quiet "off" pill; Live stays in the
+        // standard active gold.
+        pillPause.className = 'pill clickable ' + (paused ? 'paused' : 'active');
         document.getElementById('pill-updates-text').textContent = paused ? 'Paused' : 'Live';
       }
       const pillFlask = document.getElementById('pill-flask');
@@ -5254,8 +5464,14 @@
       setBtnActive('btn-pause', d.paused);
 
       // Show ▶ PoE2 only when game not running
-      const btnPoe = document.getElementById('btn-start-poe');
-      if (btnPoe) btnPoe.style.display = (d.poeRunning === true || d.poeRunning === 'true') ? 'none' : '';
+      // Snap-or-Start dual button — text + intent track whether PoE2 is up
+      const btnSnap = document.getElementById('btn-snap-or-start');
+      if (btnSnap) {
+        const running = d.poeRunning === true || d.poeRunning === 'true';
+        btnSnap.dataset.mode = running ? 'snap' : 'start';
+        btnSnap.textContent  = running ? '↺ Snap' : '▶ PoE2';
+        btnSnap.setAttribute('data-tip', running ? 'Refresh tree from live game' : 'Launch PoE2 via Steam');
+      }
 
       // Watchlist badge
       const badge = document.getElementById('wl-badge');
@@ -5526,6 +5742,14 @@
         const isMax = d.isMaximized === true || d.isMaximized === 'true';
         wmMax.textContent = isMax ? '\u2750' : '\u25a1';
         wmMax.setAttribute('data-tip', isMax ? 'Restore' : 'Maximize');
+      }
+
+      // Always-on-top toggle \u2014 active class colors the pin gold when held
+      const wmAot = document.getElementById('wm-aot');
+      if (wmAot) {
+        const aot = d.alwaysOnTop === true || d.alwaysOnTop === 'true';
+        wmAot.classList.toggle('active', aot);
+        wmAot.setAttribute('data-tip', aot ? 'Always on top \u2014 ON' : 'Always on top \u2014 OFF');
       }
     }
 
