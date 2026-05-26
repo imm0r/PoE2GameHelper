@@ -90,19 +90,107 @@
        ═══════════════════════════════════════════════════════════════════ */
     #header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 8px;
-      padding: 7px 14px;
+      /* Right padding reserved for the absolutely-positioned wm-btns
+         block (4 × 28px + gaps + a little air — pin/min/max/close).
+         Keeps any pills that wrap onto a second row from sliding
+         under the buttons. */
+      padding: 7px 140px 7px 14px;
       background:
         radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,168,90,0.06), transparent 70%),
         linear-gradient(180deg, #16100a 0%, #1f1610 55%, #14100a 100%);
       border-bottom: 1px solid var(--codex-rule);
       flex-shrink: 0;
-      flex-wrap: wrap;
+      /* No wrap at the top level — only #header-pills (below) wraps so
+         the logo column stays a single rigid left column, and any
+         overflow pills wrap into a second row to its right, never
+         underneath it. */
+      flex-wrap: nowrap;
       cursor: default;
       user-select: none;
       position: relative;
       color: var(--codex-text)
+    }
+
+    /* Right-of-logo container: every pill + the Snap/PoE2 buttons live
+       in here. Wraps to a second (or more) row when the window is
+       narrow, but always stays in the column right of the logo block.
+       align-content keeps the wrapped rows top-aligned with the logo.
+
+       container-type: inline-size lets us write @container queries
+       below that compact the pills based on THIS container's width,
+       not the viewport. Means the breakpoints behave correctly even
+       if the logo width changes or padding-right is re-tuned. */
+    #header-pills {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      align-content: flex-start;
+      gap: 8px;
+      row-gap: 6px;
+      padding-top: 2px;
+    }
+
+    /* ── Compact stage 1: ≤ 1300px viewport width ─────────────────────
+       Triggers EARLY so a typical "narrow but not tiny" window (think
+       1000-1300 px wide) gets the denser pill style. The cuts here
+       have to be visibly distinct from "normal" — earlier iterations
+       trimmed only 1-2 px and the stage looked identical to normal,
+       so users perceived a jump straight from normal → stage 2.
+       Using @media (viewport) instead of @container — container
+       queries on a flex:1 1 auto item were not measuring reliably. */
+    @media (max-width: 1300px) {
+      #header-pills .pill {
+        padding: 1px 6px;
+        font-size: 8px;
+        letter-spacing: 0.06em;
+        gap: 3px;
+      }
+      #header-pills .pill .dot {
+        width: 5px;
+        height: 5px;
+      }
+      #header-pills {
+        gap: 4px;
+        row-gap: 3px;
+      }
+      #header-pills .hbtn {
+        padding: 2px 7px;
+        font-size: 9px;
+        letter-spacing: 0.06em;
+      }
+    }
+
+    /* ── Compact stage 2: ≤ 850px viewport ─────────────────────────────
+       Falls beyond what stage 1 can handle (very narrow window): drop
+       the text labels entirely, render pills as colored status dots
+       only. The existing data-tip attributes on each pill still surface
+       the label on hover, so info is one tooltip away — not lost. */
+    @media (max-width: 850px) {
+      #header-pills .pill > span {
+        display: none;
+      }
+      #header-pills .pill {
+        padding: 3px 6px;
+        gap: 4px;
+      }
+      #header-pills .pill .dot {
+        width: 6px;
+        height: 6px;
+      }
+      /* Per-pill glyph stands in for the text label. Pulled from
+         data-icon so the HTML stays the source of truth and a new
+         pill just adds one attribute to opt in. */
+      #header-pills .pill[data-icon]::after {
+        content: attr(data-icon);
+        font-family: 'Segoe UI Symbol', 'Segoe UI Emoji', var(--codex-display);
+        font-size: 12px;
+        line-height: 1;
+        letter-spacing: 0;
+      }
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
        toolbar's signature so the whole top of the app reads as one frame. */
@@ -115,56 +203,134 @@
       opacity: 0.55
     }
 
-    #header-logo {
-      height: 32px;
-      width: auto;
-      border-radius: 2px;
-      flex-shrink: 0;
-      margin-right: 6px;
-      filter: drop-shadow(0 0 4px rgba(200,168,90,0.25))
-    }
-
-    #logo-wrap {
+    /* ═══════════════════════════════════════════════════════════════════
+       TOPBAR — outermost frame above the content. Logo lives in a
+       full-height rail on the left; pills/window-controls, main tabs,
+       and sub-tabs stack on the right. Letting the logo span all three
+       rows turns it into the visual anchor of the whole app. */
+    #topbar {
       display: flex;
-      gap: 6px;
-      margin-right: 12px;
-      align-items: flex-start;
-      padding-right: 12px;
-      border-right: 1px solid rgba(90,62,34,0.5);
-      position: relative
+      flex-shrink: 0;
+      background:
+        radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,168,90,0.05), transparent 70%),
+        linear-gradient(180deg, #16100a 0%, #1d140c 100%);
     }
-    #logo-wrap::after {
-      /* Gold hair-line companion to the brown rule */
+    /* Fixed-width rail reserving a slot for the logo. Width is the only
+       thing this element contributes to layout — its height is purely
+       inherited from the topbar, which itself is sized by the stack on
+       the right. That keeps the logo from forcing the topbar taller
+       than the three rows of pills + cat-bar + sub-tabs combined. */
+    #topbar-logo {
+      position: relative;
+      width: 110px;
+      flex-shrink: 0;
+      border-right: 1px solid rgba(90,62,34,0.5);
+      /* Bottom rule matches the codex border closing the cat-bar /
+         tab-bar to the right, so the logo rail tucks under the same
+         horizontal line instead of bleeding straight into the content. */
+      border-bottom: 1px solid var(--codex-rule);
+    }
+    #topbar-logo::after {
+      /* Gold hair-line companion to the brown rule on the divider */
       content: "";
       position: absolute;
-      right: 0; top: 15%; bottom: 15%;
+      right: 0; top: 10%; bottom: 10%;
       width: 1px;
       background: linear-gradient(180deg, transparent, var(--codex-gold) 50%, transparent);
-      opacity: 0.55
+      opacity: 0.55;
     }
-
-    #logo-left {
+    #topbar-stack {
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      align-items: flex-start
     }
 
-    #logo-right {
+    /* Logo cell — absolutely positioned inside the rail so the image's
+       intrinsic size never feeds into flex sizing. The image inside
+       fills the cell via object-fit: contain, so logo bottom aligns
+       with the bottom of the sub-tab bar (last row of the stack). */
+    #logo-cell {
+      position: absolute;
+      /* Tight inset so the artwork fills the rail — the original 6/12 px
+         padding left visible empty bands above and below. Right side
+         needs a little more breathing room because of the gold-rule
+         divider sitting on the rail's right edge. */
+      inset: 2px 8px 2px 4px;
       display: flex;
-      flex-direction: column;
-      align-items: flex-end
+      align-items: center;
+      justify-content: center;
     }
 
-    /* Brand name set in Cinzel small caps to anchor the codex vocabulary. */
-    .logo-part {
+    #header-logo {
+      width: 100%;
+      height: 100%;
+      border-radius: 2px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 4px rgba(200,168,90,0.25));
+      transition: filter .15s;
+      cursor: default;
+    }
+    #logo-cell:hover #header-logo {
+      filter: drop-shadow(0 0 7px rgba(240,214,138,0.55));
+    }
+
+    /* Hover popover surfacing the brand name + game/app version strings
+       that used to sit beside the logo. Anchored to the logo cell, fades
+       in on hover, never interferes with layout. */
+    .logo-pop {
+      position: absolute;
+      left: 0;
+      top: calc(100% + 6px);
+      z-index: 100;
+      padding: 10px 14px 9px;
+      background: linear-gradient(180deg, rgba(28,18,10,0.97), rgba(20,12,6,0.97));
+      border: 1px solid var(--codex-gold);
+      border-radius: 3px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.55);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+      transition: opacity .15s, transform .15s;
+    }
+    #logo-cell:hover .logo-pop {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .logo-pop-name {
       font-family: var(--codex-display);
       font-weight: 700;
       font-size: 14px;
       letter-spacing: .14em;
+      text-transform: uppercase;
       line-height: 1.1;
-      white-space: nowrap;
-      text-transform: uppercase
     }
+    .logo-pop-vers {
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 5px;
+      font-family: var(--codex-mono-serif);
+      font-size: 10px;
+      color: var(--codex-text-dim);
+      letter-spacing: .08em;
+    }
+    /* Hint that the logo is clickable — sits below the version row in
+       the hover popover and matches its quiet engraved aesthetic. */
+    .logo-pop-hint {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(90,62,34,0.5);
+      font-family: var(--codex-mono-serif);
+      font-size: 9px;
+      color: var(--codex-gold);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: center;
+      opacity: 0.85;
+    }
+    #logo-cell { cursor: pointer; }
 
     .logo-poe { color: var(--codex-text) }
     .logo-gh  {
@@ -172,24 +338,11 @@
       text-shadow: 0 0 6px rgba(240,214,138,0.4), 0 1px 0 rgba(0,0,0,0.6)
     }
 
-    /* Version numbers rendered in IM Fell English SC for that engraved-on-the-
-       spine feel — small but proudly typeset. */
-    .ver-game,
-    .ver-gh {
-      font-family: var(--codex-mono-serif);
-      font-size: 10px;
-      color: var(--codex-text-dim);
-      letter-spacing: .08em;
-      line-height: 1.2
-    }
-
     /* ─── STATUS PILLS — codex cartouches ──────────────────────────────
        Each pill is an inscribed brass tag rather than a rounded chip:
          · Cinzel small-caps text in ivory
          · Brown gradient fill with subtle gold inner-rim on hover/active
-         · The "dot" is recoloured to codex palette (no more bright green)
-       AutoPilot has its own .pill#pill-autopilot rules below for the
-       cockpit-feature presentation. */
+         · The "dot" is recoloured to codex palette (no more bright green) */
     .pill {
       display: flex;
       align-items: center;
@@ -242,16 +395,28 @@
 
     .pill.inactive .dot { background: #4a3424 }
 
-    /* Disconnected → blood crimson dot for the "something's wrong" beats. */
+    /* Disconnected → blood crimson "something's wrong" treatment. Shares
+       the slow attention-pulse rhythm with .pill.paused (2.4s ease-in-out)
+       so the two read as the same family of "user intervention needed";
+       only the colour distinguishes the cause (red = lost link, copper =
+       deliberately stopped). */
     .pill.disconnected {
       color: #d68a8a;
-      border-color: rgba(139,42,42,0.7)
+      border-color: rgba(139,42,42,0.85);
+      background:
+        radial-gradient(ellipse at center, rgba(139,42,42,0.18), transparent 70%),
+        linear-gradient(180deg, rgba(60,14,14,0.85), rgba(28,6,6,0.95));
+      animation: codex-pulse-disconnected 2.4s ease-in-out infinite
     }
     .pill.disconnected .dot {
       background: var(--codex-blood-hi);
       box-shadow:
         inset 0 0 0 1px rgba(0,0,0,0.55),
-        0 0 5px rgba(197,72,72,0.55)
+        0 0 8px rgba(197,72,72,0.85)
+    }
+    @keyframes codex-pulse-disconnected {
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(139,42,42,0.20), 0 0  8px -3px rgba(197,72,72,0.40) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(139,42,42,0.55), 0 0 18px -2px rgba(197,72,72,0.85) }
     }
 
     /* Warning — burnished copper. */
@@ -264,6 +429,31 @@
       box-shadow:
         inset 0 0 0 1px rgba(0,0,0,0.5),
         0 0 7px rgba(232,160,64,0.7)
+    }
+
+    /* Paused — used by the Live/Paused pill when updates are halted.
+       Has to read as "attention required" because a paused helper looks
+       superficially fine to the user. Warmer copper than the AutoPilot
+       combat-red, slower pulse (2.4s vs combat's 1.4s) so the two reads
+       as distinct: one is a calm "you stopped me", the other is an
+       urgent "I'm fighting". */
+    .pill.paused {
+      color: #f0b870;
+      border-color: rgba(212,140,52,0.85);
+      background:
+        radial-gradient(ellipse at center, rgba(212,140,52,0.16), transparent 70%),
+        linear-gradient(180deg, rgba(60,32,12,0.85), rgba(28,14,6,0.95));
+      animation: codex-pulse-paused 2.4s ease-in-out infinite
+    }
+    .pill.paused .dot {
+      background: #e8a040;
+      box-shadow:
+        inset 0 0 0 1px rgba(0,0,0,0.5),
+        0 0 8px rgba(232,160,64,0.85)
+    }
+    @keyframes codex-pulse-paused {
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(212,140,52,0.20), 0 0  8px -3px rgba(232,160,64,0.40) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(212,140,52,0.55), 0 0 18px -2px rgba(232,160,64,0.85) }
     }
 
     /* Connected — same gold language as active, slightly cooler. */
@@ -293,63 +483,16 @@
       50%      { opacity: 0.55; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.55), 0 0 12px rgba(240,214,138,1.0) }
     }
 
-    /* ─── AUTOPILOT PILL — the cockpit. ─────────────────────────────────
-       It's the user's primary status during gameplay so it earns more
-       presence: wider, taller, separator-segmented (left = label, right =
-       state badge), and state-coloured glow that's distinct enough to
-       recognise at a glance during combat. */
+    /* AUTOPILOT PILL — used to be a wider "cockpit" with diamond dot,
+       inflated padding, and a unique active glow. Visual outlier next to
+       the other pills, so it's now normalised: same shape, same circle
+       dot, same active/warning treatment. State variations come purely
+       through .active / .warning which all pills share. */
     #pill-autopilot {
-      padding: 4px 14px 4px 16px;
-      gap: 10px;
-      font-size: 11px;
-      letter-spacing: .14em;
-      min-width: 130px;
       position: relative
     }
-    /* Inner gilded inset border — replaces the .pill.active blanket shadow
-       for this specific pill so the cockpit feels carved. */
-    #pill-autopilot::before {
-      content: "";
-      position: absolute;
-      inset: 2px;
-      border: 1px solid rgba(240,214,138,0.0);
-      pointer-events: none;
-      transition: border-color .2s
-    }
-    #pill-autopilot:hover::before { border-color: rgba(240,214,138,0.30) }
-
-    /* Diamond-shape "dot" — it's a small inscribed gem in the cockpit context. */
-    #pill-autopilot .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 0;
-      transform: rotate(45deg);
-      flex-shrink: 0
-    }
-
-    /* OFF state — quiet. */
-    #pill-autopilot.inactive {
-      color: var(--codex-text-dim)
-    }
-    #pill-autopilot.inactive .dot {
-      background: rgba(90,62,34,0.7);
-      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.5)
-    }
-
-    /* ON / Exploring (active) — steady gold glow, percentage in the text. */
-    #pill-autopilot.active {
-      color: var(--codex-gold-hi);
-      border-color: var(--codex-gold-hi);
-      box-shadow:
-        inset 0 0 0 1px rgba(240,214,138,0.15),
-        0 0 14px -2px rgba(240,214,138,0.5)
-    }
-    #pill-autopilot.active .dot {
-      background: var(--codex-gold-hi);
-      box-shadow: 0 0 8px rgba(240,214,138,0.85)
-    }
-
-    /* Combat — blood-red urgency, faster pulse than the scanning beat. */
+    /* Combat — keep the urgent red treatment from before, applied to
+       the normalised pill silhouette. */
     #pill-autopilot.warning {
       color: #ff9696;
       border-color: var(--codex-blood-hi);
@@ -358,16 +501,16 @@
         linear-gradient(180deg, rgba(80,18,18,0.85), rgba(30,8,8,0.95));
       box-shadow:
         inset 0 0 0 1px rgba(197,72,72,0.25),
-        0 0 18px -3px rgba(197,72,72,0.65);
+        0 0 14px -3px rgba(197,72,72,0.55);
       animation: codex-pulse-combat 1.4s ease-in-out infinite
     }
     #pill-autopilot.warning .dot {
       background: var(--codex-blood-hi);
-      box-shadow: 0 0 10px rgba(197,72,72,1.0)
+      box-shadow: 0 0 7px rgba(197,72,72,1.0)
     }
     @keyframes codex-pulse-combat {
-      0%, 100% { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.25), 0 0 12px -3px rgba(197,72,72,0.45) }
-      50%      { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.55), 0 0 24px -2px rgba(197,72,72,0.95) }
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.25), 0 0 10px -3px rgba(197,72,72,0.45) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.55), 0 0 18px -2px rgba(197,72,72,0.85) }
     }
 
     #header-right {
@@ -402,13 +545,17 @@
     }
 
     #wm-btns {
+      /* Pinned to the top-right corner of the header so window-resize
+         reflowing can never push it down into a wrapped pill row.
+         The #header itself reserves padding-right to keep wrapped
+         content from sliding underneath these buttons. */
+      position: absolute;
+      top: 6px;
+      right: 8px;
       display: flex;
       gap: 2px;
       align-items: center;
-      margin-left: 10px;
       flex-shrink: 0;
-      padding-left: 10px;
-      border-left: 1px solid rgba(90,62,34,0.5)
     }
 
     .wm-btn {
@@ -430,6 +577,41 @@
       background: rgba(200,168,90,0.10);
       color: var(--codex-gold-hi)
     }
+
+    /* Cat-bar companion button — lives next to the Config category.
+       Same vertical rhythm as .cat (10/11 px padding) so the bottom
+       edge aligns with the category underline. Distinct shape from a
+       category tab: smaller font and no underline, so the eye still
+       reads it as a utility, not navigation. */
+    .cat-btn {
+      background: transparent;
+      border: none;
+      color: var(--codex-text-dim);
+      padding: 10px 14px 11px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color .15s, background .15s, opacity .15s, transform .15s;
+      opacity: 0.45;
+      /* Inactive default — washed-out and slightly tilted so the pin
+         glyph reads as "loose". Going active straightens + brightens it. */
+      transform: rotate(-25deg);
+    }
+    .cat-btn:hover {
+      color: var(--codex-gold-hi);
+      background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(200,168,90,0.08), transparent 70%);
+      opacity: 0.85;
+    }
+    .cat-btn.active {
+      color: var(--codex-gold-hi);
+      text-shadow: 0 0 7px rgba(240,214,138,0.7);
+      opacity: 1;
+      transform: rotate(0deg);
+    }
     .wm-close:hover {
       background: var(--codex-blood) !important;
       color: #fff !important
@@ -443,6 +625,7 @@
        so the eye lands on it immediately without it being garish.
        ═══════════════════════════════════════════════════════════════════ */
     #cat-bar {
+      position: relative;
       display: flex;
       background:
         radial-gradient(ellipse 80% 100% at 50% 100%, rgba(200,168,90,0.04), transparent 70%),
@@ -453,6 +636,53 @@
 
     #cat-bar-left { display: flex }
     #cat-bar-right { margin-left: auto; display: flex }
+
+    /* ─── Sliding active-tab marker ───────────────────────────────────
+       One absolutely-positioned indicator per bar. JS measures the
+       active tab's bounding rect against the bar and writes transform
+       + width — CSS transitions handle the glide. The diamond fleuron
+       rides on top of the marker so it travels with the rule. */
+    .bar-marker {
+      position: absolute;
+      pointer-events: none;
+      bottom: 0;
+      left: 0;
+      width: 0;
+      transform: translateX(0);
+      transition: transform .28s cubic-bezier(.6,.2,.2,1),
+                  width .28s cubic-bezier(.6,.2,.2,1),
+                  opacity .15s;
+      z-index: 2;
+    }
+    .bar-marker.cat-marker {
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--codex-gold-hi) 15%, var(--codex-gold-hi) 85%, transparent);
+      box-shadow: 0 0 10px rgba(240,214,138,0.45);
+    }
+    .bar-marker.cat-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%; bottom: -5px;
+      width: 8px; height: 8px;
+      transform: translateX(-50%) rotate(45deg);
+      background: var(--codex-gold-hi);
+      box-shadow: 0 0 6px rgba(240,214,138,0.7);
+    }
+    .bar-marker.tab-marker {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #b8852f 20%, #b8852f 80%, transparent);
+    }
+    .bar-marker.tab-marker::after {
+      content: "";
+      position: absolute;
+      left: 50%; bottom: -3px;
+      width: 5px; height: 5px;
+      transform: translateX(-50%) rotate(45deg);
+      background: #d4a043;
+      box-shadow: 0 0 4px rgba(212,160,67,0.7);
+    }
+    /* Hide marker before first measurement so it doesn't flash at 0,0 */
+    .bar-marker:not(.measured) { opacity: 0 }
 
     .cat {
       padding: 10px 22px 11px;
@@ -476,23 +706,11 @@
       background:
         radial-gradient(ellipse 80% 60% at 50% 100%, rgba(200,168,90,0.08), transparent 70%)
     }
-    /* Active category: gilded text, layered gold rule below with a tiny
-       center fleuron that anchors the eye. */
+    /* Active category: gilded text — the underline + diamond fleuron
+       are drawn by .bar-marker.cat-marker which slides between tabs. */
     .cat.active {
       color: var(--codex-gold-hi);
-      border-bottom-color: var(--codex-gold);
       text-shadow: 0 0 6px rgba(240,214,138,0.45), 0 1px 0 rgba(0,0,0,0.6)
-    }
-    .cat.active::after {
-      /* Center diamond fleuron sitting on the active underline */
-      content: "";
-      position: absolute;
-      left: 50%; bottom: -5px;
-      width: 8px; height: 8px;
-      transform: translateX(-50%) rotate(45deg);
-      background: var(--codex-gold-hi);
-      box-shadow: 0 0 6px rgba(240,214,138,0.7);
-      z-index: 2
     }
     .cat svg {
       width: 15px; height: 15px; flex-shrink: 0;
@@ -515,12 +733,27 @@
       flex-shrink: 0
     }
     .subtab-row {
+      position: relative;
       display: none;
       align-items: center;
-      overflow-x: auto
+      min-width: 0;
+      /* Wrap so a narrow window can't push items off the row's left edge
+         into the logo rail (Config's right-aligned row is especially
+         prone to that since flex-end packs from the right). */
+      flex-wrap: wrap;
+      /* Must stay `visible`: the active-tab pin marker (.tab.active::after)
+         is positioned with `bottom: -3px`, intentionally hanging below
+         the row. `overflow-x: auto` or `hidden` here would treat that
+         marker as overflow and either show a thin scrollbar (per the
+         spec, auto on one axis promotes the other from visible→auto) or
+         clip the marker entirely. */
+      overflow: visible
     }
     .subtab-row.active { display: flex }
     .subtab-row.single-tab.active { display: none }
+    /* Config category is right-aligned in the top bar, so push its
+       sub-tab row to match — keeps the visual axis consistent. */
+    .subtab-row[data-cat="config"] { justify-content: flex-end }
 
     /* Group label ("LIVE" / "TOOLS") — italic Cinzel small-caps in muted
        gold. Acts as a quiet section header inside the sub-tab row. */
@@ -566,21 +799,12 @@
       color: var(--codex-text);
       background: rgba(200,168,90,0.04)
     }
-    /* Active sub-tab — burnished bronze (lighter than the cat-bar's full
-       gold) with a tiny pin marker under the rule. */
+    /* Active sub-tab — burnished bronze text. The underline rule + pin
+       diamond are drawn by .bar-marker.tab-marker so they animate
+       between tabs instead of jumping. */
     .tab.active {
       color: #d4a043;
-      border-bottom-color: #b8852f;
       text-shadow: 0 1px 0 rgba(0,0,0,0.6)
-    }
-    .tab.active::after {
-      content: "";
-      position: absolute;
-      left: 50%; bottom: -3px;
-      width: 5px; height: 5px;
-      transform: translateX(-50%) rotate(45deg);
-      background: #d4a043;
-      box-shadow: 0 0 4px rgba(212,160,67,0.7)
     }
 
     .tab svg {
@@ -612,6 +836,12 @@
     .tab-panel.active {
       display: flex
     }
+
+    /* Config sub-panels — only one is .active at a time. Lives inside
+       #panel-config so the outer tab-panel/cfg-scroll positioning is
+       reused; switchConfigSubTab() flips the active class. */
+    .cfg-subpanel { display: none }
+    .cfg-subpanel.active { display: block }
 
     /* TSV VIEWER */
     .tsv-toolbar {
@@ -2518,7 +2748,47 @@
     }
 
     .cfg-section details summary .cfg-header {
-      margin: 0
+      margin: 0;
+      /* Drop the gold under-rule on the header itself — the summary now
+         owns it (see below) so the line extends the full row width past
+         the right-aligned status pill + diamond caret. */
+      border-bottom: none
+    }
+    /* Top-level cfg-section summaries get the gold under-rule on the
+       summary element so the line spans the entire row width regardless
+       of whether the header has a right-aligned summary-status sibling.
+       Restricted to direct children of cfg-section so the nested
+       summaries inside AutoPilot's inner <details> (📊/⚔/🧭/💎) don't
+       inherit the heavier rule. */
+    .cfg-section > details > summary {
+      border-bottom: 1px solid var(--codex-rule)
+    }
+
+    /* Right-aligned status pill inside a <summary> — used to surface
+       AutoFlask/AutoPilot "Reason" text on the same line as the heading
+       so it stays visible when the section is collapsed. Padding-right
+       clears the gold-diamond caret on the right edge of the summary. */
+    .cfg-summary-status {
+      margin-left: auto;
+      padding-right: 22px;
+      font-size: 11px;
+      color: var(--subtext);
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* One-line explanation row that sits directly under a toggle/section
+       heading. Greyed out + indented so it reads as ancillary text,
+       not as another row of UI to interact with. */
+    .cfg-help {
+      font-size: 10.5px;
+      color: var(--subtext);
+      opacity: 0.85;
+      line-height: 1.45;
+      padding: 2px 8px 8px 8px;
+      margin: -4px 0 0;
     }
 
     .cfg-subsection {
@@ -3030,57 +3300,254 @@
     .uib-sr-row:hover {
       background: var(--surface2)
     }
+
+    /* ── Maphack color picker ──────────────────────────────────────────
+       Custom modal replacing the native Windows ChooseColor dialog, so
+       the picker matches the rest of the codex/parchment styling and we
+       can show RGB/HSV + alpha in one panel. Triggered by clicking the
+       color swatches in the GGPK maphack config rows; resolves with a
+       8-char RRGGBBAA hex via window.cpResolve. */
+    .cp-swatch {
+      width: 28px;
+      height: 18px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      /* checkered alpha background — visible through the swatch's RGBA fill */
+      background-image:
+        linear-gradient(45deg, #555 25%, transparent 25%),
+        linear-gradient(-45deg, #555 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #555 75%),
+        linear-gradient(-45deg, transparent 75%, #555 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    }
+    .cp-swatch::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--swatch-color, #fff);
+    }
+    .cp-swatch:hover { border-color: var(--accent) }
+
+    /* Modal backdrop. Fixed-positioned over the whole UI so the picker
+       floats above whatever tab is active. */
+    #cp-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    #cp-modal.cp-open { display: flex }
+
+    .cp-panel {
+      width: 320px;
+      background: var(--codex-vellum, var(--surface));
+      border: 1px solid var(--codex-rule, var(--border));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(0, 0, 0, .35);
+      padding: 14px;
+      font-size: 11px;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .cp-title {
+      font-size: 12px;
+      color: var(--codex-text, var(--text));
+      border-bottom: 1px solid var(--codex-edge, var(--border));
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      letter-spacing: .04em;
+    }
+
+    /* HSV saturation/value square. CSS gradients — no canvas needed.
+       --hue holds the current hue in 0..360, used by the inline style
+       to drive the base color. */
+    .cp-sv {
+      width: 100%;
+      height: 160px;
+      position: relative;
+      cursor: crosshair;
+      background:
+        linear-gradient(to top, #000 0%, transparent 100%),
+        linear-gradient(to right, #fff 0%, transparent 100%),
+        hsl(var(--hue, 210), 100%, 50%);
+      border: 1px solid var(--codex-edge, var(--border));
+    }
+    .cp-sv-marker {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 1px #000;
+      pointer-events: none;
+    }
+
+    /* Hue + alpha sliders share the same horizontal-rail look. */
+    .cp-slider {
+      width: 100%;
+      height: 14px;
+      margin-top: 10px;
+      position: relative;
+      cursor: pointer;
+      border: 1px solid var(--codex-edge, var(--border));
+    }
+    .cp-slider-hue {
+      background: linear-gradient(to right,
+        #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%,
+        #00f 67%, #f0f 83%, #f00 100%);
+    }
+    .cp-slider-alpha {
+      background:
+        linear-gradient(to right, transparent 0%, var(--alpha-color, #fff) 100%),
+        /* checker again so user sees the alpha applied against a known bg */
+        repeating-linear-gradient(45deg,
+          #555 0 4px, #888 4px 8px);
+    }
+    .cp-slider-marker {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      width: 4px;
+      background: #fff;
+      box-shadow: 0 0 0 1px #000;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .cp-preview-row {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .cp-preview {
+      flex: 1;
+      height: 28px;
+      border: 1px solid var(--codex-edge, var(--border));
+      /* checker so alpha is visible */
+      background-image:
+        linear-gradient(45deg, #555 25%, transparent 25%),
+        linear-gradient(-45deg, #555 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #555 75%),
+        linear-gradient(-45deg, transparent 75%, #555 75%);
+      background-size: 10px 10px;
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+      position: relative;
+    }
+    .cp-preview::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--preview-color, #fff);
+    }
+
+    .cp-hex {
+      width: 86px;
+      padding: 4px 6px;
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--codex-edge, var(--border));
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .cp-hex:focus { outline: none; border-color: var(--accent) }
+
+    .cp-btn-row {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .cp-btn {
+      padding: 4px 14px;
+      font-size: 11px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--codex-edge, var(--border));
+      cursor: pointer;
+      letter-spacing: .04em;
+    }
+    .cp-btn:hover { background: var(--surface2); border-color: var(--accent) }
+    .cp-btn-primary { background: var(--codex-edge, var(--border)) }
   </style>
 </head>
 
 <body>
 
-  <!-- HEADER -->
-  <div id="header" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
-    <img id="header-logo" src="logo.png" alt="">
-    <div id="logo-wrap">
-      <div id="logo-left">
-        <div class="logo-part logo-poe">PoE2</div>
-        <div class="ver-game" id="ver-game">v—</div>
-      </div>
-      <div id="logo-right">
-        <div class="logo-part logo-gh">GameHelper</div>
-        <div class="ver-gh" id="ver-gh">v—</div>
+  <!-- TOPBAR — logo rail on the left, three stacked rows on the right
+       (pills + window controls, then main category bar, then sub-tab bar).
+       Logo grows to the full height of the topbar so it reads as an anchor. -->
+  <div id="topbar">
+    <div id="topbar-logo">
+      <div id="logo-cell" onclick="ahkCall('OpenUrl','https://github.com/imm0r/PoE2GameHelper')">
+        <img id="header-logo" src="logo.png" alt="">
+        <div class="logo-pop">
+          <div class="logo-pop-name"><span class="logo-poe">PoE2</span> <span class="logo-gh">GameHelper</span></div>
+          <div class="logo-pop-vers">
+            <span>Game <span id="ver-game">v—</span></span>
+            <span>App <span id="ver-gh">v—</span></span>
+          </div>
+          <div class="logo-pop-hint">Click to visit</div>
+        </div>
       </div>
     </div>
-    <div class="pill disconnected" id="pill-connect">
+    <div id="topbar-stack">
+  <div id="header" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
+    <!-- Pills + header-right buttons live in their own flex-wrap row
+         so when the window is narrow they wrap UNDER themselves (next
+         to the logo column), not under the logo block. #wm-btns is
+         absolutely-positioned in the top-right corner so it stays
+         there no matter how the rest reflows. -->
+    <div id="header-pills">
+    <div class="pill disconnected" id="pill-connect" data-icon="⚡">
       <div class="dot"></div><span id="pill-connect-text">Disconnected</span>
     </div>
     <div class="pill active" id="pill-updates" onclick="ahkCall('TogglePause')" data-tip="Toggle Pause"
-      style="cursor:pointer">
+      style="cursor:pointer" data-icon="❚❚">
       <div class="dot"></div><span id="pill-updates-text">Live</span>
     </div>
-    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug">
+    <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask">
+    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
-      data-tip="Toggle AutoPilot — unified explore + combat (F10)">
+      data-tip="Toggle AutoPilot — unified explore + combat (F10)" data-icon="✈">
       <div class="dot"></div><span id="pill-autopilot-text">AutoPilot OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" data-tip="Toggle Radar">
+    <div class="pill inactive clickable" id="pill-radar" onclick="ahkCall('ToggleRadar')" data-tip="Toggle Radar" data-icon="◎">
       <div class="dot"></div><span id="pill-radar-text">Radar ON</span>
     </div>
-    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD">
+    <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD" data-icon="♥">
       <div class="dot"></div><span id="pill-hud-text">HUD ON</span>
     </div>
-    <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner">
+    <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner" data-icon="🗺">
       <div class="dot"></div><span id="pill-maphack-text">Map —</span>
     </div>
-    <div class="pill inactive" id="pill-fps">
+    <div class="pill inactive" id="pill-fps" data-icon="⏱">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
     </div>
     <div id="header-right">
-      <button class="hbtn" onclick="ahkCall('TreeRefresh')">↺ Snap</button>
-      <button class="hbtn" id="btn-start-poe" onclick="ahkCall('StartGame')" style="display:none">▶ PoE2</button>
+      <!-- Same slot does double duty: when PoE2 is running it acts as
+           "Snap" (refresh the tree from the live game). When PoE2 is not
+           running it morphs into "Start PoE2" via Steam. UI sets text +
+           handler from header push (d.poeRunning). -->
+      <button class="hbtn" id="btn-snap-or-start" onclick="snapOrStartPoe()">↺ Snap</button>
     </div>
+    </div><!-- /header-pills -->
     <div id="wm-btns">
       <button class="wm-btn" onclick="ahkCall('WinMinimize')" data-tip="Minimize">&#x2013;</button>
       <button class="wm-btn" id="wm-maximize" onclick="ahkCall('WinMaximize')" data-tip="Maximize">&#x25a1;</button>
@@ -3117,7 +3584,9 @@
           <path
             d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z" />
         </svg>Config</div>
+      <button class="cat-btn" id="wm-aot" onclick="ahkCall('ToggleAlwaysOnTop')" data-tip="Always on top">&#x1F4CC;</button>
     </div>
+    <div class="bar-marker cat-marker"></div>
   </div>
 
   <!-- ── SUB-TAB BAR (one row per category, only the active row is visible) ── -->
@@ -3143,6 +3612,7 @@
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>Watchlist <span id="wl-badge"></span></div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
     <!-- RE — live inspection (UI, gameState) | tools (Panel Diff, Memory Diff, Dissector) -->
@@ -3158,12 +3628,10 @@
         </svg>gameState</div>
       <div class="subtab-divider"></div>
       <span class="subtab-group-label">Tools</span>
-      <div class="tab" data-tab="debug" onclick="switchTab('debug')"><svg viewBox="0 0 24 24">
-          <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v1h2" />
-          <path d="M18 10h2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4" />
-          <rect x="8" y="9" width="8" height="12" rx="2" />
-          <path d="M12 9v12" />
-        </svg>Panel Diff</div>
+      <!-- Panel Diff sub-tab retired — its content (radar debug, panel
+           discovery, struct-diff snapshot, overlay state) moved to
+           Config > Debug, since it's all diagnostic config rather than
+           tool-style interactive scratch space. -->
       <div class="tab" data-tab="memdiff" onclick="switchTab('memdiff')"><svg viewBox="0 0 24 24">
           <rect x="3" y="4" width="8" height="16" rx="1" />
           <rect x="13" y="4" width="8" height="16" rx="1" />
@@ -3180,17 +3648,42 @@
           <circle cx="14" cy="12" r="1.4" />
           <circle cx="10" cy="18" r="1.4" />
         </svg>Dissector</div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
-    <!-- DATA / CONFIG — single page each, sub-tab row hidden via CSS. -->
+    <!-- DATA — single page, sub-tab row hidden via CSS. -->
     <div class="subtab-row single-tab" data-cat="data">
       <div class="tab" data-tab="tsvs" onclick="switchTab('tsvs')">TSVs</div>
-    </div>
-    <div class="subtab-row single-tab" data-cat="config">
-      <div class="tab" data-tab="config" onclick="switchTab('config')">Config</div>
+      <div class="bar-marker tab-marker"></div>
     </div>
 
-  </div>
+    <!-- CONFIG — six sub-tabs, mirrors the Game/RE category structure.
+         General      — status + overview + master toggles + actions
+         Automation   — Auto-Flask + AutoPilot + Range Circles + Opacity
+         Overlay      — Radar visualisation toggles + entity-type filters
+         GGPK         — Maphack source + apply/revert + shader colors
+         Filters      — Entity filters + Skill/Buff blacklist
+         Debug        — Diagnostic / RE-style live panels moved here from the
+                        old RE > Panel Diff tab (which is now retired —
+                        its content is purely diagnostic config). -->
+    <div class="subtab-row" data-cat="config">
+      <!-- The 6 buttons all map to the same top-level `config` tab-panel
+           and just toggle which inner .cfg-subpanel is visible — hence
+           switchConfigSubTab() instead of switchTab(). This keeps the
+           existing category machinery (tabCategory, lastTabPerCategory,
+           tree-tab notifications) blissfully unaware of the inner split. -->
+      <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')">General</div>
+      <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')">Automation</div>
+      <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')">Overlay</div>
+      <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
+      <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
+      <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
+      <div class="bar-marker tab-marker"></div>
+    </div>
+
+  </div><!-- /tab-bar -->
+    </div><!-- /topbar-stack -->
+  </div><!-- /topbar -->
 
   <!-- CONTENT -->
   <div id="content">
@@ -3300,9 +3793,19 @@
       </div>
     </div>
 
-    <!-- CONFIG TAB -->
+    <!-- CONFIG TAB — split into 6 sub-panels via the cfg-subpanel
+         wrappers below. switchConfigSubTab() toggles which one carries
+         the .active class; only one is visible at a time. The outer
+         #panel-config tab-panel remains a single top-level entry in the
+         existing tab system, so tabCategory/lastTabPerCategory don't
+         need to know about the inner split. -->
     <div class="tab-panel" id="panel-config">
       <div class="cfg-scroll">
+
+        <!-- ════════════════════════════════════════════════════════════
+             GENERAL — status, overview, master toggles, action buttons
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel active" data-cfgtab="general">
 
         <div class="cfg-section">
           <details id="det-status" open ontoggle="syncCfgSections()">
@@ -3318,24 +3821,6 @@
                 <span style="display:flex;align-items:center;gap:6px">
                   <span id="cfg-conn-status" class="cfg-status">—</span>
                 </span>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <div class="cfg-section">
-          <details id="det-overview" open ontoggle="syncCfgSections()">
-            <summary>
-              <div class="cfg-header">Overview</div>
-            </summary>
-            <div class="cfg-subsection" style="padding:0">
-              <div class="tree-toolbar" id="tree-toolbar">
-                <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
-                <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
-                <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
-              </div>
-              <div id="tab-overview-content" style="max-height:300px;overflow-y:auto;padding:8px">
-                <div class="tree-empty">Loading…</div>
               </div>
             </div>
           </details>
@@ -3363,11 +3848,67 @@
           </details>
         </div>
 
+        <!-- Actions section — moved from the bottom of the old Config
+             tab to live inside General so the panel order matches the
+             sub-tab order. -->
+        <div class="cfg-section">
+          <details id="det-actions" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Actions</div>
+            </summary>
+            <div class="cfg-subsection">
+              <button class="cfg-btn" id="btn-pause" onclick="ahkCall('TogglePause')">⏸ Pause</button>
+              <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
+              <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
+              <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
+              <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+            </div>
+          </details>
+        </div>
+
+        <!-- Overview lives at the bottom of General — it's a tall live
+             tree, putting it first pushed everything else off-screen on
+             the default window height. -->
+        <div class="cfg-section">
+          <details id="det-overview" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Overview</div>
+            </summary>
+            <div class="cfg-subsection" style="padding:0">
+              <div class="tree-toolbar" id="tree-toolbar">
+                <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
+                <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
+                <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
+              </div>
+              <div id="tab-overview-content" style="max-height:300px;overflow-y:auto;padding:8px">
+                <div class="tree-empty">Loading…</div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel general -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             AUTOMATION — Auto-Flask, AutoPilot, Range Circles + Opacity
+             (the radar-alpha slider lives here because the user groups
+             it mentally with Range Circles — it does affect the entire
+             radar overlay's opacity, not just the circles, but that's
+             the closest semantic fit.)
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="automation">
+
         <div class="cfg-section">
           <details id="det-autoflask" open
             ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
               <div class="cfg-header">Autoflask</div>
+              <!-- Reason badge — mirrors the body cfg-status so the user
+                   can see WHY autoflask did/didn't fire even when the
+                   section is collapsed. AHK keeps writing to
+                   #cfg-af-reason as before; this element is updated by
+                   the same setText() call in updateConfigToggles. -->
+              <span id="cfg-af-reason-summary" class="cfg-summary-status">—</span>
             </summary>
             <div class="cfg-subsection">
               <div class="cfg-row"><span class="cfg-label">Enable AutoFlask</span>
@@ -3396,8 +3937,12 @@
                   </div>
                 </div>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-af-reason"
-                  class="cfg-status idle">—</span></div>
+              <!-- The body Reason row is gone — its content lives in
+                   the collapsible summary as #cfg-af-reason-summary, so
+                   the reason is visible whether the section is open or
+                   closed. AHK still writes to #cfg-af-reason below for
+                   back-compat with anything that reads it directly. -->
+              <span id="cfg-af-reason" class="cfg-status" style="display:none">—</span>
             </div>
           </details>
         </div>
@@ -3406,43 +3951,66 @@
           <details id="det-autopilot" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)" open>
             <summary>
               <div class="cfg-header">🤖 AutoPilot</div>
+              <span id="cfg-autopilot-reason-summary" class="cfg-summary-status">—</span>
             </summary>
             <div class="cfg-subsection">
-              <div class="cfg-row"><span class="cfg-label">Enable AutoPilot</span>
+              <!-- Master toggle + hotkey on a single row to save vertical
+                   space. The hotkey label is informational only — the
+                   actual binding lives in the AHK source. -->
+              <div class="cfg-row">
+                <span class="cfg-label">Enable AutoPilot</span>
                 <label class="toggle"><input type="checkbox" id="tog-autopilot"
                     onchange="ahkCall('ToggleAutoPilot'); updateRangeCircleVisibility()"><span
                     class="toggle-slider"></span></label>
+                <span style="margin-left:14px;font-size:11px;color:var(--subtext)">
+                  Hotkey: <span id="cfg-combat-hotkey" class="cfg-status"
+                                style="color:#7ec8e3;font-weight:600">F10</span>
+                </span>
               </div>
-              <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-autopilot-state"
-                  class="cfg-status idle">idle</span></div>
-              <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-autopilot-reason"
-                  class="cfg-status idle">—</span></div>
-              <div class="cfg-row"><span class="cfg-label">Hotkey</span><span id="cfg-combat-hotkey"
-                  class="cfg-status" style="color:#7ec8e3;font-weight:600">F10</span></div>
-              <div class="cfg-row"><span class="cfg-label">Combat</span><span id="cfg-combat-state"
-                  class="cfg-status idle">idle</span><span id="cfg-combat-reason"
-                  class="cfg-status idle" style="margin-left:8px;opacity:.8">—</span></div>
-              <div class="cfg-row"><span class="cfg-label">Explore</span><span id="cfg-explore-pct" class="cfg-status"
-                  style="color:#7ec8e3;font-weight:600">0%</span><span id="cfg-explore-reason"
-                  class="cfg-status idle" style="margin-left:8px;opacity:.8">idle</span></div>
-              <div class="cfg-row" style="opacity:.7;font-size:11px;line-height:1.4;margin-top:4px">
-                Single switch. While on: explores the area; whenever a hostile is in
-                engage range, pauses exploration and engages (LoS-gated skill firing,
-                avoids transitions/portals/UI).
+              <div class="cfg-help">
+                Single switch — while on, the helper explores the area; whenever a hostile
+                is in engage range it pauses exploration and engages (LoS-gated skill firing,
+                avoids transitions / portals / UI).
               </div>
 
-              <!-- Hidden legacy toggles — kept in DOM so the existing setChk()
-                   helpers in updateHeader don't blow up. Always mirror the
-                   AutoPilot state via JS but never visible to the user. -->
+              <!-- Hidden legacy toggles — kept in DOM so the existing
+                   setChk() helpers in updateHeader don't blow up. -->
               <input type="checkbox" id="tog-combat"  style="display:none">
               <input type="checkbox" id="tog-explore" style="display:none">
 
-              <!-- ── Advanced tuning ──────────────────────────────────── -->
-              <details id="det-autopilot-adv" style="margin-top:10px" ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)">
-                <summary style="cursor:pointer;font-size:12px;color:var(--subtext);padding:4px 0">
-                  ⚙ Erweiterte Einstellungen
+              <!-- ════════════════════════════════════════════════════
+                   📊 LIVE STATUS — quick glance at what AutoPilot is
+                   doing right now. Loot status + cache count live here
+                   too because they're a live readout, not a setting.
+                   ════════════════════════════════════════════════════ -->
+              <details open style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">📊 Live Status</div>
                 </summary>
-                <div style="margin-top:8px;padding:6px 0 0 4px;border-top:1px dashed var(--border)">
+                <div style="margin-top:4px;padding:6px 0 4px 4px">
+                  <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-autopilot-state"
+                      class="cfg-status idle">idle</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Combat</span><span id="cfg-combat-state"
+                      class="cfg-status idle">idle</span><span id="cfg-combat-reason"
+                      class="cfg-status idle" style="margin-left:8px;opacity:.8">—</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Explore</span><span id="cfg-explore-pct" class="cfg-status"
+                      style="color:#7ec8e3;font-weight:600">0%</span><span id="cfg-explore-reason"
+                      class="cfg-status idle" style="margin-left:8px;opacity:.8">idle</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Loot</span><span id="cfg-loot-status"
+                      class="cfg-status idle">idle</span><span style="margin-left:8px;color:var(--subtext);font-size:11px">
+                      pickup • cache <span id="cfg-loot-cache-count">0</span></span></div>
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   ⚔ COMBAT — engage / disengage ranges, GCD, world-to-
+                   screen scale, plus the dynamic skill-slot list.
+                   ════════════════════════════════════════════════════ -->
+              <details ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)" style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">⚔ Combat</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px">
                   <div class="cfg-slider-pair">
                     <div class="cfg-slider-item">
                       <span class="cfg-label">Engage</span>
@@ -3479,6 +4047,20 @@
                       </div>
                     </div>
                   </div>
+
+                  <div style="margin-top:12px;font-size:11px;color:var(--accent);font-weight:600">Skill Slots</div>
+                  <div id="combat-slots-cfg" style="margin-top:4px"></div>
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   🧭 EXPLORATION — target coverage %.
+                   ════════════════════════════════════════════════════ -->
+              <details ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)" style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">🧭 Exploration</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px">
                   <div class="cfg-slider-row">
                     <span class="cfg-label">Explore Ziel %</span>
                     <div class="slider-wrap">
@@ -3487,17 +4069,29 @@
                         oninput="_sb(this,'explore-target-bub',this.value+'%'); ahkCall('SetExploreTarget', parseInt(this.value))">
                     </div>
                   </div>
-
-                  <!-- ── Loot Pickup ───────────────────────────────────── -->
-                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">💎 Loot Pickup</div>
-                  <div class="cfg-row" style="margin-top:4px">
-                    <span class="cfg-label">Status</span>
-                    <span id="cfg-loot-status" class="cfg-status idle">idle</span>
-                    <span style="margin-left:8px;color:var(--subtext);font-size:11px">
-                      Cache: <span id="cfg-loot-cache-count">0</span>
-                    </span>
+                  <div class="cfg-help">
+                    AutoPilot stops the exploration phase once this fraction of the area has
+                    been visited. Higher = more thorough sweep, lower = faster zone clears.
                   </div>
-                  <div class="filter-row" id="loot-rarity-filter" style="margin-top:4px">
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   💎 LOOT PICKUP — rarity filter for what to grab. Live
+                   status (idle/picking up) + cache count moved up into
+                   Live Status above; this sub-section is only for
+                   *configuring* the pickup behaviour.
+                   ════════════════════════════════════════════════════ -->
+              <details style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">💎 Loot Pickup</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px">
+                  <div class="cfg-help">
+                    Picks up ground items matching the selected rarities. Cached items persist
+                    across ticks — drops noticed during combat are collected once the area is safe.
+                  </div>
+                  <div class="filter-row" id="loot-rarity-filter">
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-normal"
                         onchange="ahkCall('SetLootRarity','Normal',this.checked)"> Normal</label>
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-magic"
@@ -3509,19 +4103,46 @@
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-currency"
                         onchange="ahkCall('SetLootRarity','Currency',this.checked)" checked> Currency</label>
                   </div>
-                  <div style="margin-top:4px;font-size:11px;color:var(--subtext);line-height:1.4">
-                    Picks up ground items matching the selected rarities. Cached
-                    items persist across ticks — drops noticed during combat
-                    are collected once the area is safe.
-                  </div>
-
-                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">Skill Slots</div>
-                  <div id="combat-slots-cfg" style="margin-top:4px"></div>
                 </div>
               </details>
             </div>
           </details>
         </div>
+
+        <!-- Range Circles + radar overlay opacity — moved into
+             Automation per the user's grouping (they sit visually with
+             the autopilot range tuning, even though SetRadarAlpha
+             technically controls the whole radar's opacity). -->
+        <div class="cfg-section">
+          <details id="det-rangecircles" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
+            <summary>
+              <div class="cfg-header">Range Circles</div>
+            </summary>
+            <div class="cfg-subsection">
+              <div class="cfg-row"><span class="cfg-label">Show Range Circles</span>
+                <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
+                    checked><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-slider-row">
+                <span class="cfg-label">Opacity</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="radar-alpha-bub">100%</span>
+                  <input type="range" id="radar-alpha" min="20" max="255" value="255"
+                    oninput="_sb(this,'radar-alpha-bub',Math.round(this.value/255*100)+'%'); ahkCall('SetRadarAlpha', parseInt(this.value))">
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel automation -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             OVERLAY — radar visualisation (entity-type filters, zone
+             navigation, panel detection, player HUD). All the things
+             that paint markers / overlays ON TOP of the game.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="overlay">
 
         <div class="cfg-section">
           <details id="det-radar" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
@@ -3529,18 +4150,30 @@
               <div class="cfg-header">Radar</div>
             </summary>
             <div class="cfg-subsection">
+              <!-- Every toggle here paints the radar overlay on top of
+                   the game. The help text under each row explains in one
+                   sentence what the user is enabling — keeps the panel
+                   approachable without reaching for the docs. -->
               <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
                 <label class="toggle"><input type="checkbox" id="tog-radar" onchange="ahkCall('ToggleRadar')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Master switch — when off, nothing in this section paints anything on screen.</div>
+
               <div class="cfg-row"><span class="cfg-label">Player HUD</span>
                 <label class="toggle"><input type="checkbox" id="tog-player-hud" onchange="ahkCall('TogglePlayerHud')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Renders a compact life / mana / energy-shield readout near your character so you can see numbers without squinting at the corner bars.</div>
+
               <div class="cfg-row"><span class="cfg-label">Status Text on Overlay</span>
                 <label class="toggle"><input type="checkbox" id="tog-overlay-status" onchange="ahkCall('ToggleOverlayStatusText')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Shows the AutoPilot / AutoFlask "reason" lines as small text on the overlay (e.g. "engaging rare", "flask on cooldown"). Useful for debugging, distracting in normal play.</div>
+
+              <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Entity Markers</span></div>
+              <div class="cfg-help">Which monster categories the radar draws on the minimap and on-screen overlay. Off = invisible to the radar, even if the entity is in range.</div>
               <div id="radar-filters" class="filter-row">
                 <label class="filter-pill"><input type="checkbox" id="rf-normal"
                     onchange="setRadarFilter('normal',  this.checked)" checked> Normal</label>
@@ -3555,22 +4188,54 @@
                 <label class="filter-pill"><input type="checkbox" id="rf-chests"
                     onchange="setRadarFilter('chests',  this.checked)"> Chests</label>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Zone Navigation</span>
+
+              <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Zone Navigation</span>
                 <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Draws a hint arrow toward the next unexplored area / zone transition based on the maphack data — handy when you can't immediately see the way forward.</div>
+
+              <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
+                <label class="toggle"><input type="checkbox" id="tog-paneldetection"
+                    onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-help">Pauses click-to-walk / skill firing while a game UI panel is open (inventory, stash, vendor). Turn off only if you're debugging panel discovery.</div>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel overlay -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             GGPK — bundle/shader modifications. Currently just Map Hack
+             (with source picker + apply/revert + custom shader colors);
+             reserved as its own sub-tab so future GGPK tweaks have a
+             natural home.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="ggpk">
+
+        <div class="cfg-section">
+          <details id="det-maphack" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Map Hack</div>
+            </summary>
+            <div class="cfg-subsection">
+              <!-- Layout order requested by user:
+                     1) Enable + Source
+                     2) Status / info area (path entry hint, success/fail messages)
+                     3) Outline + Background color swatches, side-by-side
+                     4) Apply / Revert buttons at the bottom
+                   The color swatches + Apply/Revert all remain hidden
+                   when maphack source is "memory" — same visibility
+                   rule as before; switchConfigSubTab() leaves them be. -->
               <div class="cfg-row"><span class="cfg-label">Map Hack</span>
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
               </div>
-              <!--
-                Maphack source picker. "Memory" = the legacy overlay
-                that paints the unexplored cells on top of the game
-                (cheap, reverts the moment the helper exits). "GGPK" =
-                shader patch via ggpk-tools/PoePatcher (the game itself
-                draws every cell as explored — survives until reverted,
-                but requires the game to be closed for apply/revert).
-                -->
+              <div class="cfg-help">Reveals the entire minimap. Two implementations — pick whichever fits your workflow.</div>
+
+              <!-- Source picker. "Memory" = legacy on-the-fly overlay,
+                   "GGPK" = persistent shader patch (apply/revert below). -->
               <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
                 <span class="cfg-label" style="color:var(--subtext)">↳ Source</span>
                 <div style="display:flex;gap:8px;font-size:12px">
@@ -3586,71 +4251,80 @@
                   </label>
                 </div>
               </div>
-              <!-- GGPK apply/revert — only shown when source=ggpk.
-                   The inner state machine (see updateConfigToggles)
-                   exposes three exclusive UIs: a path-entry hint when
-                   we haven't recorded the install yet, Apply when the
-                   patch isn't applied, Revert when it is. Buttons
-                   disable themselves (with a tooltip) while PoE2 is
-                   running so the user can't corrupt the bundle index. -->
-              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none;align-items:flex-start">
-                <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
-                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+
+              <!-- ── GGPK status / info area ──────────────────────────
+                   Path entry hint (when install location unknown) and
+                   the last-action status line (e.g. "Patch applied",
+                   "Backup restored", "PoE2 still running — close first").
+                   All hidden until source=ggpk. -->
+              <div id="row-maphack-status" style="display:none;padding:6px 8px 0 18px">
+                <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
+                  <div style="margin-bottom:6px;line-height:1.4">
+                    The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
+                    and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
+                    the path to <code>Bundles2\_.index.bin</code> manually below.
+                  </div>
                   <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
-                      style="display:none">Apply</button>
-                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
-                      style="display:none">Revert</button>
-                    <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
+                    <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
+                      style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
+                      onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
+                    <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
                   </div>
-                  <!-- Path-unknown panel: input + save + auto-hint.
-                       Hidden by default; updateConfigToggles flips it
-                       on when ggpkInstallPathKnown is false. -->
-                  <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
-                    <div style="margin-bottom:6px;line-height:1.4">
-                      The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
-                      and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
-                      the path to <code>Bundles2\_.index.bin</code> manually below.
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                      <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
-                        style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
-                        onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
-                      <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
-                    </div>
+                </div>
+                <div id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px;min-height:14px"></div>
+              </div>
+
+              <!-- ── Colors row (Outline + Background side-by-side) ─── -->
+              <div id="row-maphack-colors" class="cfg-sub-row"
+                   style="display:none;padding:6px 8px 6px 18px;gap:18px;align-items:flex-start;flex-wrap:wrap">
+                <div data-tip="Color for walkable-area outlines / wall edges drawn by the GGPK maphack. Takes effect on next Apply.">
+                  <div style="color:var(--subtext);font-size:11px;margin-bottom:4px">↳ Outline</div>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <span id="cp-swatch-outline" class="cp-swatch"
+                          onclick="openColorPicker('outline')"></span>
+                    <span id="cp-hex-outline" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
+                  </div>
+                </div>
+                <div data-tip="Fill color for revealed-but-unexplored areas. Low alpha = subtle tint, high alpha = obvious overlay. Takes effect on next Apply.">
+                  <div style="color:var(--subtext);font-size:11px;margin-bottom:4px">↳ Background</div>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <span id="cp-swatch-background" class="cp-swatch"
+                          onclick="openColorPicker('background')"></span>
+                    <span id="cp-hex-background" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
                   </div>
                 </div>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Range Circles</span>
-                <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
-                    checked><span class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
-                <label class="toggle"><input type="checkbox" id="tog-paneldetection"
-                    onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-slider-row">
-                <span class="cfg-label">Opacity</span>
-                <div class="slider-wrap">
-                  <span class="slider-val" id="radar-alpha-bub">100%</span>
-                  <input type="range" id="radar-alpha" min="20" max="255" value="255"
-                    oninput="_sb(this,'radar-alpha-bub',Math.round(this.value/255*100)+'%'); ahkCall('SetRadarAlpha', parseInt(this.value))">
-                </div>
+
+              <!-- ── Apply / Revert buttons, last so the action lives at
+                   the bottom of the flow (Source → tweak → commit). ─── -->
+              <div id="row-maphack-actions" class="cfg-sub-row"
+                   style="display:none;padding:6px 8px 0 18px;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
+                  style="display:none">Apply</button>
+                <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
+                  style="display:none">Revert</button>
               </div>
             </div>
           </details>
         </div>
 
-        <div class="cfg-section">
-          <details id="det-blacklist" ontoggle="syncCfgSections()">
-            <summary>
-              <div class="cfg-header">Skills &amp; Buffs Blacklist</div>
-            </summary>
-            <div class="cfg-subsection" id="cfg-blacklist">
-              <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
-            </div>
-          </details>
+        <!-- Placeholder so the sub-tab feels alive when only Map Hack
+             is implemented. Replace with real sections as more GGPK
+             modifications land. -->
+        <div class="cfg-section" style="opacity:.55">
+          <div style="padding:10px 8px;font-size:11px;color:var(--subtext);line-height:1.5">
+            More GGPK modifications coming soon — additional shader patches and
+            bundle tweaks will land here as separate sections.
+          </div>
         </div>
+
+        </div><!-- /cfg-subpanel ggpk -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             FILTERS — entity-type filters (which entity classes the
+             trees / radar consider at all) and skill/buff blacklist.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="filters">
 
         <div class="cfg-section">
           <details id="det-entities" open ontoggle="syncCfgSections()">
@@ -3658,6 +4332,13 @@
               <div class="cfg-header">Entities</div>
             </summary>
             <div class="cfg-subsection">
+              <div class="cfg-help">
+                Global entity-class filter applied <em>before</em> anything else in the helper
+                processes the live entity list — affects the trees on the Game tab, the radar,
+                exports / dumps, and the AutoPilot's target picker. Unchecking a category hides
+                that whole class of entities everywhere; if something is missing from the radar
+                that you'd expect to see, check here first.
+              </div>
               <div class="filter-row">
                 <label class="filter-pill"><input type="checkbox" id="ef-player"
                     onchange="setEntityFilter('player',    this.checked)" checked> <span
@@ -3686,27 +4367,35 @@
         </div>
 
         <div class="cfg-section">
-          <details id="det-actions" open ontoggle="syncCfgSections()">
+          <details id="det-blacklist" ontoggle="syncCfgSections()">
             <summary>
-              <div class="cfg-header">Actions</div>
+              <div class="cfg-header">Skills &amp; Buffs Blacklist</div>
             </summary>
             <div class="cfg-subsection">
-              <button class="cfg-btn" id="btn-pause" onclick="ahkCall('TogglePause')">⏸ Pause</button>
-              <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
-              <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
-              <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
-              <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+              <div class="cfg-help">
+                Skill / buff IDs added here are suppressed from the Skills &amp; Buffs tree
+                and from the overlay's status text — useful for hiding constant-up
+                clutter like aura icons, infinite-duration debuffs, or self-applied
+                cosmetic effects. Add an entry via the ➕ button next to a buff on the
+                Skills tab; remove with the ✕ button next to its name below.
+              </div>
+              <div id="cfg-blacklist">
+                <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+              </div>
             </div>
           </details>
         </div>
 
-      </div>
-    </div>
+        </div><!-- /cfg-subpanel filters -->
 
-    <!-- WATCHLIST TAB -->
-    <!-- DEBUG TAB -->
-    <div class="tab-panel" id="panel-debug">
-      <div class="cfg-scroll">
+        <!-- ════════════════════════════════════════════════════════════
+             DEBUG — diagnostic / RE-style live panels. Content moved
+             here from the retired RE > Panel Diff tab; same backing AHK
+             code, same DOM ids, just a different visual home so all
+             configuration knobs live under Config.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="debug">
+
         <div class="cfg-section">
           <details id="det-radar-debug" open>
             <summary>
@@ -3719,32 +4408,39 @@
             <pre id="radar-debug-content" style="margin:0;padding:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;font-family:Consolas,monospace;font-size:11px;color:#d8d8d8;white-space:pre-wrap;word-break:break-all;user-select:text;min-height:40px">(no data)</pre>
           </details>
         </div>
-        <div class="cfg-section">
-          <details id="det-debug-panels" open>
-            <summary>
-              <div class="cfg-header">🎛 Panel Visibility (Live)</div>
-            </summary>
-            <div style="padding:4px 0 6px;display:flex;gap:8px">
-              <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px"
-                data-tip="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
-                first!)</button>
-            </div>
-            <div class="cfg-body" id="debug-panels-live">
-              <div class="no-data-msg">Waiting for panel discovery…</div>
-            </div>
-          </details>
-        </div>
-        <div class="cfg-section">
-          <details id="det-debug-discovery">
-            <summary>
-              <div class="cfg-header">🔍 Panel Discovery Results</div>
-            </summary>
-            <div style="padding:6px 0"><button class="tree-tbtn" onclick="ahkCall('RediscoverPanels')"
-                style="font-size:11px">🔄 Re-discover Panels</button></div>
-            <div class="cfg-body" id="debug-panels-discovery">
-              <div class="no-data-msg">No discovery data yet</div>
-            </div>
-          </details>
+        <!-- Panel Visibility + Panel Discovery sit side-by-side — they
+             describe the same panel-detection subsystem from two angles
+             (live state on the left, the underlying discovery results
+             on the right). The wrapping flex container lets them stack
+             vertically on narrow window widths. -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="cfg-section" style="flex:1;min-width:280px">
+            <details id="det-debug-panels" open>
+              <summary>
+                <div class="cfg-header">🎛 Panel Visibility (Live)</div>
+              </summary>
+              <div style="padding:4px 0 6px;display:flex;gap:8px">
+                <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px"
+                  data-tip="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
+                  first!)</button>
+              </div>
+              <div class="cfg-body" id="debug-panels-live">
+                <div class="no-data-msg">Waiting for panel discovery…</div>
+              </div>
+            </details>
+          </div>
+          <div class="cfg-section" style="flex:1;min-width:280px">
+            <details id="det-debug-discovery">
+              <summary>
+                <div class="cfg-header">🔍 Panel Discovery Results</div>
+              </summary>
+              <div style="padding:6px 0"><button class="tree-tbtn" onclick="ahkCall('RediscoverPanels')"
+                  style="font-size:11px">🔄 Re-discover Panels</button></div>
+              <div class="cfg-body" id="debug-panels-discovery">
+                <div class="no-data-msg">No discovery data yet</div>
+              </div>
+            </details>
+          </div>
         </div>
         <div class="cfg-section">
           <details id="det-debug-diff" open>
@@ -3780,8 +4476,18 @@
             </div>
           </details>
         </div>
+
+        </div><!-- /cfg-subpanel debug -->
+
       </div>
     </div>
+
+    <!-- WATCHLIST TAB -->
+    <!-- The old <div id="panel-debug"> (Panel Diff sub-tab of RE) has
+         been retired — its content (radar debug, panel discovery,
+         struct diff, overlay state) now lives in Config > Debug sub-tab.
+         Same DOM ids, same AHK bridge calls, just a different visual
+         home so configuration-style panels all live under Config. -->
 
     <!-- MEMORY DIFF — snapshot a region, do something, snapshot again, diff -->
     <div class="tab-panel" id="panel-memdiff">
@@ -3932,6 +4638,61 @@
       try { window.chrome.webview.postMessage({ method, args }); } catch (e) { }
     }
 
+    // Snap / Start dual-button click handler. The button's data-mode is
+    // set by updateHeader() based on whether PoE2 is running, so a single
+    // click does the right thing without the user needing two buttons.
+    function snapOrStartPoe() {
+      const btn = document.getElementById('btn-snap-or-start');
+      const mode = btn ? btn.dataset.mode : 'snap';
+      ahkCall(mode === 'start' ? 'StartGame' : 'TreeRefresh');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  SLIDING TAB MARKERS
+    // ═══════════════════════════════════════════════════════════════════
+    // Each bar (#cat-bar + each .subtab-row) has one .bar-marker element
+    // that's absolutely positioned. updateBarMarker measures the active
+    // tab inside the bar, then sets the marker's transform + width so a
+    // CSS transition glides it into place. Called on every tab switch,
+    // window resize, and once on load (after fonts settle).
+    function updateBarMarker(barEl) {
+      if (!barEl) return;
+      const marker = barEl.querySelector(':scope > .bar-marker');
+      if (!marker) return;
+      const active = barEl.querySelector('.cat.active, .tab.active');
+      if (!active || barEl.offsetParent === null) {
+        // No active tab, or the bar itself is hidden (e.g. an inactive
+        // subtab-row). Leave the marker wherever it was — next time the
+        // bar becomes visible we'll re-measure.
+        return;
+      }
+      const barRect = barEl.getBoundingClientRect();
+      const aRect   = active.getBoundingClientRect();
+      const left    = aRect.left - barRect.left;
+      marker.style.transform = `translateX(${left}px)`;
+      marker.style.width     = `${aRect.width}px`;
+      marker.classList.add('measured');
+    }
+    function updateAllBarMarkers() {
+      updateBarMarker(document.getElementById('cat-bar'));
+      const activeRow = document.querySelector('.subtab-row.active');
+      if (activeRow) updateBarMarker(activeRow);
+    }
+    // rAF wrapper so the call happens AFTER the class-toggle the caller
+    // just did has been applied to the DOM and laid out.
+    function scheduleMarkerUpdate() {
+      requestAnimationFrame(() => requestAnimationFrame(updateAllBarMarkers));
+    }
+    window.addEventListener('resize', updateAllBarMarkers);
+    window.addEventListener('load', () => {
+      // Fonts can still be loading when 'load' fires; once they settle
+      // the active-tab width changes, so re-measure.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateAllBarMarkers);
+      }
+      updateAllBarMarkers();
+    });
+
     function escHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
@@ -3956,12 +4717,33 @@
       watchlist: 'game',
       ui:        're',
       gamestate: 're',
-      debug:     're',
       memdiff:   're',
       dissect:   're',
       tsvs:      'data',
       config:    'config',
     };
+    // The Config tab is one top-level panel split into 6 inner sub-panels
+    // (general/automation/overlay/ggpk/filters/debug); switchConfigSubTab
+    // toggles which inner div carries .active. The currently-active sub-
+    // tab is held here so navigating away to e.g. Game and back to Config
+    // returns to the same sub-tab. Persisted via AHK on every change.
+    let activeConfigSubTab = 'general';
+
+    function switchConfigSubTab(name) {
+      // Ensure we're on the Config top-level tab in case this was
+      // invoked from elsewhere (e.g. a future auto-jump on apply error).
+      if (activeTab !== 'config')
+        switchTab('config');
+      activeConfigSubTab = name;
+      document.querySelectorAll('[data-cat="config"] .tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.cfgtab === name));
+      document.querySelectorAll('.cfg-subpanel').forEach(p =>
+        p.classList.toggle('active', p.dataset.cfgtab === name));
+      scheduleMarkerUpdate();
+      // Tell AHK so the choice survives a restart. Bridge is a no-op if
+      // the handler doesn't exist yet (graceful degradation during dev).
+      try { ahkCall('SetConfigSubTab', name); } catch (e) {}
+    }
     // Which sub-tab to activate when the user clicks a category header.
     // Remembered per-category so navigating away and back returns to the
     // last view (e.g. Dissector stays sticky inside RE).
@@ -3985,6 +4767,7 @@
       activeCategory = cat;
       document.querySelectorAll('.cat').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
       document.querySelectorAll('.subtab-row').forEach(r => r.classList.toggle('active', r.dataset.cat === cat));
+      scheduleMarkerUpdate();
       const target = lastTabPerCategory[cat];
       if (target && target !== activeTab)
         switchTab(target);
@@ -4007,7 +4790,15 @@
       }
 
       activeTab = key;
+      scheduleMarkerUpdate();
       _runTabSideEffects(key, prev);
+
+      // When switching INTO Config, re-apply whichever sub-tab was
+      // active last (state lives in activeConfigSubTab). Without this
+      // the inner .cfg-subpanel.active class wouldn't follow the user
+      // back from another tab.
+      if (key === 'config')
+        switchConfigSubTab(activeConfigSubTab);
     }
 
     // AHK-bridge calls + one-time loaders fired on tab activation. Split out so
@@ -4591,7 +5382,10 @@
       const pillPause = document.getElementById('pill-updates');
       if (pillPause) {
         const paused = d.paused === true || d.paused === 'true';
-        pillPause.className = 'pill ' + (paused ? 'inactive' : 'active');
+        // Paused gets the loud copper-amber pulse so a stopped helper
+        // can't masquerade as a quiet "off" pill; Live stays in the
+        // standard active gold.
+        pillPause.className = 'pill clickable ' + (paused ? 'paused' : 'active');
         document.getElementById('pill-updates-text').textContent = paused ? 'Paused' : 'Live';
       }
       const pillFlask = document.getElementById('pill-flask');
@@ -4670,8 +5464,14 @@
       setBtnActive('btn-pause', d.paused);
 
       // Show ▶ PoE2 only when game not running
-      const btnPoe = document.getElementById('btn-start-poe');
-      if (btnPoe) btnPoe.style.display = (d.poeRunning === true || d.poeRunning === 'true') ? 'none' : '';
+      // Snap-or-Start dual button — text + intent track whether PoE2 is up
+      const btnSnap = document.getElementById('btn-snap-or-start');
+      if (btnSnap) {
+        const running = d.poeRunning === true || d.poeRunning === 'true';
+        btnSnap.dataset.mode = running ? 'snap' : 'start';
+        btnSnap.textContent  = running ? '↺ Snap' : '▶ PoE2';
+        btnSnap.setAttribute('data-tip', running ? 'Refresh tree from live game' : 'Launch PoE2 via Steam');
+      }
 
       // Watchlist badge
       const badge = document.getElementById('wl-badge');
@@ -4705,6 +5505,13 @@
       if (poeStatus) { const on = d.poeRunning === true || d.poeRunning === 'true'; poeStatus.textContent = on ? '✅ Running' : '❌ Not running'; }
       if (connStatus) { const on = d.connected === true || d.connected === 'true'; connStatus.textContent = on ? '✅ Connected' : '❌ Disconnected'; }
       if (afReason && d.afReason !== undefined) afReason.textContent = d.afReason || '—';
+      // Mirror the reason to the collapsible summary so it stays
+      // visible when the body is closed. Same source-of-truth, two
+      // sinks. Body row may later be removed (see comment above the
+      // .cfg-summary-status CSS), in which case the mirror becomes the
+      // sole sink — but for now we keep both for diff-friendliness.
+      const afReasonSum = document.getElementById('cfg-af-reason-summary');
+      if (afReasonSum && d.afReason !== undefined) afReasonSum.textContent = d.afReason || '—';
 
       if (d.radar) {
         const setRf = (id, val) => { const el = document.getElementById('rf-' + id); if (el) el.checked = val === true || val === 'true'; };
@@ -4726,8 +5533,49 @@
       const mhGgpkRadio = document.querySelector('input[name="maphack-source"][value="ggpk"]');
       if (mhMemRadio) mhMemRadio.checked  = (mhSource === 'memory');
       if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
-      const ggpkRow = document.getElementById('row-maphack-ggpk');
-      if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      // Three sibling rows that all follow the same visibility rule
+      // (visible iff maphack source == "ggpk"): status/path-entry,
+      // color swatches, apply/revert actions. They sit at the same DOM
+      // depth so a single forEach is enough.
+      const ggpkRowsVisible = (mhSource === 'ggpk');
+      ['status', 'colors', 'actions'].forEach(part => {
+        const row = document.getElementById('row-maphack-' + part);
+        if (row) row.style.display = ggpkRowsVisible ? '' : 'none';
+      });
+      // The colors row uses flex when shown so the Outline + Background
+      // blocks sit side by side. Set explicitly so the `display:''`
+      // above doesn't fall back to its inherited block default.
+      const colorsRow = document.getElementById('row-maphack-colors');
+      if (colorsRow) colorsRow.style.display = ggpkRowsVisible ? 'flex' : 'none';
+      const actionsRow = document.getElementById('row-maphack-actions');
+      if (actionsRow) actionsRow.style.display = ggpkRowsVisible ? 'flex' : 'none';
+      // Sync swatch + hex label from the latest header values. Stash
+      // _lastHeader so openColorPicker() can read the same values when
+      // the user clicks a swatch (no separate fetch needed).
+      window._lastHeader = d;
+      const olHex = cpNormalizeHex8(d.maphackOutlineHex    || '8080FFCC');
+      const bgHex = cpNormalizeHex8(d.maphackBackgroundHex || '66FF6619');
+      const olSw  = document.getElementById('cp-swatch-outline');
+      const bgSw  = document.getElementById('cp-swatch-background');
+      const olLbl = document.getElementById('cp-hex-outline');
+      const bgLbl = document.getElementById('cp-hex-background');
+      if (olSw)  olSw.style.setProperty('--swatch-color', cpHexToCssRgba(olHex));
+      if (bgSw)  bgSw.style.setProperty('--swatch-color', cpHexToCssRgba(bgHex));
+      if (olLbl) olLbl.textContent = '#' + olHex;
+      if (bgLbl) bgLbl.textContent = '#' + bgHex;
+
+      // Restore the last active Config sub-tab from the persisted INI
+      // value. We only flip if the value actually differs to avoid a
+      // re-render loop with the AHK push (which will echo back the
+      // same value we just sent via SetConfigSubTab).
+      const wantedSubTab = (d.configSubTab || 'general');
+      if (wantedSubTab !== activeConfigSubTab) {
+        activeConfigSubTab = wantedSubTab;
+        // Only physically toggle classes when Config is the visible tab —
+        // otherwise we'd race the user's tab choice on startup.
+        if (activeTab === 'config')
+          switchConfigSubTab(wantedSubTab);
+      }
       // GGPK panel has three exclusive states:
       //   (a) install path not yet known      → buttons hidden, info hint shown
       //   (b) path known, patch NOT applied   → only Apply visible
@@ -4802,6 +5650,8 @@
         apState.className = 'cfg-status ' + (st === 'combat' ? 'warning' : st === 'explore' ? 'info' : 'idle');
       }
       if (apReason && d.autoPilotReason !== undefined) apReason.textContent = d.autoPilotReason || '—';
+      const apReasonSum = document.getElementById('cfg-autopilot-reason-summary');
+      if (apReasonSum && d.autoPilotReason !== undefined) apReasonSum.textContent = d.autoPilotReason || '—';
 
       // Inventory diagnostics — chain dump toggle in the Inventory tab toolbar.
       if (d.invChainDump !== undefined) {
@@ -4892,6 +5742,14 @@
         const isMax = d.isMaximized === true || d.isMaximized === 'true';
         wmMax.textContent = isMax ? '\u2750' : '\u25a1';
         wmMax.setAttribute('data-tip', isMax ? 'Restore' : 'Maximize');
+      }
+
+      // Always-on-top toggle \u2014 active class colors the pin gold when held
+      const wmAot = document.getElementById('wm-aot');
+      if (wmAot) {
+        const aot = d.alwaysOnTop === true || d.alwaysOnTop === 'true';
+        wmAot.classList.toggle('active', aot);
+        wmAot.setAttribute('data-tip', aot ? 'Always on top \u2014 ON' : 'Always on top \u2014 OFF');
       }
     }
 
@@ -6293,6 +7151,187 @@
       ahkCall(verb === 'apply' ? 'GgpkMaphackApply' : 'GgpkMaphackRevert');
     }
 
+    // ── Maphack color picker ─────────────────────────────────────────
+    // State held on window so handlers can read it across pointer
+    // events. cpState carries the current HSV + alpha working values;
+    // _cpCtx holds {which, original} so Cancel can restore on dismissal
+    // and OK can dispatch the right SetMaphackColor call.
+    const cpState = { h: 210, s: 0.5, v: 0.5, a: 1.0 };
+    let _cpCtx = null;
+
+    // Public entry — wire up onclick="openColorPicker('outline')" etc.
+    function openColorPicker(which) {
+      const cur = (which === 'outline')
+        ? (window._lastHeader && window._lastHeader.maphackOutlineHex)
+        : (window._lastHeader && window._lastHeader.maphackBackgroundHex);
+      const hex = cpNormalizeHex8(cur || (which === 'outline' ? '8080FFCC' : '66FF6619'));
+      _cpCtx = { which, original: hex };
+      const title = document.getElementById('cp-title');
+      if (title) title.textContent =
+        which === 'outline' ? 'Outline color' : 'Background unrevealed area';
+      cpSetFromHex(hex);
+      document.getElementById('cp-modal').classList.add('cp-open');
+      const inp = document.getElementById('cp-hex');
+      if (inp) inp.value = '#' + hex;
+    }
+
+    function cpCancel() {
+      document.getElementById('cp-modal').classList.remove('cp-open');
+      _cpCtx = null;
+    }
+
+    function cpConfirm() {
+      if (!_cpCtx) { cpCancel(); return; }
+      const hex = cpCurrentHex();
+      ahkCall('SetMaphackColor', _cpCtx.which, hex);
+      // Optimistic UI update — AHK's PushHeaderToWebView will overwrite
+      // shortly anyway, but this avoids a visual flicker between OK and
+      // the next header tick.
+      const swatch = document.getElementById('cp-swatch-' + _cpCtx.which);
+      if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
+      cpCancel();
+    }
+
+    // ── HSV ↔ RGB conversion helpers ─────────────────────────────────
+    // Standard formulas; all values 0..1 except hue which is 0..360.
+    // Kept local so the picker has no dependencies and can be lifted
+    // into another project as a single .html paste.
+    function cpHsvToRgb(h, s, v) {
+      const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+      let r = 0, g = 0, b = 0;
+      if (h < 60) { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else { r = c; b = x; }
+      return [r + m, g + m, b + m];
+    }
+    function cpRgbToHsv(r, g, b) {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      let h = 0;
+      if (d !== 0) {
+        if (mx === r) h = 60 * (((g - b) / d) % 6);
+        else if (mx === g) h = 60 * (((b - r) / d) + 2);
+        else h = 60 * (((r - g) / d) + 4);
+      }
+      if (h < 0) h += 360;
+      const s = mx === 0 ? 0 : d / mx;
+      return [h, s, mx];
+    }
+
+    function cpNormalizeHex8(s) {
+      s = (s || '').toString().trim();
+      if (s.startsWith('#')) s = s.slice(1);
+      if (s.length === 6) s += 'FF';
+      if (!/^[0-9a-fA-F]{8}$/.test(s)) return '8080FFCC';
+      return s.toUpperCase();
+    }
+
+    function cpHexToCssRgba(hex) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const a = parseInt(hex.slice(6, 8), 16) / 255;
+      return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+    }
+
+    function cpCurrentHex() {
+      const [r, g, b] = cpHsvToRgb(cpState.h, cpState.s, cpState.v);
+      const to2 = n => Math.round(n * 255).toString(16).padStart(2, '0').toUpperCase();
+      return to2(r) + to2(g) + to2(b) + to2(cpState.a);
+    }
+
+    function cpSetFromHex(hex) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      const a = parseInt(hex.slice(6, 8), 16) / 255;
+      const [h, s, v] = cpRgbToHsv(r, g, b);
+      cpState.h = h; cpState.s = s; cpState.v = v; cpState.a = a;
+      cpRender();
+    }
+
+    function cpFromHex(raw) {
+      const norm = cpNormalizeHex8(raw);
+      cpSetFromHex(norm);
+    }
+
+    function cpRender() {
+      const panel = document.querySelector('.cp-panel');
+      const sv    = document.getElementById('cp-sv');
+      const svM   = document.getElementById('cp-sv-marker');
+      const hueM  = document.getElementById('cp-hue-marker');
+      const aM    = document.getElementById('cp-alpha-marker');
+      const prev  = document.getElementById('cp-preview');
+      const alpha = document.getElementById('cp-alpha');
+      const hexI  = document.getElementById('cp-hex');
+      if (!panel) return;
+      panel.style.setProperty('--hue', cpState.h);
+      const svRect = sv.getBoundingClientRect();
+      svM.style.left = (cpState.s * svRect.width) + 'px';
+      svM.style.top  = ((1 - cpState.v) * svRect.height) + 'px';
+      const hueRect = hueM.parentElement.getBoundingClientRect();
+      hueM.style.left = ((cpState.h / 360) * hueRect.width) + 'px';
+      const aRect = aM.parentElement.getBoundingClientRect();
+      aM.style.left = (cpState.a * aRect.width) + 'px';
+      const hex = cpCurrentHex();
+      const css = cpHexToCssRgba(hex);
+      prev.style.setProperty('--preview-color', css);
+      // The alpha rail's gradient end-color uses the current opaque hue,
+      // not the alpha-pre-multiplied RGB, so the rail itself shows the
+      // alpha-vs-checker transition independent of the current a.
+      const [rr, gg, bb] = cpHsvToRgb(cpState.h, cpState.s, cpState.v);
+      alpha.style.setProperty('--alpha-color',
+        `rgb(${Math.round(rr*255)},${Math.round(gg*255)},${Math.round(bb*255)})`);
+      if (hexI && document.activeElement !== hexI) hexI.value = '#' + hex;
+    }
+
+    // ── Pointer drag handlers ────────────────────────────────────────
+    // One factory builds the "click + drag inside element" wiring shared
+    // by SV square, hue rail, alpha rail. The fraction callback receives
+    // (fx, fy) in 0..1 relative to the element rect.
+    function cpAttachDrag(el, onFrac) {
+      if (!el) return;
+      let dragging = false;
+      const onMove = (ev) => {
+        if (!dragging) return;
+        const r = el.getBoundingClientRect();
+        const fx = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        const fy = Math.max(0, Math.min(1, (ev.clientY - r.top)  / r.height));
+        onFrac(fx, fy);
+      };
+      el.addEventListener('pointerdown', (ev) => {
+        dragging = true;
+        el.setPointerCapture(ev.pointerId);
+        onMove(ev);
+      });
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerup', (ev) => {
+        dragging = false;
+        try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
+      });
+    }
+
+    function cpInitOnce() {
+      if (cpInitOnce._done) return;
+      cpInitOnce._done = true;
+      cpAttachDrag(document.getElementById('cp-sv'), (fx, fy) => {
+        cpState.s = fx;
+        cpState.v = 1 - fy;
+        cpRender();
+      });
+      cpAttachDrag(document.getElementById('cp-hue'), (fx) => {
+        cpState.h = fx * 360;
+        cpRender();
+      });
+      cpAttachDrag(document.getElementById('cp-alpha'), (fx) => {
+        cpState.a = fx;
+        cpRender();
+      });
+    }
+    document.addEventListener('DOMContentLoaded', cpInitOnce);
+
     // Manually persist the PoE2 install index path (when auto-discovery
     // via running process hasn't happened yet). AHK validates the path
     // before writing — bad paths produce a status message but don't
@@ -6506,6 +7545,36 @@
     <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="entityCtxPin()">📌 Add to Watchlist</div>
     <div class="ctx-item" onclick="entityCtxCopy()">📋 Copy Path</div>
+  </div>
+
+  <!-- Custom color picker modal (Maphack outline + background).
+       Hidden by default; openColorPicker() flips the .cp-open class,
+       wires the SV/hue/alpha pointer handlers, and stores the active
+       (which, callback) pair on window._cpCtx so OK / Cancel know what
+       to do. Drag on any sub-control updates the live preview + hex,
+       OK fires the callback with the final 8-char RRGGBBAA hex. -->
+  <div id="cp-modal" onclick="if (event.target.id==='cp-modal') cpCancel()">
+    <div class="cp-panel" style="--hue:210">
+      <div class="cp-title" id="cp-title">Pick a color</div>
+      <div class="cp-sv" id="cp-sv">
+        <div class="cp-sv-marker" id="cp-sv-marker"></div>
+      </div>
+      <div class="cp-slider cp-slider-hue" id="cp-hue">
+        <div class="cp-slider-marker" id="cp-hue-marker"></div>
+      </div>
+      <div class="cp-slider cp-slider-alpha" id="cp-alpha">
+        <div class="cp-slider-marker" id="cp-alpha-marker"></div>
+      </div>
+      <div class="cp-preview-row">
+        <div class="cp-preview" id="cp-preview"></div>
+        <input type="text" id="cp-hex" class="cp-hex" maxlength="9"
+          oninput="cpFromHex(this.value)" spellcheck="false">
+      </div>
+      <div class="cp-btn-row">
+        <button class="cp-btn" onclick="cpCancel()">Cancel</button>
+        <button class="cp-btn cp-btn-primary" onclick="cpConfirm()">OK</button>
+      </div>
+    </div>
   </div>
 </body>
 

@@ -40,7 +40,19 @@ internal static class Program
         if (verb.Equals("extract", StringComparison.OrdinalIgnoreCase))
             return RunExtract(args.AsSpan(1));
 
-        var opts = ParseArgs(args.AsSpan(1));
+        Options? opts;
+        try
+        {
+            opts = ParseArgs(args.AsSpan(1));
+        }
+        catch (ArgumentException ex)
+        {
+            // Hex-parsing failures land here — print and bail with
+            // exit-1 (bad-args) rather than blowing up with a stack
+            // trace, since the AHK bridge tries to parse stderr too.
+            Console.Error.WriteLine(ex.Message);
+            return 1;
+        }
         if (opts is null) { PrintUsage(); return 1; }
 
         if (!Patches.TryGetValue(opts.PatchName, out var patch))
@@ -61,6 +73,16 @@ internal static class Program
             // in place. LibBundle3 handles bundle recompression for us.
             using var ggpk = GgpkOpener.Open(opts.GgpkPath);
             var backups = new BackupManager(opts.GgpkPath);
+
+            // Patch-specific options: when the user passes
+            // `--minimap-outline` / `--minimap-background` and the
+            // selected patch is the MinimapPatch, push the parsed
+            // colors into the patch instance before Apply.
+            if (patch is MinimapPatch mp)
+            {
+                if (opts.MinimapOutline    is var o && o.HasValue) mp.OutlineColor    = o.Value;
+                if (opts.MinimapBackground is var b && b.HasValue) mp.BackgroundColor = b.Value;
+            }
 
             return verb.ToLowerInvariant() switch
             {
@@ -171,12 +193,17 @@ internal static class Program
         return 0;
     }
 
-    private sealed record Options(string GgpkPath, string PatchName, bool DryRun);
+    private sealed record Options(
+        string GgpkPath, string PatchName, bool DryRun,
+        (float R, float G, float B, float A)? MinimapOutline,
+        (float R, float G, float B, float A)? MinimapBackground);
 
     private static Options? ParseArgs(ReadOnlySpan<string> args)
     {
         string? ggpk = null, patch = null;
         bool dryRun = false;
+        (float, float, float, float)? outline = null;
+        (float, float, float, float)? background = null;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -184,10 +211,43 @@ internal static class Program
                 case "--ggpk":    if (++i < args.Length) ggpk  = args[i]; break;
                 case "--patch":   if (++i < args.Length) patch = args[i]; break;
                 case "--dry-run": dryRun = true; break;
+                case "--minimap-outline":
+                    if (++i < args.Length) outline = ParseRgba(args[i], "--minimap-outline");
+                    break;
+                case "--minimap-background":
+                    if (++i < args.Length) background = ParseRgba(args[i], "--minimap-background");
+                    break;
             }
         }
         if (ggpk is null || patch is null) return null;
-        return new Options(ggpk, patch, dryRun);
+        return new Options(ggpk, patch, dryRun, outline, background);
+    }
+
+    /// <summary>
+    /// Parses a 6- or 8-character hex string (with optional <c>#</c>
+    /// prefix) into a normalized (R, G, B, A) tuple in 0..1. Missing
+    /// alpha (6-char input) defaults to fully opaque. Invalid input is
+    /// a fatal ArgumentException — colors silently falling back to
+    /// random values would be worse than a clear "bad CLI arg" failure.
+    /// </summary>
+    private static (float R, float G, float B, float A) ParseRgba(string hex, string argName)
+    {
+        string h = hex.StartsWith('#') ? hex[1..] : hex;
+        if (h.Length != 6 && h.Length != 8)
+            throw new ArgumentException(
+                $"{argName} expects 6 or 8 hex chars (RRGGBB or RRGGBBAA); got \"{hex}\"");
+        try
+        {
+            byte r = Convert.ToByte(h[0..2], 16);
+            byte g = Convert.ToByte(h[2..4], 16);
+            byte b = Convert.ToByte(h[4..6], 16);
+            byte a = h.Length == 8 ? Convert.ToByte(h[6..8], 16) : (byte)255;
+            return (r / 255f, g / 255f, b / 255f, a / 255f);
+        }
+        catch (FormatException ex)
+        {
+            throw new ArgumentException($"{argName}: malformed hex \"{hex}\": {ex.Message}", ex);
+        }
     }
 
     private static int Fail(string msg, int code)
@@ -199,11 +259,16 @@ internal static class Program
     private static void PrintUsage()
     {
         Console.Error.WriteLine("usage: poe-patcher <apply|revert> --ggpk <path> --patch <name> [--dry-run]");
+        Console.Error.WriteLine("                                  [--minimap-outline RRGGBBAA]");
+        Console.Error.WriteLine("                                  [--minimap-background RRGGBBAA]");
         Console.Error.WriteLine("       poe-patcher extract --ggpk <path> --path <internal/path> --output <out>");
         Console.Error.WriteLine("       poe-patcher list");
         Console.Error.WriteLine();
         Console.Error.WriteLine("  <path>     = Content.ggpk or Bundles2/_.index.bin");
         Console.Error.WriteLine("  --dry-run  = apply the patch in memory only — verifies marker matches,");
         Console.Error.WriteLine("               does NOT call Index.Save() so no disk writes happen.");
+        Console.Error.WriteLine("  --minimap-outline / --minimap-background  = hex RGB(A) overrides for");
+        Console.Error.WriteLine("               MinimapPatch's two color literals. 6 or 8 chars,");
+        Console.Error.WriteLine("               with optional leading '#'. Missing alpha = FF (opaque).");
     }
 }

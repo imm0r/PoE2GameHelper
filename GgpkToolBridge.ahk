@@ -477,6 +477,18 @@ class GgpkToolBridge
         try FileDelete(stderr)
 
         cmd := exe["invoke"] . ' ' verb ' --ggpk "' indexPath '" --patch minimap'
+
+        ; Apply-only: forward the user-configured shader colors to the
+        ; patcher. Revert restores the backed-up shader verbatim, so the
+        ; colors don't need to (and shouldn't) be passed there.
+        if (verb = "apply")
+        {
+            global g_maphackOutlineHex, g_maphackBackgroundHex
+            if (g_maphackOutlineHex != "")
+                cmd .= ' --minimap-outline "' g_maphackOutlineHex '"'
+            if (g_maphackBackgroundHex != "")
+                cmd .= ' --minimap-background "' g_maphackBackgroundHex '"'
+        }
         fullCmd := A_ComSpec ' /c "' cmd ' 2> "' stderr '""'
 
         try LogError("GgpkTools/" verb " cmd: " fullCmd)

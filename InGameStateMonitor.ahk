@@ -122,6 +122,7 @@ g_activeTreeTabIdx := 1
 g_webViewReady := false
 g_bridge := 0
 g_webGui := 0
+g_alwaysOnTop := true   ; main window AoT — toggle via header pin button
 g_selectedNodePath := ""
 g_flaskConfigPath := A_MyDocuments "\My Games\Path of Exile 2\poe2_production_Config.ini"
 g_flaskKeyBySlot := Map(1, "1", 2, "2", 3, "3", 4, "4", 5, "5")
@@ -234,6 +235,16 @@ g_mapHackEnabled := true
 ; cell as explored (requires the game to be closed for the apply step,
 ; survives until the user reverts).
 g_maphackSource := "memory"
+; Shader-color overrides for the GGPK maphack. 8-char RRGGBBAA hex
+; (no '#'); the patcher receives these verbatim via CLI args.
+; Defaults: outline = blue-ish wall ramp at 80% alpha (game's original
+; color, just more opaque); background = faint Exile-Forge green at
+; 10% alpha so revealed-but-unexplored areas are subtly visible.
+g_maphackOutlineHex    := "8080FFCC"
+g_maphackBackgroundHex := "66FF6619"
+; Config tab sub-tab persistence. One of: general / automation /
+; overlay / ggpk / filters / debug. Defaults to General on first run.
+g_configSubTab := "general"
 g_rangeCirclesEnabled := true
 g_panelDetectionEnabled := true
 
@@ -332,6 +343,11 @@ g_webGui.Show()
 WinMove(g_winX, g_winY, g_winW, g_winH, "ahk_id " g_webGui.Hwnd)
 if g_winMaximized
     g_webGui.Maximize()
+
+; Apply persisted AlwaysOnTop AFTER Show — calling WinSetAlwaysOnTop on
+; a not-yet-shown window is a silent no-op, which left the WS_EX_TOPMOST
+; from the +AlwaysOnTop creation flag in place regardless of preference.
+try WinSetAlwaysOnTop(g_alwaysOnTop ? 1 : 0, "ahk_id " g_webGui.Hwnd)
 
 ; Save window geometry on exit and after move/resize
 OnExit((*) => (_CaptureWindowGeometry(), SaveConfig(), SaveCombatAutoConfig()))

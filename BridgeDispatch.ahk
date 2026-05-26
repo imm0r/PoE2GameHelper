@@ -116,6 +116,44 @@ _DispatchBridgeCall(method, args)
                 g_radarOverlay._mapHackEnabled := (g_mapHackEnabled && newSrc = "memory")
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
+        case "SetMaphackColor":
+            ; args[1] = "outline" | "background"
+            ; args[2] = 8-char RRGGBBAA hex (with or without leading '#')
+            ; Stores the value in the matching global + persists via
+            ; SaveConfig. Does NOT re-apply the GGPK patch — that's the
+            ; user's explicit action via the Apply button. Header-push
+            ; mirrors the new value back to the UI so other open color
+            ; swatches stay in sync.
+            global g_maphackOutlineHex, g_maphackBackgroundHex
+            if (args.Length >= 2)
+            {
+                which := args[1]
+                hex   := _NormalizeHex8(args[2], "")
+                if (hex != "")
+                {
+                    if (which = "outline")
+                        g_maphackOutlineHex := hex
+                    else if (which = "background")
+                        g_maphackBackgroundHex := hex
+                    SetTimer(SaveConfig, -100)
+                    SetTimer(PushHeaderToWebView, -50)
+                }
+            }
+        case "SetConfigSubTab":
+            ; args[1] = one of general / automation / overlay / ggpk /
+            ; filters / debug. Anything else is silently ignored so a
+            ; bad WebView call can't corrupt the persisted value.
+            global g_configSubTab
+            if (args.Length >= 1)
+            {
+                v := args[1]
+                if (v = "general" || v = "automation" || v = "overlay"
+                    || v = "ggpk" || v = "filters" || v = "debug")
+                {
+                    g_configSubTab := v
+                    SetTimer(SaveConfig, -100)
+                }
+            }
         case "ToggleRangeCircles":
             global g_rangeCirclesEnabled
             g_rangeCirclesEnabled := !g_rangeCirclesEnabled
@@ -278,6 +316,13 @@ _DispatchBridgeCall(method, args)
             SetTimer(ToggleTreePaneVisibility, -1)
         case "StartGame":
             try Run("steam://rungameid/2694490")
+        case "OpenUrl":
+            ; Open an http(s) URL in the user's default browser via the
+            ; shell. Whitelisted scheme so a malformed call can't shell
+            ; out to arbitrary paths.
+            url := (args.Length >= 1) ? args[1] : ""
+            if (InStr(url, "https://") = 1) || (InStr(url, "http://") = 1)
+                try Run(url)
         case "StartDrag":
             DllCall("ReleaseCapture")
             PostMessage(0xA1, 2, , , "ahk_id " g_webGui.Hwnd)
@@ -292,6 +337,12 @@ _DispatchBridgeCall(method, args)
             SetTimer(PushHeaderToWebView, -50)
         case "WinClose":
             ExitApp()
+        case "ToggleAlwaysOnTop":
+            global g_alwaysOnTop, g_webGui
+            g_alwaysOnTop := !g_alwaysOnTop
+            try WinSetAlwaysOnTop(g_alwaysOnTop ? 1 : 0, "ahk_id " g_webGui.Hwnd)
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "BlacklistAdd":
             name := (args.Length >= 1) ? args[1] : ""
             if (name != "")
