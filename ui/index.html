@@ -521,6 +521,9 @@
     }
     .subtab-row.active { display: flex }
     .subtab-row.single-tab.active { display: none }
+    /* Config category is right-aligned in the top bar, so push its
+       sub-tab row to match — keeps the visual axis consistent. */
+    .subtab-row[data-cat="config"] { justify-content: flex-end }
 
     /* Group label ("LIVE" / "TOOLS") — italic Cinzel small-caps in muted
        gold. Acts as a quiet section header inside the sub-tab row. */
@@ -2527,6 +2530,33 @@
       margin: 0
     }
 
+    /* Right-aligned status pill inside a <summary> — used to surface
+       AutoFlask/AutoPilot "Reason" text on the same line as the heading
+       so it stays visible when the section is collapsed. Padding-right
+       clears the gold-diamond caret on the right edge of the summary. */
+    .cfg-summary-status {
+      margin-left: auto;
+      padding-right: 22px;
+      font-size: 11px;
+      color: var(--subtext);
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* One-line explanation row that sits directly under a toggle/section
+       heading. Greyed out + indented so it reads as ancillary text,
+       not as another row of UI to interact with. */
+    .cfg-help {
+      font-size: 10.5px;
+      color: var(--subtext);
+      opacity: 0.85;
+      line-height: 1.45;
+      padding: 2px 8px 8px 8px;
+      margin: -4px 0 0;
+    }
+
     .cfg-subsection {
       padding: 4px 0 0 0
     }
@@ -3539,24 +3569,6 @@
         </div>
 
         <div class="cfg-section">
-          <details id="det-overview" open ontoggle="syncCfgSections()">
-            <summary>
-              <div class="cfg-header">Overview</div>
-            </summary>
-            <div class="cfg-subsection" style="padding:0">
-              <div class="tree-toolbar" id="tree-toolbar">
-                <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
-                <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
-                <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
-              </div>
-              <div id="tab-overview-content" style="max-height:300px;overflow-y:auto;padding:8px">
-                <div class="tree-empty">Loading…</div>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <div class="cfg-section">
           <details id="det-toggles" open ontoggle="syncCfgSections()">
             <summary>
               <div class="cfg-header">Toggles</div>
@@ -3596,6 +3608,27 @@
           </details>
         </div>
 
+        <!-- Overview lives at the bottom of General — it's a tall live
+             tree, putting it first pushed everything else off-screen on
+             the default window height. -->
+        <div class="cfg-section">
+          <details id="det-overview" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Overview</div>
+            </summary>
+            <div class="cfg-subsection" style="padding:0">
+              <div class="tree-toolbar" id="tree-toolbar">
+                <input class="tree-filter" id="tree-filter" placeholder="Filter…" oninput="applyTreeFilter()">
+                <button class="tree-tbtn" onclick="ahkCall('PinSelected')">📌 Pin</button>
+                <button class="tree-tbtn" onclick="ahkCall('DumpEntities')">💾 Dump</button>
+              </div>
+              <div id="tab-overview-content" style="max-height:300px;overflow-y:auto;padding:8px">
+                <div class="tree-empty">Loading…</div>
+              </div>
+            </div>
+          </details>
+        </div>
+
         </div><!-- /cfg-subpanel general -->
 
         <!-- ════════════════════════════════════════════════════════════
@@ -3612,6 +3645,12 @@
             ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
               <div class="cfg-header">Autoflask</div>
+              <!-- Reason badge — mirrors the body cfg-status so the user
+                   can see WHY autoflask did/didn't fire even when the
+                   section is collapsed. AHK keeps writing to
+                   #cfg-af-reason as before; this element is updated by
+                   the same setText() call in updateConfigToggles. -->
+              <span id="cfg-af-reason-summary" class="cfg-summary-status">—</span>
             </summary>
             <div class="cfg-subsection">
               <div class="cfg-row"><span class="cfg-label">Enable AutoFlask</span>
@@ -3640,8 +3679,12 @@
                   </div>
                 </div>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-af-reason"
-                  class="cfg-status idle">—</span></div>
+              <!-- The body Reason row is gone — its content lives in
+                   the collapsible summary as #cfg-af-reason-summary, so
+                   the reason is visible whether the section is open or
+                   closed. AHK still writes to #cfg-af-reason below for
+                   back-compat with anything that reads it directly. -->
+              <span id="cfg-af-reason" class="cfg-status" style="display:none">—</span>
             </div>
           </details>
         </div>
@@ -3650,43 +3693,66 @@
           <details id="det-autopilot" ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)" open>
             <summary>
               <div class="cfg-header">🤖 AutoPilot</div>
+              <span id="cfg-autopilot-reason-summary" class="cfg-summary-status">—</span>
             </summary>
             <div class="cfg-subsection">
-              <div class="cfg-row"><span class="cfg-label">Enable AutoPilot</span>
+              <!-- Master toggle + hotkey on a single row to save vertical
+                   space. The hotkey label is informational only — the
+                   actual binding lives in the AHK source. -->
+              <div class="cfg-row">
+                <span class="cfg-label">Enable AutoPilot</span>
                 <label class="toggle"><input type="checkbox" id="tog-autopilot"
                     onchange="ahkCall('ToggleAutoPilot'); updateRangeCircleVisibility()"><span
                     class="toggle-slider"></span></label>
+                <span style="margin-left:14px;font-size:11px;color:var(--subtext)">
+                  Hotkey: <span id="cfg-combat-hotkey" class="cfg-status"
+                                style="color:#7ec8e3;font-weight:600">F10</span>
+                </span>
               </div>
-              <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-autopilot-state"
-                  class="cfg-status idle">idle</span></div>
-              <div class="cfg-row"><span class="cfg-label">Reason</span><span id="cfg-autopilot-reason"
-                  class="cfg-status idle">—</span></div>
-              <div class="cfg-row"><span class="cfg-label">Hotkey</span><span id="cfg-combat-hotkey"
-                  class="cfg-status" style="color:#7ec8e3;font-weight:600">F10</span></div>
-              <div class="cfg-row"><span class="cfg-label">Combat</span><span id="cfg-combat-state"
-                  class="cfg-status idle">idle</span><span id="cfg-combat-reason"
-                  class="cfg-status idle" style="margin-left:8px;opacity:.8">—</span></div>
-              <div class="cfg-row"><span class="cfg-label">Explore</span><span id="cfg-explore-pct" class="cfg-status"
-                  style="color:#7ec8e3;font-weight:600">0%</span><span id="cfg-explore-reason"
-                  class="cfg-status idle" style="margin-left:8px;opacity:.8">idle</span></div>
-              <div class="cfg-row" style="opacity:.7;font-size:11px;line-height:1.4;margin-top:4px">
-                Single switch. While on: explores the area; whenever a hostile is in
-                engage range, pauses exploration and engages (LoS-gated skill firing,
-                avoids transitions/portals/UI).
+              <div class="cfg-help">
+                Single switch — while on, the helper explores the area; whenever a hostile
+                is in engage range it pauses exploration and engages (LoS-gated skill firing,
+                avoids transitions / portals / UI).
               </div>
 
-              <!-- Hidden legacy toggles — kept in DOM so the existing setChk()
-                   helpers in updateHeader don't blow up. Always mirror the
-                   AutoPilot state via JS but never visible to the user. -->
+              <!-- Hidden legacy toggles — kept in DOM so the existing
+                   setChk() helpers in updateHeader don't blow up. -->
               <input type="checkbox" id="tog-combat"  style="display:none">
               <input type="checkbox" id="tog-explore" style="display:none">
 
-              <!-- ── Advanced tuning ──────────────────────────────────── -->
-              <details id="det-autopilot-adv" style="margin-top:10px" ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)">
-                <summary style="cursor:pointer;font-size:12px;color:var(--subtext);padding:4px 0">
-                  ⚙ Erweiterte Einstellungen
+              <!-- ════════════════════════════════════════════════════
+                   📊 LIVE STATUS — quick glance at what AutoPilot is
+                   doing right now. Loot status + cache count live here
+                   too because they're a live readout, not a setting.
+                   ════════════════════════════════════════════════════ -->
+              <details open style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">📊 Live Status</div>
                 </summary>
-                <div style="margin-top:8px;padding:6px 0 0 4px;border-top:1px dashed var(--border)">
+                <div style="margin-top:4px;padding:6px 0 4px 4px;border-top:1px dashed var(--border)">
+                  <div class="cfg-row"><span class="cfg-label">State</span><span id="cfg-autopilot-state"
+                      class="cfg-status idle">idle</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Combat</span><span id="cfg-combat-state"
+                      class="cfg-status idle">idle</span><span id="cfg-combat-reason"
+                      class="cfg-status idle" style="margin-left:8px;opacity:.8">—</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Explore</span><span id="cfg-explore-pct" class="cfg-status"
+                      style="color:#7ec8e3;font-weight:600">0%</span><span id="cfg-explore-reason"
+                      class="cfg-status idle" style="margin-left:8px;opacity:.8">idle</span></div>
+                  <div class="cfg-row"><span class="cfg-label">Loot</span><span id="cfg-loot-status"
+                      class="cfg-status idle">idle</span><span style="margin-left:8px;color:var(--subtext);font-size:11px">
+                      pickup • cache <span id="cfg-loot-cache-count">0</span></span></div>
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   ⚔ COMBAT — engage / disengage ranges, GCD, world-to-
+                   screen scale, plus the dynamic skill-slot list.
+                   ════════════════════════════════════════════════════ -->
+              <details ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)" style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">⚔ Combat</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px;border-top:1px dashed var(--border)">
                   <div class="cfg-slider-pair">
                     <div class="cfg-slider-item">
                       <span class="cfg-label">Engage</span>
@@ -3723,6 +3789,20 @@
                       </div>
                     </div>
                   </div>
+
+                  <div style="margin-top:12px;font-size:11px;color:var(--accent);font-weight:600">Skill Slots</div>
+                  <div id="combat-slots-cfg" style="margin-top:4px"></div>
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   🧭 EXPLORATION — target coverage %.
+                   ════════════════════════════════════════════════════ -->
+              <details ontoggle="if(this.open) requestAnimationFrame(_sbInitAll)" style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">🧭 Exploration</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px;border-top:1px dashed var(--border)">
                   <div class="cfg-slider-row">
                     <span class="cfg-label">Explore Ziel %</span>
                     <div class="slider-wrap">
@@ -3731,17 +3811,29 @@
                         oninput="_sb(this,'explore-target-bub',this.value+'%'); ahkCall('SetExploreTarget', parseInt(this.value))">
                     </div>
                   </div>
-
-                  <!-- ── Loot Pickup ───────────────────────────────────── -->
-                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">💎 Loot Pickup</div>
-                  <div class="cfg-row" style="margin-top:4px">
-                    <span class="cfg-label">Status</span>
-                    <span id="cfg-loot-status" class="cfg-status idle">idle</span>
-                    <span style="margin-left:8px;color:var(--subtext);font-size:11px">
-                      Cache: <span id="cfg-loot-cache-count">0</span>
-                    </span>
+                  <div class="cfg-help">
+                    AutoPilot stops the exploration phase once this fraction of the area has
+                    been visited. Higher = more thorough sweep, lower = faster zone clears.
                   </div>
-                  <div class="filter-row" id="loot-rarity-filter" style="margin-top:4px">
+                </div>
+              </details>
+
+              <!-- ════════════════════════════════════════════════════
+                   💎 LOOT PICKUP — rarity filter for what to grab. Live
+                   status (idle/picking up) + cache count moved up into
+                   Live Status above; this sub-section is only for
+                   *configuring* the pickup behaviour.
+                   ════════════════════════════════════════════════════ -->
+              <details style="margin-top:8px">
+                <summary style="cursor:pointer;padding:4px 0">
+                  <div class="cfg-header" style="font-size:12px">💎 Loot Pickup</div>
+                </summary>
+                <div style="margin-top:4px;padding:6px 0 4px 4px;border-top:1px dashed var(--border)">
+                  <div class="cfg-help">
+                    Picks up ground items matching the selected rarities. Cached items persist
+                    across ticks — drops noticed during combat are collected once the area is safe.
+                  </div>
+                  <div class="filter-row" id="loot-rarity-filter">
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-normal"
                         onchange="ahkCall('SetLootRarity','Normal',this.checked)"> Normal</label>
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-magic"
@@ -3753,14 +3845,6 @@
                     <label class="filter-pill"><input type="checkbox" id="loot-rar-currency"
                         onchange="ahkCall('SetLootRarity','Currency',this.checked)" checked> Currency</label>
                   </div>
-                  <div style="margin-top:4px;font-size:11px;color:var(--subtext);line-height:1.4">
-                    Picks up ground items matching the selected rarities. Cached
-                    items persist across ticks — drops noticed during combat
-                    are collected once the area is safe.
-                  </div>
-
-                  <div style="margin-top:14px;font-size:12px;color:var(--accent);font-weight:600">Skill Slots</div>
-                  <div id="combat-slots-cfg" style="margin-top:4px"></div>
                 </div>
               </details>
             </div>
@@ -3805,21 +3889,33 @@
         <div class="cfg-section">
           <details id="det-radar" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
-              <div class="cfg-header">Radar Overlay</div>
+              <div class="cfg-header">Radar</div>
             </summary>
             <div class="cfg-subsection">
+              <!-- Every toggle here paints the radar overlay on top of
+                   the game. The help text under each row explains in one
+                   sentence what the user is enabling — keeps the panel
+                   approachable without reaching for the docs. -->
               <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
                 <label class="toggle"><input type="checkbox" id="tog-radar" onchange="ahkCall('ToggleRadar')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Master switch — when off, nothing in this section paints anything on screen.</div>
+
               <div class="cfg-row"><span class="cfg-label">Player HUD</span>
                 <label class="toggle"><input type="checkbox" id="tog-player-hud" onchange="ahkCall('TogglePlayerHud')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Renders a compact life / mana / energy-shield readout near your character so you can see numbers without squinting at the corner bars.</div>
+
               <div class="cfg-row"><span class="cfg-label">Status Text on Overlay</span>
                 <label class="toggle"><input type="checkbox" id="tog-overlay-status" onchange="ahkCall('ToggleOverlayStatusText')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Shows the AutoPilot / AutoFlask "reason" lines as small text on the overlay (e.g. "engaging rare", "flask on cooldown"). Useful for debugging, distracting in normal play.</div>
+
+              <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Entity Markers</span></div>
+              <div class="cfg-help">Which monster categories the radar draws on the minimap and on-screen overlay. Off = invisible to the radar, even if the entity is in range.</div>
               <div id="radar-filters" class="filter-row">
                 <label class="filter-pill"><input type="checkbox" id="rf-normal"
                     onchange="setRadarFilter('normal',  this.checked)" checked> Normal</label>
@@ -3834,14 +3930,18 @@
                 <label class="filter-pill"><input type="checkbox" id="rf-chests"
                     onchange="setRadarFilter('chests',  this.checked)"> Chests</label>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Zone Navigation</span>
+
+              <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Zone Navigation</span>
                 <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Draws a hint arrow toward the next unexplored area / zone transition based on the maphack data — handy when you can't immediately see the way forward.</div>
+
               <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
                 <label class="toggle"><input type="checkbox" id="tog-paneldetection"
                     onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-help">Pauses click-to-walk / skill firing while a game UI panel is open (inventory, stash, vendor). Turn off only if you're debugging panel discovery.</div>
             </div>
           </details>
         </div>
@@ -3862,18 +3962,22 @@
               <div class="cfg-header">Map Hack</div>
             </summary>
             <div class="cfg-subsection">
+              <!-- Layout order requested by user:
+                     1) Enable + Source
+                     2) Status / info area (path entry hint, success/fail messages)
+                     3) Outline + Background color swatches, side-by-side
+                     4) Apply / Revert buttons at the bottom
+                   The color swatches + Apply/Revert all remain hidden
+                   when maphack source is "memory" — same visibility
+                   rule as before; switchConfigSubTab() leaves them be. -->
               <div class="cfg-row"><span class="cfg-label">Map Hack</span>
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
               </div>
-              <!--
-                Maphack source picker. "Memory" = the legacy overlay
-                that paints the unexplored cells on top of the game
-                (cheap, reverts the moment the helper exits). "GGPK" =
-                shader patch via ggpk-tools/PoePatcher (the game itself
-                draws every cell as explored — survives until reverted,
-                but requires the game to be closed for apply/revert).
-                -->
+              <div class="cfg-help">Reveals the entire minimap. Two implementations — pick whichever fits your workflow.</div>
+
+              <!-- Source picker. "Memory" = legacy on-the-fly overlay,
+                   "GGPK" = persistent shader patch (apply/revert below). -->
               <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
                 <span class="cfg-label" style="color:var(--subtext)">↳ Source</span>
                 <div style="display:flex;gap:8px;font-size:12px">
@@ -3889,68 +3993,58 @@
                   </label>
                 </div>
               </div>
-              <!-- GGPK apply/revert — only shown when source=ggpk.
-                   The inner state machine (see updateConfigToggles)
-                   exposes three exclusive UIs: a path-entry hint when
-                   we haven't recorded the install yet, Apply when the
-                   patch isn't applied, Revert when it is. Buttons
-                   disable themselves (with a tooltip) while PoE2 is
-                   running so the user can't corrupt the bundle index. -->
-              <div class="cfg-row cfg-sub-row" id="row-maphack-ggpk" style="padding-left:18px;display:none;align-items:flex-start">
-                <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
-                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
+
+              <!-- ── GGPK status / info area ──────────────────────────
+                   Path entry hint (when install location unknown) and
+                   the last-action status line (e.g. "Patch applied",
+                   "Backup restored", "PoE2 still running — close first").
+                   All hidden until source=ggpk. -->
+              <div id="row-maphack-status" style="display:none;padding:6px 8px 0 18px">
+                <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
+                  <div style="margin-bottom:6px;line-height:1.4">
+                    The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
+                    and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
+                    the path to <code>Bundles2\_.index.bin</code> manually below.
+                  </div>
                   <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
-                      style="display:none">Apply</button>
-                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
-                      style="display:none">Revert</button>
-                    <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
+                    <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
+                      style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
+                      onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
+                    <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
                   </div>
-                  <!-- Path-unknown panel: input + save + auto-hint.
-                       Hidden by default; updateConfigToggles flips it
-                       on when ggpkInstallPathKnown is false. -->
-                  <div id="ggpk-path-entry" style="display:none;font-size:11px;color:var(--subtext)">
-                    <div style="margin-bottom:6px;line-height:1.4">
-                      The helper hasn't recorded your PoE2 install path yet. Either start PoE2 once
-                      and click <em>Refresh all TSVs from local GGPK</em> in the Data tab, or enter
-                      the path to <code>Bundles2\_.index.bin</code> manually below.
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                      <input type="text" id="ggpk-path-input" placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
-                        style="flex:1;min-width:280px;padding:4px 8px;font-family:monospace;font-size:11px"
-                        onkeydown="if (event.key === 'Enter') document.getElementById('ggpk-path-save').click()">
-                      <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
-                    </div>
+                </div>
+                <div id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px;min-height:14px"></div>
+              </div>
+
+              <!-- ── Colors row (Outline + Background side-by-side) ─── -->
+              <div id="row-maphack-colors" class="cfg-sub-row"
+                   style="display:none;padding:6px 8px 6px 18px;gap:18px;align-items:flex-start;flex-wrap:wrap">
+                <div data-tip="Color for walkable-area outlines / wall edges drawn by the GGPK maphack. Takes effect on next Apply.">
+                  <div style="color:var(--subtext);font-size:11px;margin-bottom:4px">↳ Outline</div>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <span id="cp-swatch-outline" class="cp-swatch"
+                          onclick="openColorPicker('outline')"></span>
+                    <span id="cp-hex-outline" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
+                  </div>
+                </div>
+                <div data-tip="Fill color for revealed-but-unexplored areas. Low alpha = subtle tint, high alpha = obvious overlay. Takes effect on next Apply.">
+                  <div style="color:var(--subtext);font-size:11px;margin-bottom:4px">↳ Background</div>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <span id="cp-swatch-background" class="cp-swatch"
+                          onclick="openColorPicker('background')"></span>
+                    <span id="cp-hex-background" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
                   </div>
                 </div>
               </div>
-              <!-- GGPK Maphack shader colors.
-                   Two swatches that open the custom HSV+alpha picker.
-                   Changes are persisted to gamehelper_config.ini and
-                   passed to PoePatcher.exe on the next Apply (the running
-                   patch keeps the colors it was applied with — the user
-                   has to Revert + Apply to re-render with new colors).
-                   Hidden unless maphackSource === "ggpk", same as the
-                   apply/revert row above. -->
-              <div class="cfg-row cfg-sub-row" id="row-maphack-outline"
-                   style="padding-left:18px;display:none"
-                   data-tip="Color for walkable-area outlines / wall edges drawn by the GGPK maphack. Takes effect on next Apply.">
-                <span class="cfg-label" style="color:var(--subtext)">↳ Outline</span>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <span id="cp-swatch-outline" class="cp-swatch"
-                        onclick="openColorPicker('outline')"></span>
-                  <span id="cp-hex-outline" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
-                </div>
-              </div>
-              <div class="cfg-row cfg-sub-row" id="row-maphack-background"
-                   style="padding-left:18px;display:none"
-                   data-tip="Fill color for revealed-but-unexplored areas. Low alpha = subtle tint, high alpha = obvious overlay. Takes effect on next Apply.">
-                <span class="cfg-label" style="color:var(--subtext)">↳ Background</span>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <span id="cp-swatch-background" class="cp-swatch"
-                        onclick="openColorPicker('background')"></span>
-                  <span id="cp-hex-background" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
-                </div>
+
+              <!-- ── Apply / Revert buttons, last so the action lives at
+                   the bottom of the flow (Source → tweak → commit). ─── -->
+              <div id="row-maphack-actions" class="cfg-sub-row"
+                   style="display:none;padding:6px 8px 0 18px;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
+                  style="display:none">Apply</button>
+                <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
+                  style="display:none">Revert</button>
               </div>
             </div>
           </details>
@@ -3980,6 +4074,13 @@
               <div class="cfg-header">Entities</div>
             </summary>
             <div class="cfg-subsection">
+              <div class="cfg-help">
+                Global entity-class filter applied <em>before</em> anything else in the helper
+                processes the live entity list — affects the trees on the Game tab, the radar,
+                exports / dumps, and the AutoPilot's target picker. Unchecking a category hides
+                that whole class of entities everywhere; if something is missing from the radar
+                that you'd expect to see, check here first.
+              </div>
               <div class="filter-row">
                 <label class="filter-pill"><input type="checkbox" id="ef-player"
                     onchange="setEntityFilter('player',    this.checked)" checked> <span
@@ -4012,8 +4113,17 @@
             <summary>
               <div class="cfg-header">Skills &amp; Buffs Blacklist</div>
             </summary>
-            <div class="cfg-subsection" id="cfg-blacklist">
-              <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+            <div class="cfg-subsection">
+              <div class="cfg-help">
+                Skill / buff IDs added here are suppressed from the Skills &amp; Buffs tree
+                and from the overlay's status text — useful for hiding constant-up
+                clutter like aura icons, infinite-duration debuffs, or self-applied
+                cosmetic effects. Add an entry via the ➕ button next to a buff on the
+                Skills tab; remove with the ✕ button next to its name below.
+              </div>
+              <div id="cfg-blacklist">
+                <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+              </div>
             </div>
           </details>
         </div>
@@ -4040,32 +4150,39 @@
             <pre id="radar-debug-content" style="margin:0;padding:8px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px;font-family:Consolas,monospace;font-size:11px;color:#d8d8d8;white-space:pre-wrap;word-break:break-all;user-select:text;min-height:40px">(no data)</pre>
           </details>
         </div>
-        <div class="cfg-section">
-          <details id="det-debug-panels" open>
-            <summary>
-              <div class="cfg-header">🎛 Panel Visibility (Live)</div>
-            </summary>
-            <div style="padding:4px 0 6px;display:flex;gap:8px">
-              <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px"
-                data-tip="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
-                first!)</button>
-            </div>
-            <div class="cfg-body" id="debug-panels-live">
-              <div class="no-data-msg">Waiting for panel discovery…</div>
-            </div>
-          </details>
-        </div>
-        <div class="cfg-section">
-          <details id="det-debug-discovery">
-            <summary>
-              <div class="cfg-header">🔍 Panel Discovery Results</div>
-            </summary>
-            <div style="padding:6px 0"><button class="tree-tbtn" onclick="ahkCall('RediscoverPanels')"
-                style="font-size:11px">🔄 Re-discover Panels</button></div>
-            <div class="cfg-body" id="debug-panels-discovery">
-              <div class="no-data-msg">No discovery data yet</div>
-            </div>
-          </details>
+        <!-- Panel Visibility + Panel Discovery sit side-by-side — they
+             describe the same panel-detection subsystem from two angles
+             (live state on the left, the underlying discovery results
+             on the right). The wrapping flex container lets them stack
+             vertically on narrow window widths. -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="cfg-section" style="flex:1;min-width:280px">
+            <details id="det-debug-panels" open>
+              <summary>
+                <div class="cfg-header">🎛 Panel Visibility (Live)</div>
+              </summary>
+              <div style="padding:4px 0 6px;display:flex;gap:8px">
+                <button class="tree-tbtn" onclick="ahkCall('ResetBaseline')" style="font-size:11px"
+                  data-tip="Close all panels first, then click to set clean baseline">📷 Reset Baseline (close panels
+                  first!)</button>
+              </div>
+              <div class="cfg-body" id="debug-panels-live">
+                <div class="no-data-msg">Waiting for panel discovery…</div>
+              </div>
+            </details>
+          </div>
+          <div class="cfg-section" style="flex:1;min-width:280px">
+            <details id="det-debug-discovery">
+              <summary>
+                <div class="cfg-header">🔍 Panel Discovery Results</div>
+              </summary>
+              <div style="padding:6px 0"><button class="tree-tbtn" onclick="ahkCall('RediscoverPanels')"
+                  style="font-size:11px">🔄 Re-discover Panels</button></div>
+              <div class="cfg-body" id="debug-panels-discovery">
+                <div class="no-data-msg">No discovery data yet</div>
+              </div>
+            </details>
+          </div>
         </div>
         <div class="cfg-section">
           <details id="det-debug-diff" open>
@@ -5063,6 +5180,13 @@
       if (poeStatus) { const on = d.poeRunning === true || d.poeRunning === 'true'; poeStatus.textContent = on ? '✅ Running' : '❌ Not running'; }
       if (connStatus) { const on = d.connected === true || d.connected === 'true'; connStatus.textContent = on ? '✅ Connected' : '❌ Disconnected'; }
       if (afReason && d.afReason !== undefined) afReason.textContent = d.afReason || '—';
+      // Mirror the reason to the collapsible summary so it stays
+      // visible when the body is closed. Same source-of-truth, two
+      // sinks. Body row may later be removed (see comment above the
+      // .cfg-summary-status CSS), in which case the mirror becomes the
+      // sole sink — but for now we keep both for diff-friendliness.
+      const afReasonSum = document.getElementById('cfg-af-reason-summary');
+      if (afReasonSum && d.afReason !== undefined) afReasonSum.textContent = d.afReason || '—';
 
       if (d.radar) {
         const setRf = (id, val) => { const el = document.getElementById('rf-' + id); if (el) el.checked = val === true || val === 'true'; };
@@ -5084,13 +5208,22 @@
       const mhGgpkRadio = document.querySelector('input[name="maphack-source"][value="ggpk"]');
       if (mhMemRadio) mhMemRadio.checked  = (mhSource === 'memory');
       if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
-      const ggpkRow = document.getElementById('row-maphack-ggpk');
-      if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
-      // Color rows — same visibility rule as the apply/revert row.
-      ['outline', 'background'].forEach(which => {
-        const row = document.getElementById('row-maphack-' + which);
-        if (row) row.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      // Three sibling rows that all follow the same visibility rule
+      // (visible iff maphack source == "ggpk"): status/path-entry,
+      // color swatches, apply/revert actions. They sit at the same DOM
+      // depth so a single forEach is enough.
+      const ggpkRowsVisible = (mhSource === 'ggpk');
+      ['status', 'colors', 'actions'].forEach(part => {
+        const row = document.getElementById('row-maphack-' + part);
+        if (row) row.style.display = ggpkRowsVisible ? '' : 'none';
       });
+      // The colors row uses flex when shown so the Outline + Background
+      // blocks sit side by side. Set explicitly so the `display:''`
+      // above doesn't fall back to its inherited block default.
+      const colorsRow = document.getElementById('row-maphack-colors');
+      if (colorsRow) colorsRow.style.display = ggpkRowsVisible ? 'flex' : 'none';
+      const actionsRow = document.getElementById('row-maphack-actions');
+      if (actionsRow) actionsRow.style.display = ggpkRowsVisible ? 'flex' : 'none';
       // Sync swatch + hex label from the latest header values. Stash
       // _lastHeader so openColorPicker() can read the same values when
       // the user clicks a swatch (no separate fetch needed).
@@ -5192,6 +5325,8 @@
         apState.className = 'cfg-status ' + (st === 'combat' ? 'warning' : st === 'explore' ? 'info' : 'idle');
       }
       if (apReason && d.autoPilotReason !== undefined) apReason.textContent = d.autoPilotReason || '—';
+      const apReasonSum = document.getElementById('cfg-autopilot-reason-summary');
+      if (apReasonSum && d.autoPilotReason !== undefined) apReasonSum.textContent = d.autoPilotReason || '—';
 
       // Inventory diagnostics — chain dump toggle in the Inventory tab toolbar.
       if (d.invChainDump !== undefined) {
