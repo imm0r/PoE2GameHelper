@@ -2305,6 +2305,22 @@
       gap: 10px
     }
 
+    /* Sub-rows (rendered indented under a parent toggle, like
+       "↳ Source" beneath the Map Hack switch) sit left-aligned next
+       to their label rather than getting flushed against the right
+       edge. The default space-between layout looked scattered on
+       wide windows because each sub-row's content floated to the
+       window edge independently. */
+    .cfg-sub-row {
+      justify-content: flex-start;
+      gap: 16px;
+    }
+
+    .cfg-sub-row .cfg-label {
+      min-width: 90px;
+      flex-shrink: 0;
+    }
+
     .cfg-label {
       color: var(--codex-text);
       font-family: var(--codex-serif);
@@ -3550,9 +3566,9 @@
                 <span class="cfg-label" style="color:var(--subtext)">↳ GGPK Patch</span>
                 <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:0">
                   <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ahkCall('GgpkMaphackApply')"
+                    <button class="cfg-btn" id="ggpk-maphack-apply" onclick="ggpkMaphackRun('apply')"
                       style="display:none">Apply</button>
-                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ahkCall('GgpkMaphackRevert')"
+                    <button class="cfg-btn" id="ggpk-maphack-revert" onclick="ggpkMaphackRun('revert')"
                       style="display:none">Revert</button>
                     <span id="ggpk-maphack-status" style="color:var(--subtext);font-size:11px"></span>
                   </div>
@@ -4650,6 +4666,11 @@
         if (applyBtn)  applyBtn.style.display  = 'none';
         if (revertBtn) revertBtn.style.display = 'none';
         if (pathEntry) pathEntry.style.display = '';
+      } else if (_ggpkMaphackBusy) {
+        // A click is in flight — leave the buttons disabled + the
+        // status text alone. updateGgpkMaphackStatus will reset
+        // _ggpkMaphackBusy when the operation completes.
+        if (pathEntry) pathEntry.style.display = 'none';
       } else {
         if (pathEntry) pathEntry.style.display = 'none';
         if (applyBtn) {
@@ -6163,6 +6184,31 @@
       status.textContent = '';
       ahkCall('RefreshItemSizes');
     }
+    // GGPK apply/revert click wrapper. Immediately disables both
+    // buttons + posts an "in progress" status, so the user gets
+    // feedback during the multi-second shell-out instead of staring
+    // at a still-active button and wondering whether the click
+    // registered. updateConfigToggles checks _ggpkMaphackBusy and
+    // skips its own Apply/Revert refresh while a run is pending,
+    // so the disabled state can't be flipped back accidentally.
+    let _ggpkMaphackBusy = false;
+    function ggpkMaphackRun(verb) {
+      if (_ggpkMaphackBusy) return;
+      _ggpkMaphackBusy = true;
+      const applyBtn  = document.getElementById('ggpk-maphack-apply');
+      const revertBtn = document.getElementById('ggpk-maphack-revert');
+      if (applyBtn)  applyBtn.disabled  = true;
+      if (revertBtn) revertBtn.disabled = true;
+      const status = document.getElementById('ggpk-maphack-status');
+      if (status) {
+        status.style.color = 'var(--subtext)';
+        status.textContent = (verb === 'apply')
+          ? 'GGPK modification in progress — this will take a few seconds…'
+          : 'Restoring vanilla shaders — this will take a few seconds…';
+      }
+      ahkCall(verb === 'apply' ? 'GgpkMaphackApply' : 'GgpkMaphackRevert');
+    }
+
     // Manually persist the PoE2 install index path (when auto-discovery
     // via running process hasn't happened yet). AHK validates the path
     // before writing — bad paths produce a status message but don't
@@ -6180,6 +6226,10 @@
     function updateGgpkMaphackStatus(json) {
       let r;
       try { r = JSON.parse(json); } catch (e) { r = { ok: false, msg: 'bad status payload: ' + e }; }
+      // Operation finished — let the next header push touch the
+      // buttons again (it'll switch between Apply / Revert / disabled
+      // based on the resulting ggpkMaphackApplied + poeRunning state).
+      _ggpkMaphackBusy = false;
       const el = document.getElementById('ggpk-maphack-status');
       if (!el) return;
       el.style.color = r.ok ? 'var(--accent, #8aff8a)' : 'var(--err, #ff8a8a)';
