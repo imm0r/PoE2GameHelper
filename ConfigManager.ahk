@@ -46,6 +46,7 @@ SaveConfig()
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_maphackOutlineHex, g_maphackBackgroundHex
+    global g_configSubTab
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -98,6 +99,7 @@ SaveConfig()
     IniWrite(blStr, f, "SkillBuffBlacklist", "names")
 
     IniWrite(g_cfgOpenSections, f, "ConfigUI", "openSections")
+    IniWrite(g_configSubTab,    f, "ConfigUI", "activeSubTab")
 
     ; Window geometry (always the normal/restored rect, not the maximized rect)
     IniWrite(g_winX,                               f, "Window",        "x")
@@ -125,6 +127,7 @@ LoadConfig()
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_maphackOutlineHex, g_maphackBackgroundHex
+    global g_configSubTab
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -165,6 +168,14 @@ LoadConfig()
     ;   background = #66FF6619  (faint Exile-Forge-style green tint)
     g_maphackOutlineHex    := _NormalizeHex8(_Ini("Radar", "maphackOutlineHex",    "8080FFCC"), "8080FFCC")
     g_maphackBackgroundHex := _NormalizeHex8(_Ini("Radar", "maphackBackgroundHex", "66FF6619"), "66FF6619")
+    ; Config sub-tab persistence — coerce to the whitelist so a bad
+    ; INI value (typo, leftover from older builds) doesn't break the UI.
+    rawSubTab := _Ini("ConfigUI", "activeSubTab", "general")
+    if (rawSubTab = "general" || rawSubTab = "automation" || rawSubTab = "overlay"
+        || rawSubTab = "ggpk" || rawSubTab = "filters" || rawSubTab = "debug")
+        g_configSubTab := rawSubTab
+    else
+        g_configSubTab := "general"
     g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_autoPilotEnabled         := _B("AutoPilot",     "enabled",         false)

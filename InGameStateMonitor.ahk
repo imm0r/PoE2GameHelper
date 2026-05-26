@@ -241,6 +241,9 @@ g_maphackSource := "memory"
 ; 10% alpha so revealed-but-unexplored areas are subtly visible.
 g_maphackOutlineHex    := "8080FFCC"
 g_maphackBackgroundHex := "66FF6619"
+; Config tab sub-tab persistence. One of: general / automation /
+; overlay / ggpk / filters / debug. Defaults to General on first run.
+g_configSubTab := "general"
 g_rangeCirclesEnabled := true
 g_panelDetectionEnabled := true
 

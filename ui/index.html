@@ -613,6 +613,12 @@
       display: flex
     }
 
+    /* Config sub-panels — only one is .active at a time. Lives inside
+       #panel-config so the outer tab-panel/cfg-scroll positioning is
+       reused; switchConfigSubTab() flips the active class. */
+    .cfg-subpanel { display: none }
+    .cfg-subpanel.active { display: block }
+
     /* TSV VIEWER */
     .tsv-toolbar {
       display: flex;
@@ -3339,12 +3345,10 @@
         </svg>gameState</div>
       <div class="subtab-divider"></div>
       <span class="subtab-group-label">Tools</span>
-      <div class="tab" data-tab="debug" onclick="switchTab('debug')"><svg viewBox="0 0 24 24">
-          <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v1h2" />
-          <path d="M18 10h2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4" />
-          <rect x="8" y="9" width="8" height="12" rx="2" />
-          <path d="M12 9v12" />
-        </svg>Panel Diff</div>
+      <!-- Panel Diff sub-tab retired — its content (radar debug, panel
+           discovery, struct-diff snapshot, overlay state) moved to
+           Config > Debug, since it's all diagnostic config rather than
+           tool-style interactive scratch space. -->
       <div class="tab" data-tab="memdiff" onclick="switchTab('memdiff')"><svg viewBox="0 0 24 24">
           <rect x="3" y="4" width="8" height="16" rx="1" />
           <rect x="13" y="4" width="8" height="16" rx="1" />
@@ -3363,12 +3367,32 @@
         </svg>Dissector</div>
     </div>
 
-    <!-- DATA / CONFIG — single page each, sub-tab row hidden via CSS. -->
+    <!-- DATA — single page, sub-tab row hidden via CSS. -->
     <div class="subtab-row single-tab" data-cat="data">
       <div class="tab" data-tab="tsvs" onclick="switchTab('tsvs')">TSVs</div>
     </div>
-    <div class="subtab-row single-tab" data-cat="config">
-      <div class="tab" data-tab="config" onclick="switchTab('config')">Config</div>
+
+    <!-- CONFIG — six sub-tabs, mirrors the Game/RE category structure.
+         General      — status + overview + master toggles + actions
+         Automation   — Auto-Flask + AutoPilot + Range Circles + Opacity
+         Overlay      — Radar visualisation toggles + entity-type filters
+         GGPK         — Maphack source + apply/revert + shader colors
+         Filters      — Entity filters + Skill/Buff blacklist
+         Debug        — Diagnostic / RE-style live panels moved here from the
+                        old RE > Panel Diff tab (which is now retired —
+                        its content is purely diagnostic config). -->
+    <div class="subtab-row" data-cat="config">
+      <!-- The 6 buttons all map to the same top-level `config` tab-panel
+           and just toggle which inner .cfg-subpanel is visible — hence
+           switchConfigSubTab() instead of switchTab(). This keeps the
+           existing category machinery (tabCategory, lastTabPerCategory,
+           tree-tab notifications) blissfully unaware of the inner split. -->
+      <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')">General</div>
+      <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')">Automation</div>
+      <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')">Overlay</div>
+      <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
+      <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
+      <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
     </div>
 
   </div>
@@ -3481,9 +3505,19 @@
       </div>
     </div>
 
-    <!-- CONFIG TAB -->
+    <!-- CONFIG TAB — split into 6 sub-panels via the cfg-subpanel
+         wrappers below. switchConfigSubTab() toggles which one carries
+         the .active class; only one is visible at a time. The outer
+         #panel-config tab-panel remains a single top-level entry in the
+         existing tab system, so tabCategory/lastTabPerCategory don't
+         need to know about the inner split. -->
     <div class="tab-panel" id="panel-config">
       <div class="cfg-scroll">
+
+        <!-- ════════════════════════════════════════════════════════════
+             GENERAL — status, overview, master toggles, action buttons
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel active" data-cfgtab="general">
 
         <div class="cfg-section">
           <details id="det-status" open ontoggle="syncCfgSections()">
@@ -3543,6 +3577,35 @@
             </div>
           </details>
         </div>
+
+        <!-- Actions section — moved from the bottom of the old Config
+             tab to live inside General so the panel order matches the
+             sub-tab order. -->
+        <div class="cfg-section">
+          <details id="det-actions" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Actions</div>
+            </summary>
+            <div class="cfg-subsection">
+              <button class="cfg-btn" id="btn-pause" onclick="ahkCall('TogglePause')">⏸ Pause</button>
+              <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
+              <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
+              <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
+              <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel general -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             AUTOMATION — Auto-Flask, AutoPilot, Range Circles + Opacity
+             (the radar-alpha slider lives here because the user groups
+             it mentally with Range Circles — it does affect the entire
+             radar overlay's opacity, not just the circles, but that's
+             the closest semantic fit.)
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="automation">
 
         <div class="cfg-section">
           <details id="det-autoflask" open
@@ -3704,10 +3767,45 @@
           </details>
         </div>
 
+        <!-- Range Circles + radar overlay opacity — moved into
+             Automation per the user's grouping (they sit visually with
+             the autopilot range tuning, even though SetRadarAlpha
+             technically controls the whole radar's opacity). -->
+        <div class="cfg-section">
+          <details id="det-rangecircles" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
+            <summary>
+              <div class="cfg-header">Range Circles</div>
+            </summary>
+            <div class="cfg-subsection">
+              <div class="cfg-row"><span class="cfg-label">Show Range Circles</span>
+                <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
+                    checked><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-slider-row">
+                <span class="cfg-label">Opacity</span>
+                <div class="slider-wrap">
+                  <span class="slider-val" id="radar-alpha-bub">100%</span>
+                  <input type="range" id="radar-alpha" min="20" max="255" value="255"
+                    oninput="_sb(this,'radar-alpha-bub',Math.round(this.value/255*100)+'%'); ahkCall('SetRadarAlpha', parseInt(this.value))">
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel automation -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             OVERLAY — radar visualisation (entity-type filters, zone
+             navigation, panel detection, player HUD). All the things
+             that paint markers / overlays ON TOP of the game.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="overlay">
+
         <div class="cfg-section">
           <details id="det-radar" open ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
-              <div class="cfg-header">Radar</div>
+              <div class="cfg-header">Radar Overlay</div>
             </summary>
             <div class="cfg-subsection">
               <div class="cfg-row"><span class="cfg-label">Enable Radar</span>
@@ -3740,6 +3838,30 @@
                 <label class="toggle"><input type="checkbox" id="tog-zonenav" onchange="ahkCall('ToggleZoneNav')"
                     checked><span class="toggle-slider"></span></label>
               </div>
+              <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
+                <label class="toggle"><input type="checkbox" id="tog-paneldetection"
+                    onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        </div><!-- /cfg-subpanel overlay -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             GGPK — bundle/shader modifications. Currently just Map Hack
+             (with source picker + apply/revert + custom shader colors);
+             reserved as its own sub-tab so future GGPK tweaks have a
+             natural home.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="ggpk">
+
+        <div class="cfg-section">
+          <details id="det-maphack" open ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Map Hack</div>
+            </summary>
+            <div class="cfg-subsection">
               <div class="cfg-row"><span class="cfg-label">Map Hack</span>
                 <label class="toggle"><input type="checkbox" id="tog-maphack" onchange="ahkCall('ToggleMapHack')"
                     checked><span class="toggle-slider"></span></label>
@@ -3830,36 +3952,27 @@
                   <span id="cp-hex-background" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
                 </div>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Range Circles</span>
-                <label class="toggle"><input type="checkbox" id="tog-rangecircles" onchange="ahkCall('ToggleRangeCircles')"
-                    checked><span class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-row"><span class="cfg-label">Panel Detection</span>
-                <label class="toggle"><input type="checkbox" id="tog-paneldetection"
-                    onchange="ahkCall('TogglePanelDetection')" checked><span class="toggle-slider"></span></label>
-              </div>
-              <div class="cfg-slider-row">
-                <span class="cfg-label">Opacity</span>
-                <div class="slider-wrap">
-                  <span class="slider-val" id="radar-alpha-bub">100%</span>
-                  <input type="range" id="radar-alpha" min="20" max="255" value="255"
-                    oninput="_sb(this,'radar-alpha-bub',Math.round(this.value/255*100)+'%'); ahkCall('SetRadarAlpha', parseInt(this.value))">
-                </div>
-              </div>
             </div>
           </details>
         </div>
 
-        <div class="cfg-section">
-          <details id="det-blacklist" ontoggle="syncCfgSections()">
-            <summary>
-              <div class="cfg-header">Skills &amp; Buffs Blacklist</div>
-            </summary>
-            <div class="cfg-subsection" id="cfg-blacklist">
-              <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
-            </div>
-          </details>
+        <!-- Placeholder so the sub-tab feels alive when only Map Hack
+             is implemented. Replace with real sections as more GGPK
+             modifications land. -->
+        <div class="cfg-section" style="opacity:.55">
+          <div style="padding:10px 8px;font-size:11px;color:var(--subtext);line-height:1.5">
+            More GGPK modifications coming soon — additional shader patches and
+            bundle tweaks will land here as separate sections.
+          </div>
         </div>
+
+        </div><!-- /cfg-subpanel ggpk -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             FILTERS — entity-type filters (which entity classes the
+             trees / radar consider at all) and skill/buff blacklist.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="filters">
 
         <div class="cfg-section">
           <details id="det-entities" open ontoggle="syncCfgSections()">
@@ -3895,27 +4008,26 @@
         </div>
 
         <div class="cfg-section">
-          <details id="det-actions" open ontoggle="syncCfgSections()">
+          <details id="det-blacklist" ontoggle="syncCfgSections()">
             <summary>
-              <div class="cfg-header">Actions</div>
+              <div class="cfg-header">Skills &amp; Buffs Blacklist</div>
             </summary>
-            <div class="cfg-subsection">
-              <button class="cfg-btn" id="btn-pause" onclick="ahkCall('TogglePause')">⏸ Pause</button>
-              <button class="cfg-btn" onclick="ahkCall('F3Dump')">📷 F3 Dump</button>
-              <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
-              <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
-              <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+            <div class="cfg-subsection" id="cfg-blacklist">
+              <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
             </div>
           </details>
         </div>
 
-      </div>
-    </div>
+        </div><!-- /cfg-subpanel filters -->
 
-    <!-- WATCHLIST TAB -->
-    <!-- DEBUG TAB -->
-    <div class="tab-panel" id="panel-debug">
-      <div class="cfg-scroll">
+        <!-- ════════════════════════════════════════════════════════════
+             DEBUG — diagnostic / RE-style live panels. Content moved
+             here from the retired RE > Panel Diff tab; same backing AHK
+             code, same DOM ids, just a different visual home so all
+             configuration knobs live under Config.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="debug">
+
         <div class="cfg-section">
           <details id="det-radar-debug" open>
             <summary>
@@ -3989,8 +4101,18 @@
             </div>
           </details>
         </div>
+
+        </div><!-- /cfg-subpanel debug -->
+
       </div>
     </div>
+
+    <!-- WATCHLIST TAB -->
+    <!-- The old <div id="panel-debug"> (Panel Diff sub-tab of RE) has
+         been retired — its content (radar debug, panel discovery,
+         struct diff, overlay state) now lives in Config > Debug sub-tab.
+         Same DOM ids, same AHK bridge calls, just a different visual
+         home so configuration-style panels all live under Config. -->
 
     <!-- MEMORY DIFF — snapshot a region, do something, snapshot again, diff -->
     <div class="tab-panel" id="panel-memdiff">
@@ -4165,12 +4287,32 @@
       watchlist: 'game',
       ui:        're',
       gamestate: 're',
-      debug:     're',
       memdiff:   're',
       dissect:   're',
       tsvs:      'data',
       config:    'config',
     };
+    // The Config tab is one top-level panel split into 6 inner sub-panels
+    // (general/automation/overlay/ggpk/filters/debug); switchConfigSubTab
+    // toggles which inner div carries .active. The currently-active sub-
+    // tab is held here so navigating away to e.g. Game and back to Config
+    // returns to the same sub-tab. Persisted via AHK on every change.
+    let activeConfigSubTab = 'general';
+
+    function switchConfigSubTab(name) {
+      // Ensure we're on the Config top-level tab in case this was
+      // invoked from elsewhere (e.g. a future auto-jump on apply error).
+      if (activeTab !== 'config')
+        switchTab('config');
+      activeConfigSubTab = name;
+      document.querySelectorAll('[data-cat="config"] .tab').forEach(t =>
+        t.classList.toggle('active', t.dataset.cfgtab === name));
+      document.querySelectorAll('.cfg-subpanel').forEach(p =>
+        p.classList.toggle('active', p.dataset.cfgtab === name));
+      // Tell AHK so the choice survives a restart. Bridge is a no-op if
+      // the handler doesn't exist yet (graceful degradation during dev).
+      try { ahkCall('SetConfigSubTab', name); } catch (e) {}
+    }
     // Which sub-tab to activate when the user clicks a category header.
     // Remembered per-category so navigating away and back returns to the
     // last view (e.g. Dissector stays sticky inside RE).
@@ -4217,6 +4359,13 @@
 
       activeTab = key;
       _runTabSideEffects(key, prev);
+
+      // When switching INTO Config, re-apply whichever sub-tab was
+      // active last (state lives in activeConfigSubTab). Without this
+      // the inner .cfg-subpanel.active class wouldn't follow the user
+      // back from another tab.
+      if (key === 'config')
+        switchConfigSubTab(activeConfigSubTab);
     }
 
     // AHK-bridge calls + one-time loaders fired on tab activation. Split out so
@@ -4956,6 +5105,19 @@
       if (bgSw)  bgSw.style.setProperty('--swatch-color', cpHexToCssRgba(bgHex));
       if (olLbl) olLbl.textContent = '#' + olHex;
       if (bgLbl) bgLbl.textContent = '#' + bgHex;
+
+      // Restore the last active Config sub-tab from the persisted INI
+      // value. We only flip if the value actually differs to avoid a
+      // re-render loop with the AHK push (which will echo back the
+      // same value we just sent via SetConfigSubTab).
+      const wantedSubTab = (d.configSubTab || 'general');
+      if (wantedSubTab !== activeConfigSubTab) {
+        activeConfigSubTab = wantedSubTab;
+        // Only physically toggle classes when Config is the visible tab —
+        // otherwise we'd race the user's tab choice on startup.
+        if (activeTab === 'config')
+          switchConfigSubTab(wantedSubTab);
+      }
       // GGPK panel has three exclusive states:
       //   (a) install path not yet known      → buttons hidden, info hint shown
       //   (b) path known, patch NOT applied   → only Apply visible
