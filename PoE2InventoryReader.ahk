@@ -718,7 +718,12 @@ class PoE2InventoryReader extends PoE2PlayerReader
 
     ; Compose the full display name like "Potent Transcendent Life Flask of the Abundant"
     ; genType 1=Prefix, 2=Suffix. Prefix goes before baseType, suffix after.
-    ; tierWord (from Words.datc64 via ModType) adds the tier qualifier after the prefix name.
+    ; Note: mod_name_map's `modFamily` column (e.g. "IncreasedLife") is the
+    ; game's internal exclusion-group label, NOT the tier-adjective shown in
+    ; the in-game item name — so we do NOT splice it into the display name
+    ; (doing so produced names like "Blessed IncreasedLife Cuffs of the …").
+    ; The real tier adjective lives in stat-description data we don't extract
+    ; yet; until that lands the composed name simply drops the tier slot.
     ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId := -1)
     {
         ; Unique items: look up by metadata path → unique name
@@ -737,7 +742,6 @@ class PoE2InventoryReader extends PoE2PlayerReader
             return displayBase
 
         prefix := ""
-        prefixTier := ""
         suffix := ""
 
         allMods := []
@@ -754,24 +758,15 @@ class PoE2InventoryReader extends PoE2PlayerReader
         {
             genType := m.Has("genType") ? m["genType"] : 0
             affix   := m.Has("displayName") ? m["displayName"] : ""
-            tier    := m.Has("tierWord") ? m["tierWord"] : ""
             if (genType = 1 && prefix = "")
-            {
                 prefix := affix
-                prefixTier := tier
-            }
             else if (genType = 2 && suffix = "")
                 suffix := affix
         }
 
         name := displayBase
-        prefixPart := prefix
-        if (prefixTier != "" && prefix != "")
-            prefixPart := prefix " " prefixTier
-        else if (prefixTier != "" && prefix = "")
-            prefixPart := prefixTier
-        if (prefixPart != "")
-            name := prefixPart " " name
+        if (prefix != "")
+            name := prefix " " name
         if (suffix != "")
             name := name " " suffix
         return name
@@ -1191,7 +1186,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
         return out
     }
 
-    ; Reads a std::vector of mod entries and returns an array of mod Maps (name, value, genType, tierWord).
+    ; Reads a std::vector of mod entries and returns an array of mod Maps (name, value, genType, modFamily).
     ; Params: maxEntries - cap on entries read to guard against corrupt/runaway vectors.
     ReadModArrayFromVector(stdVectorAddress, maxEntries := 32)
     {
@@ -1258,7 +1253,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
                     "name", modName,
                     "displayName", modInfo["affix"],
                     "genType", modInfo["genType"],
-                    "tierWord", modInfo["tierWord"],
+                    "modFamily", modInfo["modFamily"],
                     "values", values,         ; preferred — all roll values for this mod
                     "value0", value0,         ; legacy: first roll value
                     "value1", value1,         ; legacy: second roll value
@@ -1292,7 +1287,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
     }
 
     ; Loads the mod name lookup table from a TSV file into this.ModNameMap.
-    ; TSV columns: modId, affixName, genType (1=prefix / 2=suffix), tierWord.
+    ; TSV columns: modId, affixName, genType (1=prefix / 2=suffix), modFamily.
     LoadModNameMap(tsvPath)
     {
         if !FileExist(tsvPath)
@@ -1313,8 +1308,8 @@ class PoE2InventoryReader extends PoE2PlayerReader
                 modId      := parts[1]
                 affix      := parts[2]
                 genType    := (parts.Length >= 3) ? Integer(parts[3]) : 0
-                tierWord   := (parts.Length >= 4) ? parts[4] : ""
-                this.ModNameMap[modId] := Map("affix", affix, "genType", genType, "tierWord", tierWord)
+                modFamily  := (parts.Length >= 4) ? parts[4] : ""
+                this.ModNameMap[modId] := Map("affix", affix, "genType", genType, "modFamily", modFamily)
             }
             f.Close()
         }
@@ -1348,12 +1343,12 @@ class PoE2InventoryReader extends PoE2PlayerReader
         }
     }
 
-    ; Looks up affix display name, genType, and tierWord for a mod ID; returns empty defaults if absent.
+    ; Looks up affix display name, genType, and modFamily for a mod ID; returns empty defaults if absent.
     GetModDisplayInfo(modId)
     {
         if this.ModNameMap.Has(modId)
             return this.ModNameMap[modId]
-        return Map("affix", "", "genType", 0, "tierWord", "")
+        return Map("affix", "", "genType", 0, "modFamily", "")
     }
 
     ; Returns the mapped base item display name for a metadata path, or "" if not in the map.

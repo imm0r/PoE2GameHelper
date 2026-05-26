@@ -101,6 +101,77 @@ internal sealed class DatReader
     public int RowI32(int index, int offset) =>
         BitConverter.ToInt32(Row(index)[offset..(offset + 4)]);
 
+    /// <summary>Read a single byte at the given offset inside row.
+    /// PoE encodes `bool` as 1 byte (0 = false, anything else = true).</summary>
+    public bool RowBool(int index, int offset) => Row(index)[offset] != 0;
+
+    /// <summary>
+    /// Read a variable-length array column. PoE encodes arrays as a
+    /// 16-byte (count: u64, dataOffset: u64) pair in the row; the
+    /// actual element data lives in the data section at
+    /// <c>dataOffset</c>. Unlike string refs, array offsets are NOT
+    /// biased — they point straight at the first element byte.
+    ///
+    /// This helper returns the elements as <c>long[]</c>, reading
+    /// <paramref name="elementBytes"/> bytes per element (typical
+    /// values: 8 for plain `array` of row-indices, 16 for
+    /// `foreignrow[]` — in the latter case the second 8 bytes hold
+    /// the table identifier and are ignored, matching the convention
+    /// in <see cref="RowFk"/>).
+    ///
+    /// Returns an empty array for null/sentinel/out-of-range refs.
+    /// </summary>
+    public long[] RowArray(int index, int offset, int elementBytes)
+    {
+        var rowSpan = Row(index);
+        ulong count = BitConverter.ToUInt64(rowSpan[offset..(offset + 8)]);
+        ulong ptr   = BitConverter.ToUInt64(rowSpan[(offset + 8)..(offset + 16)]);
+        // Sanity: 0/sentinel/absurd → empty. 4096 is comfortably above
+        // any real PoE array length we've seen.
+        if (count == 0 || count > 4096) return Array.Empty<long>();
+        long byteStart = (long)ptr;
+        long byteEnd = byteStart + (long)count * elementBytes;
+        if (byteStart < 0 || byteEnd > _data.Length) return Array.Empty<long>();
+        var result = new long[count];
+        for (int i = 0; i < (int)count; i++)
+        {
+            long elemAt = byteStart + (long)i * elementBytes;
+            ulong raw = BitConverter.ToUInt64(_data.AsSpan((int)elemAt, 8));
+            // Same null-sentinel handling as RowFk.
+            if (raw == 0xFFFFFFFFFFFFFFFFUL || raw == 0xFEFEFEFEFEFEFEFEUL
+                || raw > (ulong)int.MaxValue)
+                result[i] = -1;
+            else
+                result[i] = (long)raw;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Read a foreign-key row index from inside a row. PoE schema types
+    /// `row` (8 bytes) and `foreignrow` (16 bytes, second half is
+    /// usually a table identifier or unused) both encode the target
+    /// row as a u64 starting at <paramref name="offset"/> — we read
+    /// only that first u64. Returns -1 for null sentinels (FE-pattern
+    /// or all-FF, which PoE uses to mean "no reference"), otherwise
+    /// the row index. Callers should bounds-check the result against
+    /// the target table's RowCount.
+    /// </summary>
+    public long RowFk(int index, int offset)
+    {
+        ulong raw = BitConverter.ToUInt64(Row(index)[offset..(offset + 8)]);
+        // 0xFFFF...FFFF and 0xFEFE...FEFE both show up in practice as
+        // "no foreign key set"; treat both as invalid.
+        if (raw == 0xFFFFFFFFFFFFFFFFUL || raw == 0xFEFEFEFEFEFEFEFEUL)
+            return -1;
+        // Anything above ~10M rows is clearly nonsense too — let the
+        // caller catch out-of-range against the real row count, but
+        // defend against signed-overflow weirdness by capping here.
+        if (raw > (ulong)int.MaxValue)
+            return -1;
+        return (long)raw;
+    }
+
     /// <summary>
     /// Read a string ref (int64) and decode the target as a UTF-16
     /// zero-terminated string.

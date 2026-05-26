@@ -1340,13 +1340,13 @@ _FormatModLines(m)
 {
     lines := []
     affix := m.Has("displayName") ? String(m["displayName"]) : ""
-    tier  := m.Has("tierWord")    ? String(m["tierWord"])    : ""
     name  := m.Has("name")        ? String(m["name"])        : ""
 
-    label := (tier != "" && affix != "") ? (tier " " affix)
-           : (affix != "")                 ? affix
-           : (tier != "")                  ? tier
-           :                                 name
+    ; Note: a `modFamily` field is also present on each mod Map (game
+    ; exclusion-group label like "IncreasedLife"). It is deliberately
+    ; NOT used in the rendered label — it's an internal grouping id,
+    ; not a human-readable tier word.
+    label := (affix != "") ? affix : name
     if (label = "")
         return lines
 
