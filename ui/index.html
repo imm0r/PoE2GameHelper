@@ -547,7 +547,13 @@
     .subtab-row {
       display: none;
       align-items: center;
-      overflow-x: auto
+      /* Must stay `visible`: the active-tab pin marker (.tab.active::after)
+         is positioned with `bottom: -3px`, intentionally hanging below
+         the row. `overflow-x: auto` or `hidden` here would treat that
+         marker as overflow and either show a thin scrollbar (per the
+         spec, auto on one axis promotes the other from visible→auto) or
+         clip the marker entirely. */
+      overflow: visible
     }
     .subtab-row.active { display: flex }
     .subtab-row.single-tab.active { display: none }
