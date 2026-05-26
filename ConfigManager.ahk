@@ -6,6 +6,31 @@
 ; Returns the full path to the configuration INI file.
 _ConfigPath() => A_ScriptDir "\gamehelper_config.ini"
 
+; Normalises a stored maphack color hex string into a clean 8-char
+; RRGGBBAA form. Strips an optional leading '#', upper-cases, and
+; falls back to <defaultHex> on any malformed input. We do this at
+; load time so the rest of the codebase can assume colors are valid
+; hex without re-validating on every consumer.
+_NormalizeHex8(raw, defaultHex)
+{
+    s := Trim(raw)
+    if (SubStr(s, 1, 1) = "#")
+        s := SubStr(s, 2)
+    ; 6-char input → assume opaque (alpha=FF).
+    if (StrLen(s) = 6)
+        s .= "FF"
+    if (StrLen(s) != 8)
+        return defaultHex
+    ; Every character must be a hex digit.
+    Loop Parse, s
+    {
+        c := A_LoopField
+        if !(InStr("0123456789abcdefABCDEF", c))
+            return defaultHex
+    }
+    return StrUpper(s)
+}
+
 ; Writes all current global settings to the INI file.
 SaveConfig()
 {
@@ -20,6 +45,7 @@ SaveConfig()
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
+    global g_maphackOutlineHex, g_maphackBackgroundHex
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -43,6 +69,11 @@ SaveConfig()
     IniWrite(g_zoneNavEnabled        ? "1" : "0",  f, "Radar",         "zoneNav")
     IniWrite(g_mapHackEnabled        ? "1" : "0",  f, "Radar",         "mapHack")
     IniWrite(g_maphackSource,                      f, "Radar",         "maphackSource")
+    ; Shader-color overrides for the GGPK maphack. 8-char RRGGBBAA hex,
+    ; passed verbatim to PoePatcher.exe via --minimap-outline /
+    ; --minimap-background. Empty value = use the patcher's defaults.
+    IniWrite(g_maphackOutlineHex,                  f, "Radar",         "maphackOutlineHex")
+    IniWrite(g_maphackBackgroundHex,               f, "Radar",         "maphackBackgroundHex")
     IniWrite(g_rangeCirclesEnabled   ? "1" : "0",  f, "Radar",         "rangeCircles")
     IniWrite(g_panelDetectionEnabled ? "1" : "0",  f, "PanelDetection", "enabled")
     IniWrite(g_autoPilotEnabled      ? "1" : "0",  f, "AutoPilot",      "enabled")
@@ -93,6 +124,7 @@ LoadConfig()
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
+    global g_maphackOutlineHex, g_maphackBackgroundHex
     global g_cfgOpenSections
     global g_winX, g_winY, g_winW, g_winH, g_winMaximized
 
@@ -127,6 +159,12 @@ LoadConfig()
     ; flip it on without their explicit choice.
     rawSrc := IniRead(f, "Radar", "maphackSource", "memory")
     g_maphackSource := (rawSrc = "ggpk") ? "ggpk" : "memory"
+    ; Shader-color overrides for the GGPK maphack. Stored as 8-char
+    ; RRGGBBAA hex without leading '#'. Defaults mirror MinimapPatch.cs:
+    ;   outline    = #8080FFCC  (game's blue-ish wall ramp at higher α)
+    ;   background = #66FF6619  (faint Exile-Forge-style green tint)
+    g_maphackOutlineHex    := _NormalizeHex8(_Ini("Radar", "maphackOutlineHex",    "8080FFCC"), "8080FFCC")
+    g_maphackBackgroundHex := _NormalizeHex8(_Ini("Radar", "maphackBackgroundHex", "66FF6619"), "66FF6619")
     g_rangeCirclesEnabled      := _B("Radar",         "rangeCircles",    true)
     g_panelDetectionEnabled    := _B("PanelDetection","enabled",         true)
     g_autoPilotEnabled         := _B("AutoPilot",     "enabled",         false)

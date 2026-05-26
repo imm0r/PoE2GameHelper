@@ -40,6 +40,7 @@ internal static class Program
                 "extract-all" => RunExtractAll(rest),
                 "inspect"     => RunInspect(rest),
                 "ls"          => RunLs(rest),
+                "cat"         => RunCat(rest),
                 _ => Fail($"Unknown verb: {verb}", 1),
             };
         }
@@ -219,6 +220,48 @@ internal static class Program
         {
             if (outputPath is not null) writer.Dispose();
         }
+        return 0;
+    }
+
+    /// <summary>
+    /// Dumps the raw bytes of a single file inside the GGPK/bundles to
+    /// stdout or to <c>--output</c>. Used for reverse-engineering shaders
+    /// or any other text/binary blob we need to inspect locally.
+    ///
+    /// Usage: poe-data-extract cat --ggpk &lt;path&gt; --path &lt;internal/path&gt; [--output &lt;file&gt;]
+    /// </summary>
+    private static int RunCat(ReadOnlySpan<string> args)
+    {
+        string? ggpkPath = null, internalPath = null, outputPath = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--ggpk":   if (++i < args.Length) ggpkPath     = args[i]; break;
+                case "--path":   if (++i < args.Length) internalPath = args[i]; break;
+                case "--output": if (++i < args.Length) outputPath   = args[i]; break;
+            }
+        }
+        if (ggpkPath is null || internalPath is null)
+        {
+            Console.Error.WriteLine("usage: poe-data-extract cat --ggpk <path> --path <internal/path> [--output <file>]");
+            return 1;
+        }
+        if (!File.Exists(ggpkPath)) { Console.Error.WriteLine($"GGPK not found: {ggpkPath}"); return 2; }
+
+        using var ggpk = GgpkOpener.Open(ggpkPath);
+        if (!ggpk.Index.TryFindNode(internalPath, out var node)
+            || node is not LibBundle3.Nodes.FileNode file)
+        {
+            Console.Error.WriteLine($"Not found in GGPK: {internalPath}");
+            return 3;
+        }
+        var bytes = file.Record.Read();
+        if (outputPath is null)
+            using (var stdout = Console.OpenStandardOutput())
+                stdout.Write(bytes.Span);
+        else
+            File.WriteAllBytes(outputPath, bytes.ToArray());
         return 0;
     }
 

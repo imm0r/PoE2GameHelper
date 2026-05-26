@@ -116,6 +116,29 @@ _DispatchBridgeCall(method, args)
                 g_radarOverlay._mapHackEnabled := (g_mapHackEnabled && newSrc = "memory")
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
+        case "SetMaphackColor":
+            ; args[1] = "outline" | "background"
+            ; args[2] = 8-char RRGGBBAA hex (with or without leading '#')
+            ; Stores the value in the matching global + persists via
+            ; SaveConfig. Does NOT re-apply the GGPK patch — that's the
+            ; user's explicit action via the Apply button. Header-push
+            ; mirrors the new value back to the UI so other open color
+            ; swatches stay in sync.
+            global g_maphackOutlineHex, g_maphackBackgroundHex
+            if (args.Length >= 2)
+            {
+                which := args[1]
+                hex   := _NormalizeHex8(args[2], "")
+                if (hex != "")
+                {
+                    if (which = "outline")
+                        g_maphackOutlineHex := hex
+                    else if (which = "background")
+                        g_maphackBackgroundHex := hex
+                    SetTimer(SaveConfig, -100)
+                    SetTimer(PushHeaderToWebView, -50)
+                }
+            }
         case "ToggleRangeCircles":
             global g_rangeCirclesEnabled
             g_rangeCirclesEnabled := !g_rangeCirclesEnabled

@@ -104,6 +104,8 @@ PushHeaderToWebView()
           . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
           . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
           . '"maphackSource":' _JsStr(IsSet(g_maphackSource) ? g_maphackSource : "memory") ","
+          . '"maphackOutlineHex":' _JsStr(IsSet(g_maphackOutlineHex) ? g_maphackOutlineHex : "8080FFCC") ","
+          . '"maphackBackgroundHex":' _JsStr(IsSet(g_maphackBackgroundHex) ? g_maphackBackgroundHex : "66FF6619") ","
           . '"ggpkInstallPathKnown":' (GgpkToolBridge.HasCachedIndexPath() ? "true" : "false") ","
           . '"ggpkMaphackApplied":' (GgpkToolBridge.IsMaphackApplied() ? "true" : "false") ","
           . '"isConnected":' (IsSet(g_isConnected) && g_isConnected ? "true" : "false") ","

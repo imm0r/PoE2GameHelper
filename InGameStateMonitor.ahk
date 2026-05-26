@@ -234,6 +234,13 @@ g_mapHackEnabled := true
 ; cell as explored (requires the game to be closed for the apply step,
 ; survives until the user reverts).
 g_maphackSource := "memory"
+; Shader-color overrides for the GGPK maphack. 8-char RRGGBBAA hex
+; (no '#'); the patcher receives these verbatim via CLI args.
+; Defaults: outline = blue-ish wall ramp at 80% alpha (game's original
+; color, just more opaque); background = faint Exile-Forge green at
+; 10% alpha so revealed-but-unexplored areas are subtly visible.
+g_maphackOutlineHex    := "8080FFCC"
+g_maphackBackgroundHex := "66FF6619"
 g_rangeCirclesEnabled := true
 g_panelDetectionEnabled := true
 

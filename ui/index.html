@@ -3030,6 +3030,187 @@
     .uib-sr-row:hover {
       background: var(--surface2)
     }
+
+    /* ── Maphack color picker ──────────────────────────────────────────
+       Custom modal replacing the native Windows ChooseColor dialog, so
+       the picker matches the rest of the codex/parchment styling and we
+       can show RGB/HSV + alpha in one panel. Triggered by clicking the
+       color swatches in the GGPK maphack config rows; resolves with a
+       8-char RRGGBBAA hex via window.cpResolve. */
+    .cp-swatch {
+      width: 28px;
+      height: 18px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      vertical-align: middle;
+      /* checkered alpha background — visible through the swatch's RGBA fill */
+      background-image:
+        linear-gradient(45deg, #555 25%, transparent 25%),
+        linear-gradient(-45deg, #555 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #555 75%),
+        linear-gradient(-45deg, transparent 75%, #555 75%);
+      background-size: 8px 8px;
+      background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    }
+    .cp-swatch::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--swatch-color, #fff);
+    }
+    .cp-swatch:hover { border-color: var(--accent) }
+
+    /* Modal backdrop. Fixed-positioned over the whole UI so the picker
+       floats above whatever tab is active. */
+    #cp-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+    #cp-modal.cp-open { display: flex }
+
+    .cp-panel {
+      width: 320px;
+      background: var(--codex-vellum, var(--surface));
+      border: 1px solid var(--codex-rule, var(--border));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(0, 0, 0, .35);
+      padding: 14px;
+      font-size: 11px;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .cp-title {
+      font-size: 12px;
+      color: var(--codex-text, var(--text));
+      border-bottom: 1px solid var(--codex-edge, var(--border));
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      letter-spacing: .04em;
+    }
+
+    /* HSV saturation/value square. CSS gradients — no canvas needed.
+       --hue holds the current hue in 0..360, used by the inline style
+       to drive the base color. */
+    .cp-sv {
+      width: 100%;
+      height: 160px;
+      position: relative;
+      cursor: crosshair;
+      background:
+        linear-gradient(to top, #000 0%, transparent 100%),
+        linear-gradient(to right, #fff 0%, transparent 100%),
+        hsl(var(--hue, 210), 100%, 50%);
+      border: 1px solid var(--codex-edge, var(--border));
+    }
+    .cp-sv-marker {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 1px #000;
+      pointer-events: none;
+    }
+
+    /* Hue + alpha sliders share the same horizontal-rail look. */
+    .cp-slider {
+      width: 100%;
+      height: 14px;
+      margin-top: 10px;
+      position: relative;
+      cursor: pointer;
+      border: 1px solid var(--codex-edge, var(--border));
+    }
+    .cp-slider-hue {
+      background: linear-gradient(to right,
+        #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%,
+        #00f 67%, #f0f 83%, #f00 100%);
+    }
+    .cp-slider-alpha {
+      background:
+        linear-gradient(to right, transparent 0%, var(--alpha-color, #fff) 100%),
+        /* checker again so user sees the alpha applied against a known bg */
+        repeating-linear-gradient(45deg,
+          #555 0 4px, #888 4px 8px);
+    }
+    .cp-slider-marker {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      width: 4px;
+      background: #fff;
+      box-shadow: 0 0 0 1px #000;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .cp-preview-row {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .cp-preview {
+      flex: 1;
+      height: 28px;
+      border: 1px solid var(--codex-edge, var(--border));
+      /* checker so alpha is visible */
+      background-image:
+        linear-gradient(45deg, #555 25%, transparent 25%),
+        linear-gradient(-45deg, #555 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #555 75%),
+        linear-gradient(-45deg, transparent 75%, #555 75%);
+      background-size: 10px 10px;
+      background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+      position: relative;
+    }
+    .cp-preview::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--preview-color, #fff);
+    }
+
+    .cp-hex {
+      width: 86px;
+      padding: 4px 6px;
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--codex-edge, var(--border));
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .cp-hex:focus { outline: none; border-color: var(--accent) }
+
+    .cp-btn-row {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+    .cp-btn {
+      padding: 4px 14px;
+      font-size: 11px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--codex-edge, var(--border));
+      cursor: pointer;
+      letter-spacing: .04em;
+    }
+    .cp-btn:hover { background: var(--surface2); border-color: var(--accent) }
+    .cp-btn-primary { background: var(--codex-edge, var(--border)) }
   </style>
 </head>
 
@@ -3619,6 +3800,34 @@
                       <button class="cfg-btn" id="ggpk-path-save" onclick="ggpkSavePathManually()">Save Path</button>
                     </div>
                   </div>
+                </div>
+              </div>
+              <!-- GGPK Maphack shader colors.
+                   Two swatches that open the custom HSV+alpha picker.
+                   Changes are persisted to gamehelper_config.ini and
+                   passed to PoePatcher.exe on the next Apply (the running
+                   patch keeps the colors it was applied with — the user
+                   has to Revert + Apply to re-render with new colors).
+                   Hidden unless maphackSource === "ggpk", same as the
+                   apply/revert row above. -->
+              <div class="cfg-row cfg-sub-row" id="row-maphack-outline"
+                   style="padding-left:18px;display:none"
+                   data-tip="Color for walkable-area outlines / wall edges drawn by the GGPK maphack. Takes effect on next Apply.">
+                <span class="cfg-label" style="color:var(--subtext)">↳ Outline</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span id="cp-swatch-outline" class="cp-swatch"
+                        onclick="openColorPicker('outline')"></span>
+                  <span id="cp-hex-outline" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
+                </div>
+              </div>
+              <div class="cfg-row cfg-sub-row" id="row-maphack-background"
+                   style="padding-left:18px;display:none"
+                   data-tip="Fill color for revealed-but-unexplored areas. Low alpha = subtle tint, high alpha = obvious overlay. Takes effect on next Apply.">
+                <span class="cfg-label" style="color:var(--subtext)">↳ Background</span>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span id="cp-swatch-background" class="cp-swatch"
+                        onclick="openColorPicker('background')"></span>
+                  <span id="cp-hex-background" style="font-family:monospace;font-size:11px;color:var(--subtext)">—</span>
                 </div>
               </div>
               <div class="cfg-row"><span class="cfg-label">Range Circles</span>
@@ -4728,6 +4937,25 @@
       if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
       const ggpkRow = document.getElementById('row-maphack-ggpk');
       if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      // Color rows — same visibility rule as the apply/revert row.
+      ['outline', 'background'].forEach(which => {
+        const row = document.getElementById('row-maphack-' + which);
+        if (row) row.style.display = (mhSource === 'ggpk') ? '' : 'none';
+      });
+      // Sync swatch + hex label from the latest header values. Stash
+      // _lastHeader so openColorPicker() can read the same values when
+      // the user clicks a swatch (no separate fetch needed).
+      window._lastHeader = d;
+      const olHex = cpNormalizeHex8(d.maphackOutlineHex    || '8080FFCC');
+      const bgHex = cpNormalizeHex8(d.maphackBackgroundHex || '66FF6619');
+      const olSw  = document.getElementById('cp-swatch-outline');
+      const bgSw  = document.getElementById('cp-swatch-background');
+      const olLbl = document.getElementById('cp-hex-outline');
+      const bgLbl = document.getElementById('cp-hex-background');
+      if (olSw)  olSw.style.setProperty('--swatch-color', cpHexToCssRgba(olHex));
+      if (bgSw)  bgSw.style.setProperty('--swatch-color', cpHexToCssRgba(bgHex));
+      if (olLbl) olLbl.textContent = '#' + olHex;
+      if (bgLbl) bgLbl.textContent = '#' + bgHex;
       // GGPK panel has three exclusive states:
       //   (a) install path not yet known      → buttons hidden, info hint shown
       //   (b) path known, patch NOT applied   → only Apply visible
@@ -6293,6 +6521,187 @@
       ahkCall(verb === 'apply' ? 'GgpkMaphackApply' : 'GgpkMaphackRevert');
     }
 
+    // ── Maphack color picker ─────────────────────────────────────────
+    // State held on window so handlers can read it across pointer
+    // events. cpState carries the current HSV + alpha working values;
+    // _cpCtx holds {which, original} so Cancel can restore on dismissal
+    // and OK can dispatch the right SetMaphackColor call.
+    const cpState = { h: 210, s: 0.5, v: 0.5, a: 1.0 };
+    let _cpCtx = null;
+
+    // Public entry — wire up onclick="openColorPicker('outline')" etc.
+    function openColorPicker(which) {
+      const cur = (which === 'outline')
+        ? (window._lastHeader && window._lastHeader.maphackOutlineHex)
+        : (window._lastHeader && window._lastHeader.maphackBackgroundHex);
+      const hex = cpNormalizeHex8(cur || (which === 'outline' ? '8080FFCC' : '66FF6619'));
+      _cpCtx = { which, original: hex };
+      const title = document.getElementById('cp-title');
+      if (title) title.textContent =
+        which === 'outline' ? 'Outline color' : 'Background unrevealed area';
+      cpSetFromHex(hex);
+      document.getElementById('cp-modal').classList.add('cp-open');
+      const inp = document.getElementById('cp-hex');
+      if (inp) inp.value = '#' + hex;
+    }
+
+    function cpCancel() {
+      document.getElementById('cp-modal').classList.remove('cp-open');
+      _cpCtx = null;
+    }
+
+    function cpConfirm() {
+      if (!_cpCtx) { cpCancel(); return; }
+      const hex = cpCurrentHex();
+      ahkCall('SetMaphackColor', _cpCtx.which, hex);
+      // Optimistic UI update — AHK's PushHeaderToWebView will overwrite
+      // shortly anyway, but this avoids a visual flicker between OK and
+      // the next header tick.
+      const swatch = document.getElementById('cp-swatch-' + _cpCtx.which);
+      if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
+      cpCancel();
+    }
+
+    // ── HSV ↔ RGB conversion helpers ─────────────────────────────────
+    // Standard formulas; all values 0..1 except hue which is 0..360.
+    // Kept local so the picker has no dependencies and can be lifted
+    // into another project as a single .html paste.
+    function cpHsvToRgb(h, s, v) {
+      const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+      let r = 0, g = 0, b = 0;
+      if (h < 60) { r = c; g = x; }
+      else if (h < 120) { r = x; g = c; }
+      else if (h < 180) { g = c; b = x; }
+      else if (h < 240) { g = x; b = c; }
+      else if (h < 300) { r = x; b = c; }
+      else { r = c; b = x; }
+      return [r + m, g + m, b + m];
+    }
+    function cpRgbToHsv(r, g, b) {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      let h = 0;
+      if (d !== 0) {
+        if (mx === r) h = 60 * (((g - b) / d) % 6);
+        else if (mx === g) h = 60 * (((b - r) / d) + 2);
+        else h = 60 * (((r - g) / d) + 4);
+      }
+      if (h < 0) h += 360;
+      const s = mx === 0 ? 0 : d / mx;
+      return [h, s, mx];
+    }
+
+    function cpNormalizeHex8(s) {
+      s = (s || '').toString().trim();
+      if (s.startsWith('#')) s = s.slice(1);
+      if (s.length === 6) s += 'FF';
+      if (!/^[0-9a-fA-F]{8}$/.test(s)) return '8080FFCC';
+      return s.toUpperCase();
+    }
+
+    function cpHexToCssRgba(hex) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const a = parseInt(hex.slice(6, 8), 16) / 255;
+      return `rgba(${r},${g},${b},${a.toFixed(3)})`;
+    }
+
+    function cpCurrentHex() {
+      const [r, g, b] = cpHsvToRgb(cpState.h, cpState.s, cpState.v);
+      const to2 = n => Math.round(n * 255).toString(16).padStart(2, '0').toUpperCase();
+      return to2(r) + to2(g) + to2(b) + to2(cpState.a);
+    }
+
+    function cpSetFromHex(hex) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      const a = parseInt(hex.slice(6, 8), 16) / 255;
+      const [h, s, v] = cpRgbToHsv(r, g, b);
+      cpState.h = h; cpState.s = s; cpState.v = v; cpState.a = a;
+      cpRender();
+    }
+
+    function cpFromHex(raw) {
+      const norm = cpNormalizeHex8(raw);
+      cpSetFromHex(norm);
+    }
+
+    function cpRender() {
+      const panel = document.querySelector('.cp-panel');
+      const sv    = document.getElementById('cp-sv');
+      const svM   = document.getElementById('cp-sv-marker');
+      const hueM  = document.getElementById('cp-hue-marker');
+      const aM    = document.getElementById('cp-alpha-marker');
+      const prev  = document.getElementById('cp-preview');
+      const alpha = document.getElementById('cp-alpha');
+      const hexI  = document.getElementById('cp-hex');
+      if (!panel) return;
+      panel.style.setProperty('--hue', cpState.h);
+      const svRect = sv.getBoundingClientRect();
+      svM.style.left = (cpState.s * svRect.width) + 'px';
+      svM.style.top  = ((1 - cpState.v) * svRect.height) + 'px';
+      const hueRect = hueM.parentElement.getBoundingClientRect();
+      hueM.style.left = ((cpState.h / 360) * hueRect.width) + 'px';
+      const aRect = aM.parentElement.getBoundingClientRect();
+      aM.style.left = (cpState.a * aRect.width) + 'px';
+      const hex = cpCurrentHex();
+      const css = cpHexToCssRgba(hex);
+      prev.style.setProperty('--preview-color', css);
+      // The alpha rail's gradient end-color uses the current opaque hue,
+      // not the alpha-pre-multiplied RGB, so the rail itself shows the
+      // alpha-vs-checker transition independent of the current a.
+      const [rr, gg, bb] = cpHsvToRgb(cpState.h, cpState.s, cpState.v);
+      alpha.style.setProperty('--alpha-color',
+        `rgb(${Math.round(rr*255)},${Math.round(gg*255)},${Math.round(bb*255)})`);
+      if (hexI && document.activeElement !== hexI) hexI.value = '#' + hex;
+    }
+
+    // ── Pointer drag handlers ────────────────────────────────────────
+    // One factory builds the "click + drag inside element" wiring shared
+    // by SV square, hue rail, alpha rail. The fraction callback receives
+    // (fx, fy) in 0..1 relative to the element rect.
+    function cpAttachDrag(el, onFrac) {
+      if (!el) return;
+      let dragging = false;
+      const onMove = (ev) => {
+        if (!dragging) return;
+        const r = el.getBoundingClientRect();
+        const fx = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        const fy = Math.max(0, Math.min(1, (ev.clientY - r.top)  / r.height));
+        onFrac(fx, fy);
+      };
+      el.addEventListener('pointerdown', (ev) => {
+        dragging = true;
+        el.setPointerCapture(ev.pointerId);
+        onMove(ev);
+      });
+      el.addEventListener('pointermove', onMove);
+      el.addEventListener('pointerup', (ev) => {
+        dragging = false;
+        try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
+      });
+    }
+
+    function cpInitOnce() {
+      if (cpInitOnce._done) return;
+      cpInitOnce._done = true;
+      cpAttachDrag(document.getElementById('cp-sv'), (fx, fy) => {
+        cpState.s = fx;
+        cpState.v = 1 - fy;
+        cpRender();
+      });
+      cpAttachDrag(document.getElementById('cp-hue'), (fx) => {
+        cpState.h = fx * 360;
+        cpRender();
+      });
+      cpAttachDrag(document.getElementById('cp-alpha'), (fx) => {
+        cpState.a = fx;
+        cpRender();
+      });
+    }
+    document.addEventListener('DOMContentLoaded', cpInitOnce);
+
     // Manually persist the PoE2 install index path (when auto-discovery
     // via running process hasn't happened yet). AHK validates the path
     // before writing — bad paths produce a status message but don't
@@ -6506,6 +6915,36 @@
     <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="entityCtxPin()">📌 Add to Watchlist</div>
     <div class="ctx-item" onclick="entityCtxCopy()">📋 Copy Path</div>
+  </div>
+
+  <!-- Custom color picker modal (Maphack outline + background).
+       Hidden by default; openColorPicker() flips the .cp-open class,
+       wires the SV/hue/alpha pointer handlers, and stores the active
+       (which, callback) pair on window._cpCtx so OK / Cancel know what
+       to do. Drag on any sub-control updates the live preview + hex,
+       OK fires the callback with the final 8-char RRGGBBAA hex. -->
+  <div id="cp-modal" onclick="if (event.target.id==='cp-modal') cpCancel()">
+    <div class="cp-panel" style="--hue:210">
+      <div class="cp-title" id="cp-title">Pick a color</div>
+      <div class="cp-sv" id="cp-sv">
+        <div class="cp-sv-marker" id="cp-sv-marker"></div>
+      </div>
+      <div class="cp-slider cp-slider-hue" id="cp-hue">
+        <div class="cp-slider-marker" id="cp-hue-marker"></div>
+      </div>
+      <div class="cp-slider cp-slider-alpha" id="cp-alpha">
+        <div class="cp-slider-marker" id="cp-alpha-marker"></div>
+      </div>
+      <div class="cp-preview-row">
+        <div class="cp-preview" id="cp-preview"></div>
+        <input type="text" id="cp-hex" class="cp-hex" maxlength="9"
+          oninput="cpFromHex(this.value)" spellcheck="false">
+      </div>
+      <div class="cp-btn-row">
+        <button class="cp-btn" onclick="cpCancel()">Cancel</button>
+        <button class="cp-btn cp-btn-primary" onclick="cpConfirm()">OK</button>
+      </div>
+    </div>
   </div>
 </body>
 
