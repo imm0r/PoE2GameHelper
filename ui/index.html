@@ -115,8 +115,15 @@
     /* Right-of-logo container: every pill + the Snap/PoE2 buttons live
        in here. Wraps to a second (or more) row when the window is
        narrow, but always stays in the column right of the logo block.
-       align-content keeps the wrapped rows top-aligned with the logo. */
+       align-content keeps the wrapped rows top-aligned with the logo.
+
+       container-type: inline-size lets us write @container queries
+       below that compact the pills based on THIS container's width,
+       not the viewport. Means the breakpoints behave correctly even
+       if the logo width changes or padding-right is re-tuned. */
     #header-pills {
+      container-type: inline-size;
+      container-name: pills;
       flex: 1 1 auto;
       min-width: 0;
       display: flex;
@@ -126,6 +133,52 @@
       gap: 8px;
       row-gap: 6px;
       padding-top: 2px;
+    }
+
+    /* ── Compact stage 1: ≤ 900px wide ─────────────────────────────────
+       The default pill size assumes a fairly wide window. When the
+       pills container has to wrap to a second row at typical 1100-px
+       window widths, we shrink font / padding / gap so 9 pills + 2
+       buttons can usually fit in one or two compact rows. Still fully
+       legible — just denser. */
+    @container pills (max-width: 900px) {
+      .pill {
+        padding: 2px 8px;
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        gap: 4px;
+      }
+      .pill .dot {
+        width: 6px;
+        height: 6px;
+      }
+      #header-pills {
+        gap: 5px;
+        row-gap: 4px;
+      }
+      .hbtn {
+        padding: 3px 9px;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+      }
+    }
+
+    /* ── Compact stage 2: ≤ 650px wide ─────────────────────────────────
+       Falls beyond what stage 1 can handle (very narrow window): drop
+       the text labels entirely, render pills as colored status dots
+       only. The existing data-tip attributes on each pill still surface
+       the label on hover, so info is one tooltip away — not lost. */
+    @container pills (max-width: 650px) {
+      .pill > span {
+        display: none;
+      }
+      .pill {
+        padding: 4px 5px;
+      }
+      .pill .dot {
+        width: 8px;
+        height: 8px;
+      }
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
        toolbar's signature so the whole top of the app reads as one frame. */
