@@ -2527,7 +2527,20 @@
     }
 
     .cfg-section details summary .cfg-header {
-      margin: 0
+      margin: 0;
+      /* Drop the gold under-rule on the header itself — the summary now
+         owns it (see below) so the line extends the full row width past
+         the right-aligned status pill + diamond caret. */
+      border-bottom: none
+    }
+    /* Top-level cfg-section summaries get the gold under-rule on the
+       summary element so the line spans the entire row width regardless
+       of whether the header has a right-aligned summary-status sibling.
+       Restricted to direct children of cfg-section so the nested
+       summaries inside AutoPilot's inner <details> (📊/⚔/🧭/💎) don't
+       inherit the heavier rule. */
+    .cfg-section > details > summary {
+      border-bottom: 1px solid var(--codex-rule)
     }
 
     /* Right-aligned status pill inside a <summary> — used to surface
