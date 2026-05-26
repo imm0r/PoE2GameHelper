@@ -284,6 +284,16 @@ class GgpkToolBridge
         return this._RunPatchVerb("revert")
     }
 
+    ; Returns true when we have a cached install path AND the file
+    ; still exists on disk. The Apply/Revert UI hides itself when this
+    ; is false (we'd have nothing to point poe-patcher at). Populated
+    ; by RefreshAllTsvs the first time PoE2 is open after upgrading.
+    static HasCachedIndexPath()
+    {
+        indexPath := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+        return (indexPath != "" && FileExist(indexPath)) ? true : false
+    }
+
     ; Returns true when PoePatcher's backup directory for the minimap
     ; patch exists and contains the snapshot file we drop on apply.
     ;

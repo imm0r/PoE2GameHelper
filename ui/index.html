@@ -4608,35 +4608,50 @@
       if (mhGgpkRadio) mhGgpkRadio.checked = (mhSource === 'ggpk');
       const ggpkRow = document.getElementById('row-maphack-ggpk');
       if (ggpkRow) ggpkRow.style.display = (mhSource === 'ggpk') ? '' : 'none';
-      // Show whichever GGPK button is actually useful right now: Apply
-      // if the patch is NOT currently applied, Revert if it IS. Both
-      // disable themselves with an explanatory tooltip while PoE2 is
-      // running (writing to the bundle index mid-session corrupts it).
-      const poeIsRunning = (d.poeRunning === true) || (d.isConnected === true);
-      const isApplied    = (d.ggpkMaphackApplied === true);
-      const applyBtn  = document.getElementById('ggpk-maphack-apply');
-      const revertBtn = document.getElementById('ggpk-maphack-revert');
-      if (applyBtn) {
-        applyBtn.style.display = isApplied ? 'none' : '';
-        applyBtn.disabled      = poeIsRunning;
-        applyBtn.title         = poeIsRunning
-          ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
-          : 'Patch PoE2 minimap shaders so every cell renders as explored.';
-      }
-      if (revertBtn) {
-        revertBtn.style.display = isApplied ? '' : 'none';
-        revertBtn.disabled      = poeIsRunning;
-        revertBtn.title         = poeIsRunning
-          ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
-          : 'Restore the original minimap shaders.';
-      }
-      const ggpkStatus = document.getElementById('ggpk-maphack-status');
-      if (ggpkStatus) {
-        // Only surface text when we have something meaningful to say.
-        // The Apply/Revert label itself already tells the story; the
-        // status row is for transient action results (filled in by
-        // updateGgpkMaphackStatus after a click).
-        ggpkStatus.textContent = '';
+      // GGPK panel has three exclusive states:
+      //   (a) install path not yet known      → buttons hidden, info hint shown
+      //   (b) path known, patch NOT applied   → only Apply visible
+      //   (c) path known, patch IS applied    → only Revert visible
+      // Either button greys out (with explanatory tooltip) while PoE2
+      // is running — writing to the bundle index mid-session would
+      // corrupt it.
+      const poeIsRunning  = (d.poeRunning === true) || (d.isConnected === true);
+      const isApplied     = (d.ggpkMaphackApplied === true);
+      const pathKnown     = (d.ggpkInstallPathKnown === true);
+      const applyBtn      = document.getElementById('ggpk-maphack-apply');
+      const revertBtn     = document.getElementById('ggpk-maphack-revert');
+      const ggpkStatus    = document.getElementById('ggpk-maphack-status');
+      if (!pathKnown) {
+        // Don't even tease buttons that would crash. Tell the user
+        // exactly what to do to unblock the workflow.
+        if (applyBtn)  applyBtn.style.display  = 'none';
+        if (revertBtn) revertBtn.style.display = 'none';
+        if (ggpkStatus) {
+          ggpkStatus.textContent =
+            'Start PoE2 once + click "Refresh all TSVs from local GGPK" in the Data tab so the helper records your install path. Then Apply/Revert show up here.';
+          ggpkStatus.style.color = 'var(--subtext)';
+        }
+      } else {
+        if (applyBtn) {
+          applyBtn.style.display = isApplied ? 'none' : '';
+          applyBtn.disabled      = poeIsRunning;
+          applyBtn.title         = poeIsRunning
+            ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+            : 'Patch PoE2 minimap shaders so every cell renders as explored.';
+        }
+        if (revertBtn) {
+          revertBtn.style.display = isApplied ? '' : 'none';
+          revertBtn.disabled      = poeIsRunning;
+          revertBtn.title         = poeIsRunning
+            ? 'Close PoE2 first — modifying bundle files while the game has them open will corrupt the index.'
+            : 'Restore the original minimap shaders.';
+        }
+        if (ggpkStatus) {
+          // Reserved for transient action results (filled by
+          // updateGgpkMaphackStatus after a click). Reset on each
+          // header push so old messages don't linger forever.
+          ggpkStatus.textContent = '';
+        }
       }
       setChk('tog-rangecircles', d.rangeCircles !== undefined ? d.rangeCircles : true);
       setChk('tog-paneldetection', d.panelDetection !== undefined ? d.panelDetection : true);
