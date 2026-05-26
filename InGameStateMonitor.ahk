@@ -465,6 +465,27 @@ EnsureConnected()
     g_isConnected := true
     g_lastConnectedPid := pid
     try LogError("Helper connected to PoE2 (pid=" pid ")")
+
+    ; Opportunistically cache the install path while we have a running
+    ; process to derive it from. This unlocks the GGPK maphack workflow
+    ; even if the user has never clicked "Refresh all TSVs" yet — they
+    ; can just hit Launch PoE2, log in (or not, the path is available
+    ; the moment the process exists), close again, and Apply.
+    try
+    {
+        exePath := ProcessGetPath(pid)
+        if (exePath != "")
+        {
+            SplitPath(exePath, , &installDir)
+            indexPath := installDir "\Bundles2\_.index.bin"
+            ggpkPath  := installDir "\Content.ggpk"
+            cached := FileExist(indexPath) ? indexPath
+                    : (FileExist(ggpkPath) ? ggpkPath : "")
+            if (cached != "")
+                IniWrite(cached, _ConfigPath(), "GgpkTools", "lastIndexPath")
+        }
+    }
+
     ; Push a snapshot immediately so the UI tree refreshes without
     ; waiting for the next 2 s ReadAndShow tick.
     try ReadAndShow()
