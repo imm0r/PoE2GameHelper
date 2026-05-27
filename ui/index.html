@@ -2432,11 +2432,31 @@
       font-size: 8px;
       transition: transform .12s;
     }
-    .ei-comp-row.no-decoded .ei-comp-caret { visibility: hidden; }
+    /* Rows that have a lazy-fetch available should still show the caret
+       as an affordance — only show the visually-hidden caret for rows
+       we KNOW can't be expanded (lazy already returned empty). */
+    .ei-comp-row.no-decoded.lazy-pending .ei-comp-caret { color: var(--codex-gold); }
+    .ei-comp-row.no-decoded:not(.lazy-pending):not(.loading) .ei-comp-caret { visibility: hidden; }
+    .ei-comp-row.loading .ei-comp-caret { color: var(--codex-text-dim); }
     .ei-comp-row.expanded .ei-comp-caret { transform: rotate(90deg); }
     .ei-comp-name { color: var(--codex-text); min-width: 130px; }
     .ei-comp-row.no-decoded .ei-comp-name { color: var(--codex-text-dim); }
+    .ei-comp-row.lazy-pending { cursor: pointer; }
+    .ei-comp-row.lazy-pending:hover { background: rgba(200,168,90,0.06); }
     .ei-comp-addr { color: #7ec07e; font-size: 10px; }
+
+    .ei-comp-hint {
+      font-size: 9px;
+      font-family: var(--codex-display);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      margin-left: auto;
+      padding-right: 6px;
+    }
+    .ei-comp-hint.radar { color: var(--codex-gold); opacity: 0.65; }
+    .ei-comp-hint.loading { color: var(--codex-gold-hi); }
+    .ei-comp-hint.empty { color: var(--codex-text-dim); opacity: 0.5; font-style: italic; }
+
     .ei-comp-decoded {
       display: none;
       margin-left: 18px;
@@ -2446,6 +2466,19 @@
     .ei-comp-row.expanded + .ei-comp-decoded { display: block; }
     .ei-comp-decoded .ei-prop-row { font-size: 10px; }
     .ei-comp-decoded .ei-prop-key { flex-basis: 160px; }
+    /* Subtle "this came from the lazy path, not the snapshot" marker */
+    .ei-decoded-source {
+      font-size: 8px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--codex-gold);
+      opacity: 0.55;
+      margin-bottom: 3px;
+    }
+
+    /* Boolean prettify — small coloured dot beside the yes/no glyph */
+    .ei-prop-val.bool-yes { color: #7ec07e; }
+    .ei-prop-val.bool-no  { color: #d68a8a; }
 
     .ei-actions {
       display: flex;
@@ -6535,7 +6568,11 @@
       items: [],
       filters: { id: '', path: '', type: 'all', state: 'all' },
       expanded: new Set(),
-      compExpanded: new Set()  // keys are `<entityAddr>::<componentName>`
+      compExpanded: new Set(),  // keys are `<entityAddr>::<componentName>`
+      // Lazy-decode cache. Keys are `<entityAddr>::<componentName>`,
+      // values are { loading: bool, data: object|null }. Survives
+      // snapshot pushes so a row stays expanded after the next tick.
+      lazyDecoded: new Map()
     };
 
     function updateEntities(jsonStr) {
@@ -6552,6 +6589,11 @@
       window._eiState.compExpanded = new Set(
         [...window._eiState.compExpanded].filter(k => liveAddrs.has(k.split('::')[0]))
       );
+      // Drop lazy-decoded cache for entities that left range
+      for (const key of [...window._eiState.lazyDecoded.keys()]) {
+        if (!liveAddrs.has(key.split('::')[0]))
+          window._eiState.lazyDecoded.delete(key);
+      }
       eiRender();
     }
 
@@ -6683,29 +6725,94 @@
       `;
     }
 
+    // Fields whose 0/1 value should render as a friendly yes/no marker.
+    // AHK has no native bool — decoders return integer flags — so the
+    // serializer can't tell ints from bools. Naming convention covers
+    // it: any decoded field starting with `is`, `has`, `can`, or
+    // matching `dies*`, `meets*`, `needs*` is treated as boolean.
+    function eiLooksBoolean(key) {
+      return /^(is|has|can|dies|meets|needs)[A-Z]/.test(key);
+    }
+    function eiPrettyValue(key, val) {
+      if (eiLooksBoolean(key)) {
+        if (val === 1 || val === '1' || val === true)  return '✓ yes';
+        if (val === 0 || val === '0' || val === false) return '✗ no';
+      }
+      return String(val);
+    }
+    function eiPrettyValueClass(key, val) {
+      if (eiLooksBoolean(key)) {
+        if (val === 1 || val === '1' || val === true)  return 'bool-yes';
+        if (val === 0 || val === '0' || val === false) return 'bool-no';
+      }
+      return '';
+    }
+
     function eiComponentRow(entityAddr, c) {
-      const decoded = c.decoded && typeof c.decoded === 'object' ? c.decoded : null;
+      const lazy = window._eiState.lazyDecoded.get(entityAddr + '::' + c.name);
+      // Three states per component row:
+      //   has-decoded   — server pushed a non-empty summary in the snapshot
+      //   lazy-decoded  — empty in snapshot, but the user clicked and we
+      //                   fetched the full decode on demand
+      //   no-decoded    — no data, no lazy fetch fired yet → click to
+      //                   trigger one (shows "📡 click to decode" hint)
+      let decoded = (c.decoded && typeof c.decoded === 'object') ? c.decoded : null;
+      let source = 'snapshot';
+      if ((!decoded || !Object.keys(decoded).length) && lazy && lazy.data && Object.keys(lazy.data).length) {
+        decoded = lazy.data;
+        source = 'lazy';
+      }
       const hasDecoded = decoded && Object.keys(decoded).length > 0;
+      const isLoading = lazy && lazy.loading;
+      const lazyTried = lazy && (lazy.data !== undefined);
+
       const key = entityAddr + '::' + c.name;
       const expanded = hasDecoded && window._eiState.compExpanded.has(key);
       const klass = ['ei-comp-row'];
       klass.push(hasDecoded ? 'has-decoded' : 'no-decoded');
       if (expanded) klass.push('expanded');
-      const onclick = hasDecoded
-        ? ` onclick="eiToggleComp('${escAttr(entityAddr)}','${escAttr(c.name)}')"`
-        : '';
+      if (isLoading) klass.push('loading');
+      if (source === 'lazy') klass.push('lazy-decoded');
+
+      // Click semantics:
+      //   has-decoded → toggle expansion
+      //   no-decoded + no fetch tried yet → fire lazy fetch
+      //   loading or already-tried-empty → inert (no action)
+      let onclick = '';
+      if (hasDecoded) {
+        onclick = ` onclick="eiToggleComp('${escAttr(entityAddr)}','${escAttr(c.name)}')"`;
+      } else if (!isLoading && !lazyTried) {
+        onclick = ` onclick="eiLazyDecode('${escAttr(entityAddr)}','${escAttr(c.name)}','${escAttr(c.addr || '')}')"`;
+        klass.push('lazy-pending');
+      }
+
       let decodedHtml = '';
       if (hasDecoded) {
-        const rows = Object.entries(decoded).map(([k, v]) =>
-          `<div class="ei-prop-row"><span class="ei-prop-key">${escHtml(k)}</span><span class="ei-prop-val">${escHtml(String(v))}</span></div>`
-        ).join('');
-        decodedHtml = `<div class="ei-comp-decoded">${rows}</div>`;
+        const rows = Object.entries(decoded).map(([k, v]) => {
+          const valClass = eiPrettyValueClass(k, v);
+          return `<div class="ei-prop-row"><span class="ei-prop-key">${escHtml(k)}</span><span class="ei-prop-val${valClass ? ' ' + valClass : ''}">${escHtml(eiPrettyValue(k, v))}</span></div>`;
+        }).join('');
+        const sourceTag = source === 'lazy' ? '<div class="ei-decoded-source">lazy-fetched</div>' : '';
+        decodedHtml = `<div class="ei-comp-decoded">${sourceTag}${rows}</div>`;
       }
+
+      // Hint label (right of the address) communicates why a row isn't
+      // expanded — radar fast-path, loading, decoder ran but came up empty.
+      let hint = '';
+      if (isLoading) {
+        hint = '<span class="ei-comp-hint loading">⏳ decoding…</span>';
+      } else if (!hasDecoded && lazyTried) {
+        hint = '<span class="ei-comp-hint empty">— no decoded data</span>';
+      } else if (!hasDecoded) {
+        hint = '<span class="ei-comp-hint radar">📡 click to decode</span>';
+      }
+
       return `
         <div class="${klass.join(' ')}"${onclick}>
           <span class="ei-comp-caret">▶</span>
           <span class="ei-comp-name">${escHtml(c.name)}</span>
           <span class="ei-comp-addr">${escHtml(c.addr || '')}</span>
+          ${hint}
         </div>
         ${decodedHtml}
       `;
@@ -6720,6 +6827,29 @@
       const set = window._eiState.compExpanded;
       const key = addr + '::' + name;
       if (set.has(key)) set.delete(key); else set.add(key);
+      eiRender();
+    }
+    // Fire a lazy decode for one component on demand. Marks the row
+    // as loading immediately, then waits for eiApplyDecodedComponent
+    // to land. After the result arrives we also auto-expand the row
+    // so the user sees the data without a second click.
+    function eiLazyDecode(entityAddr, compName, compAddr) {
+      const key = entityAddr + '::' + compName;
+      window._eiState.lazyDecoded.set(key, { loading: true, data: undefined });
+      ahkCall('DecodeComponent', entityAddr, compName, compAddr);
+      eiRender();
+    }
+    // Called from AHK via WebViewExec("eiApplyDecodedComponent(addr,name,obj)").
+    // The third arg comes through as a JSON object literal (or `null`
+    // when the decoder ran but had nothing to add).
+    function eiApplyDecodedComponent(entityAddr, compName, decoded) {
+      const key = entityAddr + '::' + compName;
+      const data = (decoded && typeof decoded === 'object') ? decoded : {};
+      window._eiState.lazyDecoded.set(key, { loading: false, data: data });
+      // Auto-expand if the lazy fetch returned anything useful, so the
+      // user doesn't have to click a second time after the await.
+      if (Object.keys(data).length > 0)
+        window._eiState.compExpanded.add(key);
       eiRender();
     }
     function eiFilterChange(which, value) {

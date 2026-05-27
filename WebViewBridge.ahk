@@ -168,6 +168,93 @@ _GetLootLastReason()
     return g_lootLastReason ? g_lootLastReason : "idle"
 }
 
+; Lazy on-demand component decoder for the Entity Inspector. Dispatched
+; from the "DecodeComponent" bridge handler when the user expands a
+; component row that has no decoded summary (because the radar fast-path
+; skipped it, or the entity was decoded by the lite vector scan).
+;
+; Calls the matching DecodeXyzComponentBasic on g_reader, then pushes
+; the flattened-scalar result back to JS via eiApplyDecodedComponent.
+_DecodeComponentOnDemand(entityAddrHex, compName, compAddrHex)
+{
+    global g_reader
+    try
+    {
+        compAddr := _ParseHexToUInt(compAddrHex)
+        if !compAddr
+            return _PushLazyComponentResult(entityAddrHex, compName, "")
+        if !g_reader.IsProbablyValidPointer(compAddr)
+            return _PushLazyComponentResult(entityAddrHex, compName, "")
+
+        canonical := StrLower(compName)
+        decoded := 0
+        switch canonical
+        {
+            case "render":         decoded := g_reader.DecodeRenderComponent(compAddr)
+            case "life":           decoded := g_reader.DecodeLifeComponentBasic(compAddr)
+            case "positioned":     decoded := g_reader.DecodePositionedComponent(compAddr)
+            case "targetable":     decoded := g_reader.DecodeTargetableComponent(compAddr)
+            case "chest":          decoded := g_reader.DecodeChestComponent(compAddr)
+            case "shrine":         decoded := g_reader.DecodeShrineComponent(compAddr)
+            case "transitionable": decoded := g_reader.DecodeTransitionableComponent(compAddr)
+            case "statemachine":   decoded := g_reader.DecodeStateMachineComponentBasic(compAddr)
+            case "actor":          decoded := g_reader.DecodeActorComponentBasic(compAddr)
+            case "animated":       decoded := g_reader.DecodeAnimatedComponentBasic(compAddr)
+            case "buffs":          decoded := g_reader.DecodeBuffsComponentBasic(compAddr)
+            case "stats":          decoded := g_reader.DecodeStatsComponentBasic(compAddr)
+            case "charges", "charge": decoded := g_reader.DecodeChargesComponentBasic(compAddr)
+            case "player":         decoded := g_reader.DecodePlayerComponentBasic(compAddr)
+            case "triggerableblockage": decoded := g_reader.DecodeTriggerableBlockageComponentBasic(compAddr)
+            case "mods":           decoded := g_reader.DecodeModsComponentBasic(compAddr)
+            case "objectmagicproperties": decoded := g_reader.DecodeObjectMagicPropertiesComponentBasic(compAddr)
+            case "npc":            decoded := g_reader.DecodeNpcComponentBasic(compAddr)
+            case "minimapicon":    decoded := g_reader.DecodeMinimapIconComponentBasic(compAddr)
+            case "diesaftertime":  decoded := g_reader.DecodeDiesAfterTimeComponentBasic(compAddr)
+            default:
+                ; No decoder registered — push an empty result so the UI
+                ; surfaces an explicit "no decoder" hint instead of
+                ; hanging on the loading spinner.
+                return _PushLazyComponentResult(entityAddrHex, compName, "")
+        }
+
+        ; Reuse the inspector's existing summary serializer so the lazy
+        ; result lands in the same shape as the snapshot-pushed version.
+        jsonSummary := IsObject(decoded) ? _SerializeComponentSummary(canonical, decoded) : ""
+        _PushLazyComponentResult(entityAddrHex, compName, jsonSummary)
+    }
+    catch as e
+    {
+        try LogError("DecodeComponentOnDemand " compName " " compAddrHex, e)
+        _PushLazyComponentResult(entityAddrHex, compName, "")
+    }
+}
+
+; Pushes the lazy-decode result to JS. Empty `jsonSummary` becomes a JSON
+; null so the UI can distinguish "decoder ran but had nothing to add" from
+; "decoder hasn't fired yet".
+_PushLazyComponentResult(entityAddrHex, compName, jsonSummary)
+{
+    payload := (jsonSummary = "") ? "null" : jsonSummary
+    try WebViewExec("eiApplyDecodedComponent("
+        . _JsStr(entityAddrHex) ","
+        . _JsStr(compName) ","
+        . payload . ")")
+}
+
+; Parse a "0x…" hex string to a UInt64. Returns 0 on bad input so callers
+; can short-circuit on the pointer-validity check downstream.
+_ParseHexToUInt(hex)
+{
+    if !hex
+        return 0
+    s := StrLower(hex)
+    if (SubStr(s, 1, 2) = "0x")
+        s := SubStr(s, 3)
+    if !RegExMatch(s, "^[0-9a-f]+$")
+        return 0
+    return Integer("0x" s)
+}
+
 ; Serialises combat skill slots to a JSON array for the header push.
 _SerializeCombatSlots()
 {
