@@ -125,8 +125,33 @@ _BuildBuffsJson(snapshot)
         return "[]"
 }
 
-; Builds a JSON array of entity objects for the Entities tab.
-; Merges awake entities with important sleeping entities (bosses, NPCs, waypoints).
+; Builds the JSON payload for the Entities tab.
+;
+; Shape: { "total": N, "items": [ entity, … ] } — top-level wrapper carries the
+; total count so the UI can render "Total: N entities" without re-counting client
+; side. (Older form was a bare array; the UI accepts both for back-compat.)
+;
+; Per-entity object carries enough for the C#-GameHelper-style entity inspector:
+;   id                 — entityId (uint)
+;   addr               — entity pointer as "0x…" hex string
+;   path               — full Metadata/... path
+;   name               — resolved short display name
+;   type               — our classification (Player/Minion/Enemy/Boss/NPC/Chest/…)
+;   rarity / rarityId  — display string + raw numeric id
+;   state              — "Awake" or "Sleeping" (top-level list source)
+;   life               — life % 0..100, or -1 if unknown
+;   alive              — bool (isAlive AND/OR targetable)
+;   dist               — distance to player, or -1
+;   sleep              — bool, mirrors `state == "Sleeping"` for back-compat
+;   componentCount     — total components attached to the entity
+;   namedComponentCount — components with a resolvable name
+;   components         — array of { name, addr, decoded } per component
+;                        decoded is omitted when the field would just repeat addr;
+;                        otherwise a small Map summarising what we know
+;
+; Sleeping entities are still pre-filtered to "important" types only — that's
+; cheap and prevents the UI choking on thousands of irrelevant sleeping
+; entities far from the player.
 _BuildEntitiesJson(snap)
 {
     try
@@ -135,7 +160,7 @@ _BuildEntitiesJson(snap)
         global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
 
         if !IsObject(snap)
-            return "[]"
+            return '{"total":0,"items":[]}'
 
         ; Collect awake and sleeping entity sources
         awakeEnt := 0
@@ -193,11 +218,12 @@ _BuildEntitiesJson(snap)
         }
 
         if (allEntries.Length = 0)
-            return "[]"
+            return '{"total":0,"items":[]}'
 
         rarityNames := Map(0,"Normal",1,"Magic",2,"Rare",3,"Unique",4,"Unique",5,"Boss")
         rows  := "["
         first := true
+        emitted := 0
         for _, item in allEntries
         {
             entry  := item["entry"]
@@ -209,6 +235,7 @@ _BuildEntitiesJson(snap)
 
             path    := entity.Has("path") ? entity["path"] : "?"
             decoded := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
+            comps   := entity.Has("components") ? entity["components"] : 0
 
             entityType := _ClassifyEntityType(path)
 
@@ -252,6 +279,12 @@ _BuildEntitiesJson(snap)
             if decoded && decoded.Has("targetable")
                 isAlive := decoded["targetable"]
 
+            entityId  := entity.Has("entityId") ? entity["entityId"] : 0
+            entityAddr := entity.Has("address") ? entity["address"] : 0
+            compCount := entity.Has("componentCount") ? entity["componentCount"] : 0
+            namedCount := entity.Has("namedComponentCount") ? entity["namedComponentCount"] : 0
+            stateStr := isSleep ? "Sleeping" : "Awake"
+
             ; JSON-escape strings
             ep := StrReplace(path,        "\", "\\")
             ep := StrReplace(ep,          '"', '\"')
@@ -260,16 +293,142 @@ _BuildEntitiesJson(snap)
             er := StrReplace(rarity,      '"', '\"')
             et := StrReplace(entityType,  '"', '\"')
             sl := isSleep ? "true" : "false"
+            addrHex := Format("0x{:X}", entityAddr)
+
             rows .= (first ? "" : ",")
-                . '{"path":"' ep '","name":"' en '","rarity":"' er '","type":"' et '"'
+                . '{"id":' entityId
+                . ',"addr":"' addrHex '"'
+                . ',"path":"' ep '","name":"' en '","rarity":"' er '","rarityId":' rarId
+                . ',"type":"' et '","state":"' stateStr '"'
                 . ',"life":' lifePct ',"dist":' dist ',"alive":' (isAlive ? "true" : "false")
-                . ',"sleep":' sl '}'
+                . ',"sleep":' sl
+                . ',"componentCount":' compCount
+                . ',"namedComponentCount":' namedCount
+                . ',"components":' _SerializeComponents(comps, decoded)
+                . '}'
             first := false
+            emitted++
         }
-        return rows . "]"
+        return '{"total":' emitted ',"items":' rows ']}'
     }
     catch
+        return '{"total":0,"items":[]}'
+}
+
+; Serializes the per-entity components list as a JSON array of
+; { name, addr, decoded? } objects.
+;   comps   — raw component array from PoE2EntityReader (each item has name+address)
+;   decoded — the entity's decodedComponents Map (keyed by name)
+;
+; For components we have a decoder for, `decoded` carries a tiny inline summary
+; (one Map of primitive fields, no nested decoder objects) so the UI can render
+; a few useful labels without a follow-up fetch. Decoders that return only
+; bookkeeping (a bare address) are skipped — those render as the standard
+; gray "name: 0x…" stub in the UI.
+_SerializeComponents(comps, decoded)
+{
+    if !IsObject(comps) || !comps.Length
         return "[]"
+
+    out := "["
+    first := true
+    for _, comp in comps
+    {
+        if !(IsObject(comp) && comp.Has("name") && comp.Has("address"))
+            continue
+        name := comp["name"]
+        addr := comp["address"]
+        nameEsc := StrReplace(StrReplace(name, "\", "\\"), '"', '\"')
+        addrHex := Format("0x{:X}", addr)
+
+        dec := ""
+        if (IsObject(decoded) && decoded.Has(name))
+            dec := _SerializeComponentSummary(name, decoded[name])
+
+        out .= (first ? "" : ",")
+            . '{"name":"' nameEsc '","addr":"' addrHex '"'
+            . (dec ? ',"decoded":' dec : "")
+            . "}"
+        first := false
+    }
+    return out . "]"
+}
+
+; Produces a small JSON object summarising one decoded component, suited for
+; inline display in the entity inspector. Returns "" when the decoder has
+; nothing to add beyond the address (in which case the UI just shows the
+; address row).
+_SerializeComponentSummary(name, data)
+{
+    if !IsObject(data)
+        return ""
+    ; Walk a curated whitelist of common scalar fields per component. We only
+    ; emit primitive types — nested structures (skill lists, mod lists, etc.)
+    ; stay hidden behind "show full JSON" because they'd blow up the row.
+    keys := _ComponentSummaryKeys(name)
+    if !keys.Length
+        return ""
+
+    out := "{"
+    first := true
+    for _, key in keys
+    {
+        if !data.Has(key)
+            continue
+        val := data[key]
+        jsonVal := _ToJsonScalar(val)
+        if (jsonVal = "")
+            continue
+        keyEsc := StrReplace(StrReplace(key, "\", "\\"), '"', '\"')
+        out .= (first ? "" : ",")
+            . '"' keyEsc '":' jsonVal
+        first := false
+    }
+    out .= "}"
+    return (first ? "" : out)   ; "" if nothing whitelisted matched
+}
+
+; Curated per-component whitelist of scalar fields worth surfacing. Adding
+; a key here exposes it in the entity inspector — adding a new component
+; just means a new case here.
+_ComponentSummaryKeys(name)
+{
+    static keysByComponent := Map(
+        "Life",        ["isAlive", "lifeCurrentValue", "lifeCurrentPercentMax", "manaCurrentValue", "energyShieldCurrentValue"],
+        "Render",      ["entityName"],
+        "Animated",    ["animationPath", "currentAnimation"],
+        "Positioned",  ["worldPosX", "worldPosY", "gridPosX", "gridPosY", "size", "reaction"],
+        "Actor",       ["currentAction", "animationId"],
+        "Stats",       ["statsCount"],
+        "Buffs",       ["buffCount"],
+        "ObjectMagicProperties", ["rarityId", "modCount"],
+        "Targetable",  ["isTargetable"],
+        "DiesAfterTime", ["timeLeft"],
+        "Pathfinding", ["isMoving", "destinationX", "destinationY"]
+    )
+    return keysByComponent.Has(name) ? keysByComponent[name] : []
+}
+
+; Converts an AHK value to a JSON-encoded scalar. Returns "" for things we
+; don't want to inline (objects/arrays/empty strings) so the caller can
+; skip the key entirely.
+_ToJsonScalar(val)
+{
+    if !IsSet(val)
+        return ""
+    t := Type(val)
+    if (t = "Integer" || t = "Float")
+        return String(val)
+    if (t = "String")
+    {
+        if (val = "")
+            return ""
+        esc := StrReplace(val, "\", "\\")
+        esc := StrReplace(esc, '"', '\"')
+        return '"' esc '"'
+    }
+    ; Bool isn't a distinct type in AHK v2 — true/false reach here as 1/0 Ints
+    return ""
 }
 
 ; Builds a JSON object of important UI element states.
