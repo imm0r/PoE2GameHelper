@@ -1,7 +1,0 @@
-﻿PatternName,Signature,BytesToSkip,MatchIndex,MatchAddress,ResolvedAddress
-"Game States","48 39 2D ^ ?? ?? ?? ?? 0F 85 16 01 00 00",3,1,"0x7FF66CCFA68E","0x7FF670C2C928"
-"File Root","48 8B 0D ^ ?? ?? ?? ?? E8 ?? ?? ?? ?? E8",3,1,"0x7FF66D9D2D8C","0x7FF670D66E68"
-"AreaChangeCounter","FF 05 ^ ?? ?? ?? ?? 4C 8B 06",2,1,"0x7FF66D9D0C19","0x7FF670061F48"
-"Terrain Rotator Helper","48 8D 05 ^ ?? ?? ?? ?? 4F 8D 04 40",3,1,"0x7FF66E5D7951","0x7FF66F63A028"
-"Terrain Rotation Selector","48 8D 0D ^ ?? ?? ?? ?? 44 0F B6 04 08",3,1,"0x7FF66E5D792E","0x7FF66F63A048"
-"GameCullSize","2B 05 ^ ?? ?? ?? ?? 45 0F 57 C9",2,1,"0x7FF66D5DE98B","0x7FF670BE98A8"
