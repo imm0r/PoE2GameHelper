@@ -341,9 +341,14 @@ _SerializeComponents(comps, decoded)
         nameEsc := StrReplace(StrReplace(name, "\", "\\"), '"', '\"')
         addrHex := Format("0x{:X}", addr)
 
+        ; PoE2EntityReader stores decoded components under lowercase
+        ; canonical keys (life, positioned, animated, …). Lookup has to
+        ; match — using the original CamelCase component name misses
+        ; every decoded entry.
         dec := ""
-        if (IsObject(decoded) && decoded.Has(name))
-            dec := _SerializeComponentSummary(name, decoded[name])
+        canonical := StrLower(name)
+        if (IsObject(decoded) && decoded.Has(canonical))
+            dec := _SerializeComponentSummary(canonical, decoded[canonical])
 
         out .= (first ? "" : ",")
             . '{"name":"' nameEsc '","addr":"' addrHex '"'
@@ -388,25 +393,34 @@ _SerializeComponentSummary(name, data)
     return (first ? "" : out)   ; "" if nothing whitelisted matched
 }
 
-; Curated per-component whitelist of scalar fields worth surfacing. Adding
-; a key here exposes it in the entity inspector — adding a new component
-; just means a new case here.
-_ComponentSummaryKeys(name)
+; Curated per-component whitelist of scalar fields worth surfacing. Keys
+; are the lowercase canonical names PoE2EntityReader writes into the
+; decodedComponents Map (life, positioned, …). Adding a new component
+; here exposes it in the entity inspector.
+_ComponentSummaryKeys(canonicalName)
 {
     static keysByComponent := Map(
-        "Life",        ["isAlive", "lifeCurrentValue", "lifeCurrentPercentMax", "manaCurrentValue", "energyShieldCurrentValue"],
-        "Render",      ["entityName"],
-        "Animated",    ["animationPath", "currentAnimation"],
-        "Positioned",  ["worldPosX", "worldPosY", "gridPosX", "gridPosY", "size", "reaction"],
-        "Actor",       ["currentAction", "animationId"],
-        "Stats",       ["statsCount"],
-        "Buffs",       ["buffCount"],
-        "ObjectMagicProperties", ["rarityId", "modCount"],
-        "Targetable",  ["isTargetable"],
-        "DiesAfterTime", ["timeLeft"],
-        "Pathfinding", ["isMoving", "destinationX", "destinationY"]
+        "life",        ["isAlive", "lifeCurrentValue", "lifeCurrentPercentMax", "manaCurrentValue", "energyShieldCurrentValue"],
+        "render",      ["entityName"],
+        "animated",    ["animationPath", "currentAnimation"],
+        "positioned",  ["worldPosX", "worldPosY", "gridPosX", "gridPosY", "size", "reaction"],
+        "actor",       ["currentAction", "animationId"],
+        "stats",       ["statsCount"],
+        "buffs",       ["buffCount"],
+        "objectmagicproperties", ["rarityId", "modCount"],
+        "targetable",  ["isTargetable"],
+        "diesaftertime", ["timeLeft"],
+        "pathfinding", ["isMoving", "destinationX", "destinationY"],
+        "chest",       ["isOpened", "isStrongbox"],
+        "shrine",      ["isAvailable"],
+        "minimapicon", ["iconName", "isHide"],
+        "statemachine", ["currentState"],
+        "transitionable", ["currentState"],
+        "charges",     ["currentCharges", "maxCharges"],
+        "mods",        ["modCount"],
+        "npc",         ["npcName"]
     )
-    return keysByComponent.Has(name) ? keysByComponent[name] : []
+    return keysByComponent.Has(canonicalName) ? keysByComponent[canonicalName] : []
 }
 
 ; Converts an AHK value to a JSON-encoded scalar. Returns "" for things we
