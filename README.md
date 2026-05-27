@@ -4,7 +4,7 @@
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
-![Version](https://img.shields.io/badge/version-v0.4.12.1-blue)
+![Version](https://img.shields.io/badge/version-v0.4.12.2-blue)
 ![Build](https://img.shields.io/badge/build-stable-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
@@ -51,6 +51,8 @@
 🗺 **GGPK Maphack** — patches PoE2's minimap shaders directly in the bundle, with configurable outline + background colors and one-click apply/revert. Reveals the full zone in-game without the radar overlay running.
 
 🔬 **Reverse-Engineering Workbench** — Memory Diff (snapshot · do something in-game · snapshot · diff with multi-format decode), Cheat-Engine-style Dissector for navigating pointer chains, struct-diff Panel Detection, live UI tree browser.
+
+🧪 **Entity Inspector** — every entity in range surfaced with its address, full property block, and a per-component tree. Filter by Id / Path / Type / State, expand any component for inline decoded fields, lazy-fetch on demand for the heavy ones the radar pass skips.
 
 📜 **Arcane Codex UI** — leather-bound grimoire aesthetic, with a full-height logo rail anchoring three stacked navigation rows, a sliding gold underline that glides between active tabs, and a header pill vocabulary that pulses copper when paused and crimson when disconnected.
 
@@ -124,10 +126,16 @@ Apply / revert is one click each from the **Config → GGPK** sub-tab. Every mod
 
 The WebView UI ships a multi-tab inspection layer over the live game state. Everything updates from the same memory-reader snapshot the automation modules consume.
 
-**Entities** — sortable list of all active entities with rarity, life percentage, distance, and path. Click an entity to highlight it on the radar.
+**Entity Inspector** — proper memory-inspector view of every entity in range. Filter the list by Id, path substring, Type, or State (Awake / Sleeping / Alive / Dead); the Type dropdown auto-populates from the types actually present in the live snapshot. Each row expands into:
+
+- A **Properties** block: address (hex), id, full metadata path, type, state, rarity (+ raw id), alive flag, life %, distance, component count.
+- A **Components** tree: every attached component listed with its memory address. Components the snapshot already carries decoded data for (Render, Life, Positioned, Targetable, …) expand inline into key/value pairs — coordinates flatten to `x=…, y=…, z=…`, booleans render as `✓ yes` / `✗ no`.
+- **Show in game** toggles the radar highlight for that entity; **Copy JSON** writes the full entity record to clipboard.
+
+The radar fast-path skips heavy decoders (Stats, Buffs, Actor, Animated, StateMachine, …) for cost reasons — those rows show a `📡 click to decode` hint. Clicking fires an on-demand decode for that single component and auto-expands the row once the result arrives. Garbage strings (uninitialized memory mis-read as UTF-16) are replaced with `— invalid memory` so the panel stays readable.
 
 <div align="center">
-  <img src="assets/entities_tab.png" width="800" alt="Entities tab">
+  <img src="assets/entities_tab.png" width="800" alt="Entity Inspector — filter row + per-entity properties + components tree">
 </div>
 
 **Skills & Buffs** — currently active skills + buffs with cooldowns, charges, and timers.
