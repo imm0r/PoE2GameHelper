@@ -2,9 +2,9 @@
 
 <img src="assets/logo_poE2gamehelper.png" width="640" alt="PoE2 GameHelper">
 
-**A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, and a reverse-engineering workbench in one place.**
+**A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
-![Version](https://img.shields.io/badge/version-v0.4.11.2-blue)
+![Version](https://img.shields.io/badge/version-v0.4.12.1-blue)
 ![Build](https://img.shields.io/badge/build-stable-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
@@ -26,13 +26,16 @@
 - [Highlights](#highlights)
 - [Features](#features)
   - [Automation](#-automation)
+  - [Loot Pickup](#-loot-pickup)
   - [Overlays](#-overlays)
+  - [GGPK Maphack](#-ggpk-maphack)
   - [Live Inspection](#-live-inspection)
   - [Reverse-Engineering Tools](#-reverse-engineering-tools)
 - [UI Theme — Arcane Codex](#ui-theme--arcane-codex)
+- [Header Anatomy](#header-anatomy)
 - [Requirements](#requirements)
 - [Installation & Usage](#installation--usage)
-- [Hotkeys](#hotkeys)
+- [Hotkeys & Header Controls](#hotkeys--header-controls)
 - [Project Structure](#project-structure)
 - [References](#references)
 - [License](#license)
@@ -45,11 +48,13 @@
 
 💎 **Loot Pickup** — rarity-filtered ground-item collection with a persistent cache (drops noticed during combat aren't forgotten) and an actual **per-item-size fit check** against the live backpack grid — fed by a 4 040-entry registry of every PoE2 base item.
 
+🗺 **GGPK Maphack** — patches PoE2's minimap shaders directly in the bundle, with configurable outline + background colors and one-click apply/revert. Reveals the full zone in-game without the radar overlay running.
+
 🔬 **Reverse-Engineering Workbench** — Memory Diff (snapshot · do something in-game · snapshot · diff with multi-format decode), Cheat-Engine-style Dissector for navigating pointer chains, struct-diff Panel Detection, live UI tree browser.
 
-📜 **Arcane Codex UI** — leather-bound grimoire aesthetic. Cinzel-titled chapter headings, vellum-page inventory grid, antique-gold inlays, IM Fell English numerals.
+📜 **Arcane Codex UI** — leather-bound grimoire aesthetic, with a full-height logo rail anchoring three stacked navigation rows, a sliding gold underline that glides between active tabs, and a header pill vocabulary that pulses copper when paused and crimson when disconnected.
 
-🗺 **Radar / Maphack overlay** — high-performance GDI render with full-zone reveal, entity icons, A\* path drawing.
+🛰 **Radar overlay** — high-performance GDI render with full-zone reveal, entity icons, A\* path drawing.
 
 💧 **AutoFlask** — life/mana threshold automation with cooldown-aware fallbacks.
 
@@ -59,9 +64,9 @@
 
 ### 🤖 Automation
 
-**AutoPilot — one switch, full automation.** Hit `F10` (or the in-UI toggle) and the bot picks up the game: it explores unexplored terrain, engages hostiles when they come into range, collects filter-passing loot when the area is safe, and avoids waypoints / transitions / NPC dialogs.
+**AutoPilot — one switch, full automation.** Hit `F10` (or the in-UI pill toggle) and the bot picks up the game: it explores unexplored terrain, engages hostiles when they come into range, collects filter-passing loot when the area is safe, and avoids waypoints / transitions / NPC dialogs.
 
-The priority chain is *combat > loot > explore*; each stage claims a tick by returning true and the next stage only runs when the previous one stayed idle. State is surfaced in real time in the header pill — gilded gold when exploring, blood-red pulse during combat.
+The priority chain is *combat > loot > explore*; each stage claims a tick by returning true and the next stage only runs when the previous one stayed idle. State is surfaced in real time in the header pill — quiet brown when off, gilded gold when exploring, blood-red pulse during combat.
 
 - **LoS-aware combat aiming** — A\* path computed when terrain blocks the straight line; the bot aims at the farthest waypoint with line-of-sight and walks via LMB until the enemy itself becomes visible. Skill keys **only** fire on direct LoS (no cooldown wasted on walls).
 - **Click safety (`AvoidZones`)** — shared registry of screen-coordinate keep-out rects covering HUD elements (life globe, skill bar, minimap) + interactable world entities (transitions, waypoints, portals, NPCs). Combat and loot both consult it before any click.
@@ -89,16 +94,31 @@ Filter ground drops by rarity (Normal · Magic · Rare · Unique · Currency) an
 
 ### 🗺 Overlays
 
-**Radar & Maphack** — high-performance GDI overlay with minimap + large-map modes, full-zone reveal, entity icons (NPCs, Bosses, Waypoints, Chests), distance indicators, and isometric projection.
+**Radar** — high-performance GDI overlay with minimap + large-map modes, full-zone reveal, entity icons (NPCs, Bosses, Waypoints, Chests), distance indicators, and isometric projection.
 
 <div align="center">
-  <img src="assets/radar_overlay.png" width="900" alt="Radar / Maphack overlay">
-  <p><em>The radar overlaid on the game window — entities, A* combat path, maphack zone reveal.</em></p>
+  <img src="assets/radar_overlay.png" width="900" alt="Radar overlay">
+  <p><em>The radar overlaid on the game window — entities, A* combat path, zone reveal.</em></p>
 </div>
 
 **Zone Navigation** — A\* pathfinder with adaptive step sizes (2/4/8) and automatic AreaTransition detection.
 
 **Player HUD** — compact vitals overlay readable at a glance during combat.
+
+### 🗺 GGPK Maphack
+
+The Radar shows a reveal **in the overlay**. The GGPK Maphack does the same thing **inside the game itself**, by patching PoE2's actual minimap shaders inside the bundle.
+
+The patcher (written in C# as part of `ggpk-tools/`) targets two shader files:
+
+- `shaders/minimap_visibility_pixel.hlsl` — forces the explored-tile ratio to `1.0`, so every cell renders as "this is revealed."
+- `shaders/minimap_blending_pixel.hlsl` — swaps two hardcoded `float4(...)` literals: the interior-walkable wash colour and the wall-outline colour. The user picks both via an in-app HSV/hex colour picker.
+
+Apply / revert is one click each from the **Config → GGPK** sub-tab. Every modified file is backed up automatically before write, and the patcher refuses to run if any marker has shifted in a game patch (saves you from a half-patched bundle that wouldn't render). The `_.index.bin` is snapshotted before each apply too, so a `--revert` always has a known-good baseline to restore.
+
+**Outline and background colours are independently tunable.** Outline gets the wall ridge; background fills walkable interior. Pick low background alpha (5–10 %) for a subtle ExileForge-style wash, or crank both for a screenshot-ready high-contrast view.
+
+> ⚠️ Modifying `Content.ggpk` / `_.index.bin` is detectable in principle by any anti-cheat the game might run. PoE2 currently doesn't have aggressive client-side anti-cheat, but **using this is at your own risk** — see [SECURITY.md](.github/SECURITY.md) for scope notes.
 
 ### 🔍 Live Inspection
 
@@ -147,7 +167,7 @@ Any address rendered as an 8-byte-stride table: hex · i32 · u32 · f32 · i64 
 </div>
 
 #### Panel Detection (struct diff)
-Capture a struct baseline, open a game panel, compare. Surfaces the exact byte offsets that flip when each panel opens — the foundation of the "is the inventory window currently open?" guard used by all the automation modules.
+Capture a struct baseline, open a game panel, compare. Surfaces the exact byte offsets that flip when each panel opens — the foundation of the "is the inventory window currently open?" guard used by all the automation modules. Lives under **Config → Debug** (moved there from a retired sub-tab, since it's diagnostic config in practice).
 
 <div align="center">
   <img src="assets/panel_diff.png" width="800" alt="Panel Detection diff">
@@ -168,7 +188,7 @@ Read-only view of the master `InGameState` struct — every nested object, decod
 </div>
 
 #### Data
-Generated TSV exports (stat templates, base-item registry, etc.) for offline analysis.
+Generated TSV exports (stat templates, base-item registry, mods, monster names, unique items, etc.) for offline analysis. The pipeline that produces them lives under `ggpk-tools/PoeDataExtract/` and re-runs automatically when the helper detects a game patch.
 
 <div align="center">
   <img src="assets/data.png" width="800" alt="Data exports">
@@ -182,13 +202,36 @@ The interface is intentionally framed as a leather-bound grimoire of relics — 
 
 - **Typography** — [Cinzel](https://fonts.google.com/specimen/Cinzel) for illuminated chapter headings, [EB Garamond](https://fonts.google.com/specimen/EB+Garamond) for body text and item names, [IM Fell English SC](https://fonts.google.com/specimen/IM+Fell+English+SC) for engraved numerals. Windows-native serif fallbacks (Constantia / Palatino / Georgia) keep the aesthetic intact when offline.
 - **Palette** — warm dark browns and aged ivory for the parchment; antique gold for active states and rules; blood crimson reserved for urgent combat warnings; cool steel-blue retained for "info" highlights to keep them distinct from automation gold.
-- **AutoPilot cockpit** — the header pill shows three visually-distinct states the user can recognise at a glance during gameplay: quiet brown (OFF), gilded gold halo (exploring / ON), blood-red pulse (combat).
+- **Header pill vocabulary** — each pill carries state colour AND animation, so a glance is enough during combat:
+  - *Live / connected* — quiet gold.
+  - *Paused* — copper-amber slow pulse (2.4 s). Halts updates can't masquerade as "off" pills.
+  - *Disconnected* — blood crimson at the same pulse rhythm, so the two read as one "attention required" family with the cause encoded only in colour.
+  - *AutoPilot — combat* — fast crimson pulse (1.4 s), a deliberate urgency over the paused/disconnected calm.
+- **Sliding tab marker** — one gold underline per bar (categories + sub-tabs) that glides between active positions with a 280 ms cubic-bezier transition instead of jumping. The little diamond fleuron rides on top of the marker so it travels with the rule.
 - **Inventory chapter** — vellum-page background with paper-grain noise + corner vignettes; item cards as sigil-slips with rarity-tinted ink-bleed glows (Rare items carry a subtle 4.5 s brightness pulse); tooltip is a parchment slip with corner fleurons and gilded section dividers.
 
 <div align="center">
   <img src="assets/configuration2.png" width="800" alt="Config tab — Arcane Codex theme">
-  <p><em>The Config tab — codex-framed sections, brass-thumbed sliders, inscribed-switch toggles, Cinzel small-caps everywhere.</em></p>
+  <p><em>Config tab split into six sub-tabs (General · Automation · Overlay · GGPK · Filters · Debug) — codex-framed sections, brass-thumbed sliders, inscribed-switch toggles.</em></p>
 </div>
+
+---
+
+## Header Anatomy
+
+The top of the app is a single visual frame around three stacked rows on the right of a full-height logo rail:
+
+| Row | Contents |
+|---|---|
+| Pills row | State pills (Connect · Pause · Debug · AutoFlask · AutoPilot · Radar · HUD · Map · FPS) + `↺ Snap` / `▶ PoE2` dual button + window controls (min / max / close) |
+| Category bar | `GAME` · `RE` · `DATA` · `CONFIG` + the **📌 Always-on-Top** pin (next to Config, tilted -25° when off, upright + gilded when on; state persisted to the config INI) |
+| Sub-tab bar | Sub-tabs of the active category — sliding underline marker glides between selections |
+
+The logo on the left fills the whole topbar height. **Hover it** for a popover with the project name + game/app versions; **click it** to open the GitHub repo in your default browser.
+
+The `Snap` button does double duty: when PoE2 is running it sends a `TreeRefresh` (re-syncs the helper's tree from the live game). When PoE2 isn't running it morphs into `▶ PoE2` and launches the game via Steam.
+
+Two compact-mode tiers kick in as the window narrows: pills shrink at ≤ 1300 px and shed their text labels in favour of a per-pill icon at ≤ 850 px (the underlying `data-tip` tooltip still reveals the full label on hover).
 
 ---
 
@@ -198,34 +241,49 @@ The interface is intentionally framed as a leather-bound grimoire of relics — 
 - **Path of Exile 2** — Steam or standalone, both supported
 - **Administrator privileges** — required for `ReadProcessMemory` against an elevated game process
 - **WebView2 Runtime** — pre-installed on Windows 11; Windows 10 may need the [Evergreen runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
+- **.NET 8 SDK** *(only if you want to use the GGPK Maphack or rebuild the data extractor)* — [download](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ---
 
 ## Installation & Usage
 
 ```bash
-# Clone
-git clone https://github.com/imm0r/PoE2GameHelper.git
+# Clone (with the LibGGPK3 submodule that ggpk-tools depends on)
+git clone --recurse-submodules https://github.com/imm0r/PoE2GameHelper.git
 cd PoE2GameHelper
 
 # Run (path may vary; AHK v2 install location)
 "C:\Program Files\AutoHotkey\v2\AutoHotkey.exe" InGameStateMonitor.ahk
 ```
 
-The WebView UI window opens immediately. Start *Path of Exile 2* (or have it running already). The header shows `Connected ●` once the helper has attached to the process; from there everything is live.
+The WebView UI window opens immediately. Start *Path of Exile 2* (or have it running already). The header `Disconnected` pill flips to `Connected` once the helper attaches to the process; from there everything is live.
+
+If you also want the **GGPK Maphack**, build the C# tools once:
+
+```bash
+cd ggpk-tools
+dotnet publish PoeDataExtract -c Release -r win-x64 --self-contained -p:PublishAot=true
+dotnet publish PoePatcher     -c Release -r win-x64 --self-contained -p:PublishAot=true
+```
+
+The AHK side shells out to the resulting `.exe`s — rebuild whenever you pull updates that touch `ggpk-tools/`.
 
 ---
 
-## Hotkeys
+## Hotkeys & Header Controls
 
-| Key | Action |
+| Input | Action |
 |---|---|
 | `F10` | Toggle **AutoPilot** (combat + loot + explore) |
 | `F3` | One-shot debug dump (TreeView + game-window screenshot + radar entity TSV) |
+| Click pill | Toggle the corresponding feature (Pause, Debug, AutoFlask, AutoPilot, Radar, HUD) |
+| Click 📌 (next to Config) | Toggle Always-on-Top — visual state tilts/straightens, persisted to the config INI |
+| Click `↺ Snap` / `▶ PoE2` | Refresh the tree (game running) OR launch the game via Steam (game not running) |
+| Click logo | Open the GitHub repo in your default browser |
+| Drag header | Move the window — bound to the pills row, doesn't trigger on buttons |
+| Double-click header | Maximise / restore |
 
-Window-drag is bound to the header; double-click maximises. The Snap button (top-right) realigns the overlay to the current PoE window.
-
-Most other toggles live in the **Config** tab — AutoPilot tuning, AutoFlask thresholds, radar entity filters, loot rarity filter, and per-skill slot configuration.
+Most other toggles live in the **Config** tab (split into six sub-tabs — General · Automation · Overlay · GGPK · Filters · Debug) — AutoPilot tuning, AutoFlask thresholds, radar entity filters, loot rarity filter, GGPK maphack apply/revert + colour pickers, and per-skill slot configuration.
 
 ---
 
@@ -255,9 +313,15 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 │   └── ProcessMemory.ahk            ─ RPM wrapper, pointer chain helpers
 │
 ├── Overlays
-│   ├── RadarOverlay.ahk        ─ GDI overlay + maphack + A* drawing
+│   ├── RadarOverlay.ahk        ─ GDI overlay + zone reveal + A* drawing
 │   ├── PlayerHUD.ahk           ─ compact vitals overlay
 │   └── Lib/TerrainPathfinder.ahk ─ A* with adaptive step sizing
+│
+├── GGPK Maphack (.NET 8)
+│   ├── ggpk-tools/PoePatcher/      ─ C# patcher: applies + reverts shader edits
+│   │   └── Patches/MinimapPatch.cs ─ the two shader markers + colour swaps
+│   ├── ggpk-tools/PoeDataExtract/  ─ C# data extractor (TSVs in data/)
+│   └── GgpkToolBridge.ahk          ─ AHK shell-out wrapper + apply/revert state
 │
 ├── Reverse-engineering
 │   ├── MemoryDiff.ahk          ─ snapshot/diff with multi-format decode
@@ -280,10 +344,20 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 │   ├── PatchChecker.ahk        ─ detect game updates / version drift
 │   └── JsonParser.ahk          ─ AHK v2 JSON parsing
 │
-└── data/                       ─ generated data assets
-    ├── base_item_sizes.tsv     ─ 4040-entry path → (w, h) (for loot fit-check)
-    ├── stat_desc_map.tsv       ─ mod template descriptions
-    └── *.tsv                   ─ name maps, monster data, item base names
+├── data/                       ─ generated data assets
+│   ├── base_item_sizes.tsv     ─ 4040-entry path → (w, h) (for loot fit-check)
+│   ├── stat_desc_map.tsv       ─ mod template descriptions
+│   ├── unique_item_name_map.tsv ─ unique-item name resolver
+│   └── *.tsv                   ─ name maps, monster data, item base names
+│
+├── .github/                    ─ community + automation files
+│   ├── CONTRIBUTING.md
+│   ├── CODE_OF_CONDUCT.md
+│   ├── SECURITY.md
+│   └── PULL_REQUEST_TEMPLATE.md
+│
+└── external/                   ─ git submodules (don't delete)
+    └── LibGGPK3/               ─ Content.ggpk + Bundles2 parser (used by ggpk-tools)
 ```
 
 ---
@@ -291,19 +365,20 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 ## References
 
 - [**C# Original (GameHelper2)**](https://gitlab.com/bylafko/gamehelper2) — the original tool this AHK port draws inspiration from
+- [**LibGGPK3**](https://github.com/aianlinb/LibGGPK3) — the Content.ggpk + Bundles2 parser that powers `ggpk-tools` (vendored as a submodule under `external/`)
 - [**Wraedar (Zone Nav)**](https://github.com/diesal/Wraedar) — terrain pathfinding reference
 - [**DAT-Schema**](https://github.com/poe-tool-dev/dat-schema) — PoE/PoE2 game-data schema
 - [**poe-data-tools**](https://github.com/LocalIdentity/poe_data_tools) — PoE data file utilities
 - [**repoe-fork (PoE2 base items)**](https://repoe-fork.github.io/poe2/base_items.json) — base-item registry source
 - [**AHK v2 docs**](https://www.autohotkey.com/docs/v2/)
 
-Detailed developer notes: [`DEV_README.md`](DEV_README.md)
+Detailed developer notes: [`DEV_README.md`](DEV_README.md). Contribution conventions: [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
 ---
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE) for the full text.
+MIT — see [`LICENSE`](LICENSE) for the full text. The `ggpk-tools/` subtree is AGPL-3.0 — see [`ggpk-tools/LICENSE`](ggpk-tools/LICENSE).
 
 <div align="center">
   <sub>Built with ❤️ for the <em>Path of Exile 2</em> community.</sub>
