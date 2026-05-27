@@ -12,6 +12,7 @@ __pycache__/
 
 # IDE / Editor
 .vscode/
+.continue/
 
 # Per-user Claude Code settings
 .claude/settings.local.json
