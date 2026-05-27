@@ -40,7 +40,7 @@ Drop `InGameStateMonitor.ahk` onto AHK or set it as the file association — tha
 
 ### Building the compiled `.exe`
 ```
-Ahk2Exe.exe /in InGameStateMonitor.ahk /out InGameStateMonitor.exe /icon assets\logo_poE2gamehelper.ico
+Ahk2Exe.exe /in InGameStateMonitor.ahk /out InGameStateMonitor.exe
 ```
 Most users will never need to do this; `DEV_README.md` covers the production-packaging details.
 
