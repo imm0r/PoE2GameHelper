@@ -403,9 +403,9 @@ _ComponentSummaryKeys(canonicalName)
     static keysByComponent := Map(
         "life",        ["isAlive", "lifeCurrentPercentMax", "manaCurrentPercentMax", "energyShieldCurrentPercentMax", "lifeRegen", "manaRegen", "energyShieldRegen"],
         "render",      ["worldPosition", "gridPosition", "modelBounds", "terrainHeight"],
-        "animated",    ["id", "path", "animatedEntityPtr"],
+        "animated",    ["id", "animatedEntityPtr"],
         "positioned",  ["reaction", "isFriendly"],
-        "actor",       ["animationId", "activeSkillsCount", "cooldownsCount", "deployedCount", "firstActiveSkill", "firstCooldown"],
+        "actor",       ["animationId", "activeSkillsCount", "cooldownsCount", "deployedCount"],
         "stats",       ["currentWeaponIndex", "statsByItemsPtr", "statsByBuffAndActionsPtr"],
         "buffs",       ["statusCount", "effectsSampleCount", "flaskLikeCount", "timedEffectCount", "firstEffect"],
         "objectmagicproperties", ["totalMods", "implicitCount", "explicitCount", "enchantCount", "hellscapeCount", "crucibleCount", "statsFromModsCount"],
@@ -431,6 +431,10 @@ _ComponentSummaryKeys(canonicalName)
 ; is flattened into a "k=v, k=v" string — covers Render's worldPosition
 ; / gridPosition / modelBounds sub-Maps without us needing nested
 ; rendering in the UI.
+;
+; Garbage safety: strings that look like uninitialized memory get
+; replaced with a "— invalid memory" sentinel rather than rendering as
+; mojibake CJK glyphs. See _LooksLikeGarbageString for the heuristic.
 _ToJsonScalar(val)
 {
     if !IsSet(val)
@@ -444,7 +448,8 @@ _ToJsonScalar(val)
     {
         if (val = "")
             return ""
-        esc := StrReplace(val, "\", "\\")
+        cleaned := _LooksLikeGarbageString(val) ? "— invalid memory" : val
+        esc := StrReplace(cleaned, "\", "\\")
         esc := StrReplace(esc, '"', '\"')
         return '"' esc '"'
     }
@@ -461,7 +466,7 @@ _ToJsonScalar(val)
             else if (vt = "Float")
                 str := Format("{:.2f}", v)
             else if (vt = "String" && v != "")
-                str := v
+                str := _LooksLikeGarbageString(v) ? "— invalid" : v
             else
                 continue
             parts .= (first ? "" : ", ") . k . "=" . str
@@ -474,6 +479,36 @@ _ToJsonScalar(val)
         return '"' esc '"'
     }
     return ""
+}
+
+; Heuristic: does `s` look like uninitialized memory mis-read as a
+; wide string? Real PoE2 metadata strings are pure ASCII (paths,
+; mod names, etc.); decoder bugs and freed-after-use reads tend to
+; surface as random CJK ideographs, Private-Use-Area chars, or
+; control bytes. Flagging them up front keeps the inspector readable.
+_LooksLikeGarbageString(s)
+{
+    if !s
+        return false
+    ; Fast path: any character in the CJK ideograph or Unicode PUA
+    ; ranges is almost certainly garbage in this context.
+    if RegExMatch(s, "[\x{3400}-\x{9FFF}\x{E000}-\x{F8FF}]")
+        return true
+    ; Slower path: count "weird" chars (control bytes + anything past
+    ; Latin-1). >20% weird in a string of any length → garbage.
+    len := StrLen(s)
+    if (len = 0)
+        return false
+    weird := 0
+    Loop Parse, s
+    {
+        c := Ord(A_LoopField)
+        if (c < 0x20 && c != 9 && c != 10 && c != 13)
+            weird++
+        else if (c > 0xFF)
+            weird++
+    }
+    return (weird * 100 / len) > 20
 }
 
 ; Builds a JSON object of important UI element states.
