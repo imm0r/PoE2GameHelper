@@ -2239,6 +2239,282 @@
       color: var(--subtext)
     }
 
+    /* ═══════════════════════════════════════════════════════════════════
+       ENTITY INSPECTOR — rich C#-GameHelper-style view.
+       Lives inside #tab-entities-content alongside the legacy table; the
+       JS picks one renderer based on the data shape it receives.
+       ═══════════════════════════════════════════════════════════════════ */
+    .ei-root {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+    }
+    .ei-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px 10px;
+      background: linear-gradient(180deg, rgba(28,18,10,0.6), rgba(20,12,6,0.6));
+      border: 1px solid var(--codex-rule);
+      border-radius: 3px;
+    }
+    .ei-toolbar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ei-total {
+      font-family: var(--codex-display);
+      font-size: 11px;
+      letter-spacing: .1em;
+      color: var(--codex-gold-hi);
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .ei-total-count { color: var(--codex-text); }
+    .ei-filter {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex: 1 1 180px;
+      min-width: 0;
+    }
+    .ei-filter > label {
+      font-family: var(--codex-display);
+      font-size: 9px;
+      letter-spacing: .12em;
+      color: var(--codex-text-dim);
+      text-transform: uppercase;
+      flex-shrink: 0;
+      min-width: 38px;
+    }
+    .ei-filter > input, .ei-filter > select {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 3px 6px;
+      font-size: 11px;
+      background: rgba(20,12,6,0.7);
+      border: 1px solid var(--codex-rule);
+      color: var(--codex-text);
+      border-radius: 2px;
+    }
+    .ei-filter > input:focus, .ei-filter > select:focus {
+      outline: none;
+      border-color: var(--codex-gold);
+    }
+    .ei-list {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .ei-card {
+      background: linear-gradient(180deg, rgba(28,18,10,0.4), rgba(20,12,6,0.5));
+      border: 1px solid rgba(90,62,34,0.5);
+      border-radius: 2px;
+      transition: border-color .12s, background .12s;
+    }
+    .ei-card:hover {
+      border-color: rgba(200,168,90,0.45);
+    }
+    .ei-card.expanded {
+      border-color: var(--codex-gold);
+    }
+    .ei-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ei-caret {
+      width: 10px;
+      color: var(--codex-text-dim);
+      font-size: 9px;
+      flex-shrink: 0;
+      transition: transform .15s;
+    }
+    .ei-card.expanded .ei-caret { transform: rotate(90deg); }
+    .ei-head-id {
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      color: var(--codex-gold);
+      min-width: 42px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .ei-head-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 12px;
+      color: var(--codex-text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ei-head-path {
+      color: var(--codex-text-dim);
+      font-size: 10px;
+      font-family: 'Consolas', monospace;
+    }
+    .ei-head-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-shrink: 0;
+      font-size: 10px;
+      color: var(--codex-text-dim);
+    }
+    .ei-head-dist { min-width: 36px; text-align: right; }
+    .ei-card.dead .ei-head-name { color: var(--codex-text-dim); text-decoration: line-through; }
+    .ei-card.sleep .ei-head { opacity: 0.55; font-style: italic; }
+    .ei-body {
+      display: none;
+      padding: 6px 10px 10px 28px;
+      border-top: 1px solid rgba(90,62,34,0.35);
+    }
+    .ei-card.expanded .ei-body { display: block; }
+
+    .ei-section-title {
+      font-family: var(--codex-display);
+      font-size: 9px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--codex-gold);
+      margin: 8px 0 4px;
+      padding-bottom: 2px;
+      border-bottom: 1px solid rgba(90,62,34,0.4);
+    }
+    .ei-section-title:first-child { margin-top: 0; }
+
+    .ei-prop-row {
+      display: flex;
+      gap: 10px;
+      padding: 1px 0;
+      font-size: 11px;
+    }
+    .ei-prop-key {
+      flex: 0 0 130px;
+      color: var(--codex-text-dim);
+      font-family: var(--codex-display);
+      letter-spacing: .05em;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    .ei-prop-val {
+      flex: 1 1 auto;
+      color: var(--codex-text);
+      font-family: 'Consolas', monospace;
+      word-break: break-all;
+    }
+    .ei-prop-val.addr { color: #7ec07e; }
+    .ei-prop-val.muted { color: var(--codex-text-dim); }
+
+    .ei-comp-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 2px 0 2px 4px;
+      font-size: 11px;
+      font-family: 'Consolas', monospace;
+    }
+    .ei-comp-row.has-decoded {
+      cursor: pointer;
+      user-select: none;
+    }
+    .ei-comp-row.has-decoded:hover { background: rgba(200,168,90,0.06); }
+    .ei-comp-caret {
+      width: 9px;
+      color: var(--codex-text-dim);
+      flex-shrink: 0;
+      font-size: 8px;
+      transition: transform .12s;
+    }
+    /* Rows that have a lazy-fetch available should still show the caret
+       as an affordance — only show the visually-hidden caret for rows
+       we KNOW can't be expanded (lazy already returned empty). */
+    .ei-comp-row.no-decoded.lazy-pending .ei-comp-caret { color: var(--codex-gold); }
+    .ei-comp-row.no-decoded:not(.lazy-pending):not(.loading) .ei-comp-caret { visibility: hidden; }
+    .ei-comp-row.loading .ei-comp-caret { color: var(--codex-text-dim); }
+    .ei-comp-row.expanded .ei-comp-caret { transform: rotate(90deg); }
+    .ei-comp-name { color: var(--codex-text); min-width: 130px; }
+    .ei-comp-row.no-decoded .ei-comp-name { color: var(--codex-text-dim); }
+    .ei-comp-row.lazy-pending { cursor: pointer; }
+    .ei-comp-row.lazy-pending:hover { background: rgba(200,168,90,0.06); }
+    .ei-comp-addr { color: #7ec07e; font-size: 10px; }
+
+    .ei-comp-hint {
+      font-size: 9px;
+      font-family: var(--codex-display);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      margin-left: auto;
+      padding-right: 6px;
+    }
+    .ei-comp-hint.radar { color: var(--codex-gold); opacity: 0.65; }
+    .ei-comp-hint.loading { color: var(--codex-gold-hi); }
+    .ei-comp-hint.empty { color: var(--codex-text-dim); opacity: 0.5; font-style: italic; }
+
+    .ei-comp-decoded {
+      display: none;
+      margin-left: 18px;
+      padding: 3px 6px 5px;
+      border-left: 1px solid rgba(90,62,34,0.5);
+    }
+    .ei-comp-row.expanded + .ei-comp-decoded { display: block; }
+    .ei-comp-decoded .ei-prop-row { font-size: 10px; }
+    .ei-comp-decoded .ei-prop-key { flex-basis: 160px; }
+    /* Subtle "this came from the lazy path, not the snapshot" marker */
+    .ei-decoded-source {
+      font-size: 8px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--codex-gold);
+      opacity: 0.55;
+      margin-bottom: 3px;
+    }
+
+    /* Boolean prettify — small coloured dot beside the yes/no glyph */
+    .ei-prop-val.bool-yes { color: #7ec07e; }
+    .ei-prop-val.bool-no  { color: #d68a8a; }
+
+    .ei-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .ei-btn {
+      padding: 3px 9px;
+      font-family: var(--codex-display);
+      font-size: 9px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      background: rgba(28,18,10,0.85);
+      border: 1px solid var(--codex-rule);
+      color: var(--codex-text-dim);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: border-color .12s, color .12s, background .12s;
+    }
+    .ei-btn:hover {
+      border-color: var(--codex-gold);
+      color: var(--codex-gold-hi);
+    }
+    .ei-btn.active {
+      border-color: var(--codex-gold);
+      color: var(--codex-gold-hi);
+      background: linear-gradient(180deg, rgba(60,40,16,0.85), rgba(40,24,8,0.95));
+    }
+
+    .ei-empty {
+      padding: 20px;
+      text-align: center;
+      color: var(--codex-text-dim);
+      font-style: italic;
+    }
+
     /* JSON VIEWER */
     .json-viewer {
       padding: 10px 12px
@@ -6280,38 +6556,330 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  ENTITY INSPECTOR
+    // ═══════════════════════════════════════════════════════════════════
+    // The serializer emits { total, items: [...] }; we cache the last
+    // payload so re-rendering on filter/expand input is instant without
+    // waiting for the next AHK snapshot tick. The filter values + the
+    // set of currently-expanded entity addresses live on window so they
+    // survive re-renders triggered by snapshot pushes.
+    window._eiState = window._eiState || {
+      items: [],
+      filters: { id: '', path: '', type: 'all', state: 'all' },
+      expanded: new Set(),
+      compExpanded: new Set(),  // keys are `<entityAddr>::<componentName>`
+      // Lazy-decode cache. Keys are `<entityAddr>::<componentName>`,
+      // values are { loading: bool, data: object|null }. Survives
+      // snapshot pushes so a row stays expanded after the next tick.
+      lazyDecoded: new Map()
+    };
+
     function updateEntities(jsonStr) {
-      const el = document.getElementById('tab-entities-content'); if (!el) return;
+      const el = document.getElementById('tab-entities-content');
+      if (!el) return;
       let data; try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; } catch (e) { return; }
-      if (!Array.isArray(data) || data.length === 0) { el.innerHTML = '<div class="no-data-msg">No entities in range</div>'; return; }
-      const rc = r => { const s = String(r || '').toLowerCase(); return s.includes('boss') || s.includes('unique') ? 'rarity-boss' : s.includes('rare') ? 'rarity-rare' : s.includes('magic') ? 'rarity-magic' : 'rarity-normal'; };
-      const _eIcon = t => ({ Player: '👤', Minion: '🐾', Enemy: '⚔️', Boss: '💀', NPC: '🧑', Chest: '📦', WorldItem: '💎', AreaTransition: '🚪', Waypoint: '🚩', Checkpoint: '✅', Projectile: '💨', Terrain: '🏔️', Object: '📍' }[t] || '📍');
-      const sorted = [...data].sort((a, b) => {
+      // Accept both new { total, items } and legacy bare-array shapes
+      const items = Array.isArray(data) ? data : (data && Array.isArray(data.items) ? data.items : []);
+      window._eiState.items = items;
+      // Prune expanded sets to entries that still exist, so an entity
+      // leaving range doesn't leave a dangling expansion record.
+      const liveAddrs = new Set(items.map(e => e.addr));
+      window._eiState.expanded = new Set([...window._eiState.expanded].filter(a => liveAddrs.has(a)));
+      window._eiState.compExpanded = new Set(
+        [...window._eiState.compExpanded].filter(k => liveAddrs.has(k.split('::')[0]))
+      );
+      // Drop lazy-decoded cache for entities that left range
+      for (const key of [...window._eiState.lazyDecoded.keys()]) {
+        if (!liveAddrs.has(key.split('::')[0]))
+          window._eiState.lazyDecoded.delete(key);
+      }
+      eiRender();
+    }
+
+    // Re-renders the inspector from the cached payload + current filter state.
+    // Called both on snapshot push and on filter input.
+    function eiRender() {
+      const el = document.getElementById('tab-entities-content');
+      if (!el) return;
+      const st = window._eiState;
+      const { id: fId, path: fPath, type: fType, state: fState } = st.filters;
+      const lowId = fId.toLowerCase().trim();
+      const lowPath = fPath.toLowerCase().trim();
+
+      // Sort: bosses + transitions + named landmarks first, then nearest distance
+      const sorted = [...st.items].sort((a, b) => {
         const typeOrder = { Boss: 0, AreaTransition: 1, Waypoint: 2, Checkpoint: 3, NPC: 4 };
         const ta = typeOrder[a.type] ?? 99, tb = typeOrder[b.type] ?? 99;
         if (ta !== tb) return ta - tb;
         return (a.dist >= 0 ? a.dist : 9999) - (b.dist >= 0 ? b.dist : 9999);
       });
-      const sleeping = sorted.filter(e => e.sleep === true);
-      const awake = sorted.filter(e => e.sleep !== true);
-      const alive = awake.filter(e => e.alive !== false);
-      const dead = awake.filter(e => e.alive === false);
-      const makeRow = (e, cls) => {
-        const life = e.life >= 0 ? e.life : null;
-        const lifeHtml = life !== null
-          ? `<div class="life-bar-wrap"><div class="life-bar"><div class="life-bar-fill${life < 25 ? ' low' : ''}" style="width:${Math.min(100, life)}%"></div></div><span class="life-pct">${life}%</span></div>`
-          : '<span class="life-pct">—</span>';
-        const rarClass = rc(e.rarity);
-        const icon = `<span class="entity-icon">${_eIcon(e.type)}</span>`;
-        const typeBadge = e.type ? `<span class="etype-badge etype-${escHtml(e.type)}">${escHtml(e.type)}</span>` : '';
-        const displayName = escHtml(e.name || e.path || '?');
-        const isTracked = e.path && e.path === _trackedEntityPath;
-        const cbHtml = `<td class="track-td" onclick="event.stopPropagation()"><input type="checkbox" class="track-cb" ${isTracked ? 'checked' : ''} onchange="trackEntity(this,'${escAttr(e.path || '')}')"></td>`;
-        return `<tr class="${cls}" onclick="entityRowClick(event,'${escAttr(e.path || '')}')">${cbHtml}<td data-tip="${escHtml(e.path || '')}">${icon}${typeBadge}${displayName}</td><td class="${rarClass}">${escHtml(String(e.rarity || 'Normal'))}</td><td>${lifeHtml}</td><td>${e.dist >= 0 ? e.dist + 'm' : '—'}</td></tr>`;
-      };
-      const rows = [...alive.map(e => makeRow(e, '')), ...dead.map(e => makeRow(e, 'dead')), ...sleeping.map(e => makeRow(e, 'entity-sleep'))].join('');
-      const sleepLabel = sleeping.length > 0 ? ` · ${sleeping.length} sleeping` : '';
-      el.innerHTML = `<div class="entity-header"><span class="entity-count">${alive.length} alive · ${dead.length} dead${sleepLabel}</span></div><table class="entity-table"><thead><tr><th class="track-th">🎯</th><th>Name</th><th>Rarity</th><th>Life</th><th>Dist</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+      const filtered = sorted.filter(e => {
+        if (lowId && String(e.id || '').indexOf(lowId) === -1) return false;
+        if (lowPath && String(e.path || '').toLowerCase().indexOf(lowPath) === -1) return false;
+        if (fType !== 'all' && e.type !== fType) return false;
+        if (fState === 'awake' && e.sleep === true) return false;
+        if (fState === 'sleeping' && e.sleep !== true) return false;
+        if (fState === 'dead' && e.alive !== false) return false;
+        if (fState === 'alive' && (e.sleep === true || e.alive === false)) return false;
+        return true;
+      });
+
+      // Build the unique type list from the live snapshot so the dropdown
+      // only ever offers types the user can actually see right now.
+      const typesPresent = [...new Set(st.items.map(e => e.type).filter(Boolean))].sort();
+
+      const cards = filtered.map(eiCard).join('');
+      const body = cards || '<div class="ei-empty">No entities match the current filters.</div>';
+
+      el.innerHTML = `
+        <div class="ei-root">
+          <div class="ei-toolbar">
+            <div class="ei-toolbar-row">
+              <span class="ei-total">Total: <span class="ei-total-count">${st.items.length}</span>${filtered.length !== st.items.length ? ` · <span class="ei-total-count">${filtered.length}</span> shown` : ''}</span>
+              <div class="ei-filter"><label>Id</label><input id="ei-f-id" type="text" placeholder="…" value="${escAttr(fId)}" oninput="eiFilterChange('id', this.value)"></div>
+              <div class="ei-filter"><label>Path</label><input id="ei-f-path" type="text" placeholder="metadata/…" value="${escAttr(fPath)}" oninput="eiFilterChange('path', this.value)"></div>
+            </div>
+            <div class="ei-toolbar-row">
+              <div class="ei-filter"><label>Type</label><select id="ei-f-type" onchange="eiFilterChange('type', this.value)">
+                <option value="all">All</option>
+                ${typesPresent.map(t => `<option value="${escAttr(t)}"${t === fType ? ' selected' : ''}>${escHtml(t)}</option>`).join('')}
+              </select></div>
+              <div class="ei-filter"><label>State</label><select id="ei-f-state" onchange="eiFilterChange('state', this.value)">
+                <option value="all"${fState === 'all' ? ' selected' : ''}>All</option>
+                <option value="awake"${fState === 'awake' ? ' selected' : ''}>Awake</option>
+                <option value="sleeping"${fState === 'sleeping' ? ' selected' : ''}>Sleeping</option>
+                <option value="alive"${fState === 'alive' ? ' selected' : ''}>Alive</option>
+                <option value="dead"${fState === 'dead' ? ' selected' : ''}>Dead</option>
+              </select></div>
+            </div>
+          </div>
+          <div class="ei-list">${body}</div>
+        </div>
+      `;
+    }
+
+    // One entity card. Expanded vs collapsed is driven by the global Set
+    // so re-renders preserve user state without round-tripping the DOM.
+    function eiCard(e) {
+      const expanded = window._eiState.expanded.has(e.addr);
+      const klass = ['ei-card'];
+      if (expanded) klass.push('expanded');
+      if (e.alive === false) klass.push('dead');
+      if (e.sleep === true) klass.push('sleep');
+      const shortName = escHtml(e.name || e.path || '?');
+      const pathTail = e.path ? escHtml('… ' + String(e.path).split('/').slice(-2).join('/')) : '';
+      const lifeStr = (e.life !== undefined && e.life >= 0) ? `${e.life}%` : '';
+      const distStr = (e.dist !== undefined && e.dist >= 0) ? `${e.dist}m` : '';
+      const meta = [
+        lifeStr ? `<span class="ei-head-life">${lifeStr}</span>` : '',
+        distStr ? `<span class="ei-head-dist">${distStr}</span>` : ''
+      ].filter(Boolean).join('');
+      const body = expanded ? eiBody(e) : '';
+      return `
+        <div class="${klass.join(' ')}" data-addr="${escAttr(e.addr)}">
+          <div class="ei-head" onclick="eiToggle('${escAttr(e.addr)}')">
+            <span class="ei-caret">▶</span>
+            <span class="ei-head-id">#${e.id ?? '?'}</span>
+            <span class="ei-head-name">${shortName} <span class="ei-head-path">${pathTail}</span></span>
+            <span class="ei-head-meta">${meta}</span>
+          </div>
+          <div class="ei-body">${body}</div>
+        </div>
+      `;
+    }
+
+    function eiBody(e) {
+      const props = [
+        ['Address',  `<span class="ei-prop-val addr">${escHtml(e.addr || '')}</span>`],
+        ['Id',       `<span class="ei-prop-val">${e.id ?? '—'}</span>`],
+        ['Path',     `<span class="ei-prop-val">${escHtml(e.path || '—')}</span>`],
+        ['Type',     `<span class="ei-prop-val">${escHtml(e.type || '—')}</span>`],
+        ['State',    `<span class="ei-prop-val">${escHtml(e.state || (e.sleep ? 'Sleeping' : 'Awake'))}</span>`],
+        ['Rarity',   `<span class="ei-prop-val">${escHtml(e.rarity || 'Normal')}${e.rarityId !== undefined ? ` <span class="muted">(id=${e.rarityId})</span>` : ''}</span>`],
+        ['Alive',    `<span class="ei-prop-val">${e.alive === false ? 'no' : 'yes'}</span>`],
+        ['Life',     `<span class="ei-prop-val">${e.life >= 0 ? e.life + '%' : '—'}</span>`],
+        ['Distance', `<span class="ei-prop-val">${e.dist >= 0 ? e.dist + 'm' : '—'}</span>`],
+        ['Components', `<span class="ei-prop-val">${e.componentCount ?? '?'}${e.namedComponentCount !== undefined ? ` (${e.namedComponentCount} named)` : ''}</span>`]
+      ];
+      const propsHtml = props.map(([k, v]) =>
+        `<div class="ei-prop-row"><span class="ei-prop-key">${k}</span>${v}</div>`
+      ).join('');
+
+      const comps = Array.isArray(e.components) ? e.components : [];
+      const compsHtml = comps.length
+        ? comps.map(c => eiComponentRow(e.addr, c)).join('')
+        : '<div class="ei-prop-val muted" style="padding:4px 0">No components reported.</div>';
+
+      const isTracked = e.path && e.path === _trackedEntityPath;
+      return `
+        <div class="ei-section-title">Properties</div>
+        ${propsHtml}
+        <div class="ei-section-title">Components (${comps.length})</div>
+        ${compsHtml}
+        <div class="ei-actions">
+          <button class="ei-btn${isTracked ? ' active' : ''}" onclick="eiToggleTrack(event, '${escAttr(e.path || '')}')">${isTracked ? '👁  Tracking' : '👁  Show in game'}</button>
+          <button class="ei-btn" onclick="eiCopyJson(event, '${escAttr(e.addr)}')">📋 Copy JSON</button>
+        </div>
+      `;
+    }
+
+    // Fields whose 0/1 value should render as a friendly yes/no marker.
+    // AHK has no native bool — decoders return integer flags — so the
+    // serializer can't tell ints from bools. Naming convention covers
+    // it: any decoded field starting with `is`, `has`, `can`, or
+    // matching `dies*`, `meets*`, `needs*` is treated as boolean.
+    function eiLooksBoolean(key) {
+      return /^(is|has|can|dies|meets|needs)[A-Z]/.test(key);
+    }
+    function eiPrettyValue(key, val) {
+      if (eiLooksBoolean(key)) {
+        if (val === 1 || val === '1' || val === true)  return '✓ yes';
+        if (val === 0 || val === '0' || val === false) return '✗ no';
+      }
+      return String(val);
+    }
+    function eiPrettyValueClass(key, val) {
+      if (eiLooksBoolean(key)) {
+        if (val === 1 || val === '1' || val === true)  return 'bool-yes';
+        if (val === 0 || val === '0' || val === false) return 'bool-no';
+      }
+      return '';
+    }
+
+    function eiComponentRow(entityAddr, c) {
+      const lazy = window._eiState.lazyDecoded.get(entityAddr + '::' + c.name);
+      // Three states per component row:
+      //   has-decoded   — server pushed a non-empty summary in the snapshot
+      //   lazy-decoded  — empty in snapshot, but the user clicked and we
+      //                   fetched the full decode on demand
+      //   no-decoded    — no data, no lazy fetch fired yet → click to
+      //                   trigger one (shows "📡 click to decode" hint)
+      let decoded = (c.decoded && typeof c.decoded === 'object') ? c.decoded : null;
+      let source = 'snapshot';
+      if ((!decoded || !Object.keys(decoded).length) && lazy && lazy.data && Object.keys(lazy.data).length) {
+        decoded = lazy.data;
+        source = 'lazy';
+      }
+      const hasDecoded = decoded && Object.keys(decoded).length > 0;
+      const isLoading = lazy && lazy.loading;
+      const lazyTried = lazy && (lazy.data !== undefined);
+
+      const key = entityAddr + '::' + c.name;
+      const expanded = hasDecoded && window._eiState.compExpanded.has(key);
+      const klass = ['ei-comp-row'];
+      klass.push(hasDecoded ? 'has-decoded' : 'no-decoded');
+      if (expanded) klass.push('expanded');
+      if (isLoading) klass.push('loading');
+      if (source === 'lazy') klass.push('lazy-decoded');
+
+      // Click semantics:
+      //   has-decoded → toggle expansion
+      //   no-decoded + no fetch tried yet → fire lazy fetch
+      //   loading or already-tried-empty → inert (no action)
+      let onclick = '';
+      if (hasDecoded) {
+        onclick = ` onclick="eiToggleComp('${escAttr(entityAddr)}','${escAttr(c.name)}')"`;
+      } else if (!isLoading && !lazyTried) {
+        onclick = ` onclick="eiLazyDecode('${escAttr(entityAddr)}','${escAttr(c.name)}','${escAttr(c.addr || '')}')"`;
+        klass.push('lazy-pending');
+      }
+
+      let decodedHtml = '';
+      if (hasDecoded) {
+        const rows = Object.entries(decoded).map(([k, v]) => {
+          const valClass = eiPrettyValueClass(k, v);
+          return `<div class="ei-prop-row"><span class="ei-prop-key">${escHtml(k)}</span><span class="ei-prop-val${valClass ? ' ' + valClass : ''}">${escHtml(eiPrettyValue(k, v))}</span></div>`;
+        }).join('');
+        const sourceTag = source === 'lazy' ? '<div class="ei-decoded-source">lazy-fetched</div>' : '';
+        decodedHtml = `<div class="ei-comp-decoded">${sourceTag}${rows}</div>`;
+      }
+
+      // Hint label (right of the address) communicates why a row isn't
+      // expanded — radar fast-path, loading, decoder ran but came up empty.
+      let hint = '';
+      if (isLoading) {
+        hint = '<span class="ei-comp-hint loading">⏳ decoding…</span>';
+      } else if (!hasDecoded && lazyTried) {
+        hint = '<span class="ei-comp-hint empty">— no decoded data</span>';
+      } else if (!hasDecoded) {
+        hint = '<span class="ei-comp-hint radar">📡 click to decode</span>';
+      }
+
+      return `
+        <div class="${klass.join(' ')}"${onclick}>
+          <span class="ei-comp-caret">▶</span>
+          <span class="ei-comp-name">${escHtml(c.name)}</span>
+          <span class="ei-comp-addr">${escHtml(c.addr || '')}</span>
+          ${hint}
+        </div>
+        ${decodedHtml}
+      `;
+    }
+
+    function eiToggle(addr) {
+      const set = window._eiState.expanded;
+      if (set.has(addr)) set.delete(addr); else set.add(addr);
+      eiRender();
+    }
+    function eiToggleComp(addr, name) {
+      const set = window._eiState.compExpanded;
+      const key = addr + '::' + name;
+      if (set.has(key)) set.delete(key); else set.add(key);
+      eiRender();
+    }
+    // Fire a lazy decode for one component on demand. Marks the row
+    // as loading immediately, then waits for eiApplyDecodedComponent
+    // to land. After the result arrives we also auto-expand the row
+    // so the user sees the data without a second click.
+    function eiLazyDecode(entityAddr, compName, compAddr) {
+      const key = entityAddr + '::' + compName;
+      window._eiState.lazyDecoded.set(key, { loading: true, data: undefined });
+      ahkCall('DecodeComponent', entityAddr, compName, compAddr);
+      eiRender();
+    }
+    // Called from AHK via WebViewExec("eiApplyDecodedComponent(addr,name,obj)").
+    // The third arg comes through as a JSON object literal (or `null`
+    // when the decoder ran but had nothing to add).
+    function eiApplyDecodedComponent(entityAddr, compName, decoded) {
+      const key = entityAddr + '::' + compName;
+      const data = (decoded && typeof decoded === 'object') ? decoded : {};
+      window._eiState.lazyDecoded.set(key, { loading: false, data: data });
+      // Auto-expand if the lazy fetch returned anything useful, so the
+      // user doesn't have to click a second time after the await.
+      if (Object.keys(data).length > 0)
+        window._eiState.compExpanded.add(key);
+      eiRender();
+    }
+    function eiFilterChange(which, value) {
+      window._eiState.filters[which] = value;
+      eiRender();
+    }
+    function eiToggleTrack(ev, path) {
+      ev.stopPropagation();
+      if (!path) return;
+      if (_trackedEntityPath === path) {
+        _trackedEntityPath = '';
+        ahkCall('ClearEntityHighlight');
+      } else {
+        _trackedEntityPath = path;
+        ahkCall('HighlightEntity', path);
+      }
+      eiRender();
+    }
+    function eiCopyJson(ev, addr) {
+      ev.stopPropagation();
+      const item = (window._eiState.items || []).find(x => x.addr === addr);
+      if (!item) return;
+      const json = JSON.stringify(item, null, 2);
+      try { navigator.clipboard.writeText(json); } catch (e) {}
+      const btn = ev.currentTarget;
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        setTimeout(() => { btn.textContent = orig; }, 1200);
+      }
     }
 
     function updateUIState(jsonStr) {

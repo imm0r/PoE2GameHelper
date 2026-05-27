@@ -91,6 +91,14 @@ _DispatchBridgeCall(method, args)
             g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
         case "ClearEntityHighlight":
             g_highlightedEntityPath := ""
+        case "DecodeComponent":
+            ; Lazy-decode a single component for the Entity Inspector. The
+            ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine
+            ; etc. for cost reasons; this handler runs the full decoder
+            ; on request when the user expands an undecoded row.
+            ; args: [entityAddrHex, componentName, componentAddrHex]
+            if (args.Length >= 3)
+                SetTimer(() => _DecodeComponentOnDemand(args[1], args[2], args[3]), -1)
         case "ToggleZoneNav":
             global g_zoneNavEnabled
             g_zoneNavEnabled := !g_zoneNavEnabled
