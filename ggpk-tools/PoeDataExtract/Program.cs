@@ -77,9 +77,15 @@ internal static class Program
             "monsternames"   or "monstervarieties"   => new MonsterNames(),
             "statnames"      or "stats"              => new StatNames(),
             "mods"           or "modnamemap"         => new Mods(),
+            "mapmods"        or "areamods"           => new MapMods(),
             "uniquenames"    or "uniqueitemnamemap"  => new UniqueNames(),
             _ => throw new ArgumentException($"Unknown table: {opts.Table}"),
         };
+        // Optional --mod-domain N override for MapMods. Lets the user
+        // re-run the same extractor pointing at a different ModDomain
+        // bucket (FLASK=2, ATLAS=11, HEIST_AREA=22, …) without a rebuild.
+        if (extractor is MapMods mapMods && opts.ModDomain is int d)
+            mapMods.DomainFilter = d;
         extractor.Run(ggpk.Index, opts.OutputPath);
         Console.Out.WriteLine($"OK — wrote {opts.OutputPath}");
         return 0;
@@ -265,32 +271,39 @@ internal static class Program
         return 0;
     }
 
-    private sealed record Options(string GgpkPath, string Table, string? OutputPath);
+    private sealed record Options(string GgpkPath, string Table, string? OutputPath, int? ModDomain);
 
     private static Options? ParseArgs(ReadOnlySpan<string> args)
     {
         string? ggpk = null, table = null, output = null;
+        int? modDomain = null;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--ggpk":   if (++i < args.Length) ggpk   = args[i]; break;
-                case "--table":  if (++i < args.Length) table  = args[i]; break;
-                case "--output": if (++i < args.Length) output = args[i]; break;
+                case "--ggpk":       if (++i < args.Length) ggpk   = args[i]; break;
+                case "--table":      if (++i < args.Length) table  = args[i]; break;
+                case "--output":     if (++i < args.Length) output = args[i]; break;
+                // --mod-domain only meaningful for the MapMods extractor;
+                // ignored elsewhere. Allows the same extractor binary to
+                // pull a different ModDomain bucket without a rebuild.
+                case "--mod-domain": if (++i < args.Length && int.TryParse(args[i], out var d)) modDomain = d; break;
             }
         }
         if (ggpk is null || table is null) return null;
-        return new Options(ggpk, table, output);
+        return new Options(ggpk, table, output, modDomain);
     }
 
     private static int Fail(string msg, int code) { Console.Error.WriteLine(msg); return code; }
 
     private static void PrintUsage()
     {
-        Console.Error.WriteLine("usage: poe-data-extract extract --ggpk <path> --table <Name> --output <out.tsv>");
+        Console.Error.WriteLine("usage: poe-data-extract extract --ggpk <path> --table <Name> --output <out.tsv> [--mod-domain <N>]");
         Console.Error.WriteLine("       poe-data-extract inspect --ggpk <path> --table <Name> [--output <dump.txt>]");
         Console.Error.WriteLine("       poe-data-extract ls      --ggpk <path> --match <substr> [--output <list.txt>]");
-        Console.Error.WriteLine("       known tables (extract): BaseItemTypes");
+        Console.Error.WriteLine("       poe-data-extract cat     --ggpk <path> --path <internal/path> [--output <file>]");
+        Console.Error.WriteLine("       known tables (extract): BaseItemTypes, MonsterNames, StatNames, Mods, MapMods, UniqueNames");
+        Console.Error.WriteLine("       --mod-domain only applies to MapMods (default 5 = AREA / map mods)");
         Console.Error.WriteLine("       <path> = either Content.ggpk or Bundles2/_.index.bin");
     }
 }
