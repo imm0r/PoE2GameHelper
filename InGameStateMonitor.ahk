@@ -39,7 +39,7 @@ Wenn Sie neue Funktionen anlegen, sollten diese vorab immer mit 2 bis 3 Zeilen k
 Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen und dem bisherigen allgemeinen style folgen.
 */
 
-GAMEHELPER_VERSION := "0.4.12.1"
+GAMEHELPER_VERSION := "0.4.12.2"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
