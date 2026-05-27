@@ -393,46 +393,53 @@ _SerializeComponentSummary(name, data)
     return (first ? "" : out)   ; "" if nothing whitelisted matched
 }
 
-; Curated per-component whitelist of scalar fields worth surfacing. Keys
-; are the lowercase canonical names PoE2EntityReader writes into the
-; decodedComponents Map (life, positioned, …). Adding a new component
-; here exposes it in the entity inspector.
+; Curated per-component whitelist of fields worth surfacing in the
+; entity inspector. Keys are the lowercase canonical names PoE2EntityReader
+; writes into the decodedComponents Map, values are field names exactly
+; as the corresponding decoder in PoE2ComponentDecoders.ahk emits them.
+; Adding a new component just means a new entry here.
 _ComponentSummaryKeys(canonicalName)
 {
     static keysByComponent := Map(
-        "life",        ["isAlive", "lifeCurrentValue", "lifeCurrentPercentMax", "manaCurrentValue", "energyShieldCurrentValue"],
-        "render",      ["entityName"],
-        "animated",    ["animationPath", "currentAnimation"],
-        "positioned",  ["worldPosX", "worldPosY", "gridPosX", "gridPosY", "size", "reaction"],
-        "actor",       ["currentAction", "animationId"],
-        "stats",       ["statsCount"],
-        "buffs",       ["buffCount"],
-        "objectmagicproperties", ["rarityId", "modCount"],
-        "targetable",  ["isTargetable"],
-        "diesaftertime", ["timeLeft"],
-        "pathfinding", ["isMoving", "destinationX", "destinationY"],
-        "chest",       ["isOpened", "isStrongbox"],
+        "life",        ["isAlive", "lifeCurrentPercentMax", "manaCurrentPercentMax", "energyShieldCurrentPercentMax", "lifeRegen", "manaRegen", "energyShieldRegen"],
+        "render",      ["worldPosition", "gridPosition", "modelBounds", "terrainHeight"],
+        "animated",    ["id", "path", "animatedEntityPtr"],
+        "positioned",  ["reaction", "isFriendly"],
+        "actor",       ["animationId", "activeSkillsCount", "cooldownsCount", "deployedCount", "firstActiveSkill", "firstCooldown"],
+        "stats",       ["currentWeaponIndex", "statsByItemsPtr", "statsByBuffAndActionsPtr"],
+        "buffs",       ["statusCount", "effectsSampleCount", "flaskLikeCount", "timedEffectCount", "firstEffect"],
+        "objectmagicproperties", ["totalMods", "implicitCount", "explicitCount", "enchantCount", "hellscapeCount", "crucibleCount", "statsFromModsCount"],
+        "targetable",  ["isTargetable", "isHighlightable", "isTargetedByPlayer", "meetsQuestState"],
+        "diesaftertime", ["diesAfterTime", "ownerEntityPtr", "staticPtr"],
+        "chest",       ["isOpened", "isStrongbox", "isLocked"],
         "shrine",      ["isAvailable"],
         "minimapicon", ["iconName", "isHide"],
-        "statemachine", ["currentState"],
+        "statemachine", ["currentState", "stateCount"],
         "transitionable", ["currentState"],
-        "charges",     ["currentCharges", "maxCharges"],
-        "mods",        ["modCount"],
+        "charges",     ["current", "perUse", "remainingUses"],
+        "mods",        ["implicitCount", "explicitCount", "totalMods"],
         "npc",         ["npcName"]
     )
     return keysByComponent.Has(canonicalName) ? keysByComponent[canonicalName] : []
 }
 
 ; Converts an AHK value to a JSON-encoded scalar. Returns "" for things we
-; don't want to inline (objects/arrays/empty strings) so the caller can
+; don't want to inline (deep arrays, empty strings) so the caller can
 ; skip the key entirely.
+;
+; Special-cased: a Map containing only scalar (Int/Float/String) values
+; is flattened into a "k=v, k=v" string — covers Render's worldPosition
+; / gridPosition / modelBounds sub-Maps without us needing nested
+; rendering in the UI.
 _ToJsonScalar(val)
 {
     if !IsSet(val)
         return ""
     t := Type(val)
-    if (t = "Integer" || t = "Float")
+    if (t = "Integer")
         return String(val)
+    if (t = "Float")
+        return Format("{:.3f}", val)
     if (t = "String")
     {
         if (val = "")
@@ -441,7 +448,31 @@ _ToJsonScalar(val)
         esc := StrReplace(esc, '"', '\"')
         return '"' esc '"'
     }
-    ; Bool isn't a distinct type in AHK v2 — true/false reach here as 1/0 Ints
+    if (t = "Map")
+    {
+        parts := ""
+        first := true
+        for k, v in val
+        {
+            ; Skip nested non-scalar values — keeps the flattened string short.
+            vt := Type(v)
+            if (vt = "Integer")
+                str := String(v)
+            else if (vt = "Float")
+                str := Format("{:.2f}", v)
+            else if (vt = "String" && v != "")
+                str := v
+            else
+                continue
+            parts .= (first ? "" : ", ") . k . "=" . str
+            first := false
+        }
+        if (parts = "")
+            return ""
+        esc := StrReplace(parts, "\", "\\")
+        esc := StrReplace(esc, '"', '\"')
+        return '"' esc '"'
+    }
     return ""
 }
 
