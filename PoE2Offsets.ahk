@@ -189,8 +189,8 @@ class PoE2Offsets
         "ActiveSkillsLast", 0xB10,
         "Cooldowns", 0xB20,           ; CooldownsPtr StdVector start
         "CooldownsLast", 0xB28,
-        "DeployedEntities", 0xC10,
-        "DeployedEntitiesLast", 0xC18
+        "DeployedEntities", 0xCF8,    ; DeployedEntityArray StdVector start
+        "DeployedEntitiesLast", 0xD00
     )
 
     static ActiveSkillStructure := Map(
@@ -200,9 +200,10 @@ class PoE2Offsets
     static ActiveSkillDetails := Map(
         "UseStage", 0x08,
         "CastType", 0x0C,
-        "UnknownIdAndEquipmentInfo", 0x10,
-        "GrantedEffectsPerLevelDatRow", 0x18,
-        "GrantedEffectStatSetsPerLevelDatRow", 0x30,
+        "ActiveSkillsDatPtr", 0x20,                  ; direct pointer to the ActiveSkills DAT row (currently unused)
+        "UnknownIdAndEquipmentInfo", 0x40,
+        "GrantedEffectsPerLevelDatRow", 0x48,
+        "GrantedEffectStatSetsPerLevelDatRow", 0x50,
         "TotalUses", 0x98,
         "TotalCooldownTimeInMs", 0xA8
     )
