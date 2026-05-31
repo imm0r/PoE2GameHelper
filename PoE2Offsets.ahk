@@ -9,7 +9,8 @@ class PoE2Offsets
 
     static InGameState := Map(
         "AreaInstanceData", 0x290,
-        "WorldData", 0x308,
+        "GameUiPtr", 0x2F0,          ; currently unused; GameUi also reachable via UiRootStruct (0xBE0)
+        "WorldData", 0x368,
         "UiRootStructPtr", 0x340
     )
 
