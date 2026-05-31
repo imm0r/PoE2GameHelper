@@ -1564,7 +1564,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             return vis
 
         flagsOffset := PoE2Offsets.UiElementBase["Flags"]
-        knownAlwaysVisible := Map(0x5C0, true, 0x6B0, true, 0x748, true, 0xAA8, true)
+        knownAlwaysVisible := Map(0x640, true, 0x6B0, true, 0x748, true, 0xAA8, true)
         newlyVisCount := 0
         newlyHidCount := 0
         currentVisCount := 0
