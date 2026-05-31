@@ -13,6 +13,13 @@ class PoE2Offsets
         "UiRootStructPtr", 0x340
     )
 
+    ; Fields within the AreaLoadingState game-state struct (StateNames[1]).
+    static AreaLoadingState := Map(
+        "IsLoading", 0x770,                  ; int — non-zero while an area is loading
+        "TotalLoadingScreenTimeMs", 0xEC0,   ; uint — cumulative loading-screen time (unconfirmed)
+        "CurrentAreaDetailsPtr", 0xF40       ; IntPtr — details of the area being loaded
+    )
+
     static UiRootStruct := Map(
         "UiRootPtr", 0x5B8,
         "GameUiPtr", 0xBE0,
