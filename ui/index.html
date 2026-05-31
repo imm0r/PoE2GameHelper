@@ -4952,6 +4952,7 @@
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
+        <button class="hk-btn" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
         <span class="hk-hint">Capture a key: click the key button, then press any key / mouse button.</span>
       </div>
       <div id="hk-groups" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'group',0,0)"><div class="hk-empty">Loading hotkeys…</div></div>
@@ -5219,6 +5220,7 @@
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-spacer"></span>
             <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
+            <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
             <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
           <div class="hk-group-body" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'hotkey',${gi},0)">${body}</div>
@@ -5242,6 +5244,7 @@
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
             <span class="hk-id">ID #${hk.id}</span>
+            <span class="hk-id" style="color:var(--text)">Hotkey:</span>
             <button class="hk-btn hk-key-btn" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
             <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
@@ -5276,6 +5279,7 @@
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
             <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+            <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
           </div>
         </div>`;
     }
@@ -5299,6 +5303,30 @@
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
 
+    // Builds <option>s listing every hotkey across all groups, for the chain
+    // action's target picker. curId is the currently-selected hotkey id.
+    function hkHotkeyOptions(curId) {
+      let opts = `<option value="0"${!curId || +curId === 0 ? ' selected' : ''}>— select hotkey —</option>`;
+      hkConfig.forEach(g => {
+        (g.hotkeys || []).forEach(hk => {
+          const sel = (+curId === +hk.id) ? ' selected' : '';
+          opts += `<option value="${hk.id}"${sel}>${hkEsc(g.name)} / ${hkEsc(hk.name)} (#${hk.id})</option>`;
+        });
+      });
+      return opts;
+    }
+
+    // Export helpers — hand the item JSON to AHK, which writes it to
+    // hotkeys_export/ in the app root.
+    function hkExportGroup(gi) {
+      const g = hkConfig[gi];
+      if (g) ahkCall('ExportHotkeysItem', 'group', g.name || 'group', JSON.stringify(g, null, 2));
+    }
+    function hkExportAction(gi, hi, ai) {
+      const a = hkConfig[gi].hotkeys[hi].actions[ai];
+      if (a) ahkCall('ExportHotkeysItem', 'action', a.type || 'action', JSON.stringify(a, null, 2));
+    }
+
     function hkRenderAction(a, gi, hi, ai) {
       const t = a.type || '';
       let body = '';
@@ -5315,7 +5343,7 @@
           body = `Duration(ms) ${hkNum(a, 'durationMs', 200, gi, hi, ai)}`;
           break;
         case 'chain':
-          body = `Target ID ${hkNum(a, 'targetId', 0, gi, hi, ai)} `
+          body = `Target <select onchange="hkSetAct(${gi},${hi},${ai},'targetId',this.value)">${hkHotkeyOptions(a.targetId)}</select> `
                + `Mode ${hkSel(a, 'triggerMode', [['always', 'Always'], ['program', 'Program only'], ['user', 'User only']], gi, hi, ai)} `
                + `Delay(ms) ${hkNum(a, 'delayMs', 0, gi, hi, ai)}`;
           break;
@@ -5361,6 +5389,7 @@
                 <span class="hk-act-type">${hkEsc(t)}</span>
                 ${body}
                 <span class="hk-spacer"></span>
+                <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                 <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
               </div>`;
     }
