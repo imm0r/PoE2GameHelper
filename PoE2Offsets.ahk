@@ -9,8 +9,16 @@ class PoE2Offsets
 
     static InGameState := Map(
         "AreaInstanceData", 0x290,
-        "WorldData", 0x308,
+        "GameUiPtr", 0x2F0,          ; currently unused; GameUi also reachable via UiRootStruct (0xBE0)
+        "WorldData", 0x368,
         "UiRootStructPtr", 0x340
+    )
+
+    ; Fields within the AreaLoadingState game-state struct (StateNames[1]).
+    static AreaLoadingState := Map(
+        "IsLoading", 0x770,                  ; int — non-zero while an area is loading
+        "TotalLoadingScreenTimeMs", 0xEC0,   ; uint — cumulative loading-screen time, increases on area change
+        "CurrentAreaDetailsPtr", 0xF40       ; IntPtr — details of the area being loaded
     )
 
     static UiRootStruct := Map(
@@ -29,23 +37,28 @@ class PoE2Offsets
     static AreaInstance := Map(
         "CurrentAreaLevel", 0xC4,
         "CurrentAreaHash", 0x11C,
-        "Environments", 0x970,
-        "PlayerInfo", 0xA20,
-        "AwakeEntities", 0xB68,
-        "SleepingEntities", 0xB78,
-        "TerrainMetadata", 0xD50   ; bylafko/gamehelper2 reference: TerrainStruct at AreaInstance+0xD50
+        "Environments", 0x4C0,
+        "PlayerInfo", 0x580,
+        ; EntityListStruct lives at AreaInstance+0x6C0; AwakeEntities is its first
+        ; StdMap field (+0x00) and SleepingEntities the second (+0x10).
+        "Entities", 0x6C0,
+        "AwakeEntities", 0x6C0,
+        "SleepingEntities", 0x6D0,
+        "TerrainMetadata", 0x8A0   ; bylafko/gamehelper2 reference: TerrainStruct at AreaInstance+0x8A0
     )
 
-    ; Offsets within TerrainStruct (base = AreaInstance + 0xD50).
+    ; Offsets within TerrainStruct (base = AreaInstance + 0x8A0).
     ; Source: https://gitlab.com/bylafko/gamehelper2 -- AreaInstanceOffsets.cs
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
     static TerrainMetadata := Map(
-        "TotalTilesX",      0x18,   ; int64 — number of tile columns
-        "TotalTilesY",      0x20,   ; int64 — number of tile rows
-        "TileDetailsPtr",   0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
-        "GridWalkableData", 0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0xE20
-        "BytesPerRow",      0x130   ; int32 -- absolute: AreaInstance+0xE80
+        "TotalTilesX",          0x18,   ; int64 — number of tile columns
+        "TotalTilesY",          0x20,   ; int64 — number of tile rows
+        "TileDetailsPtr",       0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
+        "GridWalkableData",     0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
+        "GridLandscapeData",    0xE8,   ; StdVector<byte> -- absolute: AreaInstance+0x988
+        "BytesPerRow",          0x130,  ; int32 -- absolute: AreaInstance+0x9D0
+        "TileHeightMultiplier", 0x134   ; int16 -- absolute: AreaInstance+0x9D4
     )
 
     ; TileStructure layout (0x38 bytes each, within TileDetailsPtr vector)
@@ -87,7 +100,7 @@ class PoE2Offsets
         "EntityDetailsPtr", 0x08,
         "ComponentsVec", 0x10,
         "ComponentsVecLast", 0x18,
-        "Id", 0x80,
+        "Id", 0x88,
         "Flags", 0x84
     )
 
@@ -173,12 +186,12 @@ class PoE2Offsets
 
     static Actor := Map(
         "AnimationId", 0x8A0,
-        "ActiveSkills", 0xB00,
-        "ActiveSkillsLast", 0xB08,
-        "Cooldowns", 0xB18,
-        "CooldownsLast", 0xB20,
-        "DeployedEntities", 0xC10,
-        "DeployedEntitiesLast", 0xC18
+        "ActiveSkills", 0xB08,        ; ActiveSkillsPtr StdVector start
+        "ActiveSkillsLast", 0xB10,
+        "Cooldowns", 0xB20,           ; CooldownsPtr StdVector start
+        "CooldownsLast", 0xB28,
+        "DeployedEntities", 0xCF8,    ; DeployedEntityArray StdVector start
+        "DeployedEntitiesLast", 0xD00
     )
 
     static ActiveSkillStructure := Map(
@@ -188,9 +201,10 @@ class PoE2Offsets
     static ActiveSkillDetails := Map(
         "UseStage", 0x08,
         "CastType", 0x0C,
-        "UnknownIdAndEquipmentInfo", 0x10,
-        "GrantedEffectsPerLevelDatRow", 0x18,
-        "GrantedEffectStatSetsPerLevelDatRow", 0x30,
+        "ActiveSkillsDatPtr", 0x20,                  ; direct pointer to the ActiveSkills DAT row (currently unused)
+        "UnknownIdAndEquipmentInfo", 0x40,
+        "GrantedEffectsPerLevelDatRow", 0x48,
+        "GrantedEffectStatSetsPerLevelDatRow", 0x50,
         "TotalUses", 0x98,
         "TotalCooldownTimeInMs", 0xA8
     )
@@ -384,7 +398,7 @@ class PoE2Offsets
 
     ; All offsets are relative to uiRootStructPtr (= ReadPtr(InGameState + 0x340))
     static ImportantUiElements := Map(
-        "ChatParentPtr",              0x5C0,
+        "ChatParentPtr",              0x640,
         "PassiveSkillTreePanel",      0x6B0,
         "MapParentPtr",               0x748,
         "ControllerModeMapParentPtr", 0xAA8
@@ -450,9 +464,9 @@ class PoE2Offsets
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)
     static MapUiElement := Map(
-        "Shift",        0x340,  ; StdTuple2D<float> — user/game shift of map center
-        "DefaultShift", 0x348,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
-        "Zoom",         0x380   ; float — current zoom level (default ~0.5)
+        "Shift",        0x3A0,  ; StdTuple2D<float> — user/game shift of map center
+        "DefaultShift", 0x3A8,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
+        "Zoom",         0x3E0   ; float — current zoom level (default ~0.5)
     )
 
 }

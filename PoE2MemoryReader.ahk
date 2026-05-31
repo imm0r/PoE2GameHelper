@@ -224,7 +224,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         scanBase := this.Mem.ScanBase ? this.Mem.ScanBase : this.Mem.ModuleBase
         scanSize := this.Mem.ScanSize ? this.Mem.ScanSize : this.Mem.ModuleSize
 
-        parsed := this.ParsePattern("48 39 2D ^ ?? ?? ?? ?? 0F 85 16 01 00 00")
+        parsed := this.ParsePattern("48 39 2D ^ ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? B9 40 01 00 00")
         patternLen := parsed["data"].Length
         chunkSize := 2 * 1024 * 1024
         overlap := Max(0, patternLen - 1)
@@ -1412,7 +1412,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         ; ── Phase 2: visibility baseline scan ──
         flagsOffset := PoE2Offsets.UiElementBase["Flags"]
-        knownOffsets := Map(0x5C0, "ChatParent", 0x6B0, "PassiveTree", 0x748, "MapParent", 0xAA8, "CtrlMapParent")
+        knownOffsets := Map(0x640, "ChatParent", 0x6B0, "PassiveTree", 0x748, "MapParent", 0xAA8, "CtrlMapParent")
         visBaseline := Map()
         visibleCount := 0
         invisibleCount := 0
@@ -1848,7 +1848,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; ── Per-element field comparison ──
         oldElems := snap["elemSnaps"]
         elemChanges := []
-        knownNames := Map(0x5C0, "ChatParent", 0x6B0, "PassiveTree",
+        knownNames := Map(0x640, "ChatParent", 0x6B0, "PassiveTree",
             0x748, "MapParent", 0xAA8, "CtrlMapParent")
 
         for _, elem in this._heapUiElems
