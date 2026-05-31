@@ -4945,12 +4945,16 @@
         .hk-btn.danger:hover { border-color:#d06b6b; color:#d06b6b; }
         .hk-spacer { margin-left:auto; }
         .hk-empty { color:var(--subtext); padding:20px; text-align:center; }
+        .hk-grip { cursor:grab; color:var(--subtext); padding:0 5px; user-select:none; font-size:14px; line-height:1; }
+        .hk-grip:active { cursor:grabbing; }
+        .hk-dragover { outline:2px dashed var(--accent); outline-offset:1px; }
+        .hk-dragging { opacity:.45; }
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
         <span class="hk-hint">Capture a key: click the key button, then press any key / mouse button.</span>
       </div>
-      <div id="hk-groups"><div class="hk-empty">Loading hotkeys…</div></div>
+      <div id="hk-groups" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'group',0,0)"><div class="hk-empty">Loading hotkeys…</div></div>
       <!-- Hidden key-capture overlay -->
       <div id="hk-capture" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
         <div style="background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:24px 32px;text-align:center;color:var(--text);">
@@ -5205,19 +5209,19 @@
         ? hks.map((hk, hi) => hkRenderHotkey(hk, gi, hi)).join('')
         : '<div class="hk-empty">No hotkeys in this group.</div>';
       return `
-        <div class="hk-group">
+        <div class="hk-group" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'group',${gi},0,0)">
           <div class="hk-group-head">
+            <span class="hk-grip" draggable="true" title="Drag to reorder group"
+                  ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
             <label><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
                    onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"></label>
             <input class="hk-group-name" value="${hkEsc(g.name)}"
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-spacer"></span>
-            <button class="hk-btn" title="Move group up" onclick="hkMoveGroup(${gi},-1)">▲</button>
-            <button class="hk-btn" title="Move group down" onclick="hkMoveGroup(${gi},1)">▼</button>
             <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
             <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
-          <div class="hk-group-body">${body}</div>
+          <div class="hk-group-body" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'hotkey',${gi},0)">${body}</div>
         </div>`;
     }
 
@@ -5229,8 +5233,10 @@
         ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
       return `
-        <div class="hk-card">
+        <div class="hk-card" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
           <div class="hk-row">
+            <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
+                  ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
             <label><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"></label>
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
@@ -5246,8 +5252,6 @@
             <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>
             <span class="hk-spacer"></span>
-            <button class="hk-btn" title="Move hotkey up" onclick="hkMoveHk(${gi},${hi},-1)">▲</button>
-            <button class="hk-btn" title="Move hotkey down" onclick="hkMoveHk(${gi},${hi},1)">▼</button>
             <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           <div class="hk-row">
@@ -5258,7 +5262,7 @@
             <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
           </div>
-          <div class="hk-actions">${actHtml}</div>
+          <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
             <select id="hk-addact-${gi}-${hi}">
               <option value="press">Repeat / Press</option>
@@ -5351,28 +5355,88 @@
         default:
           body = `<span style="color:var(--subtext)">unknown action</span>`;
       }
-      return `<div class="hk-action">
+      return `<div class="hk-action" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'action',${gi},${hi},${ai})">
+                <span class="hk-grip" draggable="true" title="Drag to reorder action"
+                      ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(t)}</span>
                 ${body}
                 <span class="hk-spacer"></span>
-                <button class="hk-btn" title="Move action up" onclick="hkMoveAction(${gi},${hi},${ai},-1)">▲</button>
-                <button class="hk-btn" title="Move action down" onclick="hkMoveAction(${gi},${hi},${ai},1)">▼</button>
                 <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
               </div>`;
     }
 
-    // ── Mutators (all funnel through hkChanged) ────────────────────────
-    // Swaps arr[i] with its neighbour in direction dir (-1 up / +1 down).
-    // Returns true if the move happened (i.e. not already at the edge).
-    function hkArrMove(arr, i, dir) {
-      const j = i + dir;
-      if (!Array.isArray(arr) || j < 0 || j >= arr.length) return false;
-      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-      return true;
+    // ── Drag & drop reordering ─────────────────────────────────────────
+    // A drag handle (.hk-grip) starts the drag; the surrounding container is
+    // the drop zone. Items can be dropped onto a sibling (positional insert,
+    // before/after the cursor's vertical midpoint) or onto the parent list
+    // container (append) — including across groups/hotkeys.
+    let hkDrag = null;   // { kind:'group'|'hotkey'|'action', gi, hi, ai }
+    const HK_DRAG_SEL = { group: '.hk-group', hotkey: '.hk-card', action: '.hk-action' };
+
+    function hkDragStart(e, kind, gi, hi, ai) {
+      hkDrag = { kind, gi, hi, ai };
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', kind); } catch (_) {}
+      const card = e.target.closest(HK_DRAG_SEL[kind]);
+      if (card) {
+        card.classList.add('hk-dragging');
+        try { e.dataTransfer.setDragImage(card, 12, 12); } catch (_) {}
+      }
+      e.stopPropagation();
     }
-    function hkMoveGroup(gi, dir) { if (hkArrMove(hkConfig, gi, dir)) hkChanged(); }
-    function hkMoveHk(gi, hi, dir) { if (hkArrMove(hkConfig[gi].hotkeys, hi, dir)) hkChanged(); }
-    function hkMoveAction(gi, hi, ai, dir) { if (hkArrMove(hkConfig[gi].hotkeys[hi].actions, ai, dir)) hkChanged(); }
+    function hkDragEnd(e) { hkClearDnd(); }
+    function hkClearDnd() {
+      document.querySelectorAll('.hk-dragover').forEach(el => el.classList.remove('hk-dragover'));
+      document.querySelectorAll('.hk-dragging').forEach(el => el.classList.remove('hk-dragging'));
+    }
+    function hkDragOver(e, kind) {
+      if (!hkDrag || hkDrag.kind !== kind) return;   // let it bubble to a matching parent zone
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.hk-dragover').forEach(el => el.classList.remove('hk-dragover'));
+      e.currentTarget.classList.add('hk-dragover');
+    }
+    function hkDragLeave(e) { e.currentTarget.classList.remove('hk-dragover'); }
+
+    // Returns the destination list for a (kind, gi, hi) coordinate.
+    function hkListFor(kind, gi, hi) {
+      if (kind === 'group')  return hkConfig;
+      if (kind === 'hotkey') return hkConfig[gi].hotkeys;
+      return hkConfig[gi].hotkeys[hi].actions;
+    }
+    // Moves the dragged item into dstArr at dstIdx, fixing the index shift when
+    // it is removed from the same array ahead of the insertion point.
+    function hkMoveItem(srcArr, srcIdx, dstArr, dstIdx) {
+      const [item] = srcArr.splice(srcIdx, 1);
+      if (srcArr === dstArr && srcIdx < dstIdx) dstIdx--;
+      dstIdx = Math.max(0, Math.min(dstIdx, dstArr.length));
+      dstArr.splice(dstIdx, 0, item);
+    }
+    // Drop onto a sibling element: insert before/after based on cursor position.
+    function hkDrop(e, kind, gi, hi, ai) {
+      if (!hkDrag || hkDrag.kind !== kind) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const d = hkDrag; hkDrag = null; hkClearDnd();
+      const r = e.currentTarget.getBoundingClientRect();
+      const after = (e.clientY - r.top) > r.height / 2 ? 1 : 0;
+      const srcIdx = d.kind === 'group' ? d.gi : d.kind === 'hotkey' ? d.hi : d.ai;
+      const dstIdx = (kind === 'group' ? gi : kind === 'hotkey' ? hi : ai) + after;
+      hkMoveItem(hkListFor(d.kind, d.gi, d.hi), srcIdx, hkListFor(kind, gi, hi), dstIdx);
+      hkChanged();
+    }
+    // Drop onto a list container (append to the end) — handles empty lists too.
+    function hkDropEnd(e, kind, gi, hi) {
+      if (!hkDrag || hkDrag.kind !== kind) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const d = hkDrag; hkDrag = null; hkClearDnd();
+      const srcIdx = d.kind === 'group' ? d.gi : d.kind === 'hotkey' ? d.hi : d.ai;
+      const dstArr = hkListFor(kind, gi, hi);
+      hkMoveItem(hkListFor(d.kind, d.gi, d.hi), srcIdx, dstArr, dstArr.length);
+      hkChanged();
+    }
 
     function hkAddGroup() {
       hkConfig.push({ name: 'New group', enabled: 1, hotkeys: [] });
