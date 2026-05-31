@@ -17,7 +17,7 @@ class PoE2Offsets
     ; Fields within the AreaLoadingState game-state struct (StateNames[1]).
     static AreaLoadingState := Map(
         "IsLoading", 0x770,                  ; int — non-zero while an area is loading
-        "TotalLoadingScreenTimeMs", 0xEC0,   ; uint — cumulative loading-screen time (unconfirmed)
+        "TotalLoadingScreenTimeMs", 0xEC0,   ; uint — cumulative loading-screen time, increases on area change
         "CurrentAreaDetailsPtr", 0xF40       ; IntPtr — details of the area being loaded
     )
 
