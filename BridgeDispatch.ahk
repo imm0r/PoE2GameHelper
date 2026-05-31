@@ -40,6 +40,19 @@ _DispatchBridgeCall(method, args)
             cfg := (args.Length >= 1) ? args[1] : ""
             if (cfg != "")
                 SetTimer(() => _ApplyHotkeysConfigFromUI(cfg), -1)
+        case "ExportHotkeysItem":
+            ekind := (args.Length >= 1) ? args[1] : ""
+            ename := (args.Length >= 2) ? args[2] : ""
+            ejson := (args.Length >= 3) ? args[3] : ""
+            if (ejson != "")
+                SetTimer(() => _ExportHotkeysItem(ekind, ename, ejson), -1)
+        case "ImportHotkeysGroup":
+            SetTimer(_ImportHotkeysGroup, -1)
+        case "ImportHotkeysAction":
+            igi := (args.Length >= 1) ? (args[1] + 0) : -1
+            ihi := (args.Length >= 2) ? (args[2] + 0) : -1
+            if (igi >= 0 && ihi >= 0)
+                SetTimer(() => _ImportHotkeysAction(igi, ihi), -1)
         case "SetThresholds":
             life := (args.Length >= 1) ? args[1] : ""
             mana := (args.Length >= 2) ? args[2] : ""

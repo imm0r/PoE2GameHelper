@@ -25,6 +25,8 @@ __pycache__/
 offset_history.json
 last_known_patch.txt  # legacy — PatchChecker now stores this in the config INI
 gamehelper_config.ini
+hotkeys.json
+hotkeys_export/
 desktop.ini
 
 # Dev notes (not for repo)
