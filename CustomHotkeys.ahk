@@ -33,6 +33,7 @@ HotkeysInit()
     global g_hkRuntime := Map()           ; id -> runtime Map
     global g_hkRegisteredBindings := []   ; AHK hotkey strings currently bound
     global g_hkEvalInterval := 120        ; ms between auto-trigger evaluations
+    global g_hkInjectGuard := Map()       ; lowercased key -> expiry tick (self-injection guard)
 }
 
 ; ── Persistence ────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ _HotkeysNormalizeHotkey(hk)
         "enabled", _HkBool(hk, "enabled", 1),
         "focusOnly", _HkBool(hk, "focusOnly", 1),
         "safeZoneDisabled", _HkBool(hk, "safeZoneDisabled", 0),
+        "passThrough", _HkBool(hk, "passThrough", 0),
         "key", hk.Has("key") ? hk["key"] : "",
         "mods", mods,
         "actions", actions
@@ -210,11 +212,14 @@ _HotkeysBuildBinding(hk)
         prefix .= "+"
     if (mods["alt"])
         prefix .= "!"
-    ; "~" keeps the native key working (passes through to the game). "$" forces
-    ; the keyboard hook and is only valid for keyboard keys, not mouse buttons.
+    ; By default the trigger key is SUPPRESSED (no "~"): the macro's actions
+    ; re-send the output key, so passing the native key through too would
+    ; double it. Set passThrough on a hotkey to also let the native key reach
+    ; the game. "$" forces the keyboard hook (keyboard keys only, not mouse).
     kl := StrLower(key)
     isMouse := (kl = "lbutton" || kl = "rbutton" || kl = "mbutton" || kl = "xbutton1" || kl = "xbutton2" || kl = "wheelup" || kl = "wheeldown")
-    hook := isMouse ? "~" : "~$"
+    pass := (hk.Has("passThrough") && hk["passThrough"]) ? "~" : ""
+    hook := isMouse ? pass : (pass "$")
     return hook prefix key
 }
 
@@ -346,7 +351,8 @@ _HotkeysActionsWouldRun(hk)
 ; ── Firing / action execution ──────────────────────────────────────────────
 
 ; Fires a hotkey: checks enabled state and global guards, then runs its actions.
-; Params: id - hotkey id; context - "user" | "program" | "chain".
+; Params: id - hotkey id; context - "user" (physical press) | "program"
+;   (auto/condition). Chains propagate the originating context unchanged.
 _HotkeysFire(id, context, depth := 0)
 {
     if (depth > 8)
@@ -360,10 +366,35 @@ _HotkeysFire(id, context, depth := 0)
     if (!grp["enabled"] || !hk["enabled"])
         return
 
+    ; Self-trigger guard: keys we inject via keybd_event/mouse_event are also
+    ; seen by the keyboard/mouse hook (DllCall injection isn't tagged the way
+    ; AHK's own Send is), so a press/repeat/hold whose output key equals the
+    ; trigger key would otherwise re-fire this hotkey in a runaway loop. Echoes
+    ; only matter for physically-pressed (user-context) hotkeys.
+    if (context = "user" && _HotkeysIsInjectedEcho(hk["key"]))
+        return
+
     if !_HotkeysPassesGuards(hk)
         return
 
     _HotkeysRunActions(hk, context, depth)
+}
+
+; Marks a key as just-injected by us, so its hook echo is ignored briefly.
+_HotkeysMarkInjected(key)
+{
+    global g_hkInjectGuard
+    tok := StrLower(Trim(key))
+    if (tok != "")
+        g_hkInjectGuard[tok] := A_TickCount + 60
+}
+
+; True if <key> was injected by us within the guard window (i.e. a self echo).
+_HotkeysIsInjectedEcho(key)
+{
+    global g_hkInjectGuard
+    tok := StrLower(Trim(key))
+    return (tok != "" && g_hkInjectGuard.Has(tok) && A_TickCount < g_hkInjectGuard[tok])
 }
 
 ; Checks the per-hotkey global conditions (focus, safe-zone). Returns true if OK.
@@ -614,6 +645,7 @@ _HotkeysSendKey(key)
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
         return
+    _HotkeysMarkInjected(key)
     try _SendSkillKey(key, gameHwnd)
 }
 
@@ -690,7 +722,9 @@ _HotkeysDoChain(a, context, depth)
     if (mode = "user" && context != "user")
         return
     delay := a.Has("delayMs") ? Max(0, a["delayMs"] + 0) : 0
-    SetTimer(() => _HotkeysFire(targetId, "chain", depth + 1), -Max(1, delay))
+    ; Propagate the originating context (user/program) so multi-step chains
+    ; keep honouring per-link trigger-mode filters down the whole chain.
+    SetTimer(() => _HotkeysFire(targetId, context, depth + 1), -Max(1, delay))
 }
 
 ; Auto-aim action: finds a target by filter, moves the cursor to it, and
@@ -836,6 +870,7 @@ _HotkeysAimMatches(entity, a, targetType)
 ; Presses a key (or mouse button) down via Win32 API (UIPI-safe). Returns true on success.
 _HotkeysKeyDown(key)
 {
+    _HotkeysMarkInjected(key)
     kl := StrLower(key)
     if (kl = "lbutton")
     {

@@ -5251,6 +5251,8 @@
                    onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
             <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
+            <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
           </div>
           <div class="hk-actions">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
