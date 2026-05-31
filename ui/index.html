@@ -5282,6 +5282,7 @@
               <option value="buff">Condition: Buff</option>
               <option value="charges">Condition: Charges</option>
               <option value="monsterCount">Condition: Monster count</option>
+              <option value="monsterCountCursor">Condition: Monster count @ cursor</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
             <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
@@ -5399,6 +5400,12 @@
         case 'monsterCount':
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
                + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
+               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
+          break;
+        case 'monsterCountCursor':
+          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
+               + `Cursor radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
@@ -5533,6 +5540,7 @@
         case 'buff':         return { type, buffName: '', mode: 'present', minStacks: 0, minTimeLeftMs: 0 };
         case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
         case 'monsterCount': return { type, rarity: 'any', radius: 1500, op: '>=', value: 1 };
+        case 'monsterCountCursor': return { type, rarity: 'any', radius: 120, op: '>=', value: 1 };
         case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, chestType: '', name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
         default:             return { type: 'press' };
       }
