@@ -34,6 +34,12 @@ _DispatchBridgeCall(method, args)
             key := (args.Length >= 1) ? args[1] : ""
             if (key != "")
                 SetTimer(() => SwitchTreeTab(key), -1)
+        case "RequestHotkeys":
+            SetTimer(PushHotkeysToWebView, -1)
+        case "SetHotkeysConfig":
+            cfg := (args.Length >= 1) ? args[1] : ""
+            if (cfg != "")
+                SetTimer(() => _ApplyHotkeysConfigFromUI(cfg), -1)
         case "SetThresholds":
             life := (args.Length >= 1) ? args[1] : ""
             mana := (args.Length >= 2) ? args[2] : ""

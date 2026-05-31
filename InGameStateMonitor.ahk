@@ -287,6 +287,10 @@ LoadExplorationConfig()
 LoadLootPickupConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 
+; Custom hotkey / macro engine — init defaults then load persisted hotkeys.json
+HotkeysInit()
+HotkeysLoadConfig()
+
 ; Schedule an auto-refresh check shortly after startup. Runs on a
 ; background timer so it doesn't block the GUI: PoE2 may not be open
 ; yet, the user may not have published the ggpk-tools binary, etc. —
@@ -303,6 +307,10 @@ SetTimer(() => GgpkToolBridge.MaybeAutoRefresh(), -8000)
 g_combatAutoEnabled := g_autoPilotEnabled
 g_exploreEnabled := g_autoPilotEnabled
 RegisterCombatHotkey()
+
+; Custom hotkeys: bind user-defined hotkeys and start the condition evaluator.
+HotkeysRegisterAll()
+SetTimer(HotkeysEvaluateTick, g_hkEvalInterval)
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
 g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , { DefaultWidth: g_winW, DefaultHeight: g_winH })
@@ -854,6 +862,7 @@ OnTreeTabChanged(*)
 
 ; ── Extracted single-responsibility modules ──────────────────────────────────
 #Include JsonParser.ahk
+#Include JsonFull.ahk
 #Include ErrorLogger.ahk
 #Include ConfigManager.ahk
 #Include SnapshotSerializers.ahk
@@ -870,6 +879,8 @@ OnTreeTabChanged(*)
 #Include LootPickup.ahk
 #Include ExplorationModule.ahk
 #Include AutoPilot.ahk
+#Include CustomHotkeys.ahk
+#Include CustomHotkeysBridge.ahk
 #Include MemoryDiff.ahk
 #Include MemoryDissect.ahk
 #Include UIHelpers.ahk

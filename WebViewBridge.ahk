@@ -426,6 +426,7 @@ PushAllDataToWebView()
     PushActiveTreeToWebView()
     PushWatchlistToWebView()
     _PushBlacklistToWebView()
+    PushHotkeysToWebView()
     UpdateStatusBar()
 }
 
