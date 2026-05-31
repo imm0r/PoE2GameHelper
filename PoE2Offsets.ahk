@@ -38,12 +38,15 @@ class PoE2Offsets
         "CurrentAreaHash", 0x11C,
         "Environments", 0x970,
         "PlayerInfo", 0xA20,
-        "AwakeEntities", 0xB68,
-        "SleepingEntities", 0xB78,
-        "TerrainMetadata", 0xD50   ; bylafko/gamehelper2 reference: TerrainStruct at AreaInstance+0xD50
+        ; EntityListStruct lives at AreaInstance+0x6C0; AwakeEntities is its first
+        ; StdMap field (+0x00) and SleepingEntities the second (+0x10).
+        "Entities", 0x6C0,
+        "AwakeEntities", 0x6C0,
+        "SleepingEntities", 0x6D0,
+        "TerrainMetadata", 0x8A0   ; bylafko/gamehelper2 reference: TerrainStruct at AreaInstance+0x8A0
     )
 
-    ; Offsets within TerrainStruct (base = AreaInstance + 0xD50).
+    ; Offsets within TerrainStruct (base = AreaInstance + 0x8A0).
     ; Source: https://gitlab.com/bylafko/gamehelper2 -- AreaInstanceOffsets.cs
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
@@ -51,8 +54,8 @@ class PoE2Offsets
         "TotalTilesX",      0x18,   ; int64 — number of tile columns
         "TotalTilesY",      0x20,   ; int64 — number of tile rows
         "TileDetailsPtr",   0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
-        "GridWalkableData", 0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0xE20
-        "BytesPerRow",      0x130   ; int32 -- absolute: AreaInstance+0xE80
+        "GridWalkableData", 0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
+        "BytesPerRow",      0x130   ; int32 -- absolute: AreaInstance+0x9D0
     )
 
     ; TileStructure layout (0x38 bytes each, within TileDetailsPtr vector)
