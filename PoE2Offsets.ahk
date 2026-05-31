@@ -37,8 +37,8 @@ class PoE2Offsets
     static AreaInstance := Map(
         "CurrentAreaLevel", 0xC4,
         "CurrentAreaHash", 0x11C,
-        "Environments", 0x970,
-        "PlayerInfo", 0xA20,
+        "Environments", 0x4C0,
+        "PlayerInfo", 0x580,
         ; EntityListStruct lives at AreaInstance+0x6C0; AwakeEntities is its first
         ; StdMap field (+0x00) and SleepingEntities the second (+0x10).
         "Entities", 0x6C0,
@@ -58,7 +58,7 @@ class PoE2Offsets
         "GridWalkableData",     0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
         "GridLandscapeData",    0xE8,   ; StdVector<byte> -- absolute: AreaInstance+0x988
         "BytesPerRow",          0x130,  ; int32 -- absolute: AreaInstance+0x9D0
-        "TileHeightMultiplier", 0x134   ; int32 -- absolute: AreaInstance+0x9D4
+        "TileHeightMultiplier", 0x134   ; int16 -- absolute: AreaInstance+0x9D4
     )
 
     ; TileStructure layout (0x38 bytes each, within TileDetailsPtr vector)
@@ -100,7 +100,7 @@ class PoE2Offsets
         "EntityDetailsPtr", 0x08,
         "ComponentsVec", 0x10,
         "ComponentsVecLast", 0x18,
-        "Id", 0x80,
+        "Id", 0x88,
         "Flags", 0x84
     )
 
@@ -464,9 +464,9 @@ class PoE2Offsets
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)
     static MapUiElement := Map(
-        "Shift",        0x340,  ; StdTuple2D<float> — user/game shift of map center
-        "DefaultShift", 0x348,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
-        "Zoom",         0x380   ; float — current zoom level (default ~0.5)
+        "Shift",        0x3A0,  ; StdTuple2D<float> — user/game shift of map center
+        "DefaultShift", 0x3A8,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
+        "Zoom",         0x3E0   ; float — current zoom level (default ~0.5)
     )
 
 }
