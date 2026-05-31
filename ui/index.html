@@ -4945,6 +4945,8 @@
         .hk-btn.danger:hover { border-color:#d06b6b; color:#d06b6b; }
         .hk-spacer { margin-left:auto; }
         .hk-empty { color:var(--subtext); padding:20px; text-align:center; }
+        .hk-caret { cursor:pointer; color:var(--subtext); user-select:none; width:14px; display:inline-block; text-align:center; font-size:11px; }
+        .hk-caret:hover { color:var(--accent); }
         .hk-grip { cursor:grab; color:var(--subtext); padding:0 5px; user-select:none; font-size:14px; line-height:1; }
         .hk-grip:active { cursor:grabbing; }
         .hk-dragover { outline:2px dashed var(--accent); outline-offset:1px; }
@@ -4953,6 +4955,8 @@
       <div class="hk-toolbar">
         <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
         <button class="hk-btn" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
+        <button class="hk-btn" onclick="hkCollapseAll()">⊟ Collapse all</button>
+        <button class="hk-btn" onclick="hkExpandAll()">⊞ Expand all</button>
         <span class="hk-hint">Capture a key: click the key button, then press any key / mouse button.</span>
       </div>
       <div id="hk-groups" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'group',0,0)"><div class="hk-empty">Loading hotkeys…</div></div>
@@ -5172,6 +5176,23 @@
     // actions). The whole config is sent back to AHK on every change.
     let hkConfig = [];
     let hkCapture = null;   // {gi, hi} while waiting for a key press
+    // Collapse state is view-only (not persisted, no AHK round-trip): a Set of
+    // keys 'g:<gi>' | 'h:<hotkeyId>' | 'a:<hotkeyId>:<ai>' that are folded.
+    let hkCollapsed = new Set();
+    function hkToggle(key) {
+      if (hkCollapsed.has(key)) hkCollapsed.delete(key);
+      else hkCollapsed.add(key);
+      hkRender();
+    }
+    // Collapse/expand every group and hotkey at once (toolbar buttons).
+    function hkCollapseAll() {
+      hkConfig.forEach((g, gi) => {
+        hkCollapsed.add('g:' + gi);
+        (g.hotkeys || []).forEach(hk => hkCollapsed.add('h:' + hk.id));
+      });
+      hkRender();
+    }
+    function hkExpandAll() { hkCollapsed.clear(); hkRender(); }
 
     // Called by AHK (WebViewExec) with the full config as a JSON string.
     function updateHotkeys(jsonStr) {
@@ -5206,24 +5227,30 @@
 
     function hkRenderGroup(g, gi) {
       const hks = Array.isArray(g.hotkeys) ? g.hotkeys : [];
-      const body = hks.length
+      const open = !hkCollapsed.has('g:' + gi);
+      const inner = hks.length
         ? hks.map((hk, hi) => hkRenderHotkey(hk, gi, hi)).join('')
         : '<div class="hk-empty">No hotkeys in this group.</div>';
+      const body = open
+        ? `<div class="hk-group-body" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'hotkey',${gi},0)">${inner}</div>`
+        : '';
       return `
         <div class="hk-group" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'group',${gi},0,0)">
           <div class="hk-group-head">
+            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder group"
                   ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
             <label><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
                    onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"></label>
             <input class="hk-group-name" value="${hkEsc(g.name)}"
                    onchange="hkSetGroup(${gi},'name',this.value)">
+            <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
             <span class="hk-spacer"></span>
             <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
             <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
             <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
-          <div class="hk-group-body" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'hotkey',${gi},0)">${body}</div>
+          ${body}
         </div>`;
     }
 
@@ -5231,32 +5258,11 @@
       const mods = hk.mods || {};
       const keyLabel = hk.key ? hkEsc(hk.key) : 'Set key';
       const acts = Array.isArray(hk.actions) ? hk.actions : [];
+      const open = !hkCollapsed.has('h:' + hk.id);
       const actHtml = acts.length
         ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
-      return `
-        <div class="hk-card" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
-          <div class="hk-row">
-            <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
-                  ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"></label>
-            <input class="hk-card-name" value="${hkEsc(hk.name)}"
-                   onchange="hkSetHk(${gi},${hi},'name',this.value)">
-            <span class="hk-id">ID #${hk.id}</span>
-            <span class="hk-id" style="color:var(--text)">Hotkey:</span>
-            <button class="hk-btn hk-key-btn" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
-            <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
-            <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'shift',this.checked?1:0)">Shift</label>
-            <label><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)">Alt</label>
-            <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>
-            <span class="hk-spacer"></span>
-            <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
-          </div>
+      const body = open ? `
           <div class="hk-row">
             <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
@@ -5280,7 +5286,32 @@
             </select>
             <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
+          </div>` : `<span class="hk-id" style="margin-left:30px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>`;
+      return `
+        <div class="hk-card" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
+          <div class="hk-row">
+            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
+            <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
+                  ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
+            <label><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"></label>
+            <input class="hk-card-name" value="${hkEsc(hk.name)}"
+                   onchange="hkSetHk(${gi},${hi},'name',this.value)">
+            <span class="hk-id">ID #${hk.id}</span>
+            <span class="hk-id" style="color:var(--text)">Hotkey:</span>
+            <button class="hk-btn hk-key-btn" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
+            <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
+            <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'shift',this.checked?1:0)">Shift</label>
+            <label><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)">Alt</label>
+            <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>
+            <span class="hk-spacer"></span>
+            <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
+          ${body}
         </div>`;
     }
 
@@ -5329,6 +5360,8 @@
 
     function hkRenderAction(a, gi, hi, ai) {
       const t = a.type || '';
+      const aKey = 'a:' + (hkConfig[gi].hotkeys[hi].id) + ':' + ai;
+      const open = !hkCollapsed.has(aKey);
       let body = '';
       switch (t) {
         case 'press':
@@ -5384,10 +5417,11 @@
           body = `<span style="color:var(--subtext)">unknown action</span>`;
       }
       return `<div class="hk-action" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'action',${gi},${hi},${ai})">
+                <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${open ? '▾' : '▸'}</span>
                 <span class="hk-grip" draggable="true" title="Drag to reorder action"
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(t)}</span>
-                ${body}
+                ${open ? body : ''}
                 <span class="hk-spacer"></span>
                 <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                 <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
