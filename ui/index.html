@@ -4957,7 +4957,8 @@
         <button class="hk-btn" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
         <button class="hk-btn" onclick="hkCollapseAll()">⊟ Collapse all</button>
         <button class="hk-btn" onclick="hkExpandAll()">⊞ Expand all</button>
-        <span class="hk-hint">Capture a key: click the key button, then press any key / mouse button.</span>
+        <label style="margin-left:8px" title="When on, at most one hotkey auto-fires per evaluation tick (highest in list order wins)."><input type="checkbox" id="hk-oneshot" onchange="hkSetOneShot(this.checked)">One-shot per tick</label>
+        <span class="hk-hint">Output is bound to your in-game flask/skill slots; trigger key is captured separately.</span>
       </div>
       <div id="hk-groups" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'group',0,0)"><div class="hk-empty">Loading hotkeys…</div></div>
       <!-- Hidden key-capture overlay -->
@@ -5176,6 +5177,15 @@
     // actions). The whole config is sent back to AHK on every change.
     let hkConfig = [];
     let hkCapture = null;   // {gi, hi} while waiting for a key press
+    let hkOneShot = false;  // global one-shot-per-tick toggle (mirrors AHK)
+    // In-game binds pushed from AHK: { flaskSlots:[{slot,key}], skillSlots:[{slot,key}], skillNames:[..] }
+    let hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [] };
+    // Called by AHK with the resolved in-game key bindings + active skill names.
+    function updateHotkeyBindings(jsonStr) {
+      try { hkBindings = JSON.parse(jsonStr); } catch (e) { return; }
+      if (!hkBindings || typeof hkBindings !== 'object') hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [] };
+      hkRender();
+    }
     // Collapse state is view-only (not persisted, no AHK round-trip): a Set of
     // keys 'g:<gi>' | 'h:<hotkeyId>' | 'a:<hotkeyId>:<ai>' that are folded.
     let hkCollapsed = new Set();
@@ -5194,11 +5204,17 @@
     }
     function hkExpandAll() { hkCollapsed.clear(); hkRender(); }
 
-    // Called by AHK (WebViewExec) with the full config as a JSON string.
-    function updateHotkeys(jsonStr) {
+    // Called by AHK (WebViewExec) with the full config as a JSON string and the
+    // current one-shot-per-tick flag.
+    function updateHotkeys(jsonStr, oneShot) {
       try { hkConfig = JSON.parse(jsonStr); } catch (e) { hkConfig = []; }
       if (!Array.isArray(hkConfig)) hkConfig = [];
+      if (oneShot !== undefined) hkOneShot = !!oneShot;
       hkRender();
+    }
+    function hkSetOneShot(on) {
+      hkOneShot = !!on;
+      try { ahkCall('SetHotkeyOneShot', hkOneShot ? 1 : 0); } catch (e) {}
     }
 
     // Persist + re-register on the AHK side, then re-render locally.
@@ -5218,6 +5234,8 @@
     function hkRender() {
       const root = document.getElementById('hk-groups');
       if (!root) return;
+      const osBox = document.getElementById('hk-oneshot');
+      if (osBox) osBox.checked = !!hkOneShot;
       if (!hkConfig.length) {
         root.innerHTML = '<div class="hk-empty">No hotkey groups yet. Click “+ Add Group”.</div>';
         return;
@@ -5264,6 +5282,9 @@
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
       const body = open ? `
           <div class="hk-row">
+            ${hkRenderOutput(hk, gi, hi)}
+          </div>
+          <div class="hk-row">
             <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
             <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
@@ -5299,8 +5320,8 @@
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
             <span class="hk-id">ID #${hk.id}</span>
-            <span class="hk-id" style="color:var(--text)">Hotkey:</span>
-            <button class="hk-btn hk-key-btn" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
+            <span class="hk-id" style="color:var(--text)">Trigger:</span>
+            <button class="hk-btn hk-key-btn" title="Key you press to fire this macro" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
             <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
             <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
@@ -5314,6 +5335,38 @@
           </div>
           ${body}
         </div>`;
+    }
+
+    // Renders the output-binding row: the macro's output key is chosen from the
+    // in-game flask/skill slots (not typed freely). Skill bindings also pick a
+    // skill name, used for the cooldown-readiness gate.
+    function hkRenderOutput(hk, gi, hi) {
+      const o = hk.output || { kind: 'flask', slot: 1, skillName: '', key: '' };
+      const kind = o.kind || 'flask';
+      const kindSel = `<select onchange="hkSetOutput(${gi},${hi},'kind',this.value)">`
+        + [['flask', 'Flask slot'], ['skill', 'Skill slot'], ['key', 'Raw key']]
+            .map(([v, l]) => `<option value="${v}" ${kind === v ? 'selected' : ''}>${l}</option>`).join('')
+        + `</select>`;
+      let detail = '';
+      if (kind === 'flask') {
+        const opts = (hkBindings.flaskSlots || []).length
+          ? hkBindings.flaskSlots.map(f => `<option value="${f.slot}" ${+o.slot === +f.slot ? 'selected' : ''}>Flask ${f.slot} → ${hkEsc(f.key)}</option>`).join('')
+          : [1,2,3,4,5].map(s => `<option value="${s}" ${+o.slot === s ? 'selected' : ''}>Flask ${s}</option>`).join('');
+        detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${opts}</select>`;
+      } else if (kind === 'skill') {
+        const slotOpts = (hkBindings.skillSlots || []).length
+          ? hkBindings.skillSlots.map(s => `<option value="${s.slot}" ${+o.slot === +s.slot ? 'selected' : ''}>Slot ${s.slot} → ${hkEsc(s.key)}</option>`).join('')
+          : `<option value="${o.slot || 1}">(no skill binds read from config)</option>`;
+        const names = hkBindings.skillNames || [];
+        const nameOpts = `<option value="">— skill (for cooldown gate) —</option>`
+          + names.map(n => `<option value="${hkEsc(n)}" ${o.skillName === n ? 'selected' : ''}>${hkEsc(n)}</option>`).join('')
+          + (o.skillName && !names.includes(o.skillName) ? `<option value="${hkEsc(o.skillName)}" selected>${hkEsc(o.skillName)} (not active)</option>` : '');
+        detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${slotOpts}</select> `
+               + `<select title="Skill whose cooldown gates this hotkey" onchange="hkSetOutput(${gi},${hi},'skillName',this.value)">${nameOpts}</select>`;
+      } else {
+        detail = `<button class="hk-btn hk-key-btn" title="Literal output key" onclick="hkCaptureOutputKey(${gi},${hi})">${o.key ? hkEsc(o.key) : 'Set key'}</button>`;
+      }
+      return `<span class="hk-id" style="color:var(--text)">Output:</span> ${kindSel} ${detail}`;
     }
 
     function hkNum(a, k, def, gi, hi, ai) {
@@ -5518,7 +5571,8 @@
     function hkAddHotkey(gi) {
       hkConfig[gi].hotkeys.push({
         id: 0, name: 'New hotkey', enabled: 1, focusOnly: 1, safeZoneDisabled: 0,
-        key: '', mods: { ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, actions: []
+        key: '', output: { kind: 'flask', slot: 1, skillName: '', key: '' },
+        mods: { ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, actions: []
       });
       hkChanged();   // AHK assigns the real id on normalize and echoes it back
     }
@@ -5528,6 +5582,12 @@
       const hk = hkConfig[gi].hotkeys[hi];
       if (!hk.mods) hk.mods = {};
       hk.mods[k] = v;
+      hkChanged();
+    }
+    function hkSetOutput(gi, hi, k, v) {
+      const hk = hkConfig[gi].hotkeys[hi];
+      if (!hk.output) hk.output = { kind: 'flask', slot: 1, skillName: '', key: '' };
+      hk.output[k] = (k === 'slot') ? (parseInt(v, 10) || 0) : v;
       hkChanged();
     }
 
@@ -5562,14 +5622,24 @@
 
     // ── Key capture ────────────────────────────────────────────────────
     function hkCaptureKey(gi, hi) {
-      hkCapture = { gi, hi };
+      hkCapture = { gi, hi, target: 'trigger' };
+      document.getElementById('hk-capture').style.display = 'flex';
+    }
+    function hkCaptureOutputKey(gi, hi) {
+      hkCapture = { gi, hi, target: 'output' };
       document.getElementById('hk-capture').style.display = 'flex';
     }
     function hkFinishCapture(keyName, mods) {
       if (!hkCapture) return;
       const hk = hkConfig[hkCapture.gi].hotkeys[hkCapture.hi];
-      hk.key = keyName;
-      if (mods) hk.mods = Object.assign({ ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, mods);
+      if (hkCapture.target === 'output') {
+        if (!hk.output) hk.output = { kind: 'key', slot: 1, skillName: '', key: '' };
+        hk.output.kind = 'key';
+        hk.output.key = keyName;
+      } else {
+        hk.key = keyName;
+        if (mods) hk.mods = Object.assign({ ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, mods);
+      }
       hkCapture = null;
       document.getElementById('hk-capture').style.display = 'none';
       hkChanged();

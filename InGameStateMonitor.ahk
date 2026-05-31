@@ -289,7 +289,9 @@ ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 
 ; Custom hotkey / macro engine — init defaults then load persisted hotkeys.json
 HotkeysInit()
+SkillHotkeysInit()
 HotkeysLoadConfig()
+g_hkOneShotPerTick := (IniRead(_ConfigPath(), "Hotkeys", "oneShotPerTick", "0") = "1")
 
 ; Schedule an auto-refresh check shortly after startup. Runs on a
 ; background timer so it doesn't block the GUI: PoE2 may not be open
@@ -390,6 +392,7 @@ g_webGui.Control.NavigationCompleted(OnNavigationCompleted)
 g_webGui.Navigate("ui/index.html")
 
 LoadFlaskHotkeysFromConfig(g_flaskConfigPath)
+LoadSkillHotkeysFromConfig(g_flaskConfigPath)
 
 ; Check for PoE2 patch updates (async-like: runs PowerShell hidden, max ~5s)
 CheckPoePatchVersion()
@@ -880,6 +883,7 @@ OnTreeTabChanged(*)
 #Include ExplorationModule.ahk
 #Include AutoPilot.ahk
 #Include CustomHotkeys.ahk
+#Include CustomHotkeysBindings.ahk
 #Include CustomHotkeysBridge.ahk
 #Include MemoryDiff.ahk
 #Include MemoryDissect.ahk

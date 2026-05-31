@@ -36,10 +36,15 @@ _DispatchBridgeCall(method, args)
                 SetTimer(() => SwitchTreeTab(key), -1)
         case "RequestHotkeys":
             SetTimer(PushHotkeysToWebView, -1)
+            SetTimer(PushHotkeyBindingsToWebView, -1)
         case "SetHotkeysConfig":
             cfg := (args.Length >= 1) ? args[1] : ""
             if (cfg != "")
                 SetTimer(() => _ApplyHotkeysConfigFromUI(cfg), -1)
+        case "SetHotkeyOneShot":
+            osv := (args.Length >= 1) ? args[1] : 0
+            bos := (osv = "true" || osv = true || osv = 1) ? true : false
+            SetTimer(() => _SetHotkeyOneShot(bos), -1)
         case "ExportHotkeysItem":
             ekind := (args.Length >= 1) ? args[1] : ""
             ename := (args.Length >= 2) ? args[2] : ""

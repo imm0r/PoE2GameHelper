@@ -34,6 +34,7 @@ HotkeysInit()
     global g_hkRegisteredBindings := []   ; AHK hotkey strings currently bound
     global g_hkEvalInterval := 120        ; ms between auto-trigger evaluations
     global g_hkInjectGuard := Map()       ; lowercased key -> expiry tick (self-injection guard)
+    global g_hkOneShotPerTick := false    ; when true, at most one hotkey auto-fires per eval tick
 }
 
 ; ── Persistence ────────────────────────────────────────────────────────────
@@ -113,6 +114,18 @@ _HotkeysNormalizeHotkey(hk)
     for a in actRaw
         if (a is Map)
             actions.Push(a)
+    ; Output binding: where the macro's key comes from.
+    ;   kind "flask"  -> slot (1-5), key resolved live from g_flaskKeyBySlot
+    ;   kind "skill"  -> slot (skill-bar slot), key from g_skillKeyBySlot, plus
+    ;                    skillName for the cooldown-readiness gate
+    ;   kind "key"    -> a literal key (legacy / free binding)
+    outRaw := (hk.Has("output") && hk["output"] is Map) ? hk["output"] : Map()
+    output := Map(
+        "kind", outRaw.Has("kind") ? outRaw["kind"] : (hk.Has("key") && hk["key"] != "" ? "key" : "flask"),
+        "slot", outRaw.Has("slot") ? (outRaw["slot"] + 0) : 1,
+        "skillName", outRaw.Has("skillName") ? outRaw["skillName"] : "",
+        "key", outRaw.Has("key") ? outRaw["key"] : (hk.Has("key") ? hk["key"] : "")
+    )
     return Map(
         "id", id,
         "name", hk.Has("name") ? hk["name"] : ("Hotkey #" id),
@@ -121,9 +134,51 @@ _HotkeysNormalizeHotkey(hk)
         "safeZoneDisabled", _HkBool(hk, "safeZoneDisabled", 0),
         "passThrough", _HkBool(hk, "passThrough", 0),
         "key", hk.Has("key") ? hk["key"] : "",
+        "output", output,
         "mods", mods,
         "actions", actions
     )
+}
+
+; Resolves the actual AHK send-key for a hotkey's output binding (live, so
+; config-driven flask/skill keys always reflect the current game config).
+; Returns the key string, or "" if unresolved.
+_HotkeysResolveKey(hk)
+{
+    global g_flaskKeyBySlot, g_skillKeyBySlot
+    out := (hk.Has("output") && hk["output"] is Map) ? hk["output"] : 0
+    if !out
+        return hk.Has("key") ? hk["key"] : ""
+    kind := out.Has("kind") ? out["kind"] : "key"
+    slot := out.Has("slot") ? (out["slot"] + 0) : 0
+    if (kind = "flask")
+        return (g_flaskKeyBySlot.Has(slot)) ? g_flaskKeyBySlot[slot] : ""
+    if (kind = "skill")
+        return (g_skillKeyBySlot.Has(slot)) ? g_skillKeyBySlot[slot] : (out.Has("key") ? out["key"] : "")
+    return out.Has("key") ? out["key"] : (hk.Has("key") ? hk["key"] : "")
+}
+
+; Readiness gate for the output binding: true if the bound flask has charges /
+; the bound skill is off cooldown. Free "key" bindings are always ready.
+; Returns Map("ready", bool, "cooldownMs", int).
+_HotkeysOutputReadiness(hk)
+{
+    out := (hk.Has("output") && hk["output"] is Map) ? hk["output"] : 0
+    if !out
+        return Map("ready", true, "cooldownMs", 0)
+    kind := out.Has("kind") ? out["kind"] : "key"
+    if (kind = "skill")
+    {
+        nm := out.Has("skillName") ? out["skillName"] : ""
+        if (nm = "")
+            return Map("ready", true, "cooldownMs", 0)
+        r := HotkeysSkillReadiness(nm)
+        return Map("ready", r["found"] ? r["canUse"] : true, "cooldownMs", r["cooldownMs"])
+    }
+    ; Flask charge counts are not present in the radar snapshot (only buff
+    ; data is), so a flask readiness gate can't be evaluated reliably here —
+    ; treat flask/key bindings as always ready.
+    return Map("ready", true, "cooldownMs", 0)
 }
 
 ; Serializes g_hotkeyGroups to hotkeys.json (pretty-printed for hand-editing).
@@ -256,7 +311,7 @@ _HotkeysSnap()
 ; "program" context when its conditions pass and the re-fire interval elapsed.
 HotkeysEvaluateTick()
 {
-    global g_hotkeyGroups, g_hkRuntime
+    global g_hotkeyGroups, g_hkRuntime, g_hkOneShotPerTick
     for grp in g_hotkeyGroups
     {
         if !grp["enabled"]
@@ -270,15 +325,28 @@ HotkeysEvaluateTick()
 
             id := hk["id"]
             rt := _HotkeysRuntime(id)
-            ; Re-fire throttle: default 250ms, or the smallest repeat interval.
+            ; Re-fire throttle: at least the bound skill's cooldown (so a skill
+            ; hotkey never fires faster than the skill can be cast), else the
+            ; smallest repeat interval, else a 250ms default.
             minGap := _HotkeysReFireGap(hk)
+            rdy := _HotkeysOutputReadiness(hk)
+            if (rdy["cooldownMs"] > minGap)
+                minGap := rdy["cooldownMs"]
             if ((A_TickCount - rt["lastAutoFire"]) < minGap)
+                continue
+
+            ; Skill/flask readiness gate: only fire when the bound skill is off
+            ; cooldown (flasks/keys are always ready — see _HotkeysOutputReadiness).
+            if !rdy["ready"]
                 continue
 
             if _HotkeysActionsWouldRun(hk)
             {
                 rt["lastAutoFire"] := A_TickCount
                 _HotkeysFire(id, "program")
+                ; Global one-shot: at most one hotkey fires per evaluation tick.
+                if (IsSet(g_hkOneShotPerTick) && g_hkOneShotPerTick)
+                    return
             }
         }
     }
@@ -452,7 +520,7 @@ _HotkeysRunActions(hk, context, depth)
                 if !_HotkeysCheckMonsterCountCursor(a, snap)
                     return
             case "press":
-                _HotkeysSendKey(hk["key"])
+                _HotkeysSendKey(_HotkeysResolveKey(hk))
             case "repeat":
                 _HotkeysDoRepeat(hk, a)
             case "hold":
@@ -740,7 +808,7 @@ _HotkeysSendKey(key)
 _HotkeysDoRepeat(hk, a)
 {
     id := hk["id"]
-    key := hk["key"]
+    key := _HotkeysResolveKey(hk)
     interval := a.Has("intervalMs") ? Max(15, a["intervalMs"] + 0) : 100
     rt := _HotkeysRuntime(id)
 
@@ -785,7 +853,7 @@ _HotkeysScheduleBurst(key, count, interval)
 ; action: Map("durationMs", ms)
 _HotkeysDoHold(hk, a)
 {
-    key := Trim(hk["key"])
+    key := Trim(_HotkeysResolveKey(hk))
     if (key = "")
         return
     dur := a.Has("durationMs") ? Max(10, a["durationMs"] + 0) : 200
@@ -854,14 +922,15 @@ _HotkeysDoAim(hk, a, snap)
     if (a.Has("press") && a["press"])
     {
         holdMs := a.Has("holdMs") ? (a["holdMs"] + 0) : 0
+        outKey := _HotkeysResolveKey(hk)
         if (holdMs > 0)
         {
-            key := Trim(hk["key"])
+            key := Trim(outKey)
             if (key != "" && _HotkeysKeyDown(key))
                 SetTimer(() => _HotkeysKeyUp(key), -holdMs)
         }
         else
-            _HotkeysSendKey(hk["key"])
+            _HotkeysSendKey(outKey)
     }
 }
 
