@@ -51,11 +51,13 @@ class PoE2Offsets
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
     static TerrainMetadata := Map(
-        "TotalTilesX",      0x18,   ; int64 — number of tile columns
-        "TotalTilesY",      0x20,   ; int64 — number of tile rows
-        "TileDetailsPtr",   0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
-        "GridWalkableData", 0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
-        "BytesPerRow",      0x130   ; int32 -- absolute: AreaInstance+0x9D0
+        "TotalTilesX",          0x18,   ; int64 — number of tile columns
+        "TotalTilesY",          0x20,   ; int64 — number of tile rows
+        "TileDetailsPtr",       0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
+        "GridWalkableData",     0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
+        "GridLandscapeData",    0xE8,   ; StdVector<byte> -- absolute: AreaInstance+0x988
+        "BytesPerRow",          0x130,  ; int32 -- absolute: AreaInstance+0x9D0
+        "TileHeightMultiplier", 0x134   ; int32 -- absolute: AreaInstance+0x9D4
     )
 
     ; TileStructure layout (0x38 bytes each, within TileDetailsPtr vector)
