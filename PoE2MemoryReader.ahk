@@ -224,7 +224,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         scanBase := this.Mem.ScanBase ? this.Mem.ScanBase : this.Mem.ModuleBase
         scanSize := this.Mem.ScanSize ? this.Mem.ScanSize : this.Mem.ModuleSize
 
-        parsed := this.ParsePattern("48 39 2D ^ ?? ?? ?? ?? 0F 85 16 01 00 00")
+        parsed := this.ParsePattern("48 39 2D ^ ?? ?? ?? ?? 0F 85 ?? ?? ?? ?? B9 40 01 00 00")
         patternLen := parsed["data"].Length
         chunkSize := 2 * 1024 * 1024
         overlap := Max(0, patternLen - 1)
