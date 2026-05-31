@@ -398,7 +398,7 @@ class PoE2Offsets
 
     ; All offsets are relative to uiRootStructPtr (= ReadPtr(InGameState + 0x340))
     static ImportantUiElements := Map(
-        "ChatParentPtr",              0x5C0,
+        "ChatParentPtr",              0x640,
         "PassiveSkillTreePanel",      0x6B0,
         "MapParentPtr",               0x748,
         "ControllerModeMapParentPtr", 0xAA8
