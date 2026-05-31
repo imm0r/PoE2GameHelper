@@ -3853,6 +3853,14 @@
           <line x1="16" y1="13" x2="8" y2="13" />
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>Data</div>
+      <div class="cat" data-cat="hotkeys" onclick="switchCategory('hotkeys')"><svg viewBox="0 0 24 24">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <line x1="6" y1="10" x2="6" y2="10.5" />
+          <line x1="10" y1="10" x2="10" y2="10.5" />
+          <line x1="14" y1="10" x2="14" y2="10.5" />
+          <line x1="18" y1="10" x2="18" y2="10.5" />
+          <line x1="8" y1="14" x2="16" y2="14" />
+        </svg>Hotkeys</div>
     </div>
     <div id="cat-bar-right">
       <div class="cat" data-cat="config" onclick="switchCategory('config')"><svg viewBox="0 0 24 24">
@@ -3954,6 +3962,12 @@
       <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
       <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
       <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
+      <div class="bar-marker tab-marker"></div>
+    </div>
+
+    <!-- HOTKEYS — single page, sub-tab row hidden via CSS. -->
+    <div class="subtab-row single-tab" data-cat="hotkeys">
+      <div class="tab" data-tab="hotkeys" onclick="switchTab('hotkeys')">Custom Hotkeys</div>
       <div class="bar-marker tab-marker"></div>
     </div>
 
@@ -4900,6 +4914,52 @@
       </div>
     </div>
 
+    <!-- HOTKEYS — custom hotkey / macro editor -->
+    <div class="tab-panel" id="panel-hotkeys">
+      <style>
+        #panel-hotkeys { padding: 12px; overflow-y: auto; }
+        .hk-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+        .hk-toolbar .hk-hint { color:var(--subtext); font-size:12px; margin-left:auto; }
+        .hk-group { border:1px solid var(--border); border-radius:6px; margin-bottom:12px; background:var(--surface); }
+        .hk-group-head { display:flex; gap:8px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); }
+        .hk-group-name { background:transparent; border:none; color:var(--text); font-weight:600; font-size:14px; flex:0 0 auto; min-width:120px; }
+        .hk-group-name:focus { outline:1px solid var(--accent); }
+        .hk-group-body { padding:8px 10px; }
+        .hk-card { border:1px solid var(--border); border-radius:5px; padding:8px; margin-bottom:8px; background:var(--bg); }
+        .hk-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+        .hk-card-name { background:transparent; border:none; color:var(--text); font-weight:600; min-width:120px; }
+        .hk-card-name:focus { outline:1px solid var(--accent); }
+        .hk-id { color:var(--subtext); font-size:11px; }
+        .hk-key-btn { min-width:70px; }
+        #panel-hotkeys input[type=text], #panel-hotkeys input[type=number], #panel-hotkeys select {
+          background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:12px;
+        }
+        #panel-hotkeys input[type=number] { width:74px; }
+        #panel-hotkeys label { color:var(--subtext); font-size:12px; display:inline-flex; gap:4px; align-items:center; }
+        .hk-actions { margin-top:6px; padding-left:8px; border-left:2px solid var(--border); }
+        .hk-action { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:5px 0; border-bottom:1px dashed var(--border); }
+        .hk-action:last-child { border-bottom:none; }
+        .hk-act-type { color:var(--accent); font-weight:600; min-width:96px; }
+        .hk-btn { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 9px; cursor:pointer; font-size:12px; }
+        .hk-btn:hover { border-color:var(--accent); }
+        .hk-btn.danger:hover { border-color:#d06b6b; color:#d06b6b; }
+        .hk-spacer { margin-left:auto; }
+        .hk-empty { color:var(--subtext); padding:20px; text-align:center; }
+      </style>
+      <div class="hk-toolbar">
+        <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
+        <span class="hk-hint">Capture a key: click the key button, then press any key / mouse button.</span>
+      </div>
+      <div id="hk-groups"><div class="hk-empty">Loading hotkeys…</div></div>
+      <!-- Hidden key-capture overlay -->
+      <div id="hk-capture" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border:1px solid var(--accent);border-radius:8px;padding:24px 32px;text-align:center;color:var(--text);">
+          <div style="font-size:15px;margin-bottom:8px;">Press a key or mouse button…</div>
+          <div style="color:var(--subtext);font-size:12px;">Esc to cancel</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- STATUS BAR -->
@@ -4997,6 +5057,7 @@
       dissect:   're',
       tsvs:      'data',
       config:    'config',
+      hotkeys:   'hotkeys',
     };
     // The Config tab is one top-level panel split into 6 inner sub-panels
     // (general/automation/overlay/ggpk/filters/debug); switchConfigSubTab
@@ -5024,10 +5085,11 @@
     // Remembered per-category so navigating away and back returns to the
     // last view (e.g. Dissector stays sticky inside RE).
     const lastTabPerCategory = {
-      game:   'entities',
-      re:     'ui',
-      data:   'tsvs',
-      config: 'config',
+      game:    'entities',
+      re:      'ui',
+      data:    'tsvs',
+      config:  'config',
+      hotkeys: 'hotkeys',
     };
 
     // These tabs notify AHK (to switch the AHK tree context)
@@ -5094,7 +5156,307 @@
         _invTabDeactivated();
       if (key === 'memdiff')
         ahkCall('MemDiffRequestState');
+      if (key === 'hotkeys')
+        ahkCall('RequestHotkeys');
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  CUSTOM HOTKEYS TAB — group / hotkey / action editor
+    // ═══════════════════════════════════════════════════════════════════
+    // hkConfig mirrors the AHK g_hotkeyGroups model (groups → hotkeys →
+    // actions). The whole config is sent back to AHK on every change.
+    let hkConfig = [];
+    let hkCapture = null;   // {gi, hi} while waiting for a key press
+
+    // Called by AHK (WebViewExec) with the full config as a JSON string.
+    function updateHotkeys(jsonStr) {
+      try { hkConfig = JSON.parse(jsonStr); } catch (e) { hkConfig = []; }
+      if (!Array.isArray(hkConfig)) hkConfig = [];
+      hkRender();
+    }
+
+    // Persist + re-register on the AHK side, then re-render locally.
+    function hkChanged() {
+      try { ahkCall('SetHotkeysConfig', JSON.stringify(hkConfig)); } catch (e) {}
+      hkRender();
+    }
+
+    function hkEsc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function hkBool(v) { return (v === true || v === 1 || v === '1' || v === 'true') ? 1 : 0; }
+
+    // ── Rendering ──────────────────────────────────────────────────────
+    function hkRender() {
+      const root = document.getElementById('hk-groups');
+      if (!root) return;
+      if (!hkConfig.length) {
+        root.innerHTML = '<div class="hk-empty">No hotkey groups yet. Click “+ Add Group”.</div>';
+        return;
+      }
+      root.innerHTML = hkConfig.map((g, gi) => hkRenderGroup(g, gi)).join('');
+    }
+
+    function hkRenderGroup(g, gi) {
+      const hks = Array.isArray(g.hotkeys) ? g.hotkeys : [];
+      const body = hks.length
+        ? hks.map((hk, hi) => hkRenderHotkey(hk, gi, hi)).join('')
+        : '<div class="hk-empty">No hotkeys in this group.</div>';
+      return `
+        <div class="hk-group">
+          <div class="hk-group-head">
+            <label><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
+                   onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"></label>
+            <input class="hk-group-name" value="${hkEsc(g.name)}"
+                   onchange="hkSetGroup(${gi},'name',this.value)">
+            <span class="hk-spacer"></span>
+            <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
+            <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
+          </div>
+          <div class="hk-group-body">${body}</div>
+        </div>`;
+    }
+
+    function hkRenderHotkey(hk, gi, hi) {
+      const mods = hk.mods || {};
+      const keyLabel = hk.key ? hkEsc(hk.key) : 'Set key';
+      const acts = Array.isArray(hk.actions) ? hk.actions : [];
+      const actHtml = acts.length
+        ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
+        : '<div class="hk-empty" style="padding:8px">No actions.</div>';
+      return `
+        <div class="hk-card">
+          <div class="hk-row">
+            <label><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"></label>
+            <input class="hk-card-name" value="${hkEsc(hk.name)}"
+                   onchange="hkSetHk(${gi},${hi},'name',this.value)">
+            <span class="hk-id">ID #${hk.id}</span>
+            <button class="hk-btn hk-key-btn" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
+            <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
+            <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'shift',this.checked?1:0)">Shift</label>
+            <label><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)">Alt</label>
+            <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>
+            <span class="hk-spacer"></span>
+            <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
+          </div>
+          <div class="hk-row">
+            <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
+            <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
+            <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+          </div>
+          <div class="hk-actions">${actHtml}</div>
+          <div class="hk-row" style="margin-top:6px">
+            <select id="hk-addact-${gi}-${hi}">
+              <option value="press">Repeat / Press</option>
+              <option value="repeat">Repeat (loop)</option>
+              <option value="hold">Hold</option>
+              <option value="chain">Chain (link hotkey)</option>
+              <option value="vitals">Condition: Vitals</option>
+              <option value="buff">Condition: Buff</option>
+              <option value="charges">Condition: Charges</option>
+              <option value="monsterCount">Condition: Monster count</option>
+              <option value="aim">Mouse move (auto-aim)</option>
+            </select>
+            <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+          </div>
+        </div>`;
+    }
+
+    function hkNum(a, k, def, gi, hi, ai) {
+      return `<input type="number" value="${a[k] != null ? hkEsc(a[k]) : def}"
+              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
+    }
+    function hkTxt(a, k, ph, gi, hi, ai) {
+      return `<input type="text" placeholder="${ph}" value="${hkEsc(a[k] || '')}"
+              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
+    }
+    function hkSel(a, k, opts, gi, hi, ai) {
+      const cur = a[k] != null ? String(a[k]) : '';
+      const o = opts.map(([v, lbl]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`).join('');
+      return `<select onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">${o}</select>`;
+    }
+    function hkChk(a, k, lbl, gi, hi, ai) {
+      return `<label><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
+              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.checked?1:0)">${lbl}</label>`;
+    }
+    const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
+
+    function hkRenderAction(a, gi, hi, ai) {
+      const t = a.type || '';
+      let body = '';
+      switch (t) {
+        case 'press':
+          body = `<span style="color:var(--subtext);font-size:12px">presses the hotkey’s output key once</span>`;
+          break;
+        case 'repeat':
+          body = `${hkChk(a, 'infinite', 'Infinite', gi, hi, ai)} `
+               + `Count ${hkNum(a, 'count', 1, gi, hi, ai)} `
+               + `Interval(ms) ${hkNum(a, 'intervalMs', 100, gi, hi, ai)}`;
+          break;
+        case 'hold':
+          body = `Duration(ms) ${hkNum(a, 'durationMs', 200, gi, hi, ai)}`;
+          break;
+        case 'chain':
+          body = `Target ID ${hkNum(a, 'targetId', 0, gi, hi, ai)} `
+               + `Mode ${hkSel(a, 'triggerMode', [['always', 'Always'], ['program', 'Program only'], ['user', 'User only']], gi, hi, ai)} `
+               + `Delay(ms) ${hkNum(a, 'delayMs', 0, gi, hi, ai)}`;
+          break;
+        case 'vitals':
+          body = `Resource ${hkSel(a, 'resource', [['hp', 'Life'], ['es', 'Energy Shield'], ['mana', 'Mana']], gi, hi, ai)} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
+               + `${hkNum(a, 'value', 50, gi, hi, ai)} %`;
+          break;
+        case 'buff':
+          body = `Name ${hkTxt(a, 'buffName', 'buff name / substring', gi, hi, ai)} `
+               + `${hkSel(a, 'mode', [['present', 'Present'], ['absent', 'Absent']], gi, hi, ai)} `
+               + `Min stacks ${hkNum(a, 'minStacks', 0, gi, hi, ai)} `
+               + `Min time left(ms) ${hkNum(a, 'minTimeLeftMs', 0, gi, hi, ai)}`;
+          break;
+        case 'charges':
+          body = `Type ${hkSel(a, 'chargeType', [['power', 'Power'], ['frenzy', 'Frenzy'], ['endurance', 'Endurance'], ['charged_staff', 'Charged Staff']], gi, hi, ai)} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
+               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
+          break;
+        case 'monsterCount':
+          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
+               + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
+               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
+          break;
+        case 'aim':
+          body = `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} `
+               + `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
+               + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
+               + `${hkTxt(a, 'chestType', 'chest type', gi, hi, ai)} `
+               + `${hkTxt(a, 'name', 'NPC name', gi, hi, ai)} `
+               + `${hkTxt(a, 'metadataPath', 'metadata path', gi, hi, ai)} `
+               + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
+               + `${hkChk(a, 'scanAll', 'Scan all', gi, hi, ai)}`;
+          break;
+        default:
+          body = `<span style="color:var(--subtext)">unknown action</span>`;
+      }
+      return `<div class="hk-action">
+                <span class="hk-act-type">${hkEsc(t)}</span>
+                ${body}
+                <span class="hk-spacer"></span>
+                <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
+              </div>`;
+    }
+
+    // ── Mutators (all funnel through hkChanged) ────────────────────────
+    function hkAddGroup() {
+      hkConfig.push({ name: 'New group', enabled: 1, hotkeys: [] });
+      hkChanged();
+    }
+    function hkDelGroup(gi) { hkConfig.splice(gi, 1); hkChanged(); }
+    function hkSetGroup(gi, k, v) { hkConfig[gi][k] = v; hkChanged(); }
+
+    function hkAddHotkey(gi) {
+      hkConfig[gi].hotkeys.push({
+        id: 0, name: 'New hotkey', enabled: 1, focusOnly: 1, safeZoneDisabled: 0,
+        key: '', mods: { ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, actions: []
+      });
+      hkChanged();   // AHK assigns the real id on normalize and echoes it back
+    }
+    function hkDelHk(gi, hi) { hkConfig[gi].hotkeys.splice(hi, 1); hkChanged(); }
+    function hkSetHk(gi, hi, k, v) { hkConfig[gi].hotkeys[hi][k] = v; hkChanged(); }
+    function hkSetMod(gi, hi, k, v) {
+      const hk = hkConfig[gi].hotkeys[hi];
+      if (!hk.mods) hk.mods = {};
+      hk.mods[k] = v;
+      hkChanged();
+    }
+
+    function hkActionDefaults(type) {
+      switch (type) {
+        case 'repeat':       return { type, infinite: 0, count: 1, intervalMs: 100 };
+        case 'hold':         return { type, durationMs: 200 };
+        case 'chain':        return { type, targetId: 0, triggerMode: 'always', delayMs: 0 };
+        case 'vitals':       return { type, resource: 'hp', op: '<=', value: 50 };
+        case 'buff':         return { type, buffName: '', mode: 'present', minStacks: 0, minTimeLeftMs: 0 };
+        case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
+        case 'monsterCount': return { type, rarity: 'any', radius: 1500, op: '>=', value: 1 };
+        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, chestType: '', name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
+        default:             return { type: 'press' };
+      }
+    }
+    function hkAddAction(gi, hi) {
+      const sel = document.getElementById('hk-addact-' + gi + '-' + hi);
+      const type = sel ? sel.value : 'press';
+      hkConfig[gi].hotkeys[hi].actions.push(hkActionDefaults(type));
+      hkChanged();
+    }
+    function hkDelAction(gi, hi, ai) { hkConfig[gi].hotkeys[hi].actions.splice(ai, 1); hkChanged(); }
+    function hkSetAct(gi, hi, ai, k, v) {
+      const a = hkConfig[gi].hotkeys[hi].actions[ai];
+      a[k] = (k === 'buffName' || k === 'name' || k === 'metadataPath' || k === 'chestType'
+              || k === 'op' || k === 'resource' || k === 'mode' || k === 'chargeType'
+              || k === 'rarity' || k === 'targetType' || k === 'triggerMode') ? v : (isNaN(+v) ? v : +v);
+      hkChanged();
+    }
+
+    // ── Key capture ────────────────────────────────────────────────────
+    function hkCaptureKey(gi, hi) {
+      hkCapture = { gi, hi };
+      document.getElementById('hk-capture').style.display = 'flex';
+    }
+    function hkFinishCapture(keyName, mods) {
+      if (!hkCapture) return;
+      const hk = hkConfig[hkCapture.gi].hotkeys[hkCapture.hi];
+      hk.key = keyName;
+      if (mods) hk.mods = Object.assign({ ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, mods);
+      hkCapture = null;
+      document.getElementById('hk-capture').style.display = 'none';
+      hkChanged();
+    }
+    // Maps a KeyboardEvent to an AHK key name. Returns '' if it should cancel.
+    function hkKeyName(e) {
+      const c = e.code || '';
+      if (c === 'Escape') return '';
+      if (/^Key[A-Z]$/.test(c)) return c.slice(3).toLowerCase();
+      if (/^Digit[0-9]$/.test(c)) return c.slice(5);
+      if (/^Numpad[0-9]$/.test(c)) return c;
+      if (/^F([1-9]|1[0-9]|2[0-4])$/.test(c)) return c;
+      const map = {
+        Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace',
+        ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right',
+        Home: 'Home', End: 'End', PageUp: 'PgUp', PageDown: 'PgDn',
+        Insert: 'Insert', Delete: 'Delete'
+      };
+      if (map[c]) return map[c];
+      return (e.key && e.key.length === 1) ? e.key.toLowerCase() : '';
+    }
+    document.addEventListener('keydown', function (e) {
+      if (!hkCapture) return;
+      e.preventDefault();
+      const name = hkKeyName(e);
+      if (name === '') { // Escape / unmappable → cancel
+        hkCapture = null;
+        document.getElementById('hk-capture').style.display = 'none';
+        return;
+      }
+      hkFinishCapture(name, { ctrl: e.ctrlKey ? 1 : 0, shift: e.shiftKey ? 1 : 0, alt: e.altKey ? 1 : 0, gamepadLT: 0 });
+    }, true);
+    document.addEventListener('mousedown', function (e) {
+      if (!hkCapture) return;
+      // Ignore clicks on the cancel overlay box itself except as a button trigger.
+      e.preventDefault();
+      const btn = { 0: 'LButton', 1: 'MButton', 2: 'RButton', 3: 'XButton1', 4: 'XButton2' };
+      const name = btn[e.button];
+      if (name) hkFinishCapture(name, null);
+    }, true);
 
     // ═══════════════════════════════════════════════════════════════════
     //  RE (Reverse-Engineering) TAB — memory snapshot diff
