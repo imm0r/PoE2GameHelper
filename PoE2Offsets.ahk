@@ -185,10 +185,10 @@ class PoE2Offsets
 
     static Actor := Map(
         "AnimationId", 0x8A0,
-        "ActiveSkills", 0xB00,
-        "ActiveSkillsLast", 0xB08,
-        "Cooldowns", 0xB18,
-        "CooldownsLast", 0xB20,
+        "ActiveSkills", 0xB08,        ; ActiveSkillsPtr StdVector start
+        "ActiveSkillsLast", 0xB10,
+        "Cooldowns", 0xB20,           ; CooldownsPtr StdVector start
+        "CooldownsLast", 0xB28,
         "DeployedEntities", 0xC10,
         "DeployedEntitiesLast", 0xC18
     )
