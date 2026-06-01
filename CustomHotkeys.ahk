@@ -1164,6 +1164,28 @@ _HotkeysSelectAimTarget(a, snap)
     radius := a.Has("radius") ? (a["radius"] + 0) : 1500
     scanAll := a.Has("scanAll") && a["scanAll"]
     targetType := a.Has("targetType") ? a["targetType"] : "monster"
+    ; Radius origin: "player" measures world distance from the player; "cursor"
+    ; measures screen-pixel distance from the mouse cursor (projected via W2S).
+    cursorMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor")
+
+    cx := 0, cy := 0, gameHwnd := 0, w2sMatrix := 0, pX := 0, pY := 0, pZ := 0
+    worldPre := 4000   ; world pre-filter before projecting, in cursor mode
+    if cursorMode
+    {
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+            return 0
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&cx, &cy)
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
+        pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
+        pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
+    }
 
     bestDist := radius + 1
     best := 0
@@ -1173,7 +1195,11 @@ _HotkeysSelectAimTarget(a, snap)
         if !(entity && entity is Map)
             continue
         dist := entry.Has("distance") ? entry["distance"] : -1
-        if (dist < 0 || dist > radius)
+        if (dist < 0)
+            continue
+        if (!cursorMode && dist > radius)
+            continue
+        if (cursorMode && dist > worldPre)
             continue
         if (!scanAll && !_HotkeysAimMatches(entity, a, targetType))
             continue
@@ -1182,14 +1208,28 @@ _HotkeysSelectAimTarget(a, snap)
         wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
         if !(wp && wp is Map)
             continue
-        if (dist < bestDist)
+        wx := wp.Has("x") ? wp["x"] : 0
+        wy := wp.Has("y") ? wp["y"] : 0
+        wz := wp.Has("z") ? wp["z"] : 0
+
+        metric := dist
+        if cursorMode
         {
-            bestDist := dist
-            best := Map(
-                "x", wp.Has("x") ? wp["x"] : 0,
-                "y", wp.Has("y") ? wp["y"] : 0,
-                "z", wp.Has("z") ? wp["z"] : 0
-            )
+            ci := Map("nearestWorldX", wx, "nearestWorldY", wy, "nearestWorldZ", wz,
+                "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+            sp := _WorldToScreen(ci, gameHwnd)
+            if !sp
+                continue
+            ddx := sp["x"] - cx, ddy := sp["y"] - cy
+            metric := Sqrt(ddx * ddx + ddy * ddy)
+            if (metric > radius)
+                continue
+        }
+
+        if (metric < bestDist)
+        {
+            bestDist := metric
+            best := Map("x", wx, "y", wy, "z", wz)
         }
     }
     return best

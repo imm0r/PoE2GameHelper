@@ -69,6 +69,7 @@ UpdateRadarFast()
             }
         }
         g_radarLastSnap := radarSnap  ; cache for Dump Entities button
+        HotkeyBindingsOnAreaChange(radarSnap)
 
         ; ── AutoPilot (state machine: combat → explore, owns shared guards) ──
         TryAutoPilot(radarSnap)
