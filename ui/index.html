@@ -5271,11 +5271,11 @@
     let hkCapture = null;   // {gi, hi} while waiting for a key press
     let hkOneShot = false;  // global one-shot-per-tick toggle (mirrors AHK)
     // In-game binds pushed from AHK: { flaskSlots:[{slot,key}], skillSlots:[{slot,key}], skillNames:[..] }
-    let hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [] };
+    let hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [], chestTypes: [] };
     // Called by AHK with the resolved in-game key bindings + active skill names.
     function updateHotkeyBindings(jsonStr) {
       try { hkBindings = JSON.parse(jsonStr); } catch (e) { return; }
-      if (!hkBindings || typeof hkBindings !== 'object') hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [] };
+      if (!hkBindings || typeof hkBindings !== 'object') hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [], chestTypes: [] };
       hkRender();
     }
     // Collapse state is view-only (not persisted, no AHK round-trip): a Set of
@@ -5486,6 +5486,28 @@
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
 
+    // Aim chest-type picker: a dropdown of the chest types currently present in
+    // the area (pushed live from AHK in hkBindings.chestTypes), plus a Custom…
+    // option that reveals a free-text substring field for anything else.
+    function hkTitle(s) { return String(s).replace(/(^|[\/_ ])([a-z])/g, (m,p,c)=>p+c.toUpperCase()); }
+    function hkChestTypeField(a, gi, hi, ai) {
+      const live = Array.isArray(hkBindings.chestTypes) ? hkBindings.chestTypes : [];
+      const cur = a.chestType || '';
+      const isCustom = !!a.chestTypeCustom || (cur !== '' && !live.includes(cur));
+      const selVal = isCustom ? '__custom__' : cur;
+      const opts = [['', 'Any'], ...live.map(t => [t, hkTitle(t)]), ['__custom__', 'Custom…']]
+        .map(([v, l]) => `<option value="${hkEsc(v)}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('');
+      let html = `Chest type <select onchange="hkSetChestType(${gi},${hi},${ai},this.value)">${opts}</select>`;
+      if (isCustom) html += ` ${hkTxt(a, 'chestType', 'path contains…', gi, hi, ai)}`;
+      return html + ' ';
+    }
+    function hkSetChestType(gi, hi, ai, v) {
+      const a = hkConfig[gi].hotkeys[hi].actions[ai];
+      if (v === '__custom__') { a.chestTypeCustom = 1; }
+      else { a.chestTypeCustom = 0; a.chestType = v; }
+      hkChanged();
+    }
+
     // Builds <option>s listing every hotkey across all groups, for the chain
     // action's target picker. curId is the currently-selected hotkey id.
     function hkHotkeyOptions(curId) {
@@ -5560,17 +5582,25 @@
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
-        case 'aim':
+        case 'aim': {
+          const tt = a.targetType || 'monster';
+          let filt = '';
+          if (tt === 'monster')
+            filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
+          else if (tt === 'chest')
+            filt = hkChestTypeField(a, gi, hi, ai);
+          else if (tt === 'npc')
+            filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
+          else if (tt === 'custom')
+            filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
           body = `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} `
-               + `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
+               + filt
                + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
-               + `${hkTxt(a, 'chestType', 'chest type', gi, hi, ai)} `
-               + `${hkTxt(a, 'name', 'NPC name', gi, hi, ai)} `
-               + `${hkTxt(a, 'metadataPath', 'metadata path', gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
                + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
                + `${hkChk(a, 'scanAll', 'Scan all', gi, hi, ai)}`;
           break;
+        }
         default:
           body = `<span style="color:var(--subtext)">unknown action</span>`;
       }
@@ -5700,7 +5730,7 @@
         case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
         case 'monsterCount': return { type, rarity: 'any', radius: 1500, op: '>=', value: 1 };
         case 'monsterCountCursor': return { type, rarity: 'any', radius: 120, op: '>=', value: 1 };
-        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, chestType: '', name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
+        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
         default:             return { type: 'press' };
       }
     }

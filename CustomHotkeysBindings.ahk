@@ -139,9 +139,55 @@ PushHotkeyBindingsToWebView()
     payload := Map(
         "flaskSlots", flaskArr,
         "skillSlots", skillSlotArr,
-        "skillNames", skillNames
+        "skillNames", skillNames,
+        "chestTypes", _CollectChestTypes()
     )
     try WebViewExec("updateHotkeyBindings(" _JsStr(JsonFull_Stringify(payload, false)) ")")
+}
+
+; Collects the distinct chest-type tokens present in the current area (the path
+; segment after "chests/", plus "strongbox" when seen). These feed the aim
+; action's chest-type dropdown so it reflects what's actually around.
+; Returns an array of lowercase substring tokens (may be empty).
+_CollectChestTypes()
+{
+    global g_radarLastSnap
+    out := []
+    seen := Map()
+    snap := (g_radarLastSnap && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+    if !snap
+        return out
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    if !area
+        return out
+    for listKey in ["awakeEntities", "sleepingEntities"]
+    {
+        lst := area.Has(listKey) ? area[listKey] : 0
+        sample := (lst && lst is Map && lst.Has("sample")) ? lst["sample"] : 0
+        if !(sample is Array)
+            continue
+        for entry in sample
+        {
+            entity := (entry is Map && entry.Has("entity")) ? entry["entity"] : 0
+            if !(entity is Map)
+                continue
+            path := entity.Has("path") ? StrLower(entity["path"]) : ""
+            if (path = "" || !InStr(path, "chest"))
+                continue
+            tok := ""
+            if RegExMatch(path, "chests/([^/]+)", &m)
+                tok := m[1]
+            else if InStr(path, "strongbox")
+                tok := "strongbox"
+            if (tok != "" && !seen.Has(tok))
+            {
+                seen[tok] := true
+                out.Push(tok)
+            }
+        }
+    }
+    return out
 }
 
 ; Reads the player's currently active skills and returns a sorted array of their
