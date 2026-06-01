@@ -972,7 +972,6 @@ _HotkeysSendKey(key)
 _HotkeysDoRepeat(hk, a)
 {
     id := hk["id"]
-    key := _HotkeysResolveKey(hk)
     interval := a.Has("intervalMs") ? Max(15, a["intervalMs"] + 0) : 100
     rt := _HotkeysRuntime(id)
 
@@ -986,7 +985,10 @@ _HotkeysDoRepeat(hk, a)
             rt["repeatFn"] := 0
             return
         }
-        fn := () => _HotkeysSendKey(key)
+        ; Re-resolve the key and re-check skill readiness on every tick so a
+        ; cooldown-bound skill isn't spammed during its cooldown (the eval-tick
+        ; minGap only throttles _HotkeysFire, not this timer).
+        fn := () => _HotkeysSendKeyIfReady(hk)
         rt["repeatFn"] := fn
         rt["repeatActive"] := 1
         SetTimer(fn, interval)
@@ -995,18 +997,37 @@ _HotkeysDoRepeat(hk, a)
 
     ; Finite count: schedule N sends without blocking the message loop.
     count := a.Has("count") ? Max(1, a["count"] + 0) : 1
-    _HotkeysScheduleBurst(key, count, interval)
+    _HotkeysScheduleBurst(hk, count, interval)
 }
 
-; Schedules <count> key presses spaced <interval> ms apart via a self-cancelling timer.
-_HotkeysScheduleBurst(key, count, interval)
+; Sends the hotkey's resolved output key, but only if its output readiness gate
+; passes (skill off cooldown). Used by repeat timers so each tick is gated.
+_HotkeysSendKeyIfReady(hk)
 {
-    state := Map("left", count, "fn", 0)
+    rdy := _HotkeysOutputReadiness(hk)
+    if !rdy["ready"]
+        return
+    _HotkeysSendKey(_HotkeysResolveKey(hk))
+}
+
+; Schedules <count> key presses spaced <interval> ms apart via a self-cancelling
+; timer. Each tick re-checks readiness (and counts only when a key was sent), so
+; a cooldown-bound skill burst won't fire faster than the skill allows.
+_HotkeysScheduleBurst(hk, count, interval)
+{
+    ; ticksLeft caps total attempts so a never-ready skill can't keep the timer
+    ; alive forever: allow up to 4x the requested sends before giving up.
+    state := Map("left", count, "ticksLeft", count * 4 + 8, "fn", 0)
     tick()
     {
-        _HotkeysSendKey(key)
-        state["left"] -= 1
-        if (state["left"] <= 0)
+        rdy := _HotkeysOutputReadiness(hk)
+        if rdy["ready"]
+        {
+            _HotkeysSendKey(_HotkeysResolveKey(hk))
+            state["left"] -= 1
+        }
+        state["ticksLeft"] -= 1
+        if (state["left"] <= 0 || state["ticksLeft"] <= 0)
             SetTimer(state["fn"], 0)
     }
     state["fn"] := tick
