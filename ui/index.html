@@ -4917,40 +4917,132 @@
     <!-- HOTKEYS — custom hotkey / macro editor -->
     <div class="tab-panel" id="panel-hotkeys">
       <style>
-        #panel-hotkeys { padding: 12px; overflow-y: auto; }
-        .hk-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
-        .hk-toolbar .hk-hint { color:var(--subtext); font-size:12px; margin-left:auto; }
-        .hk-group { border:1px solid var(--border); border-radius:6px; margin-bottom:12px; background:var(--surface); }
-        .hk-group-head { display:flex; gap:8px; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border); }
-        .hk-group-name { background:transparent; border:none; color:var(--text); font-weight:600; font-size:14px; flex:0 0 auto; min-width:120px; }
-        .hk-group-name:focus { outline:1px solid var(--accent); }
-        .hk-group-body { padding:8px 10px; }
-        .hk-card { border:1px solid var(--border); border-radius:5px; padding:8px; margin-bottom:8px; background:var(--bg); }
-        .hk-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
-        .hk-card-name { background:transparent; border:none; color:var(--text); font-weight:600; min-width:120px; }
-        .hk-card-name:focus { outline:1px solid var(--accent); }
-        .hk-id { color:var(--subtext); font-size:11px; }
-        .hk-key-btn { min-width:70px; }
-        #panel-hotkeys input[type=text], #panel-hotkeys input[type=number], #panel-hotkeys select {
-          background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:3px 6px; font-size:12px;
+        /* HOTKEYS — Codex parchment theme, matching the Inventory tab.
+           Scoped to #panel-hotkeys; uses the :root --codex-* palette and serif
+           typefaces so the rest of the WebView is unaffected. */
+        #panel-hotkeys {
+          padding: 0;
+          overflow-y: auto;
+          color: var(--codex-text);
+          font-family: var(--codex-serif);
+          position: relative;
+          background:
+            radial-gradient(ellipse 80% 60% at 50% 40%, rgba(80,52,30,0.18), transparent 70%),
+            radial-gradient(circle at 0% 0%,   rgba(0,0,0,0.55) 0%, transparent 45%),
+            radial-gradient(circle at 100% 0%, rgba(0,0,0,0.55) 0%, transparent 45%),
+            radial-gradient(circle at 0% 100%, rgba(0,0,0,0.50) 0%, transparent 45%),
+            radial-gradient(circle at 100% 100%, rgba(0,0,0,0.50) 0%, transparent 45%),
+            linear-gradient(180deg, var(--codex-ink) 0%, var(--codex-vellum) 18%, var(--codex-vellum) 82%, var(--codex-ink) 100%);
         }
-        #panel-hotkeys input[type=number] { width:74px; }
-        #panel-hotkeys label { color:var(--subtext); font-size:12px; display:inline-flex; gap:4px; align-items:center; }
-        .hk-actions { margin-top:6px; padding-left:8px; border-left:2px solid var(--border); }
-        .hk-action { display:flex; gap:6px; align-items:center; flex-wrap:wrap; padding:5px 0; border-bottom:1px dashed var(--border); }
-        .hk-action:last-child { border-bottom:none; }
-        .hk-act-type { color:var(--accent); font-weight:600; min-width:96px; }
-        .hk-btn { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 9px; cursor:pointer; font-size:12px; }
-        .hk-btn:hover { border-color:var(--accent); }
-        .hk-btn.danger:hover { border-color:#d06b6b; color:#d06b6b; }
-        .hk-spacer { margin-left:auto; }
-        .hk-empty { color:var(--subtext); padding:20px; text-align:center; }
-        .hk-caret { cursor:pointer; color:var(--subtext); user-select:none; width:14px; display:inline-block; text-align:center; font-size:11px; }
-        .hk-caret:hover { color:var(--accent); }
-        .hk-grip { cursor:grab; color:var(--subtext); padding:0 5px; user-select:none; font-size:14px; line-height:1; }
-        .hk-grip:active { cursor:grabbing; }
-        .hk-dragover { outline:2px dashed var(--accent); outline-offset:1px; }
-        .hk-dragging { opacity:.45; }
+        #panel-hotkeys::before {
+          content: ""; position: absolute; inset: 0; pointer-events: none;
+          opacity: 0.35; mix-blend-mode: overlay; z-index: 0;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.6  0 0 0 0 0.5  0 0 0 0 0.35  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+          background-size: 200px 200px;
+        }
+        #panel-hotkeys > * { position: relative; z-index: 1; }
+
+        /* Toolbar — section banner with gilded under-rule. */
+        .hk-toolbar {
+          display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+          padding: 10px 18px; margin: 0 0 14px;
+          border-bottom: 1px solid var(--codex-rule);
+          background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.08));
+        }
+        .hk-toolbar .hk-hint {
+          color: var(--codex-text-dim); font-size: 12px; font-style: italic; margin-left: auto;
+        }
+        #panel-hotkeys .hk-groups-wrap, #hk-groups { padding: 0 18px 22px; }
+
+        /* Group — a chapter on raised parchment with a gold-on-brown frame. */
+        .hk-group {
+          margin: 0 0 18px;
+          border: 1px solid var(--codex-rule);
+          border-radius: 1px;
+          background:
+            radial-gradient(ellipse at center, rgba(232,220,184,0.04), transparent 70%),
+            linear-gradient(180deg, var(--codex-parchment) 0%, var(--codex-vellum) 100%);
+          box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.5);
+        }
+        .hk-group-head {
+          display: flex; gap: 8px; align-items: center; padding: 9px 12px;
+          border-bottom: 1px solid var(--codex-rule);
+          background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.05));
+        }
+        .hk-group-name {
+          background: transparent; border: none; color: var(--codex-gold-hi);
+          font-family: var(--codex-display); letter-spacing: 0.14em; text-transform: uppercase;
+          font-size: 13px; min-width: 140px;
+        }
+        .hk-group-name:focus { outline: 1px solid var(--codex-gold); }
+        .hk-group-body { padding: 10px 12px; }
+
+        /* Hotkey card — a parchment slip inside the chapter. */
+        .hk-card {
+          border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
+          padding: 8px 10px; margin-bottom: 8px;
+          background: linear-gradient(180deg, rgba(20,12,6,0.55), rgba(10,6,4,0.6));
+          box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
+        }
+        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .hk-card-name {
+          background: transparent; border: none; color: var(--codex-text);
+          font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 130px;
+        }
+        .hk-card-name:focus { outline: 1px solid var(--codex-gold); }
+        .hk-id {
+          color: var(--codex-text-dim); font-size: 11px;
+          font-family: var(--codex-mono-serif); letter-spacing: 0.05em;
+        }
+        .hk-key-btn { min-width: 70px; }
+
+        /* Inputs / selects — sunken parchment fields. */
+        #panel-hotkeys input[type=text], #panel-hotkeys input[type=number], #panel-hotkeys select {
+          background: linear-gradient(180deg, rgba(10,6,4,0.85), rgba(20,12,6,0.7));
+          color: var(--codex-text);
+          border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
+          padding: 3px 6px; font-size: 12px; font-family: var(--codex-serif);
+        }
+        #panel-hotkeys input:focus, #panel-hotkeys select:focus { outline: 1px solid var(--codex-gold); }
+        #panel-hotkeys input[type=number] { width: 74px; }
+        #panel-hotkeys label {
+          color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 4px; align-items: center;
+        }
+        #panel-hotkeys input[type=checkbox] { accent-color: var(--codex-gold); }
+
+        .hk-actions { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
+        .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
+        .hk-action:last-child { border-bottom: none; }
+        .hk-act-type {
+          color: var(--codex-gold); font-family: var(--codex-display);
+          letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; min-width: 104px;
+        }
+
+        /* Buttons — gilded two-tone, Cinzel small-caps (like the inv toolbar). */
+        .hk-btn {
+          font-family: var(--codex-display); letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px;
+          background: linear-gradient(180deg, var(--codex-edge), var(--codex-parchment));
+          color: var(--codex-gold-hi);
+          border: 1px solid var(--codex-rule); border-radius: 1px;
+          padding: 5px 11px; cursor: pointer;
+          transition: color .15s, border-color .15s, transform .1s, box-shadow .15s;
+        }
+        .hk-btn:hover {
+          color: #fff5d0; border-color: var(--codex-gold);
+          transform: translateY(-1px); box-shadow: 0 2px 6px -2px rgba(200,168,90,0.45);
+        }
+        .hk-btn.danger { color: var(--codex-blood-hi); }
+        .hk-btn.danger:hover { border-color: var(--codex-blood-hi); color: #ff8d8d; box-shadow: 0 2px 6px -2px rgba(197,72,72,0.5); }
+
+        .hk-spacer { margin-left: auto; }
+        .hk-empty { color: var(--codex-text-dim); padding: 20px; text-align: center; font-style: italic; }
+        .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
+        .hk-caret:hover { color: var(--codex-gold-hi); }
+        .hk-grip { cursor: grab; color: var(--codex-text-dim); padding: 0 5px; user-select: none; font-size: 14px; line-height: 1; }
+        .hk-grip:hover { color: var(--codex-gold); }
+        .hk-grip:active { cursor: grabbing; }
+        .hk-dragover { outline: 2px dashed var(--codex-gold); outline-offset: 1px; }
+        .hk-dragging { opacity: .45; }
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
