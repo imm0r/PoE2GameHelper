@@ -9,9 +9,9 @@ class PoE2Offsets
 
     static InGameState := Map(
         "AreaInstanceData", 0x290,
-        "GameUiPtr", 0x2F0,          ; currently unused; GameUi also reachable via UiRootStruct (0xBE0)
-        "WorldData", 0x368,
-        "UiRootStructPtr", 0x340
+        "UiRootStructPtr", 0x2F0,    ; KB/M UI manager = UserInterface_MouseAndKeyboard
+        "GamepadUiRootStructPtr", 0x318, ; controller UI manager
+        "WorldData", 0x368
     )
 
     ; Fields within the AreaLoadingState game-state struct (StateNames[1]).
@@ -22,7 +22,7 @@ class PoE2Offsets
     )
 
     static UiRootStruct := Map(
-        "UiRootPtr", 0x5B8,
+        "UiRootPtr", 0x340,
         "GameUiPtr", 0xBE0,
         "GameUiControllerPtr", 0xBE8
     )
@@ -52,29 +52,29 @@ class PoE2Offsets
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
     static TerrainMetadata := Map(
-        "TotalTilesX",          0x18,   ; int64 — number of tile columns
-        "TotalTilesY",          0x20,   ; int64 — number of tile rows
-        "TileDetailsPtr",       0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
-        "GridWalkableData",     0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
-        "GridLandscapeData",    0xE8,   ; StdVector<byte> -- absolute: AreaInstance+0x988
-        "BytesPerRow",          0x130,  ; int32 -- absolute: AreaInstance+0x9D0
+        "TotalTilesX", 0x18,   ; int64 — number of tile columns
+        "TotalTilesY", 0x20,   ; int64 — number of tile rows
+        "TileDetailsPtr", 0x28,   ; StdVector<TileStructure> (each 0x38 bytes)
+        "GridWalkableData", 0xD0,   ; StdVector<byte> -- absolute: AreaInstance+0x970
+        "GridLandscapeData", 0xE8,   ; StdVector<byte> -- absolute: AreaInstance+0x988
+        "BytesPerRow", 0x130,  ; int32 -- absolute: AreaInstance+0x9D0
         "TileHeightMultiplier", 0x134   ; int16 -- absolute: AreaInstance+0x9D4
     )
 
     ; TileStructure layout (0x38 bytes each, within TileDetailsPtr vector)
     static TileStruct := Map(
         "SubTileDetailsPtr", 0x00,
-        "TgtFilePtr",        0x08,  ; pointer to TgtFileStruct
-        "TileHeight",        0x30,  ; int16
-        "TileIdX",           0x34,  ; byte
-        "TileIdY",           0x35,  ; byte
-        "RotationSelector",  0x36   ; byte
+        "TgtFilePtr", 0x08,  ; pointer to TgtFileStruct
+        "TileHeight", 0x30,  ; int16
+        "TileIdX", 0x34,  ; byte
+        "TileIdY", 0x35,  ; byte
+        "RotationSelector", 0x36   ; byte
     )
 
     ; TgtFileStruct layout (pointed to by TileStruct.TgtFilePtr)
     static TgtFile := Map(
-        "Vtable",   0x00,
-        "TgtPath",  0x08           ; StdWString — the entity/tile path
+        "Vtable", 0x00,
+        "TgtPath", 0x08           ; StdWString — the entity/tile path
     )
 
     static LocalPlayerStruct := Map(
@@ -344,12 +344,12 @@ class PoE2Offsets
     )
 
     static InventoryArray := Map(
-        "EntrySize",     0x18,
-        "InventoryId",   0x00,
+        "EntrySize", 0x18,
+        "InventoryId", 0x00,
         "InventoryPtr0", 0x08,
         "InventoryPtr1", 0x10   ; second pointer per upstream layout — usually
-                                ; points 0x10 bytes before InventoryPtr0;
-                                ; only the diagnostic dump reads it.
+        ; points 0x10 bytes before InventoryPtr0;
+        ; only the diagnostic dump reads it.
     )
 
     static Inventory := Map(
@@ -396,11 +396,12 @@ class PoE2Offsets
         "Capacity", 0x18
     )
 
-    ; All offsets are relative to uiRootStructPtr (= ReadPtr(InGameState + 0x340))
+    ; All offsets are relative to the KB/M UiRootStructPtr (= ReadPtr(InGameState + 0x2F0)).
+    ; Controller-mode UI uses a different manager layout and may not use these KB/M offsets.
     static ImportantUiElements := Map(
-        "ChatParentPtr",              0x640,
-        "PassiveSkillTreePanel",      0x6B0,
-        "MapParentPtr",               0x748,
+        "ChatParentPtr", 0x640,
+        "PassiveSkillTreePanel", 0x730,
+        "MapParentPtr", 0x7C8,
         "ControllerModeMapParentPtr", 0xAA8
     )
 
@@ -408,7 +409,7 @@ class PoE2Offsets
     ; (read from cache location inside the struct)
     static MapParentStruct := Map(
         "LargeMapPtr", 0x28,   ; 1st child ~ reading from cache location
-        "MiniMapPtr",  0x30    ; 2nd child ~ reading from cache location
+        "MiniMapPtr", 0x30    ; 2nd child ~ reading from cache location
     )
 
     ; PassiveSkillTreeStruct: cache location disabled, use ChildNumber to walk children.
@@ -419,17 +420,17 @@ class PoE2Offsets
 
     ; Offsets shared by every UiElement (UiElementBaseOffset.cs)
     static UiElementBase := Map(
-        "ChildrenFirst",        0x010,  ; StdVector First ptr → pointer array of child UiElements
-        "ParentPtr",            0x0B8,  ; ptr to parent UiElement (for absolute pos traversal)
-        "PositionModifier",     0x0F0,  ; StdTuple2D<float> — added to parent pos when child's ShouldModifyPos (bit10) is set
-        "RelativePosition",     0x118,  ; StdTuple2D<float> — position relative to parent (UI coords, base 2560×1600)
+        "ChildrenFirst", 0x010,  ; StdVector First ptr → pointer array of child UiElements
+        "ParentPtr", 0x0B8,  ; ptr to parent UiElement (for absolute pos traversal)
+        "PositionModifier", 0x0F0,  ; StdTuple2D<float> — added to parent pos when child's ShouldModifyPos (bit10) is set
+        "RelativePosition", 0x118,  ; StdTuple2D<float> — position relative to parent (UI coords, base 2560×1600)
         "LocalScaleMultiplier", 0x130,  ; float — scale factor applied to children
-        "StringIdPtr",          0x0F8,  ; StdWString — UI element identifier (e.g. "LeftPanel", "UltimatumTitle"). 0x140 was the pre-patch offset.
-        "FontNamePtr",          0x0C8,  ; StdWString — font family used for text rendering (e.g. "Fontin", "Fontin Smallcaps")
-        "Flags",                0x180,  ; uint — bit 10 = SHOULD_MODIFY_POS, bit 11 = IS_VISIBLE
-        "ScaleIndex",           0x18A,  ; byte — 1/2/3 for GameWindowScale lookup
-        "BackgroundColor",      0x25C,  ; float4 RGBA — .W (alpha, +12) is used for chat-active check
-        "UnscaledSize",         0x288   ; StdTuple2D<float> — element size in UI coords
+        "StringIdPtr", 0x0F8,  ; StdWString — UI element identifier (e.g. "LeftPanel", "UltimatumTitle"). 0x140 was the pre-patch offset.
+        "FontNamePtr", 0x0C8,  ; StdWString — font family used for text rendering (e.g. "Fontin", "Fontin Smallcaps")
+        "Flags", 0x180,  ; uint — bit 10 = SHOULD_MODIFY_POS, bit 11 = IS_VISIBLE
+        "ScaleIndex", 0x18A,  ; byte — 1/2/3 for GameWindowScale lookup
+        "BackgroundColor", 0x25C,  ; float4 RGBA — .W (alpha, +12) is used for chat-active check
+        "UnscaledSize", 0x288   ; StdTuple2D<float> — element size in UI coords
     )
 
     ; Panels we want to detect for overlay visibility gating.
@@ -457,16 +458,16 @@ class PoE2Offsets
     ; Runtime-populated: panelName → byte offset from GameUiPtr.
     ; Filled by DiscoverPanelOffsets(), persisted to INI under [PanelOffsets].
     static DiscoveredPanelOffsets := Map(
-        "LeftPanel",        0x748,
-        "RightPanel",       0x9F8
+        "LeftPanel", 0x748,
+        "RightPanel", 0x9F8
     )
 
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)
     static MapUiElement := Map(
-        "Shift",        0x3A0,  ; StdTuple2D<float> — user/game shift of map center
+        "Shift", 0x3A0,  ; StdTuple2D<float> — user/game shift of map center
         "DefaultShift", 0x3A8,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
-        "Zoom",         0x3E0   ; float — current zoom level (default ~0.5)
+        "Zoom", 0x3E0   ; float — current zoom level (default ~0.5)
     )
 
 }
