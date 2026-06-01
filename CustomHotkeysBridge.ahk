@@ -8,11 +8,13 @@
 ; updateHotkeys() handler in the WebView as a JSON string.
 PushHotkeysToWebView()
 {
-    global g_hotkeyGroups, g_webViewReady
+    global g_hotkeyGroups, g_webViewReady, g_hkOneShotPerTick
     if !g_webViewReady
         return
     json := JsonFull_Stringify(g_hotkeyGroups, false)
-    try WebViewExec("updateHotkeys(" _JsStr(json) ")")
+    oneShot := (IsSet(g_hkOneShotPerTick) && g_hkOneShotPerTick) ? "true" : "false"
+    try WebViewExec("updateHotkeys(" _JsStr(json) ", " oneShot ")")
+    PushHotkeyBindingsToWebView()
 }
 
 ; Applies a full hotkey config received from the UI as a JSON string:
@@ -31,6 +33,14 @@ _ApplyHotkeysConfigFromUI(jsonStr)
     HotkeysRegisterAll()
     HotkeysSaveConfig()
     PushHotkeysToWebView()
+}
+
+; Sets the global one-shot-per-tick flag and persists it to the config INI.
+_SetHotkeyOneShot(enabled)
+{
+    global g_hkOneShotPerTick
+    g_hkOneShotPerTick := enabled ? true : false
+    try IniWrite(g_hkOneShotPerTick ? "1" : "0", _ConfigPath(), "Hotkeys", "oneShotPerTick")
 }
 
 ; Returns the export/import folder (A_ScriptDir\hotkeys_export), creating it.

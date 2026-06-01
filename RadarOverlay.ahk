@@ -722,6 +722,10 @@ class RadarOverlay
             }
         }
 
+        ; ── Hotkey action debug (per-action debug flag in the Hotkeys tab) ──
+        this._RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin,
+            gameWindowWidth, gameWindowHeight)
+
         ; ── Entities zeichnen ────────────────────────────────────────────────────────────
         awakeEntities   := (areaInstance && areaInstance.Has("awakeEntities"))    ? areaInstance["awakeEntities"]    : 0
         sleepingEntities := (areaInstance && areaInstance.Has("sleepingEntities")) ? areaInstance["sleepingEntities"] : 0
@@ -1317,6 +1321,74 @@ class RadarOverlay
 
         if (label != "")
             this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
+    }
+
+    ; Renders per-action debug overlays for hotkey actions whose debug flag is on.
+    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws, per
+    ; item: a world range circle (around the player) or a cursor pixel circle,
+    ; plus a stacked text block (label + monster counts / cooldown / charges).
+    _RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin, gw, gh)
+    {
+        global g_hkDebugItems
+        if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
+            return
+
+        COL := 0x55FFFF        ; debug yellow (BGR)
+        COL_CUR := 0xC0A8FF    ; cursor circle (pinkish)
+        textX := Round(gw * 0.55)
+        textY := Round(gh * 0.30)
+        pitch := 15
+
+        for _, rec in g_hkDebugItems
+        {
+            if !(rec is Map)
+                continue
+            ; World range circle around the player.
+            if (rec.Has("circleWorld") && rec["circleWorld"] > 0)
+                this._DrawRangeCircle(rec["circleWorld"], mapCenterX, mapCenterY,
+                    projectionCos, projectionSin, COL,
+                    rec.Has("label") ? rec["label"] : "")
+            ; Cursor pixel circle (screen cursor → client coords).
+            if (rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
+            {
+                cx := 0, cy := 0
+                CoordMode("Mouse", "Screen")
+                MouseGetPos(&cx, &cy)
+                this._DrawPixelCircle(cx - this._lastGwX, cy - this._lastGwY,
+                    rec["circleCursorPx"], COL_CUR)
+            }
+            ; Text block.
+            this._DrawText(textX, textY, rec.Has("label") ? rec["label"] : "?", COL)
+            textY += pitch
+            if (rec.Has("lines") && rec["lines"] is Array)
+            {
+                for _, ln in rec["lines"]
+                {
+                    this._DrawText(textX + 10, textY, ln, 0xB8DCE8)
+                    textY += pitch
+                }
+            }
+            textY += 4
+        }
+    }
+
+    ; Draws a screen-space (non-isometric) circle of <radiusPx> around (cx,cy).
+    _DrawPixelCircle(cx, cy, radiusPx, colorBGR)
+    {
+        segments := 40
+        step := 6.2831853 / segments
+        n := segments + 1
+        pts := Buffer(n * 8, 0)
+        Loop n
+        {
+            angle := (A_Index - 1) * step
+            NumPut("Int", Round(cx + radiusPx * Cos(angle)), pts, (A_Index - 1) * 8)
+            NumPut("Int", Round(cy + radiusPx * Sin(angle)), pts, (A_Index - 1) * 8 + 4)
+        }
+        pen := this._GetPen(colorBGR, 2)
+        oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pts, "Int", n)
+        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
     }
 
     ; ── Interne Buffer-Verwaltung ────────────────────────────────────────────────────────
