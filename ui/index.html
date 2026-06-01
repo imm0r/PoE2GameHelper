@@ -4985,6 +4985,10 @@
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
         .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        /* The per-hotkey option checkboxes ride on the Output row when wide, but
+           wrap to the next line together (never split) when space runs short. */
+        .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
+        .hk-chk-group label { white-space: nowrap; }
         .hk-card-name {
           background: transparent; border: none; color: var(--codex-text);
           font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 130px;
@@ -5377,14 +5381,14 @@
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
-          </div>
-          <div class="hk-row">
-            <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
-            <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
-            <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+            <span class="hk-chk-group">
+              <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
+              <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
+              <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+            </span>
           </div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
@@ -5606,8 +5610,8 @@
           // Counts targetable monsters inside a screen-pixel radius measured
           // either from the mouse cursor or from the player's on-screen position.
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
                + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
@@ -5633,11 +5637,15 @@
           const targetSel = `<select title="any (debug) aims at the nearest targetable entity, ignoring the target type and its filter." onchange="hkSetAimTarget(${gi},${hi},${ai},this.value)">`
                + targetOpts.map(([v, l]) => `<option value="${v}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('')
                + `</select>`;
+          // Hold(ms) only matters when "Press key" is on — grey it out otherwise.
+          const pressed = !!a.press;
+          const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? '' : 'Enable "Press key" to use Hold(ms)'}">`
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}</span>`;
           body = `Target ${targetSel} ${filt}`
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
                + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}`;
+               + holdBlock;
           break;
         }
         default:
