@@ -5606,8 +5606,8 @@
           // Counts targetable monsters inside a screen-pixel radius measured
           // either from the mouse cursor or from the player's on-screen position.
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
                + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
@@ -5633,11 +5633,15 @@
           const targetSel = `<select title="any (debug) aims at the nearest targetable entity, ignoring the target type and its filter." onchange="hkSetAimTarget(${gi},${hi},${ai},this.value)">`
                + targetOpts.map(([v, l]) => `<option value="${v}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('')
                + `</select>`;
+          // Hold(ms) only matters when "Press key" is on — grey it out otherwise.
+          const pressed = !!a.press;
+          const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? '' : 'Enable "Press key" to use Hold(ms)'}">`
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}</span>`;
           body = `Target ${targetSel} ${filt}`
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
                + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}`;
+               + holdBlock;
           break;
         }
         default:
