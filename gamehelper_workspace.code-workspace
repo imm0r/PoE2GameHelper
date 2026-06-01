@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"github.copilot.chat.agentDebugLog.enabled": true,
+		"editor.aiStats.enabled": true
+	}
+}

@@ -1,14 +1,150 @@
+GetKnownPoeExeCandidates()
+{
+    return ["PathOfExileSteam.exe", "PathOfExile_x64Steam.exe", "PathOfExile.exe", "PathOfExile_x64.exe"]
+}
+
+; Helper: detect installed/active PoE executable name from common candidates.
+DetectPoeExeName()
+{
+    for name in GetKnownPoeExeCandidates()
+        if ProcessExist(name)
+            return name
+
+    name := ResolvePoeExeNameFromCachedInstall()
+    if (name != "")
+        return name
+
+    name := ResolvePoeExeNameFromSteamInstall()
+    if (name != "")
+        return name
+
+    return GetKnownPoeExeCandidates()[1]
+}
+
+; Helper: return PID of first-matching running PoE process, or 0.
+FindPoePid()
+{
+    for name in GetKnownPoeExeCandidates()
+    {
+        pid := ProcessExist(name)
+        if (pid)
+            return pid
+    }
+    return 0
+}
+
+; Helper: return main window HWND for PoE if present, or 0.
+GetPoeMainWindowHwnd()
+{
+    for name in GetKnownPoeExeCandidates()
+    {
+        hwnd := WinExist("ahk_exe " name)
+        if (hwnd)
+            return hwnd
+    }
+    return 0
+}
+
+ResolvePoeExeNameFromCachedInstall()
+{
+    configPath := A_ScriptDir "\gamehelper_config.ini"
+    if IsFunc("_ConfigPath")
+        configPath := _ConfigPath()
+
+    indexPath := IniRead(configPath, "GgpkTools", "lastIndexPath", "")
+    if (!FileExist(indexPath))
+        return ""
+
+    installDir := ""
+    if (InStr(indexPath, "\Bundles2\_.index.bin"))
+        installDir := SubStr(indexPath, 1, StrLen(indexPath) - StrLen("\Bundles2\_.index.bin"))
+    else if (InStr(indexPath, "\Content.ggpk"))
+        installDir := SubStr(indexPath, 1, StrLen(indexPath) - StrLen("\Content.ggpk"))
+
+    if (installDir = "" || !DirExist(installDir))
+        return ""
+
+    for name in GetKnownPoeExeCandidates()
+    {
+        if FileExist(installDir "\" name)
+            return name
+    }
+    return ""
+}
+
+ResolvePoeExeNameFromSteamInstall()
+{
+    exeNames := GetKnownPoeExeCandidates()
+    steamRoot := RegRead("HKLM\SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath", "")
+    if (steamRoot = "")
+        steamRoot := RegRead("HKLM\SOFTWARE\Valve\Steam", "InstallPath", "")
+    if (steamRoot = "" || !DirExist(steamRoot))
+        return ""
+
+    vdf := steamRoot "\steamapps\libraryfolders.vdf"
+    if (!FileExist(vdf))
+        return ""
+
+    libraries := ParseSteamLibraryPaths(vdf)
+    if (!ListContains(libraries, steamRoot))
+        libraries.Push(steamRoot)
+
+    for _, lib in libraries
+    {
+        manifest := lib "\steamapps\appmanifest_2694490.acf"
+        if (!FileExist(manifest))
+            continue
+        installDir := ParseAcfKey(manifest, "installdir")
+        if (installDir = "")
+            continue
+
+        baseDir := lib "\steamapps\common\" installDir
+        for name in exeNames
+            if FileExist(baseDir "\" name)
+                return name
+    }
+    return ""
+}
+
+ParseSteamLibraryPaths(vdfPath)
+{
+    contents := FileRead(vdfPath)
+    paths := []
+    for line in StrSplit(contents, "`n")
+    {
+        if RegExMatch(line, '"path"\s*"([^"]+)"', m)
+        {
+            path := StrReplace(m1, "\\", "\\")
+            if (path != "" && DirExist(path))
+                paths.Push(path)
+        }
+    }
+    return paths
+}
+
+ParseAcfKey(manifestPath, key)
+{
+    contents := FileRead(manifestPath)
+    pattern := '"' key '"\s*"([^"]+)"'
+    if RegExMatch(contents, pattern, m)
+        return m1
+    return ""
+}
+
+ListContains(list, value)
+{
+    for _, item in list
+        if (item = value)
+            return true
+    return false
+}
+
 class ProcessMemory
 {
     ; Initializes all process, handle, and module tracking fields to zero/default.
-    ; processNames may be a single exe name or an array of candidates (Steam,
-    ; standalone, 32/64-bit). Open() picks the first one that is running.
-    __New(processNames := "PathOfExileSteam.exe")
+    __New(processName := "")
     {
-        this.ProcessNames := (processNames is Array) ? processNames : [processNames]
-        ; The candidate actually matched by Open() — kept current so module
-        ; lookup in RefreshMainModuleInfo() targets the right executable.
-        this.ProcessName := this.ProcessNames[1]
+        this.ProcessName := (processName != "") ? processName : DetectPoeExeName()
         this.Pid := 0
         this.Handle := 0
         this.ModuleBase := 0
@@ -36,20 +172,11 @@ class ProcessMemory
     {
         this.Close()
 
-        ; Try each candidate executable (Steam / standalone / 32-/64-bit). The
-        ; first one that is running wins and becomes the active ProcessName so
-        ; the module enumeration below matches it.
-        pid := 0
-        for name in this.ProcessNames
+        pid := ProcessExist(this.ProcessName)
+        if (!pid)
         {
-            pid := ProcessExist(name)
-            if (!pid)
-                pid := ProcessExist(StrReplace(name, ".exe"))
-            if (pid)
-            {
-                this.ProcessName := name
-                break
-            }
+            baseName := StrReplace(this.ProcessName, ".exe")
+            pid := ProcessExist(baseName)
         }
 
         if (!pid)

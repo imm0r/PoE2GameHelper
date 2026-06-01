@@ -107,7 +107,7 @@ class GgpkToolBridge
 
         outPath := A_ScriptDir "\data\base_item_sizes.tsv"
         tmpPath := outPath ".tmp-ggpk"
-        stderr  := A_Temp "\poe-data-extract.stderr.txt"
+        stderr := A_Temp "\poe-data-extract.stderr.txt"
 
         try FileDelete(tmpPath)
         try FileDelete(stderr)
@@ -176,7 +176,7 @@ class GgpkToolBridge
         return Map("ok", true, "msg", "Refreshed " rows " entries from local PoE2 install.", "rows", rows)
     }
 
-        ; Decide whether base_item_sizes.tsv needs refreshing and trigger
+    ; Decide whether base_item_sizes.tsv needs refreshing and trigger
     ; it on a background timer if so. Called once at startup; safe to
     ; invoke before PoE2 is running (skips silently in that case and
     ; reschedules itself with a back-off).
@@ -195,11 +195,11 @@ class GgpkToolBridge
     {
         try
         {
-            tsvPath        := A_ScriptDir "\data\base_item_sizes.tsv"
-            tsvOk          := FileExist(tsvPath) && FileGetSize(tsvPath) >= 100
-            iniFile        := _ConfigPath()
+            tsvPath := A_ScriptDir "\data\base_item_sizes.tsv"
+            tsvOk := FileExist(tsvPath) && FileGetSize(tsvPath) >= 100
+            iniFile := _ConfigPath()
             lastRefreshVer := IniRead(iniFile, "GgpkTools", "lastRefreshedAtPatch", "")
-            currentVer     := GetLastKnownPoeVersion()
+            currentVer := GetLastKnownPoeVersion()
 
             ; If PatchChecker hasn't populated the version yet, wait —
             ; CheckPoePatchVersion runs on startup but the TCP probe
@@ -451,10 +451,7 @@ class GgpkToolBridge
     {
         ; Hard pre-flight: refuse if PoE2 is running. The UI also
         ; disables the buttons but this is defense in depth.
-        if (ProcessExist("PathOfExileSteam.exe")
-            || ProcessExist("PathOfExile_x64Steam.exe")
-            || ProcessExist("PathOfExile.exe")
-            || ProcessExist("PathOfExile_x64.exe"))
+        if (FindPoePid())
         {
             return this._Fail("PoE2 is still running — close the game first.")
         }

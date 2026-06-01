@@ -72,18 +72,13 @@ if A_IsCompiled
 ; Tray icon
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
 
-; Candidate PoE2 executable names, tried in order. Covers the Steam client,
-; the standalone client, and their 32-/64-bit variants so the helper attaches
-; regardless of how the game was installed/launched.
-g_poeProcessNames := ["PathOfExileSteam.exe", "PathOfExile_x64Steam.exe", "PathOfExile.exe", "PathOfExile_x64.exe"]
-
-g_reader := PoE2GameStateReader(g_poeProcessNames)
+g_reader := PoE2GameStateReader()
 ; Connection state — flipped by EnsureConnected(). When false, the
 ; game-tick timers (radar, flask, ReadAndShow) short-circuit so we
 ; don't spam ReadProcessMemory failures against a dead handle.
 g_isConnected := false
 g_lastConnectedPid := 0   ; tracks whether the PID changed between checks
-                          ; so PID-rotation (Steam restart) refreshes module addresses
+; so PID-rotation (Steam restart) refreshes module addresses
 g_debugMode := false
 g_updatesPaused := false
 g_autoFlaskEnabled := false
@@ -245,7 +240,7 @@ g_maphackSource := "memory"
 ; Defaults: outline = blue-ish wall ramp at 80% alpha (game's original
 ; color, just more opaque); background = faint Exile-Forge green at
 ; 10% alpha so revealed-but-unexplored areas are subtly visible.
-g_maphackOutlineHex    := "8080FFCC"
+g_maphackOutlineHex := "8080FFCC"
 g_maphackBackgroundHex := "66FF6619"
 ; Config tab sub-tab persistence. One of: general / automation /
 ; overlay / ggpk / filters / debug. Defaults to General on first run.
@@ -424,10 +419,10 @@ try
     g_valueTree.Add("Waiting for PoE2 process…")
     g_valueTree.Add("Start the game (Steam or via the Launch button below).")
 }
-SetTimer(TryAutoFlaskFast,  150)
-SetTimer(UpdateRadarFast,    50)
-SetTimer(ReadAndShow,      2000)
-SetTimer(EnsureConnected,  2000)
+SetTimer(TryAutoFlaskFast, 150)
+SetTimer(UpdateRadarFast, 50)
+SetTimer(ReadAndShow, 2000)
+SetTimer(EnsureConnected, 2000)
 EnsureConnected()  ; immediate first attempt
 return
 
@@ -447,15 +442,9 @@ return
 ;   - WebView header push:  surfaces connection state in the title bar
 EnsureConnected()
 {
-    global g_reader, g_isConnected, g_lastConnectedPid, g_valueTree, g_poeProcessNames
+    global g_reader, g_isConnected, g_lastConnectedPid, g_valueTree
 
-    pid := 0
-    for name in g_poeProcessNames
-    {
-        pid := ProcessExist(name)
-        if (pid)
-            break
-    }
+    pid := FindPoePid()
 
     if (!pid)
     {
@@ -510,9 +499,9 @@ EnsureConnected()
         {
             SplitPath(exePath, , &installDir)
             indexPath := installDir "\Bundles2\_.index.bin"
-            ggpkPath  := installDir "\Content.ggpk"
+            ggpkPath := installDir "\Content.ggpk"
             cached := FileExist(indexPath) ? indexPath
-                    : (FileExist(ggpkPath) ? ggpkPath : "")
+                : (FileExist(ggpkPath) ? ggpkPath : "")
             if (cached != "")
                 IniWrite(cached, _ConfigPath(), "GgpkTools", "lastIndexPath")
         }

@@ -7,8 +7,8 @@
 ; Escapes a string for use as a JSON string literal (with surrounding double quotes).
 _JsStr(s)
 {
-    s := StrReplace(s, "\",  "\\")
-    s := StrReplace(s, '"',  '\"')
+    s := StrReplace(s, "\", "\\")
+    s := StrReplace(s, '"', '\"')
     s := StrReplace(s, "`n", "\n")
     s := StrReplace(s, "`r", "\r")
     s := StrReplace(s, "`t", "\t")
@@ -55,19 +55,7 @@ PushHeaderToWebView()
     global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
     global g_lootRarityUnique, g_lootRarityCurrency, g_lootCache, g_lootLastReason
 
-    global g_poeProcessNames
-    poeRunning := "false"
-    if (IsSet(g_poeProcessNames) && g_poeProcessNames is Array)
-    {
-        for name in g_poeProcessNames
-        {
-            if (ProcessExist(name))
-            {
-                poeRunning := "true"
-                break
-            }
-        }
-    }
+    poeRunning := (FindPoePid() ? "true" : "false")
     slot1Key := g_flaskKeyBySlot.Has(1) ? g_flaskKeyBySlot[1] : "?"
     slot2Key := g_flaskKeyBySlot.Has(2) ? g_flaskKeyBySlot[2] : "?"
     connected := (IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle) ? "true" : "false"
@@ -75,80 +63,80 @@ PushHeaderToWebView()
     isMaximized := (WinGetMinMax("ahk_id " g_webGui.Hwnd) = 1) ? "true" : "false"
 
     json := "{"
-          . '"connected":'      connected                ","
-          . '"debug":'          (g_debugMode              ? "true" : "false") ","
-          . '"paused":'         (g_updatesPaused          ? "true" : "false") ","
-          . '"autoFlask":'      (g_autoFlaskEnabled        ? "true" : "false") ","
-          . '"afPerf":'         (g_autoFlaskPerformanceMode ? "true" : "false") ","
-          . '"showTree":'       (g_showTreePane            ? "true" : "false") ","
-          . '"npcSync":'        (g_npcWatchAutoSync        ? "true" : "false") ","
-          . '"poeRunning":'     poeRunning               ","
-          . '"lifeThreshold":'  g_lifeThresholdPercent     ","
-          . '"manaThreshold":'  g_manaThresholdPercent     ","
-          . '"pinnedCount":'    g_pinnedNodePaths.Length   ","
-          . '"activeTab":'      _JsStr(g_activeTreeTabKey) ","
-          . '"afReason":'       _JsStr(g_autoFlaskLastReason) ","
-          . '"afSlot1Key":'     _JsStr(slot1Key) ","
-          . '"afSlot2Key":'     _JsStr(slot2Key) ","
-          . '"ghVersion":'      _JsStr(GAMEHELPER_VERSION) ","
-          . '"gameVersion":'    _JsStr(gameVer) ","
-          . '"radarEnabled":'   (g_radarEnabled ? "true" : "false") ","
-          . '"playerHud":'      (g_playerHudEnabled ? "true" : "false") ","
-          . '"radarAlpha":'     g_radarAlpha ","
-          . '"isMaximized":'    isMaximized ","
-          . '"alwaysOnTop":'    (g_alwaysOnTop ? "true" : "false") ","
-          . '"entityFilter":{'
-          . '"player":'    (g_entityShowPlayer    ? "true" : "false") ","
-          . '"minion":'    (g_entityShowMinion    ? "true" : "false") ","
-          . '"enemy":'     (g_entityShowEnemy     ? "true" : "false") ","
-          . '"npc":'       (g_entityShowNPC       ? "true" : "false") ","
-          . '"chest":'     (g_entityShowChest     ? "true" : "false") ","
-          . '"worlditem":' (g_entityShowWorldItem ? "true" : "false") ","
-          . '"other":'     (g_entityShowOther     ? "true" : "false")
-          . "},"
-          . '"radar":{'
-          . '"normal":'  (g_radarShowEnemyNormal ? "true" : "false") ","
-          . '"rare":'    (g_radarShowEnemyRare   ? "true" : "false") ","
-          . '"boss":'    (g_radarShowEnemyBoss   ? "true" : "false") ","
-          . '"minions":' (g_radarShowMinions     ? "true" : "false") ","
-          . '"npcs":'    (g_radarShowNpcs        ? "true" : "false") ","
-          . '"chests":'  (g_radarShowChests      ? "true" : "false")
-          . "},"
-          . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
-          . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
-          . '"maphackSource":' _JsStr(IsSet(g_maphackSource) ? g_maphackSource : "memory") ","
-          . '"maphackOutlineHex":' _JsStr(IsSet(g_maphackOutlineHex) ? g_maphackOutlineHex : "8080FFCC") ","
-          . '"maphackBackgroundHex":' _JsStr(IsSet(g_maphackBackgroundHex) ? g_maphackBackgroundHex : "66FF6619") ","
-          . '"configSubTab":' _JsStr(IsSet(g_configSubTab) ? g_configSubTab : "general") ","
-          . '"ggpkInstallPathKnown":' (GgpkToolBridge.HasCachedIndexPath() ? "true" : "false") ","
-          . '"ggpkMaphackApplied":' (GgpkToolBridge.IsMaphackApplied() ? "true" : "false") ","
-          . '"isConnected":' (IsSet(g_isConnected) && g_isConnected ? "true" : "false") ","
-          . '"rangeCircles":' (g_rangeCirclesEnabled ? "true" : "false") ","
-          . '"panelDetection":' (g_panelDetectionEnabled ? "true" : "false") ","
-          . '"cfgSections":' _JsStr(g_cfgOpenSections) ","
-          . '"autoPilot":' (g_autoPilotEnabled ? "true" : "false") ","
-          . '"autoPilotState":' _JsStr(g_autoPilotState) ","
-          . '"autoPilotReason":' _JsStr(g_autoPilotReason) ","
-          . '"invChainDump":' (g_inventoryChainDumpEnabled ? "true" : "false") ","
-          . '"overlayStatusText":' (g_overlayStatusTextEnabled ? "true" : "false") ","
-          . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
-          . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
-          . '"combatState":' _JsStr(g_combatState) ","
-          . '"combatReason":' _JsStr(g_combatLastReason) ","
-          . '"combatRange":' g_combatRange ","
-          . '"combatDisengage":' g_combatDisengageRange ","
-          . '"combatGCD":' g_combatGlobalCooldownMs ","
-          . '"combatW2S":' Format("{:.2f}", g_combatW2SScale) ","
-          . '"combatSlots":' _SerializeCombatSlots() ","
-          . '"exploreEnabled":' (g_exploreEnabled ? "true" : "false") ","
-          . '"explorePct":' Format("{:.1f}", g_exploreCurrentPercent) ","
-          . '"exploreTarget":' g_exploreTargetPercent ","
-          . '"exploreReason":' _JsStr(g_exploreLastReason) ","
-          . '"lootRarity":' _SerializeLootRarity() ","
-          . '"lootCacheCount":' _GetLootCacheCount() ","
-          . '"lootReason":' _JsStr(_GetLootLastReason()) ","
-          . '"zoneScan":' _SerializeZoneScanStatus()
-          . "}"
+        . '"connected":' connected ","
+        . '"debug":' (g_debugMode ? "true" : "false") ","
+        . '"paused":' (g_updatesPaused ? "true" : "false") ","
+        . '"autoFlask":' (g_autoFlaskEnabled ? "true" : "false") ","
+        . '"afPerf":' (g_autoFlaskPerformanceMode ? "true" : "false") ","
+        . '"showTree":' (g_showTreePane ? "true" : "false") ","
+        . '"npcSync":' (g_npcWatchAutoSync ? "true" : "false") ","
+        . '"poeRunning":' poeRunning ","
+        . '"lifeThreshold":' g_lifeThresholdPercent ","
+        . '"manaThreshold":' g_manaThresholdPercent ","
+        . '"pinnedCount":' g_pinnedNodePaths.Length ","
+        . '"activeTab":' _JsStr(g_activeTreeTabKey) ","
+        . '"afReason":' _JsStr(g_autoFlaskLastReason) ","
+        . '"afSlot1Key":' _JsStr(slot1Key) ","
+        . '"afSlot2Key":' _JsStr(slot2Key) ","
+        . '"ghVersion":' _JsStr(GAMEHELPER_VERSION) ","
+        . '"gameVersion":' _JsStr(gameVer) ","
+        . '"radarEnabled":' (g_radarEnabled ? "true" : "false") ","
+        . '"playerHud":' (g_playerHudEnabled ? "true" : "false") ","
+        . '"radarAlpha":' g_radarAlpha ","
+        . '"isMaximized":' isMaximized ","
+        . '"alwaysOnTop":' (g_alwaysOnTop ? "true" : "false") ","
+        . '"entityFilter":{'
+        . '"player":' (g_entityShowPlayer ? "true" : "false") ","
+        . '"minion":' (g_entityShowMinion ? "true" : "false") ","
+        . '"enemy":' (g_entityShowEnemy ? "true" : "false") ","
+        . '"npc":' (g_entityShowNPC ? "true" : "false") ","
+        . '"chest":' (g_entityShowChest ? "true" : "false") ","
+        . '"worlditem":' (g_entityShowWorldItem ? "true" : "false") ","
+        . '"other":' (g_entityShowOther ? "true" : "false")
+        . "},"
+        . '"radar":{'
+        . '"normal":' (g_radarShowEnemyNormal ? "true" : "false") ","
+        . '"rare":' (g_radarShowEnemyRare ? "true" : "false") ","
+        . '"boss":' (g_radarShowEnemyBoss ? "true" : "false") ","
+        . '"minions":' (g_radarShowMinions ? "true" : "false") ","
+        . '"npcs":' (g_radarShowNpcs ? "true" : "false") ","
+        . '"chests":' (g_radarShowChests ? "true" : "false")
+        . "},"
+        . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
+        . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
+        . '"maphackSource":' _JsStr(IsSet(g_maphackSource) ? g_maphackSource : "memory") ","
+        . '"maphackOutlineHex":' _JsStr(IsSet(g_maphackOutlineHex) ? g_maphackOutlineHex : "8080FFCC") ","
+        . '"maphackBackgroundHex":' _JsStr(IsSet(g_maphackBackgroundHex) ? g_maphackBackgroundHex : "66FF6619") ","
+        . '"configSubTab":' _JsStr(IsSet(g_configSubTab) ? g_configSubTab : "general") ","
+        . '"ggpkInstallPathKnown":' (GgpkToolBridge.HasCachedIndexPath() ? "true" : "false") ","
+        . '"ggpkMaphackApplied":' (GgpkToolBridge.IsMaphackApplied() ? "true" : "false") ","
+        . '"isConnected":' (IsSet(g_isConnected) && g_isConnected ? "true" : "false") ","
+        . '"rangeCircles":' (g_rangeCirclesEnabled ? "true" : "false") ","
+        . '"panelDetection":' (g_panelDetectionEnabled ? "true" : "false") ","
+        . '"cfgSections":' _JsStr(g_cfgOpenSections) ","
+        . '"autoPilot":' (g_autoPilotEnabled ? "true" : "false") ","
+        . '"autoPilotState":' _JsStr(g_autoPilotState) ","
+        . '"autoPilotReason":' _JsStr(g_autoPilotReason) ","
+        . '"invChainDump":' (g_inventoryChainDumpEnabled ? "true" : "false") ","
+        . '"overlayStatusText":' (g_overlayStatusTextEnabled ? "true" : "false") ","
+        . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
+        . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
+        . '"combatState":' _JsStr(g_combatState) ","
+        . '"combatReason":' _JsStr(g_combatLastReason) ","
+        . '"combatRange":' g_combatRange ","
+        . '"combatDisengage":' g_combatDisengageRange ","
+        . '"combatGCD":' g_combatGlobalCooldownMs ","
+        . '"combatW2S":' Format("{:.2f}", g_combatW2SScale) ","
+        . '"combatSlots":' _SerializeCombatSlots() ","
+        . '"exploreEnabled":' (g_exploreEnabled ? "true" : "false") ","
+        . '"explorePct":' Format("{:.1f}", g_exploreCurrentPercent) ","
+        . '"exploreTarget":' g_exploreTargetPercent ","
+        . '"exploreReason":' _JsStr(g_exploreLastReason) ","
+        . '"lootRarity":' _SerializeLootRarity() ","
+        . '"lootCacheCount":' _GetLootCacheCount() ","
+        . '"lootReason":' _JsStr(_GetLootLastReason()) ","
+        . '"zoneScan":' _SerializeZoneScanStatus()
+        . "}"
     WebViewExec("updateHeader(" json ")")
 }
 
@@ -160,12 +148,12 @@ _SerializeLootRarity()
     global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
     global g_lootRarityUnique, g_lootRarityCurrency
     return "{"
-        . '"Normal":'   (g_lootRarityNormal   ? "true" : "false") ","
-        . '"Magic":'    (g_lootRarityMagic    ? "true" : "false") ","
-        . '"Rare":'     (g_lootRarityRare     ? "true" : "false") ","
-        . '"Unique":'   (g_lootRarityUnique   ? "true" : "false") ","
-        . '"Currency":' (g_lootRarityCurrency ? "true" : "false")
-        . "}"
+    . '"Normal":' (g_lootRarityNormal ? "true" : "false") ","
+    . '"Magic":' (g_lootRarityMagic ? "true" : "false") ","
+    . '"Rare":' (g_lootRarityRare ? "true" : "false") ","
+    . '"Unique":' (g_lootRarityUnique ? "true" : "false") ","
+    . '"Currency":' (g_lootRarityCurrency ? "true" : "false")
+    . "}"
 }
 
 _GetLootCacheCount()
@@ -202,26 +190,26 @@ _DecodeComponentOnDemand(entityAddrHex, compName, compAddrHex)
         decoded := 0
         switch canonical
         {
-            case "render":         decoded := g_reader.DecodeRenderComponent(compAddr)
-            case "life":           decoded := g_reader.DecodeLifeComponentBasic(compAddr)
-            case "positioned":     decoded := g_reader.DecodePositionedComponent(compAddr)
-            case "targetable":     decoded := g_reader.DecodeTargetableComponent(compAddr)
-            case "chest":          decoded := g_reader.DecodeChestComponent(compAddr)
-            case "shrine":         decoded := g_reader.DecodeShrineComponent(compAddr)
+            case "render": decoded := g_reader.DecodeRenderComponent(compAddr)
+            case "life": decoded := g_reader.DecodeLifeComponentBasic(compAddr)
+            case "positioned": decoded := g_reader.DecodePositionedComponent(compAddr)
+            case "targetable": decoded := g_reader.DecodeTargetableComponent(compAddr)
+            case "chest": decoded := g_reader.DecodeChestComponent(compAddr)
+            case "shrine": decoded := g_reader.DecodeShrineComponent(compAddr)
             case "transitionable": decoded := g_reader.DecodeTransitionableComponent(compAddr)
-            case "statemachine":   decoded := g_reader.DecodeStateMachineComponentBasic(compAddr)
-            case "actor":          decoded := g_reader.DecodeActorComponentBasic(compAddr)
-            case "animated":       decoded := g_reader.DecodeAnimatedComponentBasic(compAddr)
-            case "buffs":          decoded := g_reader.DecodeBuffsComponentBasic(compAddr)
-            case "stats":          decoded := g_reader.DecodeStatsComponentBasic(compAddr)
+            case "statemachine": decoded := g_reader.DecodeStateMachineComponentBasic(compAddr)
+            case "actor": decoded := g_reader.DecodeActorComponentBasic(compAddr)
+            case "animated": decoded := g_reader.DecodeAnimatedComponentBasic(compAddr)
+            case "buffs": decoded := g_reader.DecodeBuffsComponentBasic(compAddr)
+            case "stats": decoded := g_reader.DecodeStatsComponentBasic(compAddr)
             case "charges", "charge": decoded := g_reader.DecodeChargesComponentBasic(compAddr)
-            case "player":         decoded := g_reader.DecodePlayerComponentBasic(compAddr)
+            case "player": decoded := g_reader.DecodePlayerComponentBasic(compAddr)
             case "triggerableblockage": decoded := g_reader.DecodeTriggerableBlockageComponentBasic(compAddr)
-            case "mods":           decoded := g_reader.DecodeModsComponentBasic(compAddr)
+            case "mods": decoded := g_reader.DecodeModsComponentBasic(compAddr)
             case "objectmagicproperties": decoded := g_reader.DecodeObjectMagicPropertiesComponentBasic(compAddr)
-            case "npc":            decoded := g_reader.DecodeNpcComponentBasic(compAddr)
-            case "minimapicon":    decoded := g_reader.DecodeMinimapIconComponentBasic(compAddr)
-            case "diesaftertime":  decoded := g_reader.DecodeDiesAfterTimeComponentBasic(compAddr)
+            case "npc": decoded := g_reader.DecodeNpcComponentBasic(compAddr)
+            case "minimapicon": decoded := g_reader.DecodeMinimapIconComponentBasic(compAddr)
+            case "diesaftertime": decoded := g_reader.DecodeDiesAfterTimeComponentBasic(compAddr)
             default:
                 ; No decoder registered — push an empty result so the UI
                 ; surfaces an explicit "no decoder" hint instead of
@@ -304,15 +292,15 @@ _SerializeZoneScanStatus()
     if !(IsObject(g_reader))
         return '{"done":false,"inProgress":false,"elapsed":0,"timing":0,"tiles":0}'
 
-    done       := g_reader._zoneScanDone
+    done := g_reader._zoneScanDone
     inProgress := g_reader._tgtScanInProgress
-    timing     := g_reader._zoneScanTimingMs
-    tiles      := g_reader._zoneScanAccumulated.Count
-    startedAt  := g_reader._zoneScanStartedAt
-    retries    := g_reader._zoneScanRetries
-    schedAt    := g_reader._zoneScanScheduledAt
+    timing := g_reader._zoneScanTimingMs
+    tiles := g_reader._zoneScanAccumulated.Count
+    startedAt := g_reader._zoneScanStartedAt
+    retries := g_reader._zoneScanRetries
+    schedAt := g_reader._zoneScanScheduledAt
     totalTiles := g_reader.HasOwnProp("_tgtScanTotalTiles") ? g_reader._tgtScanTotalTiles : 0
-    tileIdx    := g_reader.HasOwnProp("_tgtScanTileIdx") ? g_reader._tgtScanTileIdx : 0
+    tileIdx := g_reader.HasOwnProp("_tgtScanTileIdx") ? g_reader._tgtScanTileIdx : 0
     failReason := g_reader.HasOwnProp("_zoneScanFailReason") ? g_reader._zoneScanFailReason : ""
 
     if (!done && startedAt > 0)
@@ -321,16 +309,16 @@ _SerializeZoneScanStatus()
         elapsed := timing
 
     return "{"
-        . '"done":'       (done ? "true" : "false") ","
-        . '"inProgress":' (inProgress ? "true" : "false") ","
-        . '"elapsed":'    elapsed ","
-        . '"timing":'     timing ","
-        . '"tiles":'      tiles ","
-        . '"retries":'    retries ","
+    . '"done":' (done ? "true" : "false") ","
+    . '"inProgress":' (inProgress ? "true" : "false") ","
+    . '"elapsed":' elapsed ","
+        . '"timing":' timing ","
+        . '"tiles":' tiles ","
+        . '"retries":' retries ","
         . '"totalTiles":' totalTiles ","
-        . '"tileIdx":'    tileIdx ","
-        . '"schedAt":'    (schedAt > 0 ? "true" : "false") ","
-        . '"fail":'       _JsStr(failReason)
+        . '"tileIdx":' tileIdx ","
+        . '"schedAt":' (schedAt > 0 ? "true" : "false") ","
+        . '"fail":' _JsStr(failReason)
         . "}"
 }
 
@@ -358,8 +346,8 @@ _DumpTreeNodeRecursiveJsonEx(ctrl, hwnd, nodeId, nodePathsMap)
     while (nodeId != 0)
     {
         label := ctrl.GetText(nodeId)
-        escaped := StrReplace(label, "\",  "\\")
-        escaped := StrReplace(escaped, '"',  '\"')
+        escaped := StrReplace(label, "\", "\\")
+        escaped := StrReplace(escaped, '"', '\"')
         escaped := StrReplace(escaped, "`n", "\n")
         escaped := StrReplace(escaped, "`r", "\r")
         escaped := StrReplace(escaped, "`t", "\t")
@@ -404,8 +392,8 @@ PushWatchlistToWebView()
         {
             try value := _ResolveSnapshotPath(g_lastSnapshotForUi, path)
         }
-        ep := StrReplace(path,  "\", "\\")
-        ep := StrReplace(ep,    '"', '\"')
+        ep := StrReplace(path, "\", "\\")
+        ep := StrReplace(ep, '"', '\"')
         ev := StrReplace(String(value), "\", "\\")
         ev := StrReplace(ev, '"', '\"')
         rows .= (first ? "" : ",") '{"path":"' ep '","value":"' ev '"}'
@@ -583,15 +571,15 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         mapDebug := "uiElems=" (uiElems ? "non-obj" : "null")
 
     json .= '"overlay":{'
-        . '"allowed":'      (overlayAllowed ? "true" : "false") ","
-        . '"hideReason":'   _JsStr(hideReason) ","
+        . '"allowed":' (overlayAllowed ? "true" : "false") ","
+        . '"hideReason":' _JsStr(hideReason) ","
         . '"currentState":' _JsStr(currentState) ","
         . '"largeMapOpen":' (largeMapOpen ? "true" : "false") ","
-        . '"miniMapOpen":'  (miniMapOpen ? "true" : "false") ","
-        . '"mapDebug":'     _JsStr(mapDebug) ","
-        . '"isTown":'       (isTown ? "true" : "false") ","
-        . '"isHideout":'    (isHideout ? "true" : "false") ","
-        . '"isAlive":'      (isAlive ? "true" : "false")
+        . '"miniMapOpen":' (miniMapOpen ? "true" : "false") ","
+        . '"mapDebug":' _JsStr(mapDebug) ","
+        . '"isTown":' (isTown ? "true" : "false") ","
+        . '"isHideout":' (isHideout ? "true" : "false") ","
+        . '"isAlive":' (isAlive ? "true" : "false")
         . "}"
 
     json .= "}"
@@ -617,7 +605,7 @@ PushRadarDebugToWebView(overlayAllowed := true, hideReason := "")
     json := "{"
     debugMode := (g_radarOverlay && g_radarOverlay.DebugMode) ? true : false
     json .= '"enabled":' (debugMode ? "true" : "false") ","
-    json .= '"readMs":'   (IsSet(g_radarReadMs)   ? Integer(g_radarReadMs)   : 0) ","
+    json .= '"readMs":' (IsSet(g_radarReadMs) ? Integer(g_radarReadMs) : 0) ","
     json .= '"renderMs":' (IsSet(g_radarRenderMs) ? Integer(g_radarRenderMs) : 0) ","
     json .= '"lines":['
     if (g_radarOverlay && IsObject(g_radarOverlay._debugLines))
@@ -736,9 +724,9 @@ PushInventoryToWebView()
     ; variant that omits both (it's optimized for per-frame entity/panel reads), so
     ; we walk the same pointer chain ReadAutoFlaskSnapshot uses — four extra RPMs
     ; that only run when the user has the Inventory tab open.
-    snap     := IsObject(g_radarLastSnap) ? g_radarLastSnap : 0
-    inGs     := (snap && snap.Has("inGameState")) ? snap["inGameState"] : 0
-    area     := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    snap := IsObject(g_radarLastSnap) ? g_radarLastSnap : 0
+    inGs := (snap && snap.Has("inGameState")) ? snap["inGameState"] : 0
+    area := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
     inGsAddr := (inGs && IsObject(inGs) && inGs.Has("address")) ? inGs["address"] : 0
     areaAddr := (area && IsObject(area) && area.Has("address")) ? area["address"] : 0
 
@@ -748,18 +736,18 @@ PushInventoryToWebView()
         return
     }
 
-    sdPtr  := 0
+    sdPtr := 0
     gameUi := 0
     try
     {
         ; serverDataPtr: read raw pointer from playerInfo struct, then resolve via reader's
         ; own pointer-laundering helper (handles indirections + plausibility checks).
-        playerInfoPtr    := areaAddr + PoE2Offsets.AreaInstance["PlayerInfo"]
+        playerInfoPtr := areaAddr + PoE2Offsets.AreaInstance["PlayerInfo"]
         serverDataRawPtr := g_reader.Mem.ReadPtr(playerInfoPtr + PoE2Offsets.LocalPlayerStruct["ServerDataPtr"])
-        sdPtr            := g_reader.ResolveServerDataPointer(playerInfoPtr, serverDataRawPtr)
+        sdPtr := g_reader.ResolveServerDataPointer(playerInfoPtr, serverDataRawPtr)
 
         ; gameUiPtr: inGameState → UiRootStruct → GameUiPtr
-        uiRootStructPtr  := g_reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.InGameState["UiRootStructPtr"])
+        uiRootStructPtr := g_reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.InGameState["UiRootStructPtr"])
         if g_reader.IsProbablyValidPointer(uiRootStructPtr)
             gameUi := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
     }
@@ -808,8 +796,8 @@ PushInventoryToWebView()
         LogError("PushInventoryToWebView/player", ex)
 
     json := "{"
-          . '"player":' _BuildInventoryArrayJson(invs)
-          . "}"
+        . '"player":' _BuildInventoryArrayJson(invs)
+        . "}"
     try WebViewExec("updateInventory(" _JsStr(json) ")")
 }
 
@@ -829,15 +817,15 @@ PushMemDiffStateToWebView()
         return
 
     json := "{"
-        . '"symbol":'      _JsStr(g_memDiffSymbol) ","
-        . '"customAddr":'  _JsStr(Format("0x{:X}", g_memDiffCustomAddr)) ","
-        . '"size":'        g_memDiffSize ","
+        . '"symbol":' _JsStr(g_memDiffSymbol) ","
+        . '"customAddr":' _JsStr(Format("0x{:X}", g_memDiffCustomAddr)) ","
+        . '"size":' g_memDiffSize ","
         . '"beforeReady":' ((g_memDiffBeforeBuf && Type(g_memDiffBeforeBuf) = "Buffer") ? "true" : "false") ","
-        . '"afterReady":'  ((g_memDiffAfterBuf  && Type(g_memDiffAfterBuf)  = "Buffer") ? "true" : "false") ","
-        . '"beforeAddr":'  _JsStr(Format("0x{:X}", g_memDiffBeforeAddr)) ","
-        . '"beforeAge":'   (g_memDiffBeforeTime > 0 ? (A_TickCount - g_memDiffBeforeTime) : 0) ","
-        . '"afterAge":'    (g_memDiffAfterTime  > 0 ? (A_TickCount - g_memDiffAfterTime)  : 0) ","
-        . '"status":'      _JsStr(g_memDiffStatus)
+        . '"afterReady":' ((g_memDiffAfterBuf && Type(g_memDiffAfterBuf) = "Buffer") ? "true" : "false") ","
+        . '"beforeAddr":' _JsStr(Format("0x{:X}", g_memDiffBeforeAddr)) ","
+        . '"beforeAge":' (g_memDiffBeforeTime > 0 ? (A_TickCount - g_memDiffBeforeTime) : 0) ","
+        . '"afterAge":' (g_memDiffAfterTime > 0 ? (A_TickCount - g_memDiffAfterTime) : 0) ","
+        . '"status":' _JsStr(g_memDiffStatus)
         . "}"
     try WebViewExec("updateMemDiffState(" _JsStr(json) ")")
 }
@@ -886,7 +874,7 @@ PushMemDiffResultToWebView()
             . '"offset":' run["offset"] ","
             . '"length":' run["length"] ","
             . '"before":' _JsStr(run["before"]) ","
-            . '"after":'  _JsStr(run["after"]) ","
+            . '"after":' _JsStr(run["after"]) ","
             . '"decode":' decodeJson
             . "}"
     }
@@ -932,11 +920,11 @@ PushMemDissectToWebView()
         ; Build a minimal status-only payload so the UI shows something useful
         ; rather than going dark when the render path blows up.
         json := "{"
-            . '"addr":'    _JsStr(g_memDissectAddress ? Format("0x{:X}", g_memDissectAddress) : "") ","
-            . '"size":'    g_memDissectSize ","
-            . '"status":'  _JsStr(g_memDissectStatus) ","
+            . '"addr":' _JsStr(g_memDissectAddress ? Format("0x{:X}", g_memDissectAddress) : "") ","
+            . '"size":' g_memDissectSize ","
+            . '"status":' _JsStr(g_memDissectStatus) ","
             . '"canBack":' (g_memDissectHistory.Length > 0 ? "true" : "false") ","
-            . '"canFwd":'  (g_memDissectFwd.Length  > 0 ? "true" : "false") ","
+            . '"canFwd":' (g_memDissectFwd.Length > 0 ? "true" : "false") ","
             . '"rows":[]}'
     }
 
@@ -951,24 +939,24 @@ _BuildMemDissectJson()
     global g_memDissectHistory, g_memDissectFwd, g_memDissectStatus
 
     baseAddr := g_memDissectAddress
-    buf      := g_memDissectBuf
-    canRead  := (IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+    buf := g_memDissectBuf
+    canRead := (IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
 
     json := "{"
-        . '"addr":'    _JsStr(baseAddr ? Format("0x{:X}", baseAddr) : "") ","
-        . '"size":'    g_memDissectSize ","
-        . '"status":'  _JsStr(g_memDissectStatus) ","
+        . '"addr":' _JsStr(baseAddr ? Format("0x{:X}", baseAddr) : "") ","
+        . '"size":' g_memDissectSize ","
+        . '"status":' _JsStr(g_memDissectStatus) ","
         . '"canBack":' (g_memDissectHistory.Length > 0 ? "true" : "false") ","
-        . '"canFwd":'  (g_memDissectFwd.Length  > 0 ? "true" : "false") ","
+        . '"canFwd":' (g_memDissectFwd.Length > 0 ? "true" : "false") ","
         . '"rows":['
 
     if (buf && Type(buf) = "Buffer" && baseAddr && buf.Size >= 8)
     {
-        bufPtr  := buf.Ptr      ; snapshot Ptr+Size up front so concurrent reassignments
+        bufPtr := buf.Ptr      ; snapshot Ptr+Size up front so concurrent reassignments
         bufSize := buf.Size     ;  to g_memDissectBuf can't make us read off the end.
-        stride  := 8
+        stride := 8
         maxRows := bufSize // stride
-        first   := true
+        first := true
         r := 0
         while (r < maxRows)
         {
@@ -992,14 +980,14 @@ _BuildMemDissectJson()
                 rawHex := RTrim(rawHex)
 
                 ; Numeric decodes
-                u8v   := NumGet(bufPtr, off, "UChar")
-                u16v  := NumGet(bufPtr, off, "UShort")
-                i32v  := NumGet(bufPtr, off, "Int")
-                u32v  := NumGet(bufPtr, off, "UInt")
-                f32v  := Round(NumGet(bufPtr, off, "Float"), 4)
-                i64v  := NumGet(bufPtr, off, "Int64")
+                u8v := NumGet(bufPtr, off, "UChar")
+                u16v := NumGet(bufPtr, off, "UShort")
+                i32v := NumGet(bufPtr, off, "Int")
+                u32v := NumGet(bufPtr, off, "UInt")
+                f32v := Round(NumGet(bufPtr, off, "Float"), 4)
+                i64v := NumGet(bufPtr, off, "Int64")
                 ptrHex := Format("0x{:X}", i64v & 0xFFFFFFFFFFFFFFFF)
-                f64v  := Round(NumGet(bufPtr, off, "Double"), 6)
+                f64v := Round(NumGet(bufPtr, off, "Double"), 6)
 
                 ascii := ""
                 kk := 0
@@ -1044,19 +1032,19 @@ _BuildMemDissectJson()
             absAddr := Format("0x{:X}", baseAddr + off)
 
             json .= "{"
-                . '"off":'    off ","
-                . '"addr":'   _JsStr(absAddr) ","
-                . '"hex":'    _JsStr(rawHex) ","
-                . '"u8":'     u8v ","
-                . '"u16":'    u16v ","
-                . '"i32":'    i32v ","
-                . '"u32":'    u32v ","
-                . '"f32":'    f32v ","
-                . '"i64":'    i64v ","
-                . '"ptr":'    _JsStr(ptrHex) ","
-                . '"f64":'    f64v ","
-                . '"ascii":'  _JsStr(ascii) ","
-                . '"isPtr":'  isPtr
+                . '"off":' off ","
+                . '"addr":' _JsStr(absAddr) ","
+                . '"hex":' _JsStr(rawHex) ","
+                . '"u8":' u8v ","
+                . '"u16":' u16v ","
+                . '"i32":' i32v ","
+                . '"u32":' u32v ","
+                . '"f32":' f32v ","
+                . '"i64":' i64v ","
+                . '"ptr":' _JsStr(ptrHex) ","
+                . '"f64":' f64v ","
+                . '"ascii":' _JsStr(ascii) ","
+                . '"isPtr":' isPtr
                 . "}"
 
             r += 1
@@ -1102,9 +1090,9 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
     out .= "`n"
 
     ; ── Step 1: ServerData → PlayerServerData std::vector ──────────────
-    psdOff      := PoE2Offsets.ServerData["PlayerServerData"]
+    psdOff := PoE2Offsets.ServerData["PlayerServerData"]
     psdVecFirst := mem.ReadInt64(sdPtr + psdOff)
-    psdVecLast  := mem.ReadInt64(sdPtr + psdOff + 8)
+    psdVecLast := mem.ReadInt64(sdPtr + psdOff + 8)
     out .= "`n[Step 1] ServerData + 0x" Format("{:X}", psdOff) " → PlayerServerData std::vector"
     out .= "`n  First: " _FmtChainHex(psdVecFirst)
     out .= "`n  Last:  " _FmtChainHex(psdVecLast)
@@ -1122,9 +1110,9 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
         return _WriteChainLog(out . "`n  [bailing — invalid PlayerData ptr]`n")
 
     ; ── Step 3: PlayerData → PlayerInventories std::vector ─────────────
-    piOff   := PoE2Offsets.ServerDataStructure["PlayerInventories"]
+    piOff := PoE2Offsets.ServerDataStructure["PlayerInventories"]
     piFirst := mem.ReadInt64(playerDataPtr + piOff)
-    piLast  := mem.ReadInt64(playerDataPtr + piOff + 8)
+    piLast := mem.ReadInt64(playerDataPtr + piOff + 8)
     entrySz := PoE2Offsets.InventoryArray["EntrySize"]
     invCount := (piFirst > 0 && piLast >= piFirst) ? Floor((piLast - piFirst) / entrySz) : 0
     out .= "`n"
@@ -1145,7 +1133,7 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
     while (idx < maxInv)
     {
         entryAddr := piFirst + (idx * entrySz)
-        invId   := mem.ReadInt(entryAddr + PoE2Offsets.InventoryArray["InventoryId"])
+        invId := mem.ReadInt(entryAddr + PoE2Offsets.InventoryArray["InventoryId"])
         invPtr0 := mem.ReadPtr(entryAddr + PoE2Offsets.InventoryArray["InventoryPtr0"])
         invPtr1 := mem.ReadPtr(entryAddr + PoE2Offsets.InventoryArray["InventoryPtr1"])
 
@@ -1200,11 +1188,11 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
 
             if g_reader.IsProbablyValidPointer(itemEntityPtr)
             {
-                edPtr   := mem.ReadPtr(itemEntityPtr + PoE2Offsets.Entity["EntityDetailsPtr"])
+                edPtr := mem.ReadPtr(itemEntityPtr + PoE2Offsets.Entity["EntityDetailsPtr"])
                 cvFirst := mem.ReadInt64(itemEntityPtr + PoE2Offsets.Entity["ComponentsVec"])
-                cvLast  := mem.ReadInt64(itemEntityPtr + PoE2Offsets.Entity["ComponentsVecLast"])
-                eid     := mem.ReadUInt(itemEntityPtr + PoE2Offsets.Entity["Id"])
-                flags   := mem.ReadUChar(itemEntityPtr + PoE2Offsets.Entity["Flags"])
+                cvLast := mem.ReadInt64(itemEntityPtr + PoE2Offsets.Entity["ComponentsVecLast"])
+                eid := mem.ReadUInt(itemEntityPtr + PoE2Offsets.Entity["Id"])
+                flags := mem.ReadUChar(itemEntityPtr + PoE2Offsets.Entity["Flags"])
                 compCnt := (cvFirst > 0 && cvLast >= cvFirst) ? Floor((cvLast - cvFirst) / A_PtrSize) : 0
                 out .= "`n        Entity: id=" eid " flags=0x" Format("{:02X}", flags)
                 out .= "`n          EntityDetailsPtr: " _FmtChainHex(edPtr)
@@ -1280,12 +1268,12 @@ _BuildInventoryArrayJson(invs)
         if !first
             json .= ","
         first := false
-        invId   := inv.Has("inventoryId") ? Integer(inv["inventoryId"]) : -1
-        boxX    := inv.Has("totalBoxesX") ? Integer(inv["totalBoxesX"]) : 0
-        boxY    := inv.Has("totalBoxesY") ? Integer(inv["totalBoxesY"]) : 0
-        source  := inv.Has("source")   ? String(inv["source"])   : ""
-        tabName := inv.Has("tabName")  ? String(inv["tabName"])  : ""
-        items   := inv.Has("items") ? inv["items"] : []
+        invId := inv.Has("inventoryId") ? Integer(inv["inventoryId"]) : -1
+        boxX := inv.Has("totalBoxesX") ? Integer(inv["totalBoxesX"]) : 0
+        boxY := inv.Has("totalBoxesY") ? Integer(inv["totalBoxesY"]) : 0
+        source := inv.Has("source") ? String(inv["source"]) : ""
+        tabName := inv.Has("tabName") ? String(inv["tabName"]) : ""
+        items := inv.Has("items") ? inv["items"] : []
 
         ; PoE2's inventory ItemList is cell-based: a 2×3 body armor produces
         ; 6 entries that all point to the same itemEntityPtr with identical
@@ -1308,8 +1296,8 @@ _BuildInventoryArrayJson(invs)
             iep := it.Has("itemEntityPtr") ? it["itemEntityPtr"] : 0
             isx := it.Has("slotStartX") ? it["slotStartX"] : 0
             isy := it.Has("slotStartY") ? it["slotStartY"] : 0
-            iex := it.Has("slotEndX")   ? it["slotEndX"]   : isx
-            iey := it.Has("slotEndY")   ? it["slotEndY"]   : isy
+            iex := it.Has("slotEndX") ? it["slotEndX"] : isx
+            iey := it.Has("slotEndY") ? it["slotEndY"] : isy
             dedupKey := iep ? ("p:" iep) : ("r:" isx "," isy "," iex "," iey)
             if seenItemKeys.Has(dedupKey)
                 continue
@@ -1317,31 +1305,31 @@ _BuildInventoryArrayJson(invs)
             if !itemFirst
                 itemsJson .= ","
             itemFirst := false
-            name   := d.Has("displayName") ? String(d["displayName"]) : ""
-            base   := d.Has("baseType")    ? String(d["baseType"])    : ""
-            rarId  := d.Has("rarityId")    ? Integer(d["rarityId"])   : -1
-            stkCnt := d.Has("stackCount")  ? Integer(d["stackCount"]) : 0
+            name := d.Has("displayName") ? String(d["displayName"]) : ""
+            base := d.Has("baseType") ? String(d["baseType"]) : ""
+            rarId := d.Has("rarityId") ? Integer(d["rarityId"]) : -1
+            stkCnt := d.Has("stackCount") ? Integer(d["stackCount"]) : 0
             modsJson := _BuildItemModsJson(d.Has("modsInfo") ? d["modsInfo"] : 0)
             itemsJson .= "{"
-                . '"sx":'  Integer(it["slotStartX"]) ","
-                . '"sy":'  Integer(it["slotStartY"]) ","
-                . '"ex":'  Integer(it["slotEndX"])   ","
-                . '"ey":'  Integer(it["slotEndY"])   ","
-                . '"n":'   _JsStr(name) ","
-                . '"b":'   _JsStr(base) ","
-                . '"r":'   rarId        ","
-                . '"s":'   stkCnt       ","
-                . '"m":'   modsJson
+                . '"sx":' Integer(it["slotStartX"]) ","
+                . '"sy":' Integer(it["slotStartY"]) ","
+                . '"ex":' Integer(it["slotEndX"]) ","
+                . '"ey":' Integer(it["slotEndY"]) ","
+                . '"n":' _JsStr(name) ","
+                . '"b":' _JsStr(base) ","
+                . '"r":' rarId ","
+                . '"s":' stkCnt ","
+                . '"m":' modsJson
                 . "}"
         }
         itemsJson .= "]"
 
         json .= "{"
-            . '"id":'    invId  ","
-            . '"bx":'    boxX   ","
-            . '"by":'    boxY   ","
-            . '"src":'   _JsStr(source) ","
-            . '"tn":'    _JsStr(tabName) ","
+            . '"id":' invId ","
+            . '"bx":' boxX ","
+            . '"by":' boxY ","
+            . '"src":' _JsStr(source) ","
+            . '"tn":' _JsStr(tabName) ","
             . '"items":' itemsJson
             . "}"
     }
@@ -1401,7 +1389,7 @@ _BuildItemModsJson(modsInfo)
     ; ── Fallback: per-mod affix + roll values when no aggregated stats ──
     for _, entry in [
         Map("key", "implicitMods", "cat", "implicit"),
-        Map("key", "enchantMods",  "cat", "enchant"),
+        Map("key", "enchantMods", "cat", "enchant"),
         Map("key", "explicitMods", "cat", "explicit")]
     {
         arr := modsInfo.Has(entry["key"]) ? modsInfo[entry["key"]] : 0
@@ -1444,7 +1432,7 @@ _FormatModLines(m)
 {
     lines := []
     affix := m.Has("displayName") ? String(m["displayName"]) : ""
-    name  := m.Has("name")        ? String(m["name"])        : ""
+    name := m.Has("name") ? String(m["name"]) : ""
 
     ; Note: a `modFamily` field is also present on each mod Map (game
     ; exclusion-group label like "IncreasedLife"). It is deliberately
@@ -1505,11 +1493,11 @@ PushSpecialTabsToWebView(snapshot)
         return
     try
     {
-        WebViewExec("updateBuffs("     _JsStr(_BuildBuffsJson(snapshot))                                    ")")
-        WebViewExec("updateEntities("  _JsStr(_BuildEntitiesJson(IsObject(g_radarLastSnap) ? g_radarLastSnap : 0)) ")")
-        WebViewExec("updateUIState("   _JsStr(_BuildUIJson(snapshot))                                       ")")
-        WebViewExec("updateGameState(" _JsStr(_BuildGameStateJson(snapshot))                                ")")
-        WebViewExec("updateSkills("    _JsStr(_BuildSkillsJson(snapshot))                                   ")")
+        WebViewExec("updateBuffs(" _JsStr(_BuildBuffsJson(snapshot)) ")")
+        WebViewExec("updateEntities(" _JsStr(_BuildEntitiesJson(IsObject(g_radarLastSnap) ? g_radarLastSnap : 0)) ")")
+        WebViewExec("updateUIState(" _JsStr(_BuildUIJson(snapshot)) ")")
+        WebViewExec("updateGameState(" _JsStr(_BuildGameStateJson(snapshot)) ")")
+        WebViewExec("updateSkills(" _JsStr(_BuildSkillsJson(snapshot)) ")")
     }
     catch as ex
         LogError("PushSpecialTabsToWebView", ex)
@@ -1778,5 +1766,5 @@ _RunCmdCapture(cmd, workDir)
         try output := FileRead(tmpFile, "UTF-8")
         try FileDelete(tmpFile)
     }
-    return {output: output, exitCode: exitCode}
+    return { output: output, exitCode: exitCode }
 }
