@@ -26,7 +26,7 @@
 - [Highlights](#highlights)
 - [Features](#features)
   - [Automation](#-automation)
-  - [Custom Hotkeys](#-hotkeys)
+  - [Custom Hotkeys](#️-custom-hotkeys))
   - [Loot Pickup](#-loot-pickup)
   - [Overlays](#-overlays)
   - [GGPK Maphack](#-ggpk-maphack)
