@@ -962,6 +962,15 @@ _HotkeysSendKey(key)
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
         return
+    ; X1/X2 mouse buttons aren't handled by _SendSkillKey — route via the
+    ; local down/up helpers (which support them) as a quick click.
+    kl := StrLower(Trim(key))
+    if (kl = "xbutton1" || kl = "xbutton2")
+    {
+        if _HotkeysKeyDown(key)
+            SetTimer(() => _HotkeysKeyUp(key), -20)
+        return
+    }
     _HotkeysMarkInjected(key)
     try _SendSkillKey(key, gameHwnd)
 }
@@ -1226,6 +1235,16 @@ _HotkeysKeyDown(key)
         DllCall("mouse_event", "uint", 0x0020, "int", 0, "int", 0, "uint", 0, "uptr", 0)
         return true
     }
+    if (kl = "xbutton1")
+    {
+        DllCall("mouse_event", "uint", 0x0080, "int", 0, "int", 0, "uint", 1, "uptr", 0)   ; XDOWN, XBUTTON1
+        return true
+    }
+    if (kl = "xbutton2")
+    {
+        DllCall("mouse_event", "uint", 0x0080, "int", 0, "int", 0, "uint", 2, "uptr", 0)   ; XDOWN, XBUTTON2
+        return true
+    }
     vk := GetKeyVK(key)
     if (!vk)
         return false
@@ -1250,6 +1269,16 @@ _HotkeysKeyUp(key)
     if (kl = "mbutton")
     {
         DllCall("mouse_event", "uint", 0x0040, "int", 0, "int", 0, "uint", 0, "uptr", 0)
+        return true
+    }
+    if (kl = "xbutton1")
+    {
+        DllCall("mouse_event", "uint", 0x0100, "int", 0, "int", 0, "uint", 1, "uptr", 0)   ; XUP, XBUTTON1
+        return true
+    }
+    if (kl = "xbutton2")
+    {
+        DllCall("mouse_event", "uint", 0x0100, "int", 0, "int", 0, "uint", 2, "uptr", 0)   ; XUP, XBUTTON2
         return true
     }
     vk := GetKeyVK(key)

@@ -54,49 +54,56 @@ LoadSkillHotkeysFromConfig(configPath)
         return false
     }
 
-    found := 0
-    for line in StrSplit(raw, "`n", "`r")
+    lines := StrSplit(raw, "`n", "`r")
+
+    ; PoE2 keeps two skill-bind sections — [ACTION_KEYS] and [WASD_ACTION_KEYS] —
+    ; with different bindings; the active one is chosen by user_input_mode.
+    inputMode := ""
+    for line in lines
     {
-        slot := 0
-        keyValue := ""
-        if _TryParseSkillBindingLine(line, &slot, &keyValue)
+        if RegExMatch(Trim(line), "i)^user_input_mode\s*=\s*(\S+)", &mm)
         {
-            normalized := NormalizeConfigKeyToSend(keyValue)
-            if (slot >= 1 && slot <= 13 && normalized != "")
+            inputMode := StrLower(mm[1])
+            break
+        }
+    }
+    targetSection := (inputMode = "wasd") ? "wasd_action_keys" : "action_keys"
+
+    ; Parse use_bound_skillN within the chosen section. Values are decimal VK
+    ; codes; a trailing " 2" is the weapon-set indicator (same physical key) and
+    ; is ignored. VK 0 means unbound.
+    found := 0
+    curSection := ""
+    for line in lines
+    {
+        clean := Trim(line)
+        if (clean = "" || SubStr(clean, 1, 1) = ";")
+            continue
+        if RegExMatch(clean, "^\[(.+)\]$", &sm)
+        {
+            curSection := StrLower(sm[1])
+            continue
+        }
+        if (curSection != targetSection)
+            continue
+        if RegExMatch(clean, "i)^use_bound_skill([0-9]+)\s*=\s*(.+)$", &m)
+        {
+            slot := Integer(m[1])
+            vkTok := Trim(m[2])
+            if RegExMatch(vkTok, "^(\d+)", &vm)   ; primary VK; drop weapon-set suffix
+                vkTok := vm[1]
+            if (vkTok = "0")
+                continue
+            normalized := NormalizeConfigKeyToSend(vkTok)
+            if (slot >= 1 && normalized != "")
             {
                 g_skillKeyBySlot[slot] := normalized
                 found += 1
             }
         }
     }
-    g_skillKeyLoadStatus := (found > 0) ? "config" : "default(no-match)"
+    g_skillKeyLoadStatus := (found > 0) ? ("config:" targetSection) : "default(no-match)"
     return found > 0
-}
-
-; Tries to extract a skill-slot binding from a config line.
-; Recognises patterns like: skill1=..., skill_slot_2=..., InputAction_skill3=...
-; Sets &slot (1-based) and &keyValue (raw key token). Returns true on match.
-_TryParseSkillBindingLine(line, &slot, &keyValue)
-{
-    slot := 0
-    keyValue := ""
-    clean := Trim(line)
-    if (clean = "" || SubStr(clean, 1, 1) = ";")
-        return false
-    ; Avoid matching flask lines (handled separately).
-    if RegExMatch(clean, "i)flask")
-        return false
-    if RegExMatch(clean, "i)\bskill[_\s-]*slot[_\s-]*([0-9]+)\b[^=]*=\s*(.+)$", &m)
-    {
-        slot := Integer(m[1]), keyValue := Trim(m[2])
-        return true
-    }
-    if RegExMatch(clean, "i)\bskill[_\s-]*([0-9]+)\b[^=]*=\s*(.+)$", &m2)
-    {
-        slot := Integer(m2[1]), keyValue := Trim(m2[2])
-        return true
-    }
-    return false
 }
 
 ; Builds the bindings payload (flask slots, skill slots, active skill names with
@@ -116,10 +123,14 @@ PushHotkeyBindingsToWebView()
             flaskArr.Push(Map("slot", s, "key", g_flaskKeyBySlot[s]))
     }
 
-    ; Skill slots (whatever the config yielded).
+    ; Skill slots (whatever the config yielded), in ascending slot order.
     skillSlotArr := []
-    for s, k in g_skillKeyBySlot
-        skillSlotArr.Push(Map("slot", s, "key", k))
+    loop 24
+    {
+        s := A_Index
+        if g_skillKeyBySlot.Has(s)
+            skillSlotArr.Push(Map("slot", s, "key", g_skillKeyBySlot[s]))
+    }
 
     ; Active skill names for the readiness dropdown (on-demand read).
     skillNames := _CollectActiveSkillNames()
