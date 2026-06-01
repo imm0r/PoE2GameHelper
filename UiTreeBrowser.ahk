@@ -1,0 +1,323 @@
+; UiTreeBrowser.ahk
+; Recursive UI element tree walker and navigator
+
+; Dump entire UI tree starting from gameUiPtr to a TSV file.
+; Returns: path to written file, or "" on error.
+UiTree_Dump(reader, gameUiPtr, maxDepth := 12, outPath := "")
+{
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(gameUiPtr))
+        return ""
+    if (outPath = "")
+    {
+        debugDir := A_ScriptDir "\debug"
+        if !DirExist(debugDir)
+            DirCreate(debugDir)
+        stamp := FormatTime(, "yyyyMMdd_HHmmss")
+        outPath := debugDir "\ui_tree_" stamp ".tsv"
+    }
+    header := "Depth`tPath`tStringId`tAddress`tVisible`tChildCount`tScreenX`tScreenY`tSizeW`tSizeH`tFlags`n"
+    queue   := [{ptr: gameUiPtr, depth: 0, parentPath: ""}]
+    rows    := []
+    visited := Map()
+    deadline := A_TickCount + 20000
+    while (queue.Length > 0)
+    {
+        if (A_TickCount > deadline)
+            break
+        item     := queue.RemoveAt(1)
+        elemPtr  := item.ptr
+        depth    := item.depth
+        parentPath := item.parentPath
+        if (visited.Has(elemPtr))
+            continue
+        visited[elemPtr] := true
+        elem := UiTree_ReadElement(reader, elemPtr)
+        if !elem
+            continue
+        stringId   := elem["stringId"]
+        childCount := elem["childCount"]
+        if (stringId != "")
+            myPath := (parentPath = "") ? stringId : parentPath " > " stringId
+        else
+            myPath := parentPath
+        rows.Push(
+            depth . "`t"
+            . myPath . "`t"
+            . stringId . "`t"
+            . Format("0x{:X}", elemPtr) . "`t"
+            . (elem["isVisible"] ? "1" : "0") . "`t"
+            . childCount . "`t"
+            . Round(elem["screenX"], 1) . "`t"
+            . Round(elem["screenY"], 1) . "`t"
+            . Round(elem["sizeW"], 1) . "`t"
+            . Round(elem["sizeH"], 1) . "`t"
+            . Format("0x{:08X}", elem["flags"])
+        )
+        if (depth < maxDepth && childCount > 0)
+        {
+            childFirst := elem["childFirst"]
+            childLast  := elem["childLast"]
+            if (reader.IsProbablyValidPointer(childFirst) && childLast > childFirst)
+            {
+                numChildren := Min((childLast - childFirst) // A_PtrSize, 512)
+                ptrBuf := reader.Mem.ReadBytes(childFirst, numChildren * A_PtrSize)
+                if ptrBuf
+                {
+                    Loop numChildren
+                    {
+                        childPtr := NumGet(ptrBuf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
+                        if (reader.IsProbablyValidPointer(childPtr) && !visited.Has(childPtr))
+                            queue.Push({ptr: childPtr, depth: depth + 1, parentPath: myPath})
+                    }
+                }
+            }
+        }
+    }
+    try
+    {
+        content := header
+        for _, row in rows
+            content .= row . "`n"
+        FileAppend(content, outPath, "UTF-8")
+        return outPath
+    }
+    catch
+        return ""
+}
+
+; Read all properties of a single UI element in one batch RPM call.
+; Returns: Map with all properties, or 0 on invalid pointer.
+UiTree_ReadElement(reader, elemPtr)
+{
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(elemPtr))
+        return 0
+    headerSize := 0x2A0
+    hdr := reader.Mem.ReadBytes(elemPtr, headerSize)
+    if !hdr
+        return 0
+    childFirst := NumGet(hdr.Ptr, 0x010, "Ptr")
+    childLast  := NumGet(hdr.Ptr, 0x018, "Ptr")
+    childCount := 0
+    if (reader.IsProbablyValidPointer(childFirst) && childLast > childFirst)
+        childCount := Min((childLast - childFirst) // A_PtrSize, 4096)
+    parentPtr  := NumGet(hdr.Ptr, 0x0B8, "Ptr")
+    relX       := NumGet(hdr.Ptr, 0x118, "Float")
+    relY       := NumGet(hdr.Ptr, 0x11C, "Float")
+    localMult  := NumGet(hdr.Ptr, 0x130, "Float")
+    scaleIndex := NumGet(hdr.Ptr, 0x18A, "UChar")
+    stringId   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["StringIdPtr"])
+    fontName   := reader.ReadStdWStringAt(elemPtr + PoE2Offsets.UiElementBase["FontNamePtr"])
+    flags      := NumGet(hdr.Ptr, 0x180, "UInt")
+    isVisible  := ((flags >> 11) & 1) ? true : false
+    sizeW      := NumGet(hdr.Ptr, 0x288, "Float")
+    sizeH      := NumGet(hdr.Ptr, 0x28C, "Float")
+    posModX    := NumGet(hdr.Ptr, 0x0F0, "Float")
+    posModY    := NumGet(hdr.Ptr, 0x0F4, "Float")
+    vtable     := NumGet(hdr.Ptr, 0x000, "Ptr")
+    ; BackgroundColor — 4 floats (RGBA, normalized 0..1) at 0x25C
+    bgR        := NumGet(hdr.Ptr, 0x25C + 0x00, "Float")
+    bgG        := NumGet(hdr.Ptr, 0x25C + 0x04, "Float")
+    bgB        := NumGet(hdr.Ptr, 0x25C + 0x08, "Float")
+    bgA        := NumGet(hdr.Ptr, 0x25C + 0x0C, "Float")
+    bgPacked   := _UiPackColor(bgR, bgG, bgB, bgA)
+    shouldModifyPos := ((flags >> 10) & 1) ? true : false
+    return Map(
+        "address",         elemPtr,
+        "stringId",        stringId,
+        "fontName",        fontName,
+        "isVisible",       isVisible,
+        "shouldModifyPos", shouldModifyPos,
+        "flags",           flags,
+        "childCount",      childCount,
+        "childFirst",      childFirst,
+        "childLast",       childLast,
+        "parentPtr",       parentPtr,
+        "relX",            relX,
+        "relY",            relY,
+        "screenX",         relX,
+        "screenY",         relY,
+        "sizeW",           sizeW,
+        "sizeH",           sizeH,
+        "localMult",       localMult,
+        "scaleIndex",      scaleIndex,
+        "posModX",         posModX,
+        "posModY",         posModY,
+        "vtable",          vtable,
+        "bgColor",         bgPacked
+    )
+}
+
+; Packs four normalized floats (0..1) into an RRGGBBAA hex uint.
+_UiPackColor(r, g, b, a)
+{
+    ri := Min(255, Max(0, Round(r * 255)))
+    gi := Min(255, Max(0, Round(g * 255)))
+    bi := Min(255, Max(0, Round(b * 255)))
+    ai := Min(255, Max(0, Round(a * 255)))
+    return (ri << 24) | (gi << 16) | (bi << 8) | ai
+}
+
+; Walks up from elemPtr through parent pointers until rootPtr (or hitting NULL),
+; finding each step's index in its parent's children array.
+; Returns: Array of integers like [1, 41, 1] (root → element).
+UiTree_GetIndexPath(reader, rootPtr, elemPtr)
+{
+    path := []
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(elemPtr))
+        return path
+    cur := elemPtr
+    Loop 32
+    {
+        if (cur = rootPtr || !reader.IsProbablyValidPointer(cur))
+            break
+        hdr := reader.Mem.ReadBytes(cur, 0xC0)
+        if !hdr
+            break
+        parent := NumGet(hdr.Ptr, 0x0B8, "Ptr")
+        if (!reader.IsProbablyValidPointer(parent))
+            break
+        ; Read parent's child array to find cur's index
+        phdr := reader.Mem.ReadBytes(parent, 0x20)
+        if !phdr
+            break
+        cFirst := NumGet(phdr.Ptr, 0x010, "Ptr")
+        cLast  := NumGet(phdr.Ptr, 0x018, "Ptr")
+        if (!reader.IsProbablyValidPointer(cFirst) || cLast <= cFirst)
+            break
+        n := Min((cLast - cFirst) // A_PtrSize, 4096)
+        buf := reader.Mem.ReadBytes(cFirst, n * A_PtrSize)
+        if !buf
+            break
+        idx := -1
+        Loop n
+        {
+            cp := NumGet(buf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
+            if (cp = cur)
+            {
+                idx := A_Index - 1
+                break
+            }
+        }
+        if (idx < 0)
+            break
+        path.InsertAt(1, idx)
+        cur := parent
+    }
+    return path
+}
+
+; Navigate by StringId path like "LeftPanel > InventoryPanel"
+; or index path like "[0] > [3]"
+; Returns: address of found element, or 0.
+UiTree_FindByPath(reader, gameUiPtr, pathString)
+{
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(gameUiPtr) || pathString = "")
+        return 0
+    segments := StrSplit(pathString, " > ")
+    currentPtr := gameUiPtr
+    for _, segment in segments
+    {
+        segment := Trim(segment)
+        if (segment = "")
+            continue
+        if (SubStr(segment, 1, 1) = "[" && SubStr(segment, -1) = "]")
+        {
+            idx := Integer(SubStr(segment, 2, StrLen(segment) - 2))
+            currentPtr := UiTree_GetChildByIndex(reader, currentPtr, idx)
+        }
+        else
+            currentPtr := UiTree_GetChildByStringId(reader, currentPtr, segment)
+        if !reader.IsProbablyValidPointer(currentPtr)
+            return 0
+    }
+    return currentPtr
+}
+
+; Find child by StringId.
+UiTree_GetChildByStringId(reader, elemPtr, targetId)
+{
+    if (!reader.IsProbablyValidPointer(elemPtr))
+        return 0
+    hdr := reader.Mem.ReadBytes(elemPtr, 0x20)
+    if !hdr
+        return 0
+    childFirst := NumGet(hdr.Ptr, 0x010, "Ptr")
+    childLast  := NumGet(hdr.Ptr, 0x018, "Ptr")
+    if (!reader.IsProbablyValidPointer(childFirst) || childLast <= childFirst)
+        return 0
+    numChildren := Min((childLast - childFirst) // A_PtrSize, 512)
+    ptrBuf := reader.Mem.ReadBytes(childFirst, numChildren * A_PtrSize)
+    if !ptrBuf
+        return 0
+    Loop numChildren
+    {
+        childPtr := NumGet(ptrBuf.Ptr, (A_Index - 1) * A_PtrSize, "Ptr")
+        if !reader.IsProbablyValidPointer(childPtr)
+            continue
+        sid := reader.ReadStdWStringAt(childPtr + PoE2Offsets.UiElementBase["StringIdPtr"])
+        if (sid = targetId)
+            return childPtr
+    }
+    return 0
+}
+
+; Find child by index (0-based).
+UiTree_GetChildByIndex(reader, elemPtr, idx)
+{
+    if (!reader.IsProbablyValidPointer(elemPtr))
+        return 0
+    hdr := reader.Mem.ReadBytes(elemPtr, 0x20)
+    if !hdr
+        return 0
+    childFirst := NumGet(hdr.Ptr, 0x010, "Ptr")
+    childLast  := NumGet(hdr.Ptr, 0x018, "Ptr")
+    if (!reader.IsProbablyValidPointer(childFirst) || childLast <= childFirst)
+        return 0
+    numChildren := (childLast - childFirst) // A_PtrSize
+    if (idx < 0 || idx >= numChildren)
+        return 0
+    ptrBuf := reader.Mem.ReadBytes(childFirst + idx * A_PtrSize, A_PtrSize)
+    return ptrBuf ? NumGet(ptrBuf.Ptr, 0, "Ptr") : 0
+}
+
+; Get exact screen position by walking parent chain.
+UiTree_GetScreenPos(reader, elemPtr)
+{
+    chain := []
+    curPtr := elemPtr
+    Loop 16 {
+        if !reader.IsProbablyValidPointer(curPtr)
+            break
+        hdr := reader.Mem.ReadBytes(curPtr, 0x200)
+        if !hdr
+            break
+        relX    := NumGet(hdr.Ptr, 0x118, "Float")
+        relY    := NumGet(hdr.Ptr, 0x11C, "Float")
+        flags   := NumGet(hdr.Ptr, 0x180, "UInt")
+        posModX := NumGet(hdr.Ptr, 0x0F0, "Float")
+        posModY := NumGet(hdr.Ptr, 0x0F4, "Float")
+        parentP := NumGet(hdr.Ptr, 0x0B8, "Ptr")
+        chain.Push(Map("relX", relX, "relY", relY, "flags", flags, "posModX", posModX, "posModY", posModY))
+        if !reader.IsProbablyValidPointer(parentP)
+            break
+        curPtr := parentP
+    }
+    N := chain.Length
+    if (N = 0)
+        return Map("x", 0.0, "y", 0.0)
+    accX := chain[N]["relX"]
+    accY := chain[N]["relY"]
+    Loop N - 1 {
+        childIdx  := N - A_Index
+        parentIdx := childIdx + 1
+        child  := chain[childIdx]
+        parent := chain[parentIdx]
+        if (child["flags"] >> 10) & 1 {
+            accX += parent["posModX"]
+            accY += parent["posModY"]
+        }
+        accX += child["relX"]
+        accY += child["relY"]
+    }
+    return Map("x", accX, "y", accY)
+}

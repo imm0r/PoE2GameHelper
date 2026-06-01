@@ -1,0 +1,31 @@
+## Build artefacts (re-created by `dotnet build`)
+bin/
+obj/
+*/publish/
+
+## Backups produced by PoePatcher at runtime — stored alongside the GGPK
+## the user pointed it at, never inside this repo
+backups/
+
+## Local extracts / inspector dumps from running against a live GGPK.
+## These are output of running the tools — easy to regenerate, can be
+## large (~2 MB for BaseItemTypes), and technically derived from the
+## game's own copyrighted data so we don't want them in git regardless.
+*.tsv
+*.tsv.tmp
+*.datc64
+*.dat64
+*.hlsl
+*-inspect.txt
+*-paths.txt
+out/
+
+## Proprietary Oodle DLL — see README. Users provide their own.
+oo2core_*.dll
+oo2core.dll
+
+## Visual Studio / Rider / VS Code junk
+*.user
+*.suo
+.vs/
+.idea/

@@ -1,0 +1,2394 @@
+metadata_path	display_name
+Any	[ANY MONSTER]
+Metadata/Monsters/Monkeys/MonkeyJungle	Feral Primate
+Metadata/Monsters/Monkeys/MonkeyJunglePale	Feral Primate
+Metadata/Monsters/Monkeys/MonkeyJungleTamed	Feral Primate
+Metadata/Monsters/Monkeys/MonkeyJungleTamedBossSpectator	Feral Primate
+Metadata/Monsters/BloodChieftain/MonkeyChiefJungle	Alpha Primate
+Metadata/Monsters/InsectMinion/InsectTest	Testling
+Metadata/Monsters/Spiker/Spiker	Porcupine Goliath
+Metadata/Monsters/Spiker/Spiker3_	Porcupine Goliath
+Metadata/Monsters/Spiker/Spiker3SanctumTrial__	Porcupine Goliath
+Metadata/Monsters/Totems/StrengthTotem	Totem
+Metadata/Monsters/Totems/IntelligenceTotem	Totem
+Metadata/Monsters/Totems/DexterityTotem	Totem
+Metadata/Monsters/Totems/SnipeTotem	Totem
+Metadata/Monsters/Totems/ForwardBallista	Totem
+Metadata/Monsters/Totems/UpwardBallista	Totem
+Metadata/Monsters/Totems/SlamTotem	Totem
+Metadata/Monsters/Totems/SpellTotem	Totem
+Metadata/Monsters/Totems/GrenadeTotem	Mortar Cannon
+Metadata/Monsters/MudBurrower/BrambleBurrower	Bramble Burrower
+Metadata/Monsters/MudBurrower/SpiresBurrower	Spire Burrower
+Metadata/Monsters/MudBurrower/SpiresBurrowerSanctumTrial	Spire Burrower
+Metadata/Monsters/StonebackRhoa/BrambleRhoa	Bramble Rhoa
+Metadata/Monsters/RagingSpirit/RagingSpiritPlayerSummoned	Raging Spirit
+Metadata/Monsters/Daemon/ChestDaemonBarrelExplodeBurningGround	Daemon
+Metadata/Monsters/Double/DoubleMarauder	Double
+Metadata/Monsters/Double/DoubleRanger	Double
+Metadata/Monsters/Double/DoubleWitch	Double
+Metadata/Monsters/Double/DoubleDuelist	Double
+Metadata/Monsters/Double/DoubleTemplar	Double
+Metadata/Monsters/Double/DoubleShadow	Double
+Metadata/Monsters/Double/DoubleMarauderTwo	Double
+Metadata/Monsters/Double/DoubleRangerTwo	Double
+Metadata/Monsters/Double/DoubleWitchTwo_	Double
+Metadata/Monsters/Double/DoubleDuelistTwo	Double
+Metadata/Monsters/Double/DoubleTemplarTwo	Double
+Metadata/Monsters/Double/DoubleShadowTwo	Double
+Metadata/Monsters/Dummy/D1	-|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|-
+Metadata/Monsters/Dummy/D10	-|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|-
+Metadata/Monsters/Dummy/D100	-|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|-
+Metadata/Monsters/Dummy/D	-|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|- -|-
+Metadata/Monsters/Dummy/Placeholder1	Placeholder 1
+Metadata/Monsters/Dummy/Placeholder2	Placeholder 2
+Metadata/Monsters/Dummy/Placeholder3	Placeholder 3
+Metadata/Monsters/Dummy/Placeholder4	Placeholder 4
+Metadata/Monsters/Daemon/DoNothingDaemon	Boring
+Metadata/Monsters/Clone/MarauderClone	Clone
+Metadata/Monsters/Clone/RangerClone	Clone
+Metadata/Monsters/Clone/WitchClone	Clone
+Metadata/Monsters/Clone/DuelistClone	Clone
+Metadata/Monsters/Clone/TemplarClone	Clone
+Metadata/Monsters/Clone/ShadowClone	Clone
+Metadata/Monsters/Clone/MarauderFourCloneImmobile	Clone
+Metadata/Monsters/Clone/RangerFourCloneImmobile	Clone
+Metadata/Monsters/Clone/WitchFourCloneImmobile_	Clone
+Metadata/Monsters/Clone/DuelistFourCloneImmobile	Clone
+Metadata/Monsters/Clone/TemplarFourCloneImmobile	Clone
+Metadata/Monsters/Clone/ShadowFourCloneImmobile_	Clone
+Metadata/Monsters/Mirage/MarauderFourMirage	Mirage
+Metadata/Monsters/Mirage/RangerFourMirage	Mirage
+Metadata/Monsters/Mirage/WitchFourMirage	Mirage
+Metadata/Monsters/Mirage/DuelistFourMirage	Mirage
+Metadata/Monsters/Mirage/TemplarFourMirage	Mirage
+Metadata/Monsters/Mirage/ShadowFourMirage	Mirage
+Metadata/Monsters/Mirage/MarauderReplicateClone	Clone
+Metadata/Monsters/Mirage/RangerReplicateClone	Clone
+Metadata/Monsters/Mirage/WitchReplicateClone	Clone
+Metadata/Monsters/Mirage/DuelistReplicateClone	Clone
+Metadata/Monsters/Mirage/TemplarReplicateClone	Clone
+Metadata/Monsters/Mirage/ShadowReplicateClone	Clone
+Metadata/Monsters/InvisibleFire/MDTitanBossLaserTarget	Invisible
+Metadata/Monsters/InvisibleFire/MDVaalSunApparitionMinisun	Invisible
+Metadata/Monsters/InvisibleFire/MDHighbornSpore	Invisible
+Metadata/Monsters/InvisibleFire/MDVaalBossStatueLaserTarget	Invisible
+Metadata/Monsters/InvisibleFire/MDVaalBossStatueLaserCrissCrossTarget	Invisible
+Metadata/Monsters/InvisibleFire/MDVaalBossStatueBallLightning	Invisible
+Metadata/Monsters/InvisibleFire/MDFallenGodFIreBeam	Invisible
+Metadata/Monsters/InvisibleFire/MDFallenGodFireBeamSanctified	Invisible
+Metadata/Monsters/InvisibleFire/MDPerennialKingObsidianStorm_	Invisible
+Metadata/Monsters/InvisibleFire/MDPerennialKingTornado	Invisible
+Metadata/Monsters/InvisibleFire/PerennialKingOrbitTornado	Invisible
+Metadata/Monsters/InvisibleFire/MDGolemancerTornado	Invisible
+Metadata/Monsters/InvisibleFire/MDGolemancerTornadoWhiteSand	Invisible
+Metadata/Monsters/InvisibleFire/AzmerianViperTornado	Invisible
+Metadata/Monsters/InvisibleFire/MDBaronWolfBloodBurst	Invisible
+Metadata/Monsters/InvisibleFire/MDCarrionCroneWave	Invisible
+Metadata/Monsters/InvisibleFire/MDGoldCrushLavaEdge	Invisible
+Metadata/Monsters/InvisibleFire/MDGoldCrushLavaSunder	Invisible
+Metadata/Monsters/InvisibleFire/MDVaseMonsterBugs	Invisible
+Metadata/Monsters/InvisibleFire/MDUtlimatumOmnitectWave	Invisible
+Metadata/Monsters/InvisibleFire/MDIcyOwlBossSnowball	Invisible
+Metadata/Monsters/InvisibleFire/MDSharkBossFishnado	Invisible
+Metadata/Monsters/InvisibleFire/MDSharkBossFin	Invisible
+Metadata/Monsters/InvisibleFire/MDSandStormTornado	Invisible
+Metadata/Monsters/InvisibleFire/MDRitualWendigoBossVacuumBlob	Invisible
+Metadata/Monsters/InvisibleFire/MDRitualWendigoBossFistSlamMothball	Invisible
+Metadata/Monsters/InvisibleFire/MDGoblinGiantStompSpike	Invisible
+Metadata/Monsters/MarakethSanctumTrial/Boss/ApparitionBoss/OrbitDaemon	Invisible
+Metadata/Monsters/VolatileCore/VolatileDeadCore	Volatile Core
+Metadata/Monsters/VolatileCore/VolatileDeadCoreStygian	Volatile Core
+Metadata/Monsters/Daemon/ElderBlenderDaemon	Daemon
+Metadata/Monsters/CrabMonsters/CrabCoconut	Coconut Crab
+Metadata/Monsters/Daemon/LightningCloneRetaliationDaemon	Daemon
+Metadata/Monsters/Daemon/Player/LightningCloneRetaliationDaemon	Daemon
+Metadata/Monsters/Daemon/LightningCloneRetaliationDaemon2	Daemon
+Metadata/Monsters/Daemon/Player/LightningCloneRetaliationDaemon2	Daemon
+Metadata/Monsters/Clone/MarauderLightningClone	Clone
+Metadata/Monsters/Clone/WarriorLightningClone	Clone
+Metadata/Monsters/Clone/RangerLightningClone	Clone
+Metadata/Monsters/Clone/HuntressLightningClone	Clone
+Metadata/Monsters/Clone/WitchLightningClone	Clone
+Metadata/Monsters/Clone/SorceressLightningClone	Clone
+Metadata/Monsters/Clone/DuelistLightningClone	Clone
+Metadata/Monsters/Clone/MercenaryLightningClone	Clone
+Metadata/Monsters/Clone/TemplarLightningClone	Clone
+Metadata/Monsters/Clone/DruidLightningClone	Clone
+Metadata/Monsters/Clone/ShadowLightningClone__	Clone
+Metadata/Monsters/Clone/MonkLightningClone__	Clone
+Metadata/Monsters/MirageWarrior/MirageWarriorMarauder	Mirage Saviour
+Metadata/Monsters/MirageWarrior/MirageWarriorRanger	Mirage Saviour
+Metadata/Monsters/MirageWarrior/MirageWarriorWitch	Mirage Saviour
+Metadata/Monsters/MirageWarrior/MirageWarriorDuelist	Mirage Saviour
+Metadata/Monsters/MirageWarrior/MirageWarriorTemplar	Mirage Saviour
+Metadata/Monsters/MirageWarrior/MirageWarriorShadow	Mirage Saviour
+Metadata/Monsters/VolatileCore/VolatileDeadCoreVoid	Volatile Core
+Metadata/Monsters/VolatileCore/VolatileDeadCoreDarkwood_	Volatile Core
+Metadata/Monsters/CrowBell/CrowBellBoss_	The Crowbell
+Metadata/Monsters/CrowBell/CrowBellBossMap_	The Black Crow
+Metadata/Monsters/CrowBell/CrowBellBossSTANDALONE	The Black Crow
+Metadata/Monsters/Wraith/WraithSpookyCold	Frost Wraith
+Metadata/Monsters/Wraith/WraithSpookyColdSpectre	Frost Wraith
+Metadata/Monsters/Wraith/WraithSpookyColdSanctumTrialTime	Frost Wraith
+Metadata/Monsters/Wraith/WraithSpookyColdStrongbox_	Frost Wraith
+Metadata/Monsters/Wraith/WraithSpookyLightning	Lightning Wraith
+Metadata/Monsters/Wraith/WraithSpookyLightningSpectre	Lightning Wraith
+Metadata/Monsters/Wraith/WraithSpookyLightningStrongbox	Lightning Wraith
+Metadata/Monsters/GuillotineExecutioner/GuillotineExecutioner	The Executioner
+Metadata/Monsters/GuillotineExecutioner/GuillotineExecutionerMap	Incarnation of Death
+Metadata/Monsters/GuillotineExecutioner/GuillotineExecutionerCRUEL	The Executioner
+Metadata/Monsters/GuillotineExecutioner/GuillotineExecutionerSTANDALONE	Incarnation of Death
+Metadata/Monsters/TheCountsGuardEliteCorruptedMageLessCorrupted/CorruptedEliteGuard	Iron Thaumaturgist
+Metadata/Monsters/TheCountsEliteGuardCorrupted/VariantB/CorruptedEliteToothy	Iron Guard
+Metadata/Monsters/TheCountsEliteGuardCorrupted/VariantA/CorruptedEliteSpear_	Iron Spearman
+Metadata/Monsters/TheCountsEliteGuardCorrupted/Ranged/CorruptedEliteRanger_	Iron Sharpshooter
+Metadata/Monsters/TheCountsEliteGuardCorrupted/Ranged/MoveDaemonLaser	Invisible
+Metadata/Monsters/TheCountsEliteGuardCorrupted/MeleeVariantB/CorruptedEliteBloater	Iron Enforcer
+Metadata/Monsters/MudBurrower/MudBurrowerHeadBoss	The Devourer
+Metadata/Monsters/MudBurrower/MudBurrowerHeadBossMAP_	Gorian, the Moving Earth
+Metadata/Monsters/MudBurrower/MudBurrowerHeadBossMAP2__	Gorian, the Moving Earth
+Metadata/Monsters/MudBurrower/MudBurrowerHeadBossMAP_clone_	Gorian, the Moving Earth
+Metadata/Monsters/MudBurrower/MudBurrowerHeadBossSTANDALONE	Gorian, the Moving Earth
+Metadata/Monsters/MudBurrower/MudBurrowerHeadTrap	The Devourer
+Metadata/Monsters/MudBurrower/MudBurrowerHeadTrap2	The Devourer
+Metadata/Monsters/MudBurrower/MudBurrowerTailBoss_	The Devourer
+Metadata/Monsters/MudBurrower/MudBurrowerBodyDaemon	Daemon
+Metadata/Monsters/FungusZombie/FungusZombieMedium	Fungal Zombie
+Metadata/Monsters/FungusZombie/FungusZombieLarge	Fungal Zombie
+Metadata/Monsters/FungusZombie/FungusZombieFungalmancer	Fungal Proliferator
+Metadata/Monsters/MudGolem/MudGolem	Mud Simulacrum
+Metadata/Monsters/MudGolem/MudGolemWet1	Mud Simulacrum
+Metadata/Monsters/MudGolem/MudGolemWetEmerge1	Mud Simulacrum
+Metadata/Monsters/MudGolem/MudGolemWetEncased1	Mud Simulacrum
+Metadata/Monsters/MudGolem/SandGolem	Living Sand
+Metadata/Monsters/MudGolem/SandGolemStrongbox	Living Sand
+Metadata/Monsters/MudGolem/SandGolemHidden__	Living Sand
+Metadata/Monsters/SwollenMiller/SwollenMillerBoss	The Bloated Miller
+Metadata/Monsters/SwollenMiller/SwollenMillerBossMAP	Tierney, the Hateful
+Metadata/Monsters/SwollenMiller/SwollenMillerBossMAPDuo_	Murtagh, the Engorged
+Metadata/Monsters/SwollenMiller/SwollenMillerBossMAPDuo2_	Colm, the Rancorous
+Metadata/Monsters/SwollenMiller/SwollenMillerBossSTANDALONE	Tierney, the Hateful
+Metadata/Monsters/NPC/BitterGuy	Lachlann, Ezomyte Rebel
+Metadata/Monsters/NPC/BitterGuyMap	Lachlann, Ezomyte Rebel
+Metadata/Monsters/NPC/BitterGuyHuman	Lachlann, Ezomyte Rebel
+Metadata/Monsters/BitterGuy/BitterGuyBoss	Lachlann of Endless Lament
+Metadata/Monsters/BitterGuy/BitterGuyBossCRUEL	Lachlann of Endless Lament
+Metadata/Monsters/BitterGuy/BitterGuyBossMap	Connal, the Tormented
+Metadata/Monsters/BitterGuy/BitterGuyBossSTANDALONE	Connal, the Tormented
+Metadata/Monsters/BitterGuy/BitterGuyWifeGhost	Isabel, Mourning Wife
+Metadata/Monsters/BitterGuy/BitterGuyWifeChasingDaemon	Daemon
+Metadata/Monsters/BitterGuy/BitterGuyWifeSurge	Isabel, Mourning Wife
+Metadata/Monsters/BitterGuy/BitterGuyChild1Surge_	Calum, Weeping Child
+Metadata/Monsters/BitterGuy/BitterGuyChild2Surge	Torcall, Sobbing Child
+Metadata/Monsters/QuillCrab/QuillCrab	Porcupine Crab
+Metadata/Monsters/QuillCrab/QuillCrabBig	Porcupine Crab
+Metadata/Monsters/QuillCrab/QuillCrabBigElite	Porcupine Crab
+Metadata/Monsters/QuillCrab/QuillCrabPoison	Venomous Crab
+Metadata/Monsters/QuillCrab/QuillCrabBigPoison_	Venomous Crab Matriarch
+Metadata/Monsters/QuillCrab/QuillCrabBigPoisonElite	Venomous Crab Matriarch
+Metadata/Monsters/QuillCrab/QuillCrabTropical	Quill Crab
+Metadata/Monsters/QuillCrab/QuillCrabBigTropical	Quill Crab
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedUnarmed	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedUnarmedPhysics	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedOneHandAxe	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedOneHandAxePhysics	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedUnarmedHighAggroRangeMiller	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedUnarmedPhysicsHighAggroRangeMiller	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedOneHandAxeHighAggroRangeMiller	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedOneHandAxePhysicsHighAggroRangeMiller	Drowned
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedDryUnarmed	Lumbering Dead
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedDryUnarmedPhysics	Lumbering Dead
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedDryOneHandAxe	Lumbering Dead
+Metadata/Monsters/Zombies/Lumberjack/LumberingDrownedDryOneHandAxePhysics__	Lumbering Dead
+Metadata/Monsters/Urchins/SlingUrchin1	Vile Imp
+Metadata/Monsters/Urchins/MeleeUrchin1	Vile Imp
+Metadata/Monsters/Hags/UrchinHag1	Vile Hag
+Metadata/Monsters/Hags/UrchinHagBoss	Beira of the Rotten Pack
+Metadata/Monsters/Hags/UrchinHagBossMap	Riona, Winter's Cackle
+Metadata/Monsters/Hags/UrchinHagBossSTANDALONE	Riona, Winter's Cackle
+Metadata/Monsters/Hags/UrchinHagBossHagBattleMap	Gelida, the Frost-Tongue
+Metadata/Monsters/Hags/UrchinHagBossHagBattleMap2	Rael, the Frost Hand
+Metadata/Monsters/Hags/UrchinHagBossHagBattleInterlude	Isolde of the White Shroud
+Metadata/Monsters/Hags/TrenchHag	River Hag
+Metadata/Monsters/Skeletons/FungalSkeletonOneHandSword	Fungal Rattler
+Metadata/Monsters/Skeletons/FungalSkeletonOneHandSwordShield	Fungal Rattler
+Metadata/Monsters/Skeletons/FungalZombieOneHandSword	Fungal Rattler
+Metadata/Monsters/Skeletons/FungalZombieOneHandSwordShield	Fungal Rattler
+Metadata/Monsters/Skeletons/RetchSkeletonOneHandSword	Wretched Rattler
+Metadata/Monsters/Skeletons/RetchSkeletonOneHandSwordShield	Wretched Rattler
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvae	Flesh Larva
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeSpectre	Flesh Larva
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeRanged1	Flesh Larva
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeRanged1Spectre	Flesh Larva
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeRangedLandmark1	The Brood Queen
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeEmerge1	Flesh Larva
+Metadata/Monsters/HuhuGrub/HuhuGrubLarvaeEmergeSummoned1_	Flesh Larva
+Metadata/Monsters/Werewolves/WerewolfPack1	Pack Werewolf
+Metadata/Monsters/Werewolves/WerewolfPackStrongbox_	Pack Werewolf
+Metadata/Monsters/Werewolves/WerewolfMoonClan1	Voracious Werewolf
+Metadata/Monsters/Werewolves/WerewolfPackHuntingGrounds	Pack Werewolf
+Metadata/Monsters/Werewolves/WerewolfMoonClanHuntingGrounds	Voracious Werewolf
+Metadata/Monsters/Werewolves/WerewolfProwler1	Werewolf Prowler
+Metadata/Monsters/Werewolves/WerewolfProwlerStrongbox	Werewolf Prowler
+Metadata/Monsters/Werewolves/WerewolfProwlerRed1	Tendril Prowler
+Metadata/Monsters/Stalker/Stalker	Hungering Stalker
+Metadata/Monsters/Stalker/StalkerStrongbox	Hungering Stalker
+Metadata/Monsters/RustKing/TheRustKingBoss	The Rust King
+Metadata/Monsters/RustKing/TheRustKingBossMAP	Gozen, Rebellious Rustlord
+Metadata/Monsters/RustKing/TheRustKingBossSTANDALONE	Gozen, Rebellious Rustlord
+Metadata/Monsters/BloodMonsters/BloodCourtesan1	Courtesan
+Metadata/Monsters/BloodMonsters/BloodCourtesanStrongbox	Courtesan
+Metadata/Monsters/BloodMonsters/BloodCarrier1	Blood Carrier
+Metadata/Monsters/BloodMonsters/BloodCretin1	Blood Cretin
+Metadata/Monsters/BloodMonsters/BloodCretinStrongbox	Blood Cretin
+Metadata/Monsters/BloodMonsters/BloodCollector1__	Blood Collector
+Metadata/Monsters/Knight/DeathKnight1	Death Knight
+Metadata/Monsters/Knight/DeathKnightNecropolis	Death Knight
+Metadata/Monsters/Knight/DeathKnightNecropolisStrongbox	Death Knight
+Metadata/Monsters/Knight/DeathKnightNecropolisElite	Death Knight
+Metadata/Monsters/Knight/DeathKnightNecropolisEliteStrongbox	Death Knight
+Metadata/Monsters/Gargoyle/GargoyleGolemRed	Gargoyle Demon
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxe__	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenarySword	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeAxe	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenarySwordSword_	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryCrossbow	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryCrossbowIncin	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenarySwordTorchIncin	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryMaulIncin	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeIncin	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryCrossbowExecutionerMinion	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryCrossbowExecutionerMinionSTANDALONE	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeShieldExecutionerMinion	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeShieldExecutionerMinion_STANDALONE	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeAxeExecutionerMinion	Decrepit Mercenary
+Metadata/Monsters/Mercenary/Infected/InfectedMercenaryAxeAxeExecutionerMinionSTANDALONE	Decrepit Mercenary
+Metadata/Monsters/Crow/CrowCarrion	Rotting Crow
+Metadata/Monsters/BrambleHulk/BrambleHulk1	Bramble Hulk
+Metadata/Monsters/Ghouls/GhoulCommander	Ghoul Commander
+Metadata/Monsters/Ghouls/GhoulCommanderStrongbox	Ghoul Commander
+Metadata/Monsters/ChimeraWetlandsBoss/ChimeraWetlandsBoss	Xyclucian, the Chimera
+Metadata/Monsters/ChimeraWetlandsBoss/ChimeraWetlandsBossSTANDALONE	Xilozoma, the Maw-Beast
+Metadata/Monsters/ChimeraWetlandsBoss/ChimeraWetlandsBossSTANDALONEExpedition	Xilozoma, the Maw-Beast
+Metadata/Monsters/ChimeraWetlandsBoss/ChimeraWetlandsPillar	Stone Pillar
+Metadata/Monsters/Ultimatum/ChimeraUltimatumBoss__	Uxmal, the Beastlord
+Metadata/Monsters/Ultimatum/ChimeraUltimatumBossMap	Gressor-Kul, the Apex
+Metadata/Monsters/Ultimatum/ChimeraUltimatumBossStandalone	Gressor-Kul, the Apex
+Metadata/Monsters/Bird/MutantBird	Scourge of the Skies
+Metadata/Monsters/Bird/MutantBirdDog	Flesh Pup
+Metadata/Monsters/Bird2/MutantBird2	Chetza, the Feathered Plague
+Metadata/Monsters/Bird2/MutantBird2NOUltimatum	Scourge of the Skies
+Metadata/Monsters/Bird2/MutantBird2Map	Chetza, the Feathered Plague
+Metadata/Monsters/Bird2/MutantBird2Standalone	Chetza, the Feathered Plague
+Metadata/Monsters/Bird2/MutantBirdDog2_	Plagueling
+Metadata/Monsters/Bird2/MutantBirdDog2_Standalone	Plagueling
+Metadata/Monsters/Hatchling/Hatchling	Hatchling
+Metadata/Monsters/Ghouls/Ghoul	Skulking Ghoul
+Metadata/Monsters/Ghouls/GhoulStrongbox	Skulking Ghoul
+Metadata/Monsters/Skeletons/Rusted/RustedSkeletonOneHandSwordShield	Rust Skeleton
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonUnarmedSnakeBossMinion	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonUnarmed	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeNoArmour_	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeClothArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeMediumArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeHeavyArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordNoArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordClothArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordMediumArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordShieldMediumArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordShieldHeavyArmour	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordShieldHeavyArmourSanctumTrial	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonUnarmedStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeNoArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeClothArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandAxeMediumArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordNoArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordClothArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonOneHandSwordMediumArmourStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonBow	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonCrossbow	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonBowStrongbox	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonCrossbowStrongbox	Risen Maraketh
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSword	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordStrongbox	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordShield	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordShieldStrongbox	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierCrossbow	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierCrossbowStrongbox	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierBow	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierBowStrongbox	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordQuest	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordShieldQuest	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierBowQuest	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordBoss	Ancient Ezomyte
+Metadata/Monsters/SkeletonSoldier/Rusted/RustedSoldierOneHandSwordShieldBoss_	Ancient Ezomyte
+Metadata/Monsters/Zombies/Fungal/FungalArtillery1__	Fungal Artillery
+Metadata/Monsters/Wretches/CoffinWretch1	Undertaker
+Metadata/Monsters/Wretches/StatueWretch	Burdened Wretch
+Metadata/Monsters/Wretches/StatueWretchElite	Bearer of Penitence
+Metadata/Monsters/Frog/PaleFrog1	Maw Demon
+Metadata/Monsters/BoneStalker/TombStalker1	Bone Stalker
+Metadata/Monsters/Sentinels/TendrilSentinel1__	Tendril Sentinel
+Metadata/Monsters/Wolves/Wolf1	Hungry Wolf
+Metadata/Monsters/Wolves/RottenWolf1_	Rotten Wolf
+Metadata/Monsters/Wolves/RottenWolfHagSummoned	Rotten Wolf
+Metadata/Monsters/Wolves/RottenWolfHagSummonedDead	Rotten Wolf
+Metadata/Monsters/Wolves/RottenWolfDead	Rotten Wolf
+Metadata/Monsters/Wolves/FungalWolf1_	Fungal Wolf
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonUnarmed	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonUnarmedHusbandWife	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonUnarmedStance2	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonUnarmedStrongbox	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSword__	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSwordHusbandWife	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSwordStrongbox	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSwordShield	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSwordShieldHusbandWife	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonOneHandSwordShieldStrongbox	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonBow	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonBowHusbandWife	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterCold	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterColdHusbandWife	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterColdStrongbox	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterFire	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterFireStrongbox	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterLightning	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/GraveSkeletonCasterLightningStrongbox	Risen Rattler
+Metadata/Monsters/SnakeFlowerMan/BloomSerpent1	Bloom Serpent
+Metadata/Monsters/SnakeFlowerMan/BloomSerpentEmerge1	Bloom Serpent
+Metadata/Monsters/Zombies/Farmer/FarmerZombieMedium	Risen Farmhand
+Metadata/Monsters/Zombies/Farmer/FarmerZombieMediumHoe	Risen Farmhand
+Metadata/Monsters/Zombies/Farmer/FarmerZombieSkinny	Risen Farmhand
+Metadata/Monsters/Zombies/Farmer/FarmerZombieGood_	Risen Farmhand
+Metadata/Monsters/Zombies/Farmer/FarmerZombieGoodScythe_	Risen Farmhand
+Metadata/Monsters/Zombies/Burned/BurnedLumberjackUnarmed	Burning Dead
+Metadata/Monsters/Zombies/Burned/BurnedLumberjackOneHandAxe_	Burning Dead
+Metadata/Monsters/Zombies/Burned/BurnedLumberjackTwoHandAxe	Burning Dead
+Metadata/Monsters/Monkeys/Bramble/BrambleMonkey1	Bramble Ape
+Metadata/Monsters/Daemon/FungalBurstDaemon	Daemon
+Metadata/Monsters/Daemon/PlantBurstDaemon	Daemon
+Metadata/Monsters/Daemon/RustKingQuestChestDaemon_	Daemon
+Metadata/Monsters/NPC/DogTrader_	[DNT-UNUSED] Dog Trader
+Metadata/Monsters/Act2/ForsakenSon	Azarian, the Forsaken Son
+Metadata/Monsters/Act2/ForsakenSonMap	Hask, the Fallen Son
+Metadata/Monsters/Act2/ForsakenSonSTANDALONE	Hask, the Fallen Son
+Metadata/Monsters/TitanBoss/TitanBoss	Zalmarath, the Colossus
+Metadata/Monsters/TitanBoss/TitanBossMap	Vastweld, the Colossal Guardian
+Metadata/Monsters/TitanBoss/TitanBossSTANDALONE	Zalmarath, the Colossus
+Metadata/Monsters/RisenArbalest__	Risen Arbalest
+Metadata/Monsters/RisenArbalestSanctumTrial	Risen Arbalest
+Metadata/Monsters/Lark/Lark	[DNT-UNUSED] Lark
+Metadata/Monsters/Balbala/Balbala	Balbala, the Traitor
+Metadata/Monsters/Balbala/BalbalaMAP	Pirasha, the Forgotten Prisoner
+Metadata/Monsters/Balbala/BalbalaSTANDALONE_	Pirasha, the Forgotten Prisoner
+Metadata/Monsters/Balbala/BalbalaClone_	Spirit of Balbala
+Metadata/Monsters/Balbala/BalbalaCloneMAP	Spirit of Pirasha
+Metadata/Monsters/Balbala/BalbalaFog	Daemon
+Metadata/Monsters/Balbala/BalbalaFogSTANDALONE	Daemon
+Metadata/Monsters/Bugbot/BugbotRocky_	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotRockyNoEmerge	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotRockySanctumTrial	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotRockyNoEmergeSanctumTrial	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotBlack	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotBlackNoEmerge	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotSulphiteIsleOfKinLandmark	Skitter Golem
+Metadata/Monsters/Bugbot/BugbotRockyNoEmergePlayerSummoned	Skittering Stone
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/FarudinLocustWarlock	Faridun Plaguebringer
+Metadata/Monsters/Mutewind/MutewindManDualSword	Faridun Swordsman
+Metadata/Monsters/Mutewind/MutewindMan2HSpear	Faridun Spearman
+Metadata/Monsters/Mutewind/MutewindManSpearShield_	Faridun Heavy Infantry
+Metadata/Monsters/Mutewind/MutewindWomanDualSword	Faridun Bladedancer
+Metadata/Monsters/Mutewind/MutewindWomanJavelin	Faridun Javelineer
+Metadata/Monsters/Mutewind/MutewindWomanSpearShield	Faridun Infantry
+Metadata/Monsters/Mutewind/MutewindBoy	Faridun Neophyte
+Metadata/Monsters/Mutewind/MutewindGirl	Faridun Fledgling
+Metadata/Monsters/Mutewind/MutewindManDualSwordCorroded_	Faridun Swordsman
+Metadata/Monsters/Mutewind/MutewindManDualSwordCorrodedPatrol	Faridun Swordsman
+Metadata/Monsters/Mutewind/MutewindMan2HSpearCorroded	Faridun Spearman
+Metadata/Monsters/Mutewind/MutewindMan2HSpearCorrodedPatrol	Faridun Spearman
+Metadata/Monsters/Mutewind/MutewindManSpearShieldCorroded	Faridun Heavy Infantry
+Metadata/Monsters/Mutewind/MutewindManSpearShieldCorrodedPatrol	Faridun Heavy Infantry
+Metadata/Monsters/Mutewind/MutewindWomanSpearCorroded__	Faridun Spearwoman
+Metadata/Monsters/Mutewind/MutewindWomanSpearCorrodedPatrol	Faridun Spearwoman
+Metadata/Monsters/Mutewind/MutewindWomanDualSwordCorroded_	Faridun Bladedancer
+Metadata/Monsters/Mutewind/MutewindWomanDualSwordCorrodedPatrol	Faridun Bladedancer
+Metadata/Monsters/Mutewind/MutewindWomanDualDaggerCorroded__	Faridun Wind-slicer
+Metadata/Monsters/Mutewind/MutewindWomanDualDaggerCorrodedPatrol_	Faridun Wind-slicer
+Metadata/Monsters/Mutewind/MutewindWomanJavelinCorroded	Faridun Javelineer
+Metadata/Monsters/Mutewind/MutewindWomanSpearShieldCorroded_	Faridun Infantry
+Metadata/Monsters/Mutewind/MutewindWomanSpearShieldCorrodedPatrol	Faridun Infantry
+Metadata/Monsters/Mutewind/MutewindBoyCorroded	Faridun Neophyte
+Metadata/Monsters/Mutewind/MutewindGirlCorroded_	Faridun Fledgling
+Metadata/Monsters/FaridunLizards/FaridunLizard_	Rhex
+Metadata/Monsters/FaridunLizards/FaridunLizardStrongbox	Rhex
+Metadata/Monsters/FaridunLizards/FaridunLizard_Armoured_	Armoured Rhex
+Metadata/Monsters/Mutewind/MutewindManDualSwordGrim	Faridun Swordsman
+Metadata/Monsters/Mutewind/MutewindMan2HSpearGrim	Faridun Spearman
+Metadata/Monsters/Mutewind/MutewindManSpearShieldGrim	Faridun Heavy Infantry
+Metadata/Monsters/Mutewind/MutewindWomanSpearGrim	Faridun Spearwoman
+Metadata/Monsters/Mutewind/MutewindWomanDualSwordGrim	Faridun Bladedancer
+Metadata/Monsters/Mutewind/MutewindWomanDualDaggerGrim	Faridun Wind-slicer
+Metadata/Monsters/Mutewind/MutewindWomanJavelinGrim	Faridun Javelineer
+Metadata/Monsters/Mutewind/MutewindWomanSpearShieldGrim_	Faridun Infantry
+Metadata/Monsters/Mutewind/MutewindBoyGrim	Faridun Neophyte
+Metadata/Monsters/Mutewind/MutewindGirlGrim_	Faridun Fledgling
+Metadata/Monsters/Mutewind/MutewindBanditExecutioner	Faridun Butcher
+Metadata/Monsters/NPC/MarakethMatriarchGate	Sekhema Asala
+Metadata/Monsters/NPC/MarakethMatriarchDreadnought_	Sekhema Asala
+Metadata/Monsters/NPC/MarakethMatriarchTemple	Sekhema Asala
+Metadata/Monsters/NPC/MarakethMatriarchQimah	Sekhema Asala
+Metadata/Monsters/NPC/DjinnOrderQimahReservoir	Jado
+Metadata/Monsters/Parasites/FishParasite	Chyme Skitterer
+Metadata/Monsters/Parasites/FishParasiteWaterways	Chyme Skitterer
+Metadata/Monsters/Parasites/PirateFishParasite	Abyss Fish
+Metadata/Monsters/LeagueExpedition/ApparitionBoss/ApparitionExpedition	Uhtred, Covetous Traitor
+Metadata/Monsters/LeagueExpeditionNew/Skeletons/ExpeditionSkeletonSword	Unearthed Skeletal Swordsman
+Metadata/Monsters/LeagueExpeditionNew/Skeletons/ExpeditionSkeletonSwordShield	Unearthed Skeletal Warrior
+Metadata/Monsters/LeagueExpeditionNew/Skeletons/ExpeditionSkeletonSwordShieldOlroth	Unearthed Skeletal Warrior
+Metadata/Monsters/LeagueExpeditionNew/Skeletons/ExpeditionSkeletonBow_	Unearthed Skeletal Archer
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionBasicZombie	Unearthed Zombie
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionZombieColdCloudOnDeath	Unearthed Icebearer
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionZombieLarge	Unearthed Rampager
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionZombieLargeExplodeOnDeath	Unearthed Berserker
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionZombieHusk_	Unearthed Zombie
+Metadata/Monsters/LeagueExpeditionNew/Zombies/ExpeditionZombieHuskTorso	Unearthed Crawler
+Metadata/Monsters/LeagueExpeditionNew/MercurialArmour/MercurialArmourCaster	Unearthed Runecaster
+Metadata/Monsters/LeagueExpeditionNew/MercurialArmour/MercurialArmourAxeShield	Unearthed Soldier
+Metadata/Monsters/LeagueExpeditionNew/Urchin/ExpeditionUrchin	Unearthed Urchin
+Metadata/Monsters/LeagueExpeditionNew/Arbalest/ExpeditionArbalest	Black Scythe Arbalist
+Metadata/Monsters/LeagueExpeditionNew/DeathKnight/ExpeditionDeathKnight	Knight of the Sun
+Metadata/Monsters/LeagueExpeditionNew/DeathKnight/ExpeditionDeathKnightOlroth	Knight of the Sun
+Metadata/Monsters/LeagueExpeditionNew/VaalArmour/ExpeditionArmourCaster	Runed Knight
+Metadata/Monsters/LeagueExpeditionNew/Golemancer/ExpeditionGolemancer	Priest of the Chalice
+Metadata/Monsters/LeagueExpeditionNew/BoneCultist/ExpeditionBoneCultist	Druid of the Broken Circle
+Metadata/Monsters/LeagueExpeditionNew/RatMonster/ExpeditionRat	Druidic Familiar
+Metadata/Monsters/LeagueExpeditionNew/ScytheHand/ExpeditionScytheHand_	Black Scythe Mercenary
+Metadata/Monsters/LeagueExpeditionNew/SwordSkeleton/ExpeditionMegaSkeleton	Order Ostiary
+Metadata/Monsters/LeagueExpeditionNew/Olroth/Olroth	Olroth, Origin of the Fall
+Metadata/Monsters/LeagueExpeditionNew/Olroth/OlrothRelic	The Triskelion Flame
+Metadata/Monsters/LeagueExpedition/ApparitionBoss/ApparitionExpeditionOrb	[DNT-UNUSED] Expedition Apparition Orb
+Metadata/Monsters/LeagueExpedition/NPC/ExpeditionDannig	Dannig
+Metadata/Monsters/LeagueExpedition/NPC/ExpeditionGwennen_	Gwennen
+Metadata/Monsters/LeagueExpedition/NPC/ExpeditionRog	Rog
+Metadata/Monsters/LeagueExpedition/NPC/ExpeditionTujen	Tujen
+Metadata/Monsters/Daemon/OlrothRelicLaserDaemon	Creeping Fire
+Metadata/Monsters/Tornado/Tornado	Tornado
+Metadata/Monsters/MonsterMods/GroundOnDeath/ShockedGroundDaemon	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/ShockedGroundDaemonParent	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/Player/ShockedGroundDaemonParent	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/BurningGroundDaemon	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/BurningGroundDaemonParent	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/Player/BurningGroundDaemonParent_	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/ColdSnapGroundDaemon	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/ColdSnapGroundDaemonParent	Daemon
+Metadata/Monsters/MonsterMods/GroundOnDeath/Player/ColdSnapGroundDaemonParent	Daemon
+Metadata/Monsters/MonsterMods/ShroudWalker/ShroudWalker	Daemon
+Metadata/Monsters/MonsterMods/ShroudWalker/Player/ShroudWalker	Daemon
+Metadata/Monsters/MonsterMods/ShroudWalker/ShroudWalker2	Daemon
+Metadata/Monsters/MonsterMods/ShroudWalker/Player/ShroudWalker2	Daemon
+Metadata/Monsters/MonsterMods/LightningStorms	Daemon
+Metadata/Monsters/MonsterMods/Player/LightningStorms	Daemon
+Metadata/Monsters/MonsterMods/ElementalWaller1	Daemon
+Metadata/Monsters/MonsterMods/Player/ElementalWaller1	Daemon
+Metadata/Monsters/MonsterMods/AbyssalCrystalWaller	Daemon
+Metadata/Monsters/MonsterMods/Player/AbyssalCrystalWaller	Daemon
+Metadata/Monsters/MonsterMods/VolatilePlants	Daemon
+Metadata/Monsters/MonsterMods/Player/VolatilePlants	Daemon
+Metadata/Monsters/MonsterMods/VolatilePlants2	Daemon
+Metadata/Monsters/MonsterMods/Player/VolatilePlants2	Daemon
+Metadata/Monsters/MonsterMods/Player/VolatilePlantsVolatile1	Volatile Orchard
+Metadata/Monsters/MonsterMods/Player/VolatilePlantsVolatile2	Volatile Orchard
+Metadata/Monsters/MonsterMods/VolatileRocks	Daemon
+Metadata/Monsters/MonsterMods/Player/VolatileRocks	Daemon
+Metadata/Monsters/MonsterMods/VolatileRocks2	Daemon
+Metadata/Monsters/MonsterMods/Player/VolatileRocks2____	Daemon
+Metadata/Monsters/MonsterMods/ProximalTangibility	Daemon
+Metadata/Monsters/MonsterMods/Player/ProximalTangibility	Daemon
+Metadata/Monsters/MonsterMods/VolatilePlantsVolatile	Volatile Orchard
+Metadata/Monsters/MonsterMods/VolatilePlantsVolatile2	Volatile Orchard
+Metadata/Monsters/MonsterMods/VolatileRocksVolatile	Volatile Rock
+Metadata/Monsters/MonsterMods/VolatileRocksVolatile2	Volatile Rock
+Metadata/Monsters/MonsterMods/Player/VolatileRocksVolatile	Volatile Rock
+Metadata/Monsters/MonsterMods/Player/VolatileRocksVolatile2	Volatile Rock
+Metadata/Monsters/Daemon/Archnemesis/ArcaneEnchantedDaemon	Daemon
+Metadata/Monsters/MonsterMods/GlacialPrison	Daemon
+Metadata/Monsters/MonsterMods/Player/GlacialPrison	Daemon
+Metadata/Monsters/MonsterMods/Flamewaller	Daemon
+Metadata/Monsters/MonsterMods/Player/Flamewaller	Daemon
+Metadata/Monsters/Daemon/Archnemesis/FlameWalkerDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/Player/FlameWalkerDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/FrostWalkerDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/Player/FrostWalkerDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/LightningWalkerDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/Player/LightningWalkerDaemon	Daemon
+Metadata/Monsters/MonsterMods/MagmaBarrier	Daemon
+Metadata/Monsters/MonsterMods/Player/MagmaBarrier	Daemon
+Metadata/Monsters/MonsterMods/ManaSiphoner	Daemon
+Metadata/Monsters/MonsterMods/Player/ManaSiphoner	Daemon
+Metadata/Monsters/MonsterMods/ManaSiphoner2	Daemon
+Metadata/Monsters/MonsterMods/Player/ManaSiphoner2	Daemon
+Metadata/Monsters/MonsterMods/Player/PreventRecoveryAura	Daemon
+Metadata/Monsters/MonsterMods/Player/HinderAura1	Daemon
+Metadata/Monsters/MonsterMods/Player/FlaskRemovalAura1	Daemon
+Metadata/Monsters/MonsterMods/OnDeathFireExplosion	Daemon
+Metadata/Monsters/MonsterMods/OnDeathColdExplosion_	Daemon
+Metadata/Monsters/MonsterMods/OnDeathLightningExplosion	Daemon
+Metadata/Monsters/MonsterMods/OnDeathFireExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/Player/OnDeathFireExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/OnDeathColdExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/Player/OnDeathColdExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/OnDeathLightningExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/Player/OnDeathLightningExplosionParent	Daemon
+Metadata/Monsters/MonsterMods/PeriodicallyImmuneMinions	Daemon
+Metadata/Monsters/MonsterMods/Player/PeriodicallyImmuneMinions	Daemon
+Metadata/Monsters/MonsterMods/PeriodicallyImmuneMinions2	Daemon
+Metadata/Monsters/MonsterMods/Player/PeriodicallyImmuneMinions2	Daemon
+Metadata/Monsters/MonsterMods/CorpseExploder	Daemon
+Metadata/Monsters/MonsterMods/Player/CorpseExploder	Daemon
+Metadata/Monsters/MonsterMods/HealingNova	Daemon
+Metadata/Monsters/MonsterMods/Player/HealingNova	Daemon
+Metadata/Monsters/MonsterMods/PeriodicEnrage	Daemon
+Metadata/Monsters/MonsterMods/Player/PeriodicEnrage	Daemon
+Metadata/Monsters/MonsterMods/PeriodicEnrage2	Daemon
+Metadata/Monsters/MonsterMods/Player/PeriodicEnrage2	Daemon
+Metadata/Monsters/MonsterMods/Player/PeriodicEnrageMinion2	Daemon
+Metadata/Monsters/MonsterMod/RevivingMinions	Daemon
+Metadata/Monsters/MonsterMod/RevivingMinions2	Daemon
+Metadata/Monsters/Daemon/Archnemesis/BombardierDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/Player/BombardierDaemon	Daemon
+Metadata/Monsters/MonsterMod/LivingCrystals	Living Crystal
+Metadata/Monsters/Totems/MonsterTotemArchnemesisObelisk	Totem
+Metadata/Monsters/TwigMonsters/canopy/TwigMonster	Skeleton Spriggan
+Metadata/Monsters/TwigMonsters/canopy/TwigMonsterCaster	Skeleton Spriggan
+Metadata/Monsters/SaplingMonster/TwigMonsterArchnemesis	Treant
+Metadata/Monsters/Daemon/Archnemesis/ArchnemesisGraspingVinesDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/ArchnemesisLivingCrystalsDaemon	Daemon
+Metadata/Monsters/Daemon/Archnemesis/ArchnemesisDefenderReckoningDaemon	Daemon
+Metadata/Monsters/DemonSpiders/BlackStrider	Black Strider
+Metadata/Monsters/DemonSpiders/BlackStriderSanctumTrial	Black Strider
+Metadata/Monsters/DemonSpiders/BlackStriderEmerge	Black Strider
+Metadata/Monsters/DemonSpiders/BlackStriderEmergeInterlude	Ashen Arachnid
+Metadata/Monsters/DemonSpiders/BlackStriderEmergeSanctumTrial	Black Strider
+Metadata/Monsters/DemonSpiders/MeleeSpider	Vault Lurker
+Metadata/Monsters/DemonSpiders/MeleeSpiderEmergeDrop_	Vault Lurker
+Metadata/Monsters/DemonSpiders/MeleeSpiderSanctumTrial	Vault Lurker
+Metadata/Monsters/DemonSpiders/SpiderSabre	Sabre Spider
+Metadata/Monsters/EtchedBeetles/SmallEtchedBeetleArmoured	Adorned Beetle
+Metadata/Monsters/EtchedBeetles/SmallEtchedBeetleArmouredSanctumTrial_	Adorned Beetle
+Metadata/Monsters/EtchedBeetles/SmallEtchedBeetleArmouredDull	Tarnished Beetle
+Metadata/Monsters/EtchedBeetles/SmallEtchedBeetleArmouredDullSanctumScorpionBoss	Tarnished Beetle
+Metadata/Monsters/EtchedBeetles/MediumEtchedBeetleArmouredTuskWide	Adorned Scarab
+Metadata/Monsters/EtchedBeetles/MediumEtchedBeetleArmouredTuskWideSanctumTrial	Adorned Scarab
+Metadata/Monsters/EtchedBeetles/MediumEtchedBeetleArmouredDull	Tarnished Scarab
+Metadata/Monsters/EtchedBeetles/LargeEtchedBeetle_	Gilded Beetle
+Metadata/Monsters/EtchedBeetles/LargeEtchedBeetleSanctumTrial	Gilded Beetle
+Metadata/Monsters/EtchedBeetles/LargeEtchedBeetleBoss	The Ninth Treasure of Keth
+Metadata/Monsters/EtchedBeetles/LargeEtchedBeetleBossMinion	Adorned Beetle
+Metadata/Monsters/EtchedBeetles/LargeEtchedBeetleStrongbox	The Rain Festival Beetle
+Metadata/Monsters/RamGiant/RamGiant	Desert Hulk
+Metadata/Monsters/RamGiant/RamGiantQuarry	Forsaken Hulk
+Metadata/Monsters/RamGiant/RamGiantQuarryWheel_	Cart Wheel
+Metadata/Monsters/RamGiant/RamGiantWheel	Cart Wheel
+Metadata/Monsters/RamGiant/RottingRamGiant_	Rotting Hulk
+Metadata/Monsters/RamGiant/RottingRamGiantStrongbox	Rotting Hulk
+Metadata/Monsters/RamGiant/RottingRamGiantBog	Bog Hulk
+Metadata/Monsters/MaggotHusks/MaggotHusk	Sandscoured Dead
+Metadata/Monsters/MaggotHusks/MaggotHuskStrongbox	Sandscoured Dead
+Metadata/Monsters/MaggotHusks/MaggotHuskTorso1__	Sandscoured Dead
+Metadata/Monsters/MaggotHusks/MaggotHuskTorso2	Sandscoured Dead
+Metadata/Monsters/MaggotHusks/MaggotHuskTorso3	Sandscoured Dead
+Metadata/Monsters/MaggotHusks/MaggotHuskTorso4	Sandscoured Dead
+Metadata/Monsters/SerpentClanMonster/SerpentClan1	Serpent Clan
+Metadata/Monsters/SerpentClanMonster/SerpentClan1SanctumTrial	Serpent Clan
+Metadata/Monsters/SaltGolem/SaltGolem_	Quake Golem
+Metadata/Monsters/SaltGolem/SaltGolemNoEmerge_	Quake Golem
+Metadata/Monsters/SaltGolem/SulphiteGolemIsleOfKinLandmark	Quake Golem
+Metadata/Monsters/SaltGolem/SaltGolemSanctumTrial	Quake Golem
+Metadata/Monsters/SaltGolem/SaltGolemNoEmergeSanctumTrial	Quake Golem
+Metadata/Monsters/SaltGolem/SaltGolemSanctumTrialRockWall	Stone Wall
+Metadata/Monsters/SaltGolem/SaltGolemBoss	Rattlecage, the Earthbreaker
+Metadata/Monsters/SaltGolem/SaltGolemBossMAP	Volkhar, the Emberborn
+Metadata/Monsters/SaltGolem/SaltGolemBossSTANDALONE	Rattlecage, the Earthbreaker
+Metadata/Monsters/SaltGolem/SaltGolemVolcanicMiniboss	Magmanore, the Molten
+Metadata/Monsters/SaltGolem/SaltGolemSulphiteMiniboss	Sulphirox, the Voltaxic
+Metadata/Monsters/SaltGolem/SaltGolemBlack	Quake Golem
+Metadata/Monsters/SaltGolem/SaltGolemBlackNoEmerge	Quake Golem
+Metadata/Monsters/MastodonBoss/MastodonBoss	Ekbab, Ancient Steed
+Metadata/Monsters/MastodonBoss/MastodonBossMAP	The Bone Colossus
+Metadata/Monsters/MastodonBoss/MastodonBossSTANDALONE	The Bone Colossus
+Metadata/Monsters/HyenaMonster/HyenaMonster	Hyena Demon
+Metadata/Monsters/HyenaMonster/HyenaMonsterStrongbox	Hyena Demon
+Metadata/Monsters/HyenaMonster/HyenaMonsterBossMinion	Hyena Demon
+Metadata/Monsters/HyenaMonster/HyenaMonsterHighAggro	Hyena Demon
+Metadata/Monsters/HyenaMonster/HyenaCentaurSpear	Sun Clan Scavenger
+Metadata/Monsters/HyenaMonster/HyenaCentaurSpearStrongbox	Sun Clan Scavenger
+Metadata/Monsters/HyenaMonster/HyenaCentaurSpearBossMinion_	Sun Clan Scavenger
+Metadata/Monsters/HyenaMonster/RathbreakerBoss	Rathbreaker
+Metadata/Monsters/HyenaMonster/RathbreakerBossMap	Caedron, the Hyena Lord
+Metadata/Monsters/HyenaMonster/RathbreakerBossSTANDALONE	Caedron, the Hyena Lord
+Metadata/Monsters/ShellMonster/ShellMonster	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterSmall	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmerge	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergeSmall	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergeNoSand	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergeNoSandSmall	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergeNoSandSanctumTrial_	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterSanctumTrial	Brimstone Crab
+Metadata/Monsters/ShellMonster/ShellMonsterPoison_	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterPoisonSmall	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergePoison_	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergePoisonSmall	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergePoisonInland	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterEmergePoisonInlandSmall	Caustic Crab
+Metadata/Monsters/ShellMonster/ShellMonsterGigantic	Cinderback Crab
+Metadata/Monsters/ShellMonster/ShellMonsterGiganticSpectre	Cinderback Crab
+Metadata/Monsters/MundaneMagi/MundaneMagi	Risen Magi
+Metadata/Monsters/MundaneMagi/MundaneMagiSanctumTrial_	Risen Magi
+Metadata/Monsters/MundaneMagi/MundaneMagiSanctumTrialTime_	Risen Magi
+Metadata/Monsters/MundaneMagi/Censer/MundaneMagiCenser	Censer
+Metadata/Monsters/MundaneMagi/Censer/MundaneMagiCenserSanctum	Censer
+Metadata/Monsters/VultureRegurgitator/VultureRegurgitator_	Regurgitating Vulture
+Metadata/Monsters/PerennialKingHumanBoss	Jamanra, the Risen King
+Metadata/Monsters/PerennialKingHumanBossMAP	Ishtaroth, the Perennial
+Metadata/Monsters/PerennialKingHumanBossStandalone	Ishtaroth, the Perennial
+Metadata/Monsters/PerennialKingTotem/PerennialKingCorruptionTotem	Vile Idol
+Metadata/Monsters/SandLeaper02/DesertLeaper1_	Crag Leaper
+Metadata/Monsters/SandLeaper02/DesertLeaper1Emerge	Crag Leaper
+Metadata/Monsters/SkeletonGolemancer/SkeletonGolemancer	Dread Servant
+Metadata/Monsters/SkeletonGolemancer/SkeletonGolemancerStrongbox_	Dread Servant
+Metadata/Monsters/SandGolemancer/SandGolemancer	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerStrongbox	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerSanctumTrial	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerSanctumTrialTime	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerTornado	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerTornadoWhiteSand	Desiccated Lich
+Metadata/Monsters/SandGolemancer/SandGolemancerTornadoStrongbox	Desiccated Lich
+Metadata/Monsters/MarakethSanctumTrial/Hazards/PortalRitualCaster	Desiccated Lich Summoner
+Metadata/Monsters/MarAcolyte/MarAcolyte	Mar Acolyte
+Metadata/Monsters/MarAcolyte/MarAcolyteSanctumTrial	Mar Acolyte
+Metadata/Monsters/WingedFiend/WingedFiend	Winged Fiend
+Metadata/Monsters/RockSlider	Boulder Ant
+Metadata/Monsters/RockSliderSpectre	Boulder Ant
+Metadata/Monsters/RockSliderSanctumTrial	Boulder Ant
+Metadata/Monsters/RockSliderSanctumTrialSpectre	Boulder Ant
+Metadata/Monsters/RockSlider/RockSliderVoltaxic	Boulder Ant
+Metadata/Monsters/RockSlider/RockSliderVoltaxicSpectre	Boulder Ant
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealot01	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealotAbyssIntro	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealotSummoner_01	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealotSummonerAbyssPit	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealot02	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultist_Zealots/BoneCultistZealotSummoner_02	Lost-men Zealot
+Metadata/Monsters/BoneCultists/BoneCultists_Shield/BoneCultistShield	Lost-men Brute
+Metadata/Monsters/SkeletonSnake	Gilded Cobra
+Metadata/Monsters/MarakethGuards/MarakethGuard02	Ardura Homeguard
+Metadata/Monsters/MarakethGuards/MarakethHeroGuard01___	Emal
+Metadata/Monsters/MarakethGuards/MarakethHeroGuard02	Tanim
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptre	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShield_	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreSanctumTrial	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldSanctumTrial	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreAmbushSanctumTrial	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldAmbushSanctumTrial	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreSanctumTrialNoEmerge	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldSanctumTrialNoEmerge	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreFormation	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldFormation	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreStatue	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldStatue	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreStatueBridge	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldStatueBridge	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSceptreAmbush__	Terracotta Soldier
+Metadata/Monsters/TerracottaGuardians/TerracottaGuardianSickleShieldAmbush	Terracotta Soldier
+Metadata/Monsters/BoneGolem/BoneGolemCultist	Carrion Reaper
+Metadata/Monsters/BoneCultists/BoneCultists_Savage/BoneCultists_Savage__	Lost-men Subjugator
+Metadata/Monsters/BoneCultists/BoneCultists_Beast/BoneCultistBeast	Drudge Osseodon
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultistNecromancer	Lost-men Necromancer
+Metadata/Monsters/PitifulFabrications/PitifulFabrication01	Skullslinger
+Metadata/Monsters/PitifulFabrications/PitifulFabrication02	Ribrattle
+Metadata/Monsters/PitifulFabrications/PitifulFabrication03_	Spinesnatcher
+Metadata/Monsters/SerpentClanMonster/SerpentClanCaster	Serpent Shaman
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterSanctumTrial	Serpent Shaman
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBoss	Kabala, Constrictor Queen
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBossMap	Manassa, the Serpent Queen
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBossMapSpring	Manassa, the Serpent Queen
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBossSTANDALONE	Manassa, the Serpent Queen
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBossInterlude	Bewitching Serpent
+Metadata/Monsters/SkeletonSnake/SkeletonSnakeSerpentCasterMinion	Gilded Cobra
+Metadata/Monsters/SkeletonSnake/SkeletonSnakeSerpentCasterMinionSTANDALONE	Gilded Cobra
+Metadata/Monsters/SerpentClanMonster/SerpentClanCasterBossBoneWall	Bone Wall
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBoss	Iktab, the Deathlord
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossMAP	Lord of the Pit
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossMAPSOLO	Lord of the Pit
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossSTANDALONE	Lord of the Pit
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossSoulOrb	Iktab, the Deathlord
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossSoulOrbLarge	Iktab, the Deathlord
+Metadata/Monsters/BoneCultists/BoneCultist_Necromancer/BoneCultist_NecromancerBossSoulOrbVolatile_	Iktab, the Deathlord
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeOneHand	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeUnarmed	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeSwordShield	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeBow	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeCrossbow	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonEmergeCrossbowSanctumTrial_	Risen Maraketh
+Metadata/Monsters/Skeletons/Maraketh/MarakethSkeletonCrossbowSanctumTrial_	Risen Maraketh
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoUnarmed_	Sandflesh Skeleton
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoUnarmedStrongbox	Sandflesh Skeleton
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoSword_	Sandflesh Warrior
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoSwordStrongbox	Sandflesh Warrior
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoSwordShield	Sandflesh Warrior
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoSwordShieldStrongbox	Sandflesh Warrior
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoCaster	Sandflesh Mage
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoCasterStrongbox	Sandflesh Mage
+Metadata/Monsters/Skeletons/TitanGrotto/SkeletonTitanGrottoCasterSanctumTrial	Sandflesh Mage
+Metadata/Monsters/PorcupineAnt/PorcupineAntSmall	Rasp Scavenger
+Metadata/Monsters/PorcupineAnt/PorcupineAntMedium	Rasp Scavenger
+Metadata/Monsters/PorcupineAnt/PorcupineAntMediumSanctumTrial	Rasp Scavenger
+Metadata/Monsters/PorcupineAnt/PorcupineAntLarge	Rasp Scavenger
+Metadata/Monsters/PorcupineAnt/PorcupineAntLargeSanctumTrial	Rasp Scavenger
+Metadata/Monsters/CaveDweller/CaveDweller	Tombshrieker
+Metadata/Monsters/CaveDweller/CaveDwellerStrongbox	Tombshrieker
+Metadata/Monsters/CaveDweller/CaveDwellerSanctumTrial__	Tombshrieker
+Metadata/Monsters/MetaDemonCaster	Demon Magus
+Metadata/Monsters/MineBat/MineBatDesertCave	Vesper Bat
+Metadata/Monsters/MineBat/MineBatDesertCaveNoEmerge	Vesper Bat
+Metadata/Monsters/MineBat/MineBatDesertCaveSanctumTrial_	Vesper Bat
+Metadata/Monsters/MineBat/MineBatDesertCaveSanctumTrial_NoEmerge	Vesper Bat
+Metadata/Monsters/SummonedPhantasm/DesertPhantasm	Sand Spirit
+Metadata/Monsters/SummonedPhantasm/DesertPhantasmSanctumTrial	Sand Spirit
+Metadata/Monsters/SummonedPhantasm/DesertPhantasmSanctumTrialTime	Sand Spirit
+Metadata/Monsters/MarakethWaterDjinn/WaterDjinn	Navira, the Last Mirage
+Metadata/Monsters/MarakethTimeDjinn/FireDjinn	Ruzhan, the Blazing Sword
+Metadata/Monsters/MarakethSamdDjinn/SandDjinn	Kelari, the Tainted Sands
+Metadata/Monsters/Wisp/TitanGrottoWisp_	Vril Apparition
+Metadata/Monsters/Wisp/TitanGrottoWispSanctumTrial	Vril Apparition
+Metadata/Monsters/Wisp/TitanBossWisp	Vril Apparition
+Metadata/Monsters/GiantSnakeSkeletonBoss/GiantSkeletonSnakeBoss_	Tor Gul, the Defiler
+Metadata/Monsters/GiantSnakeSkeletonBoss/GiantSkeletonSnakeBossMap	Zar Wali, the Bone Tyrant
+Metadata/Monsters/GiantSnakeSkeletonBoss/GiantSkeletonSnakeBossSTANDALONE	Tor Gul, the Defiler
+Metadata/Monsters/VultureZombie/VultureDemon	Vile Vulture
+Metadata/Monsters/VultureZombie/VultureDemonWall	Vile Vulture
+Metadata/Monsters/VultureZombie/VultureDemonSpectre	Vile Vulture
+Metadata/Monsters/Kinarha/Kinarha	Kinarha
+Metadata/Monsters/Kinarha/KinarhaSpectre	Kinarha
+Metadata/Monsters/Zombies/Maraketh/MarakethZombie	Maraketh Undead
+Metadata/Monsters/Zombies/Maraketh/MarakethZombieCorpse	Maraketh Undead
+Metadata/Monsters/PlagueMorphs/PlagueMorph1	Corrupted Corpse
+Metadata/Monsters/PlagueMorphs/PlagueMorph2_	Corrupted Corpse
+Metadata/Monsters/PlagueMorphs/PlagueMorph3	Corrupted Corpse
+Metadata/Monsters/PlagueMorphs/PlagueMorph4	Corrupted Corpse
+Metadata/Monsters/PlagueSwarm/PlagueSwarm	Plague Swarm
+Metadata/Monsters/PlagueSwarm/PlagueSwarmStrongbox	Plague Swarm
+Metadata/Monsters/PlagueNymph/PlagueNymph_	Plague Nymph
+Metadata/Monsters/PlagueNymph/PlagueNymphFoundry	Plague Nymph
+Metadata/Monsters/PlagueBringer/PlagueBringer	Plague Harvester
+Metadata/Monsters/PlagueBringer/PlagueBringerInterlude1	Bloodgulp
+Metadata/Monsters/PlagueBringer/PlagueBringerInterlude2	Fleshpierce
+Metadata/Monsters/PlagueBringer/PlagueBringerStrongbox	Plague Harvester
+Metadata/Monsters/PlagueBringer/PlagueBringerEmerge	Plague Harvester
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderSoldier	Twilight Order Soldier
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderSoldier_ChurchAmbush	Twilight Order Soldier
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderOfficer_	Twilight Order Officer
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderOfficer_ChurchAmbush	Twilight Order Officer
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderSoldierPatrol_	Twilight Order Soldier
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderOfficerPatrol	Twilight Order Officer
+Metadata/Monsters/CorpseWheel/PlagueCorpseWheel	The Punished
+Metadata/Monsters/BrainWorm/DuneLurker_	Dune Lurker
+Metadata/Monsters/BrainWorm/DuneLurkerStrongbox	Dune Lurker
+Metadata/Monsters/BrainWorm/DuneLurkerSanctumTrial	Dune Lurker
+Metadata/Monsters/WingedCreature/WingedCreature	Winged Horror
+Metadata/Monsters/WingedCreature/WingedCreatureSanctumTrial	Winged Horror
+Metadata/Monsters/TerracottaKamikaze/TerracottaKamikaze	Terracotta Fanatic
+Metadata/Monsters/HarpyMonster/RavenHarpyPatrol	Raven Harpy [DNT-UNUSED]
+Metadata/Monsters/MantisRat/MantisRat	Mantis Rat
+Metadata/Monsters/RudjaDreadEngineer/RudjaDreadEngineer	Rudja, the Dread Engineer
+Metadata/Monsters/RudjaDreadEngineer/RudjaDreadEngineerMAP	Vorrik, The Infernal Engineer
+Metadata/Monsters/RudjaDreadEngineer/RudjaDreadEngineerSTANDALONE	Vorrik, The Infernal Engineer
+Metadata/Monsters/ApparitionBoss/SilentSpiresApparition	Zarokh, the Temporal
+Metadata/Monsters/ApparitionBoss/SilentSpiresApparitionSTANDALONE	Zarokh, the Temporal
+Metadata/Monsters/MudGolem/MarshBruiser	Swamp Golem
+Metadata/Monsters/BogBodies/BogCorpseUnarmed	Bogfelled Slave
+Metadata/Monsters/BogBodies/BogCorpseOneHandAxe	Bogfelled Commoner
+Metadata/Monsters/BogBodies/BogCorpseTwoHandAxe	Bogfelled Commoner
+Metadata/Monsters/BogBodies/BogCorpseOffensiveSummon	Bogfelled Commoner
+Metadata/Monsters/BogBodies/BogCorpseDefensiveSummon	Bogfelled Commoner
+Metadata/Monsters/TwigMonsters/DredgeFiend	Dredge Fiend
+Metadata/Monsters/TwigMonsters/DredgeFiendIce	Dredge Fiend
+Metadata/Monsters/TwigMonsters/DredgeFiendShamanBoss	Rootdredge
+Metadata/Monsters/TwigMonsters/DredgeFiendShamanBossMap	Grudgelash, Vile Thorn
+Metadata/Monsters/TwigMonsters/DredgeFiendShamanBossSTANDALONE	Grudgelash, Vile Thorn
+Metadata/Monsters/VaalSavage/CannibalTribeSpearThrower	Orok Hunter
+Metadata/Monsters/VaalSavage/CannibalTribeSpearMelee	Orok Fleshstabber
+Metadata/Monsters/VaalSavage/CannibalTribeDagger	Orok Throatcutter
+Metadata/Monsters/VaalSavage/CannibalTribeShaman	Orok Shaman
+Metadata/Monsters/VaalSavage/CannibalTribeShamanLandmarkNamed	Ranbu the Pale Shaman
+Metadata/Monsters/VaalSavage/CannibalTribeGiantLandmarkNamed	Garkam, Ranbu's Maul
+Metadata/Monsters/VaalSavage/VaalSavageStalker	Azak Stalker
+Metadata/Monsters/VaalSavage/VaalSavageSpearThrower_	Azak Spearthrower
+Metadata/Monsters/VaalSavage/VaalSavageSpearMelee	Azak Fleshstabber
+Metadata/Monsters/VaalSavage/VaalSavageBeastMaster	Azak Mongrelmaster
+Metadata/Monsters/VaalSavage/VaalSavageDagger_	Azak Throatcutter
+Metadata/Monsters/VaalSavage/VaalSavageShaman	Azak Shaman
+Metadata/Monsters/VaalSavage/VaalSavageShamanWaterways	Azak Shaman
+Metadata/Monsters/VaalSavage/VaalSavageShamanLandmarkNamed	Narag of the Vile Word
+Metadata/Monsters/VaalSavage/VaalSavageBrute	Azak Brute
+Metadata/Monsters/VaalSavage/VaalSavageDelinquent	Azak Fledgling
+Metadata/Monsters/VaalSavage/VaalSavageTorchbearer	Azak Torchbearer
+Metadata/Monsters/VaalSavage/VaalSavageGiant	Azak Mauler
+Metadata/Monsters/VaalSavage/bonewall/SavageBoneWall	Bone Wall
+Metadata/Monsters/VaalSavage/SavageEffigy	Savage Effigy
+Metadata/Monsters/VaalSavage/SavageEffigy04	Savage Effigy
+Metadata/Monsters/PlagueSwarm/BloodDrone	Bloodthief Wasp
+Metadata/Monsters/PlagueSwarm/BloodDroneSacEmerge	Bloodthief Wasp
+Metadata/Monsters/SwarmHost/SwarmHost	Bloodthief Queen
+Metadata/Monsters/BloodClan/BloodClanTrapper	Sea-tribe Trapper
+Metadata/Monsters/BloodClan/BloodClanVillager	Sea-tribe Villager
+Metadata/Monsters/BloodClan/BloodClanCaster	Sea-tribe Caster
+Metadata/Monsters/BloodClan/BloodClanVaulter	Sea-tribe Vaulter
+Metadata/Monsters/BloodClan/BloodClanDagger 	Sea-tribe Daggerbearer
+Metadata/Monsters/BloodClan/BloodClanKina	Sea-tribe Pouchbearer
+Metadata/Monsters/BloodClan/BloodClanHarpooner	Sea-tribe Harpooner
+Metadata/Monsters/BloodClan/BloodClanBirdFisherman	Sea-tribe Spearfisher
+Metadata/Monsters/BloodClan/BloodClanBird	Sea-tribe Avian
+Metadata/Monsters/IgguranRaider/BladeStalkerPale	Pale-stitched Stalker
+Metadata/Monsters/IgguranRaider/BladeStalker	Adorned Miscreation
+Metadata/Monsters/Anchorite/AnchoriteSpawn_	Hunchback Clubber
+Metadata/Monsters/Anchorite/AnchoriteFlathead	Flathead Clubber
+Metadata/Monsters/Anchorite/AnchoriteMother	Pyromushroom Cultivator
+Metadata/Monsters/BaneSapling/BaneSapling	Bane Sapling
+Metadata/Monsters/ArmadilloDemon/ArmadilloDemon	Antlion Charger
+Metadata/Monsters/ChawMongrel/ChawMongrel	Chaw Mongrel
+Metadata/Monsters/ChawMongrel/ChawMongrelLeash	Chaw Mongrel
+Metadata/Monsters/ChawMongrel/ChawMongrelLeashBoss	Chaw Mongrel
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleJaguar_	Vaal Skeletal Warrior
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleSquire	Vaal Skeletal Squire
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabblePriest	Vaal Skeletal Priest
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleEagle	Vaal Skeletal Archer
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleJaguarStrongbox	Vaal Skeletal Warrior
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleSquireStrongbox	Vaal Skeletal Squire
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabblePriestStrongbox	Vaal Skeletal Priest
+Metadata/Monsters/Skeletons/BoneRabble/BoneRabbleEagleStrongbox	Vaal Skeletal Archer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorer1	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorer2	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorer3	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorer4	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSpores1	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSpores2	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSpores3	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSpores4_	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSporesOrange1	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSporesOrange2	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSporesOrange3	Ill-fated Explorer
+Metadata/Monsters/ZombieTreasureHunters/IllFatedExplorerNoSporesOrange4	Ill-fated Explorer
+Metadata/Monsters/Quadrilla/Quadrilla	Quadrilla
+Metadata/Monsters/Quadrilla/QuadrillaRock	[DNT-UNUSED] Just A Rock
+Metadata/Monsters/Quadrilla/QuadrillaBoss	Mighty Silverfist
+Metadata/Monsters/Quadrilla/QuadrillaBossMAP	Zekoa, the Headcrusher
+Metadata/Monsters/Quadrilla/QuadrillaBossSTANDALONE	Zekoa, the Headcrusher
+Metadata/Monsters/Quadrilla/QuadrillaBossSTANDALONEExpedition	Zekoa, the Headcrusher
+Metadata/Monsters/Quadrilla/IcyQuadrillaBoss	The Abominable Yeti
+Metadata/Monsters/Quadrilla/IcyQuadrillaBossMap	The Frostborn Fiend
+Metadata/Monsters/Quadrilla/IcyQuadrillaBossStandalone	The Frostborn Fiend
+Metadata/Monsters/NettleAnt/NettleAnt__	Nettle Ant
+Metadata/Monsters/NettleAnt/NettleAntInterlude	Frozen Mandibles
+Metadata/Monsters/NettleAnt/NettleAntSummoned	Nettle Ant
+Metadata/Monsters/SnakeHulk/SnakeHulk	Entwined Hulk
+Metadata/Monsters/SerpentHusk/SerpentHusk__	Snakethroat Shambler
+Metadata/Monsters/GutViper/GutViper	Entrailhome Shambler
+Metadata/Monsters/SpittingSnake/SpittingSnake	Slitherspitter
+Metadata/Monsters/ConstrictorCorpse/ConstrictorCorpse	Constricted Shambler
+Metadata/Monsters/ConstrictorCorpse/ConstrictorCorpseRanged_	Constricted Spitter
+Metadata/Monsters/SpiderMonkey/SpiderMonkey	Scorpion Monkey
+Metadata/Monsters/SpiderMonkey/SpiderMonkeyTropical	Scorpion Monkey
+Metadata/Monsters/GoreCharger/GoreCharger	Diretusk Boar
+Metadata/Monsters/Daemon/PlayerIsHarbingerSummonHarbingerMonstersDaemon	Daemon
+Metadata/Monsters/MtxWasp/MtxWasp	Wasp
+Metadata/Monsters/LeagueAncestral/AncestralTurtle	[DNT-UNUSED] Spirit Turtle
+Metadata/Monsters/LeagueAncestral/AncestralJadeHulk	[DNT-UNUSED] Jade Hulk
+Metadata/Monsters/LeagueAncestral/AncestralSpiritCaster	[DNT-UNUSED] Spirit Caster
+Metadata/Monsters/LeagueAncestral/AncestralKaruiHorn_	[DNT-UNUSED] Karui Warhorn
+Metadata/Monsters/LeagueAncestral/AncestralTurtleTotemSpirit	Ancestral Spirit Turtle
+Metadata/Monsters/LeagueAncestral/AncestralJadeHulkTotemSpirit	Ancestral Jade Hulk
+Metadata/Monsters/LeagueAncestral/AncestralSpiritCasterTotemSpirit	Ancestral Jadecaster
+Metadata/Monsters/LeagueAncestral/AncestralKaruiHornTotemSpirit	Ancestral Warhorn
+Metadata/Monsters/CrazedCannibalPicts/PictFemaleBow	Cultist Archer
+Metadata/Monsters/CrazedCannibalPicts/PictFemaleDaggerDagger	Cultist Daggerdancer
+Metadata/Monsters/CrazedCannibalPicts/PictFemaleStaff	Cultist Witch
+Metadata/Monsters/CrazedCannibalPicts/PictMaleAxe	Cultist Warrior
+Metadata/Monsters/CrazedCannibalPicts/PictMaleAxeAxe	Cultist Warrior
+Metadata/Monsters/CrazedCannibalPicts/PictMaleAxeDagger	Cultist Warrior
+Metadata/Monsters/CrazedCannibalPicts/PictMaleAxeShield	Cultist Warrior
+Metadata/Monsters/CrazedCannibalPicts/PictBigMale	Cultist Brute
+Metadata/Monsters/PitifulFabrications/Canopy/PitifulFabrication01	Skullslinger
+Metadata/Monsters/PitifulFabrications/Canopy/PitifulFabrication02	Ribrattle
+Metadata/Monsters/PitifulFabrications/Canopy/PitifulFabrication03_	Spinesnatcher
+Metadata/Monsters/CrazedCannibalPicts/VoodooPole/VoodooPole	Affliction Totem
+Metadata/Monsters/WereCat/TigerChimeral	Prowling Chimeral
+Metadata/Monsters/Taniwha/RiverTaniwha	River Drake
+Metadata/Monsters/Taniwha/RiverTaniwhaEmerge	River Drake
+Metadata/Monsters/Taniwha/RiverTaniwhaTropicalIsland_	Chameleon Drake
+Metadata/Monsters/Taniwha/RiverTaniwhaWaterways	River Drake
+Metadata/Monsters/Taniwha/RiverTaniwhaNoJank	River Drake
+Metadata/Monsters/BlackJawSuperunique/BlackJaw	Blackjaw, the Remnant
+Metadata/Monsters/BlackJawSuperunique/BlackJawMap	Oloton, the Remorseless
+Metadata/Monsters/BlackJawSuperunique/BlackJawSTANDALONE	Oloton, the Remorseless
+Metadata/Monsters/BlackJawSuperunique/BlackJawSTANDALONEExpedition	Oloton, the Remorseless
+Metadata/Monsters/BlackJawSuperunique/BlackJawLightning	Stormgore, the Guardian
+Metadata/Monsters/BlackJawSuperunique/BlackJawLightningMap	Stormgore, the Guardian
+Metadata/Monsters/BlackJawSuperunique/BlackJawLightningSTANDALONE	Stormgore, the Guardian
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitch	Ignagduk, the Bog Witch
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitchMap	Brakka, the Withered Crone
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitchSTANDALONE	Brakka, the Withered Crone
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitchHagBattleMap	Ignatia, the Flame-Sworn
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitchHagBattleMap2	Elvara, the Savage Flame
+Metadata/Monsters/IgnagdukBogWitch/IgnagdukBogWitchHagBattleInterlude	Heldra of the Black Pyre
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinel	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelInert	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelNoEmerge_	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelStrongbox	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelSpawned	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelUpperMachinarium_	Stone Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelGolden	Gold-Melted Sentinel
+Metadata/Monsters/VaalConstructs/Sentinel/VaalConstructSentinelGoldenNoEmerge	Gold-Melted Sentinel
+Metadata/Monsters/VaalConstructs/Pyramid/VaalConstructPyramidAncient	Rusted Reconstructor
+Metadata/Monsters/VaalConstructs/Pyramid/VaalConstructPyramidAncientActivated	Rusted Reconstructor
+Metadata/Monsters/VaalConstructs/Pyramid/VaalConstructPyramidSpawned	Reconstructor
+Metadata/Monsters/VaalConstructs/Golem/VaalConstructGolem	Shockblade Construct
+Metadata/Monsters/VaalConstructs/Golem/VaalConstructGolemAncient	Rusted Dyna Golem
+Metadata/Monsters/VaalConstructs/Golem/VaalConstructGolemAncientStrongbox	Rusted Dyna Golem
+Metadata/Monsters/VaalConstructs/Golem/VaalConstructGolemSpawned	Shockblade Construct
+Metadata/Monsters/VaalConstructs/Skitterbot/VaalConstructSkitterbot	Crawler Sentinel
+Metadata/Monsters/VaalConstructs/Skitterbot/VaalConstructSkitterbotAncient_	Crawler Sentinel
+Metadata/Monsters/VaalConstructs/Skitterbot/VaalConstructSkitterbotAncientStrongbox	Crawler Sentinel
+Metadata/Monsters/VaalConstructs/Skitterbot/VaalConstructSkitterbotSpawned	Crawler Sentinel
+Metadata/Monsters/VaalConstructs/Monkey/VaalConstructMonkey	Constructed Monkey
+Metadata/Monsters/VaalConstructs/Monkey/VaalConstructMonkeyHead	Constructed Monkey Head
+Metadata/Monsters/RatMonster/RatMonster	Rotted Rat
+Metadata/Monsters/RatMonster/RatMonsterPoison__	Rotted Rat
+Metadata/Monsters/VaalMonsters/Machinarium/Wraith/ProwlingShade	Prowling Shade
+Metadata/Monsters/VaalMonsters/Machinarium/Wraith/ProwlingShadeClone_	Prowling Shade
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardDaggers	Undead Vaal Bladedancer
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardMortar	Undead Vaal Guard
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardSpear	Undead Vaal Guard
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardDaggersStrongbox	Undead Vaal Bladedancer
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardMortarStrongbox	Undead Vaal Guard
+Metadata/Monsters/VaalMonsters/Machinarium/VaalGuards/UndeadGuardSpearStrongbox	Undead Vaal Guard
+Metadata/Monsters/Cenobite/CenobiteHighborn/CenobiteHighborn	Foul Sage
+Metadata/Monsters/Cenobite/CenobiteHighborn/CenobitePawn	Flathead Youngling
+Metadata/Monsters/Cenobite/CenobiteLeash/CenobiteLeash	Foul Blacksmith
+Metadata/Monsters/Cenobite/CenobiteSlam/CenobiteSlam	Foul Mauler
+Metadata/Monsters/Cenobite/CenobiteStoneThrower/CenobiteStoneThrower	Filthy Lobber
+Metadata/Monsters/Cenobite/CenobiteSwarmUgly/CenobiteSwarm	Flathead Warrior
+Metadata/Monsters/Cenobite/CenobiteBloater/CenobiteBloater	Filthy First-born
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatzi	Viper Napuatzi
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziMAP	Viper Napuatzi
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziSTANDALONE	Viper Napuatzi
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziAzmeri	Lythara, the Wayward Spear
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziAzmeriMap_	Morwyn, the Kinslayer
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziAzmeriStandalone	Morwyn, the Kinslayer
+Metadata/Monsters/VaalMonsters/ViperNapuatzi/ViperNapuatziSnakeMinion	Viper Servant
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireBow_	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireClaw_	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireShield_	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireShieldNapuatzi	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireShieldNapuatziNoScale	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/ViperLegionnaire/ViperLegionnaireShieldUtzaalIntro	Viper Legionnaire
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBlood	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBloodBloodied	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBloodUtzaalIntro	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersChaos	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersChaosBloodied	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersChaosPatrol	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersCold_	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdBloodied	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdPatrol	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdSacrifice	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdSacrificePray	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdSacrificeWorship	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersFire	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersFireBloodied	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersLightning	Powered Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersLightningBloodied	Powered Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBannerPatrol	Bannerbearing Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBannerPatrolSpectre	Bannerbearing Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBannerSacrifice	Bannerbearing Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickBlood	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickBloodBloodied	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickChaos	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickChaosBloodied	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickChaosPatrol	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickCold	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickColdBloodied	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickColdPatrol	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickColdSacrifice	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickFire	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickFireBloodied	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickLightning__	Powered Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickLightningBloodied	Powered Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearBlood	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearBloodBloodied	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearChaos	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearChaosBloodied	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearChaosPatrol	Chaotic Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearCold	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearColdBloodied	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearColdPatrol	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearColdSacrifice	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearFire	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearFireBloodied	Fiery Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearLightning	Powered Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearLightningBloodied	Powered Zealot
+Metadata/Monsters/VaalMonsters/Living/VaalGuardClawsLiving	Vaal Excoriator
+Metadata/Monsters/VaalMonsters/Living/VaalGuardMortarLiving	Vaal Guard
+Metadata/Monsters/VaalMonsters/Living/VaalGuardSpearLiving	Vaal Guard
+Metadata/Monsters/VaalMonsters/Living/VaalGuardSpearLivingSacrificeGuide	Vaal Guard
+Metadata/Monsters/VaalMonsters/Living/VaalGuardBowLiving	Vaal Guard
+Metadata/Monsters/VaalMonsters/Living/VaalOverseerLiving_	Vaal Overseer
+Metadata/Monsters/VaalMonsters/Living/VaalOverseerLivingSacrificeGuard	Vaal Overseer
+Metadata/Monsters/VaalMonsters/Living/VaalGoliathLiving_	Vaal Goliath
+Metadata/Monsters/VaalMonsters/Living/VaalGoliathLivingPatrol_	Vaal Goliath
+Metadata/Monsters/VaalMonsters/Living/VaalGoliathLivingCrystalThrower	Vaal Goliath
+Metadata/Monsters/VaalMonsters/Living/VaalStormcaller	Surgical Experimentalist
+Metadata/Monsters/VaalMonsters/Living/VaalShapeshifter_	Vaal Formshifter
+Metadata/Monsters/VaalMonsters/Living/VaalShapeshifterBloodied__	Vaal Formshifter
+Metadata/Monsters/VaalMonsters/Living/VaalShapeshifterPatrol	Vaal Formshifter
+Metadata/Monsters/VaalMonsters/Living/VaalShapeshifterJaguarForm	Vaal Formshifter
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestFemale	Blood Priestess
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestMale	Blood Priest
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VolatileBloodCore	Volatile Core
+Metadata/Monsters/VaalMonsters/Living/VaalEagleKnightLiving	Vaal Enforcer
+Metadata/Monsters/VaalMonsters/Living/VaalArchivistLiving	Vaal Researcher
+Metadata/Monsters/VaalMonsters/Living/Beasts/VaalJaguar	Loyal Jaguar
+Metadata/Monsters/VaalMonsters/Living/Minions/VaalJaguarMinion	Jaguar Familiar
+Metadata/Monsters/VaalMonsters/Living/Minions/VaalSnakeMinion	Serpentine Familiar
+Metadata/Monsters/VaalMonsters/Living/Minions/VaalMonkeyMinion_	Primal Familiar
+Metadata/Monsters/SerpentHusk/snakes/SerpentHuskSnake	Snake
+Metadata/Monsters/NPC/AlvaMachinarium	Alva
+Metadata/Monsters/NPC/AlvaMachinariumLower	Alva
+Metadata/NPC/Four_Act3/AlvaMachinarium1Summon_	Alva
+Metadata/NPC/Four_Act3/AlvaMachinarium2Summon__	Alva
+Metadata/NPC/Four_Act3/AlvaWaterwaysSummon__	Alva
+Metadata/NPC/Four_Act3/ServiJungleDepthsSummon	Servi
+Metadata/NPC/Four_Act3/ServiCarverBogSummon_	Servi
+Metadata/NPC/Four_Act1/UnaTreeSummon	Una
+Metadata/NPC/Four_Act1/UnaGrimTangleSummon	Una
+Metadata/NPC/Four_Act3/OswaldTreasureVaultSummon	Oswald
+Metadata/NPC/Four_Act4/HoodedMentorSingingCavernsSummon	The Hooded One
+Metadata/NPC/Four_Act4/HoodedMentorVolcanicWarrensSummon	The Hooded One
+Metadata/NPC/Four_Act4/HoodedMentorShrikeIslandSummon	The Hooded One
+Metadata/NPC/Four_Act4/HoodedMentorSolitaryConfinementSummon	The Hooded One
+Metadata/NPC/Four_Act4/TujenJourneysEndSummon	Tujen
+Metadata/NPC/Four_Act4/Expedition/DannigTreasureIslandSummon	Dannig
+Metadata/NPC/Four_Act4/AngeShoreline	Ange
+Metadata/Monsters/Procession/ProcessionAxeShield	Vaal Embalmed Axeman
+Metadata/Monsters/Procession/ProcessionSpear_	Vaal Embalmed Spearman
+Metadata/Monsters/Procession/ProcessionDagger	Vaal Embalmed Rogue
+Metadata/Monsters/Procession/ProcessionBow	Vaal Embalmed Archer
+Metadata/Monsters/Procession/ProcessionBanner	Vaal Embalmed Bearer
+Metadata/Monsters/Procession/ProcessionBannerSpectre	Vaal Embalmed Bearer
+Metadata/Monsters/GoldenOnes/GoldenOnesTwoHandSword	Gold-Melted Shambler
+Metadata/Monsters/GoldenOnes/GoldenOnesOneHandMace	Gold-Melted Shambler
+Metadata/Monsters/GoldenOnes/GoldenOnesOneHandClub	Gold-Melted Shambler
+Metadata/Monsters/GoldenOnes/GoldenOnesSpear	Gold-Melted Shambler
+Metadata/Monsters/DrownedCrew/DrownedCrewSword_	Drowned Explorer
+Metadata/Monsters/DrownedCrew/DrownedCrewAxe	Drowned Explorer
+Metadata/Monsters/DrownedCrew/DrownedCrewSwordMinion	Drowned Explorer
+Metadata/Monsters/DrownedCrew/DrownedCrewAxeMinion	Drowned Explorer
+Metadata/Monsters/DrownedCrew/DrownedCrewGhost	Drowned Spectre
+Metadata/Monsters/DrownedCrew/DrownedCrewFigurehead	Drowned Bearer
+Metadata/Monsters/VaalForgeMan/VaalForgeMan	Gold-melted Blacksmith
+Metadata/Monsters/DrownedCrawler/DrownedCrawler__	Drowned Crawler
+Metadata/Monsters/DrownedCrawler/DrownedCrawlerWallWalk	Drowned Crawler
+Metadata/Monsters/Hags/DrowningOrbs/DrowningOrb	Daemon
+Metadata/Monsters/LiquidElementals/LiquidElementalBlood	Blood Elemental
+Metadata/Monsters/LiquidElementals/LiquidElementalBloodBoss	[DNT-UNUSED] Liquid Elemental Blood
+Metadata/Monsters/FormationControllerDaemonGeneric	Daemon
+Metadata/Monsters/FormationControllerDaemonEstates	Daemon
+Metadata/Monsters/FormationControllerDaemonBigBeetle	Daemon
+Metadata/Monsters/FormationControllerDaemonBeetle_	Daemon
+Metadata/Monsters/FormationControllerDaemonVaalZealot	Daemon
+Metadata/Monsters/BloodBathers/BloodBatherDualWield/BloodBatherDualWield	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherMace/BloodBatherMace	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherMace/BloodBatherMacePraying	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherShield/BloodBatherShield	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherShield/BloodBatherShieldPraying	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherFlail/BloodBatherFlail	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherFlail/BloodBatherFlailPraying__	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSpear/BloodBatherSpear	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSpear/BloodBatherSpearPraying	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSword/BloodBatherSword	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSword/BloodBatherSwordPraying	Bloodrite Guard
+Metadata/Monsters/BloodBathers/VaalApparition/SunVaalApparition	Priest of the Sun
+Metadata/Monsters/BloodCultistDrones/BloodBatherMage	Bloodrite Priest
+Metadata/Monsters/BloodCultistDrones/BloodBatherMagePraying_	Bloodrite Priest
+Metadata/Monsters/VaalSunWorshipper/VaalSunWorshipperBoss	Ketzuli, High Priest of the Sun
+Metadata/Monsters/VaalSunWorshipper/VaalSunWorshipperMAP	Tonqui, Seer of the Sun
+Metadata/Monsters/VaalSunWorshipper/VaalSunWorshipperSTANDALONE	Tonqui, Seer of the Sun
+Metadata/Monsters/VaalSunWorshipper/SunWorshipperBossBlackhole	Daemon
+Metadata/Monsters/VaalSunWorshipper/SunWorshipperBossSunWall	Daemon
+Metadata/Monsters/VaalConstructs/Cycloning/VaalCycloneConstruct	Cyclonic Construct
+Metadata/Monsters/VaalConstructs/Cycloning/VaalCycloneConstructArms	Cyclonic Construct Arms
+Metadata/Monsters/VaalConstructs/Cycloning/VaalCycloneConstructInert	Cyclonic Construct
+Metadata/Monsters/VaalConstructs/Cycloning/VaalCycloneConstructSpawned	Cyclonic Construct
+Metadata/Monsters/VaalConstructs/Cycloning/VaalCycloneConstructArmsSpawned	Cyclonic Construct Arms
+Metadata/Monsters/AscendancyBatMonster/AscendancyBat	Feral Bat
+Metadata/Monsters/VaalConstructs/Ball/VaalBowlingBall	Flame Sentry
+Metadata/Monsters/VaalConstructs/Ball/VaalBowlingBallInert	Flame Sentry
+Metadata/Monsters/VaalConstructs/Ball/VaalBowlingBallSpawned	Flame Sentry
+Metadata/Monsters/VaalMonsters/Living/VaalAxeThrower_	Vaal Axeman
+Metadata/Monsters/VaalMonsters/Living/VaalAxeThrowerBloodied	Vaal Axeman
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestessBoss_	Zelina, Blood Priestess
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestBoss_	Zolin, Blood Priest
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestessBossMAP_	Ytzara, Blood Oracle
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestBossMAP_	Maztli, Flesh-Shaper
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestessBossSTANDALONE	Zelina, Blood Priestess
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/VaalBloodPriestBossSTANDALONE	Zolin, Blood Priest
+Metadata/Monsters/CauldronCrone/CauldronCrone	Filthy Crone
+Metadata/Monsters/QueenOfFilth/QueenofFilfthBoss_	The Queen of Filth
+Metadata/Monsters/QueenOfFilth/QueenofFilfthBossMap	Yaota, the Loathsome
+Metadata/Monsters/QueenOfFilth/QueenofFilfthBossSTANDALONE	Yaota, the Loathsome
+Metadata/Monsters/QueenOfFilth/QueenofFilfthBossSTANDALONEExpedition	Yaota, the Loathsome
+Metadata/Monsters/CauldronCrone/CroneAuraVulnerability	Crone's Curse
+Metadata/Monsters/CauldronCrone/CroneAuraDespair	Crone's Curse
+Metadata/Monsters/CauldronCrone/CroneAuraEnfeeble	Crone's Curse
+Metadata/Monsters/CauldronCrone/CroneAuraTempChains	Crone's Curse
+Metadata/Monsters/QueenOfFilth/QueenOfFilthAuraVulnerability	Queen of Filth's Curse
+Metadata/Monsters/QueenOfFilth/QueenOfFilthAuraEnfeeble	Queen of Filth's Curse
+Metadata/Monsters/QueenOfFilth/QueenOfFilthAuraTempChains	Queen of Filth's Curse
+Metadata/Monsters/Pirates/PirateBootyBlaster	Rotting Soulcatcher
+Metadata/Monsters/ManOWar/ManoWar	Man o' War
+Metadata/Monsters/Pirates/PirateCannon	Rotting Cannoneer
+Metadata/Monsters/Pirates/PirateGrenade	Rotting Grenadier
+Metadata/Monsters/Pirates/PirateBarrel	Rotting Demolitionist
+Metadata/Monsters/Pirates/CaptainRothBoss	Captain Hartlin
+Metadata/Monsters/Pirates/CaptainRothBossMAP	Malgor, the Nautilord
+Metadata/Monsters/Pirates/CaptainRothBossCannon	Ghost Cannon
+Metadata/Monsters/Pirates/CaptainRothBossWave	Volatile Core
+Metadata/Monsters/Pirates/CaptainRothBossSTANDALONE	Torrek of the Drowned Fleet
+Metadata/Monsters/Pirates/CaptainRothBossCASTAWAY_	Torrek of the Drowned Fleet
+Metadata/Monsters/Anchorman/BloatedAnchorman	Bloated Anchorman
+Metadata/Monsters/CorpseWheel/ShipsWheelRemains	Impaled Mutineer
+Metadata/Monsters/KelpDreg/KelpDregSword	Searot Skeleton
+Metadata/Monsters/KelpDreg/KelpDregCrossbowSniper	Searot Harpooner
+Metadata/Monsters/KelpDreg/KelpDregCrossbowEnsarer	Searot Ensnarer
+Metadata/Monsters/KelpDreg/KelpDregCrossbowIceShot	Searot Sniper
+Metadata/Monsters/KelpDreg/KelpDregSwordShield	Searot Skeleton
+Metadata/Monsters/KelpDreg/KelpDregAxe	Searot Skeleton
+Metadata/Monsters/VaalHumanoids/VaalHumanoidBow/VaalHumanoidBow__	Archer Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidBow/VaalHumanoidBowArms	Archer Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidGoliathFist/VaalHumanoidGoliathFist_	Goliath Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidPyramidHands/VaalPyramidHands	Brutal Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidShieldLegs/VallHumanoidShieldLegs	Shielded Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidSwordShield/VaalHumanoidSwordShield_	Fused Swordsman
+Metadata/Monsters/VaalHumanoids/VaalHumanoidCannon/VaalHumanoidCannonFire	Doryani's Elite
+Metadata/Monsters/VaalHumanoids/VaalHumanoidCannon/VaalHumanoidCannonLightning	Doryani's Elite
+Metadata/Monsters/VaalHumanoids/VaalHumanoidCannon/VaalHumanoidCannonLightningSkitterMine_	Skitter Mine
+Metadata/Monsters/VaalHumanoids/VaalHumanoidBladeHands/VaalHumanoidBladeHands	Warrior Transcendent
+Metadata/Monsters/VaalHumanoids/VaalHumanoidStalker/VaalHumanoidStalker	Bladelash Transcendent
+Metadata/Monsters/GullGoliath/GullGoliath_	Goliath Shrike
+Metadata/Monsters/GullMen/GullMen	Manshrike
+Metadata/Monsters/GullCarrion/GullCarrion	Carrion Gull
+Metadata/Monsters/WingedFiend/CrawGull	Vilespit Gull
+Metadata/Monsters/Skeletons/FleshPicked/FleshPickedSkeleton_	Scavenged Skeleton
+Metadata/Monsters/Skeletons/FleshPicked/FleshPickedSkeletonNoEmerge	Scavenged Skeleton
+Metadata/Monsters/HarpyMonster/RavenHarpyShrikeIsland	Raven Shrike
+Metadata/Monsters/HarpyMonster/GullHarpy	Gull Shrike
+Metadata/Monsters/Doryani/DoryaniInThePast/DoryaniPast	Doryani, Royal Thaumaturge
+Metadata/Monsters/Doryani/DoryaniInThePast/DoryaniPastMap	Doryani, Royal Thaumaturge
+Metadata/Monsters/Doryani/DoryaniInThePast/DoryaniPastStandalone_	Doryani, Royal Thaumaturge
+Metadata/Monsters/DoryaniMechSuit/DoryaniMech	Doryani's Triumph
+Metadata/Monsters/DoryaniMechSuit/DoryaniMechMap	Doryani's Triumph
+Metadata/Monsters/DoryaniMechSuit/DoryaniMechStandalone_	Doryani's Triumph
+Metadata/Monsters/DoryaniMechSuit/DoryaniMechRailGun	Doryani's Triumph
+Metadata/Monsters/LeagueAffliction/JourneyEndAfflictionDemonBoss	Omniphobia, Fear Manifest
+Metadata/Monsters/CageSkeleton/CageSkeleton_	Rattling Gibbet
+Metadata/Monsters/PrisonTorturerZombieMonster/ZombieTorturer	Eternal Torturer
+Metadata/Monsters/NecromancerRemakeBook/SpinedNecromancer	Spined Necromancer
+Metadata/Monsters/NecromancerRemakeBook/SpinedNecromancerChapel	Forael, the Soulkeeper
+Metadata/Monsters/SkeletonProwler/SkeletonProwler_	Prowling Skeleton
+Metadata/Monsters/SkeletonProwler/SkeletonProwlerDead	Prowling Skeleton
+Metadata/Monsters/RatMonster/RatMonsterPrison	Eaten Rat
+Metadata/Monsters/RatMonster/RatMonsterPrisonMedium	Eaten Rat
+Metadata/Monsters/RatMonster/RatMonsterPrisonSmall	Eaten Rat
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonUnarmed	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonUnarmedDead	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonOneHandSword	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonOneHandSwordDead	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonOneHandSwordShield	Risen Rattler
+Metadata/Monsters/Skeletons/Basic/PrisonSkeletonOneHandSwordShieldDead	Risen Rattler
+Metadata/Monsters/Zombies/UpperPrison/PrisonZombieUnarmed_	Eternal Prisoner
+Metadata/Monsters/Zombies/UpperPrison/PrisonZombieUnarmed_Dead	Eternal Prisoner
+Metadata/Monsters/Zombies/UpperPrison/PrisonZombieOneHandAxe	Eternal Prisoner
+Metadata/Monsters/Zombies/UpperPrison/PrisonZombieOneHandAxeDead	Eternal Prisoner
+Metadata/Monsters/Zombies/UpperPrison/PrisonZombieProxEmerge_	Eternal Prisoner
+Metadata/Monsters/SkeletonProwler/SkeletonProwlerWet_	Prowling Skeleton
+Metadata/Monsters/PaleWalker/PaleWalkerWave	Pale Tidecrasher
+Metadata/Monsters/PaleWalker/PaleWalkerMirage	Pale Brinesplitter
+Metadata/Monsters/PaleWalker/PaleWalkerMirageClone	Pale Brinesplitter
+Metadata/Monsters/PaleWalker/PaleWalkerShield_	Pale Waterwalker
+Metadata/Monsters/PrisonStalker/UpperPrisonStalker	Eternal Guard
+Metadata/Monsters/PrisonStalker/UpperPrisonStalkerLandmark	Fallen Quartermaster
+Metadata/Monsters/DeliriumEncounter/Tangmazu__	Tangmazu
+Metadata/Monsters/DeliriumEncounter/LilyRothMum	Freya Hartlin
+Metadata/Monsters/TarHulk/PaleHulk_	Pale Abductor
+Metadata/Monsters/Skeletons/DrownedSkeleton/DrownedSkeleton_	Coral-crowned Skeleton
+Metadata/Monsters/RumCarrier/PaleCrawler_	Bulbous Maw
+Metadata/Monsters/PaleFishman/PaleFisherman	Angler Maw
+Metadata/Monsters/PrisonStalker/SlimyStalker__	Slimy Stalker
+Metadata/Monsters/VaalForgeMaster/VaalForgemaster	Mektul, the Forgemaster
+Metadata/Monsters/VaalForgeMaster/VaalForgemasterMAP	Gulzal, the Living Furnace 
+Metadata/Monsters/VaalForgeMaster/VaalForgemasterSTANDALONE_	Gulzal, the Living Furnace 
+Metadata/Monsters/PrisonerBoss/PrisonerBoss	The Prisoner
+Metadata/Monsters/PrisonerBoss/PrisonerBossMAP_	The Shackled Horror
+Metadata/Monsters/PrisonerBoss/PrisonerBossStandalone_	The Shackled Horror
+Metadata/Monsters/PrisonerBoss/PrisonerBossIceCrystal_	Ice Spike
+Metadata/Monsters/PrisonerBoss/PrisonerBossChillDonut	Daemon
+Metadata/Monsters/ElephantRhino/ElephantRhino	Elephant Tortoise
+Metadata/Monsters/DeepDwellerBoss/SpikedDweller	Spiked Scuttler
+Metadata/Monsters/StonebackRhoa/StonebackRhoa	Stoneback Rhoa
+Metadata/Monsters/StonebackRhoa/GoblinStonebackRhoa	Captive Stoneback Rhoa
+Metadata/Monsters/GreatWhiteOne/GreatWhiteOne	Great White One
+Metadata/Monsters/GreatWhiteOne/GreatWhiteOneMAP_	The Sandstrider
+Metadata/Monsters/GreatWhiteOne/GreatWhiteOneStandalone_	The Sandstrider
+Metadata/Monsters/Goblins/GoblinStabber	Skulltop Kin
+Metadata/Monsters/Goblins/GoblinStabberNoSkull	Feral Kin
+Metadata/Monsters/Goblins/GoblinStabberRider	Skulltop Kin
+Metadata/Monsters/Goblins/GoblinStabberNoSkullRider	Feral Kin
+Metadata/Monsters/Goblins/Beast/GoblinTamedBeast	Subdued Behemoth
+Metadata/Monsters/Goblins/Beast/GoblinTamedBeastNoPassengers	Subdued Behemoth
+Metadata/Monsters/Goblins/Beast/GoblinTamedBeastEnslaved	Mimbok, the Enslaved
+Metadata/Monsters/Goblins/GoblinSpearman/GoblinSpearman	Spearbearer Kin
+Metadata/Monsters/Goblins/GoblinSpearman/GoblinSpearmanDistracted	Spearbearer Kin
+Metadata/Monsters/Goblins/GoblinSpearman/GoblinSpearmanWalkEmerge	Spearbearer Kin
+Metadata/Monsters/Goblins/GoblinSpearman/GoblinSpearmanNoSkull_	Spearbearer Kin
+Metadata/Monsters/Goblins/GoblinStiltsFighter/GoblinStiltsFighter	Tallwalker Kin
+Metadata/Monsters/Goblins/GoblinDrummer/GoblinDrummer	Wardrum Kin
+Metadata/Monsters/Goblins/GoblinDrummer/GoblinDrummerWalkEmerge	Wardrum Kin
+Metadata/Monsters/Goblins/GoblinTusker/GoblinTusker	Tuskbearer Kin
+Metadata/Monsters/Goblins/GoblinTusker/GoblinTuskerDistracted	Tuskbearer Kin
+Metadata/Monsters/Goblins/GoblinTusker/GoblinTuskerWalkEmerge	Tuskbearer Kin
+Metadata/Monsters/Goblins/GoblinShaman/GoblinShaman	Shaman Kin
+Metadata/Monsters/Goblins/GoblinShaman/GoblinShamanDistracted	Shaman Kin
+Metadata/Monsters/Goblins/GoblinShaman/GoblinShamanWalkEmerge	Shaman Kin
+Metadata/Monsters/HarpyMonster/MagmaHarpy/MagmaHarpy	Molten Imp
+Metadata/Monsters/Goblins/Beast/ArenaBeastBoss	The Blind Beast
+Metadata/Monsters/Goblins/Beast/ArenaBeastBossMAP_	The Ravenous Fang
+Metadata/Monsters/Goblins/Beast/ArenaBeastBossSTANDALONE	The Blind Beast
+Metadata/Monsters/Goblins/GoblinGiantBoss/GoblinGiantBoss	Krutog, Lord of Kin
+Metadata/Monsters/Goblins/GoblinGiantBoss/GoblinGiantBossMAP_	Brughor, the Insatiable
+Metadata/Monsters/Goblins/GoblinGiantBoss/GoblinGiantBossStandalone_	Brughor, the Insatiable
+Metadata/Monsters/Goblins/GoblinMiner/GoblinMinerMining	Prospector Kin
+Metadata/Monsters/Goblins/GoblinMiner/GoblinMinerTorch	Torchbearer Kin
+Metadata/Monsters/ElectricStingray/ElectricStingray_	Spiked Ray
+Metadata/Monsters/JellfishNettler/JellyfishNettlerBig	Skittering Jellycrab
+Metadata/Monsters/JellfishNettler/JellyfishNettlerSmall	Skittering Jellycrab
+Metadata/Monsters/JellfishNettler/JellyfishNettlerFlying	Luminous Jellyfish
+Metadata/Monsters/TentacleDemonFemale/TentacleWhipper	Ghastly Siren
+Metadata/Monsters/GiantStarfish/GiantStarfish_	Giant Maw
+Metadata/Monsters/CarrionWing/CarrionWing_	Luminous Spinefish
+Metadata/Monsters/BrineMaiden/BrineMaiden	Brine Maiden
+Metadata/Monsters/BrineMaiden/BrineMaidenClamEncounter	Adelina, Guardian of the Pearl
+Metadata/Monsters/ProwlerLeviathan/ProwlerLeviathan	Amphibious Prowler
+Metadata/Monsters/KaruiTuatara/KaruiTuatara_	Guardian Lizard
+Metadata/Monsters/KaruiTuatara/KaruiTuataraStrongbox	Guardian Lizard
+Metadata/Monsters/KaruiSoulCaster/KaruiSoulCaster_	Ancestral Channeler
+Metadata/Monsters/KaruiSoulCaster/KaruiSoulCasterHalls	Ancestral Channeler
+Metadata/Monsters/KaruiSoulCaster/KaruiSoulCasterStrongbox	Ancestral Channeler
+Metadata/Monsters/KaruiHulk/KaruiHulk_	Primal Spirit
+Metadata/Monsters/KaruiHulk/KaruiHulkStrongbox	Primal Spirit
+Metadata/Monsters/FallenKarui/FallenKaruiArcher_______	Ancestral Archer
+Metadata/Monsters/FallenKarui/FallenKaruiArcherHalls_	Ancestral Archer
+Metadata/Monsters/FallenKarui/FallenKaruiArcherStrongbox	Ancestral Archer
+Metadata/Monsters/FallenKarui/FallenKaruiShieldAxe	Ancestral Guardian
+Metadata/Monsters/FallenKarui/FallenKaruiShieldAxeHalls	Ancestral Guardian
+Metadata/Monsters/FallenKarui/FallenKaruiShieldAxeStrongbox	Ancestral Guardian
+Metadata/Monsters/FallenKarui/FallenKaruiTwoHandAxe	Ancestral Warrior
+Metadata/Monsters/FallenKarui/FallenKaruiTwoHandAxeHalls	Ancestral Warrior
+Metadata/Monsters/FallenKarui/FallenKaruiTwoHandAxeStrongbox	Ancestral Warrior
+Metadata/Monsters/FallenKarui/FallenKaruiOneHandMace	Ancestral Headtaker
+Metadata/Monsters/FallenKarui/FallenKaruiOneHandMaceHalls	Ancestral Headtaker
+Metadata/Monsters/FallenKarui/FallenKaruiOneHandMaceStrongbox	Ancestral Headtaker
+Metadata/Monsters/LeagueAncestral/StandaloneNgamahu/FirebreatherStandalone	Firebreather
+Metadata/Monsters/LeagueAncestral/StandaloneNgamahu/CalderaRavagerStandalone	Ngamahu Ravager
+Metadata/Monsters/LeagueAncestral/StandaloneNgamahu/BlackbarkDemolisherStandalone	Blackbark Demolisher
+Metadata/Monsters/LeagueAncestral/StandaloneTasalio/SpearfisherStandalone	Spearfisher
+Metadata/Monsters/LeagueAncestral/StandaloneTasalio/RiptideStandalone	Riptide
+Metadata/Monsters/LeagueAncestral/StandaloneTasalio/RiptideWave	Volatile Core
+Metadata/Monsters/LeagueAncestral/StandaloneTasalio/TrawlerStandalone_	Tasalio Trawler
+Metadata/Monsters/SirenMonster/SirenBoss	Diamora, Song of Death
+Metadata/Monsters/SirenMonster/SirenBossMAP_	Syvora, Daughter of the Deep
+Metadata/Monsters/SirenMonster/SirenBossSTANDALONE	Diamora, Song of Death
+Metadata/Monsters/SirenMonster/SirenBossPretty	Diamora, Song of Death
+Metadata/Monsters/SirenMonster/SirenBossWaterBall	[DNT-UNUSED]Water Ball
+Metadata/Monsters/KaruiSoulCaster/KaruiSpiritSummon	Ancestral Mask
+Metadata/Monsters/KaruiWarriorHorn/KaruiWarriorHorn_	Ancestral Hornbearer
+Metadata/Monsters/KaruiWarriorHorn/KaruiWarriorHornHalls	Ancestral Hornbearer
+Metadata/Monsters/KaruiWarriorHorn/KaruiWarriorHornStrongbox	Ancestral Hornbearer
+Metadata/Monsters/SudokuTotemBoss/SudokuBoss	Tawhani, the Ancestral Guardian
+Metadata/Monsters/SudokuTotemBoss/SudokuBossUpperFace	Daemon
+Metadata/Monsters/SudokuTotemBoss/SudokuBossMiddleFace	Daemon
+Metadata/Monsters/SudokuTotemBoss/SudokuBossLowerFace	Daemon
+Metadata/Monsters/YamaBoss/YamaBoss	Yama The White
+Metadata/Monsters/YamaBoss/YamaBossMAP_	Yama The White
+Metadata/Monsters/YamaBoss/YamaBossClone	Yama The White
+Metadata/Monsters/YamaBoss/YamaBossSTANDALONE	Yama The White
+Metadata/Monsters/BloodFeverKarui/BloodFeverDrunk	Blood-fevered Brew-breather
+Metadata/Monsters/BloodFeverKarui/BloodFeverDrunkLandmark	Blood-fevered Brew-breather
+Metadata/Monsters/BloodFeverKarui/BloodFeverHook	Blood-fevered Hookman
+Metadata/Monsters/BloodFeverKarui/BloodFeverSpear	Blood-fevered Spearman
+Metadata/Monsters/BloodFeverKarui/BloodFeverSpearLandmark	Blood-fevered Spearman
+Metadata/Monsters/BloodFeverKarui/BloodFeverKarui1HAxe_	Blood-fevered Axeman
+Metadata/Monsters/BloodFeverKarui/BloodFeverKarui2HAxe	Blood-fevered Warrior
+Metadata/Monsters/BloodFeverKarui/BloodFeverKarui1HMace	Blood-fevered Maceman
+Metadata/Monsters/BloodFeverKarui/BloodFeverBlob	Blood-fevered Pustule
+Metadata/Monsters/BloodFeverKarui/BloodFeverPoi_	Blood-fevered Arsonist
+Metadata/Monsters/BloodFeverKarui/BloodFeverBoar	Blood-fevered Tuskbeast
+Metadata/Monsters/BloodFeverKarui/BloodFeverMedicineWoman	Blood-fevered Wisewoman
+Metadata/Monsters/BloodFeverKarui/BloodFeverButcher	Harano, the Meat Carver
+Metadata/Monsters/BloodFeverKarui/BloodFeverButcherSpectre	Harano, the Meat Carver
+Metadata/Monsters/ParasiteMonsters/ParasiteMonster01	Armoured Parasite
+Metadata/Monsters/ParasiteMonsters/ParasiteMonster02	Kreth Parasite
+Metadata/Monsters/MorayClanMonster/MorayClan	Moray Clan
+Metadata/Monsters/ParasiteMonsters/MantaRayParasite	Infested Manta
+Metadata/Monsters/ParasiteMonsters/OctopusParasite	Infested Octopus
+Metadata/Monsters/ParasiteMonsters/TurtleParasite__	Infested Turtle
+Metadata/Monsters/ParasiteMonsters/AngerfishParasite	Infested Anglerfish
+Metadata/Monsters/ParasiteHostMiniBoss/ParasiteHostBoss	[DNT-UNUSED] Parasite Host
+Metadata/Monsters/ParasiteMonsters/MantaRayParasiteDead	Infested Manta
+Metadata/Monsters/ParasiteMonsters/OctopusParasiteDead	Infested Octopus
+Metadata/Monsters/ParasiteMonsters/TurtleParasiteDead	Infested Turtle
+Metadata/Monsters/ParasiteMonsters/AngerfishParasiteDead	Infested Anglerfish
+Metadata/Monsters/BloodFeverKarui/BloodFeverBloater	Blood-fevered Plaguespreader
+Metadata/Monsters/KaruiSpiritTortoise/SpiritTortoise_	Guardian Turtle
+Metadata/Monsters/KaruiSpiritTortoise/SpiritTortoiseStrongbox	Guardian Turtle
+Metadata/Monsters/RootedGuys/RootedGuy01/RootedGuy1____	Blightstalker
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss	Tavakai, the Chieftain
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_2	Tavakai, the Fallen
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_3	Tavakai, the Consumed
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_Map	Manoki, the Chosen
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_2Map	Manoki, the Fevered
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_3Map	Manoki, the Defiled
+Metadata/Monsters/KaruiChieftain/KaruiCaptainBoss_3Standalone	Manoki, the Defiled
+Metadata/Monsters/KaruiJadeSpearSpirit/WarriorSpirit	Warrior Spirit
+Metadata/Monsters/RootedGuys/RootedGuy03/RootedGuy3	Sporebearer
+Metadata/Monsters/RootedGuys/RootedGuy04/RootedGuy4	Fungal Reaver
+Metadata/Monsters/RootedGuys/RootedGuy04/RaisedBranchMonster	Cultivated Grove
+Metadata/Monsters/RootedGuys/RootedGuy04/RaisedBranchMonsterLandmark	Cultivated Grove
+Metadata/Monsters/TwigMonsters/RaisedBranchMinion	Skeleton Spriggan
+Metadata/Monsters/RootedGuys/RootedGuy04/RaisedBranchMonsterActive	Cultivated Grove
+Metadata/Monsters/JudgementBird	[DNT-UNUSED] Judgement Bird
+Metadata/Monsters/Baron/BaronBossHumanForm	Count Geonor
+Metadata/Monsters/Baron/BaronBossHumanFormMap	Count Geonor
+Metadata/Monsters/Baron/BaronBossHumanFormWolf	Count Geonor
+Metadata/Monsters/Baron/BaronBossHumanFormWolfMap	Count Geonor
+Metadata/Monsters/Baron/BaronBossCorruptedWolfForm	Geonor, the Putrid Wolf
+Metadata/Monsters/Baron/BaronBossCorruptedWolfFormMap	Geonor, the Putrid Wolf
+Metadata/Monsters/Baron/BaronBossCorruptedWolfFormStandalone	Geonor, the Putrid Wolf
+Metadata/Monsters/Baron/BaronBossCorruptedWolfFogDaemon	Daemon
+Metadata/Monsters/Baron/BaronWerewolfSummon	Court Werewolf
+Metadata/Monsters/Baron/BaronWerewolfProwlerSummon	Tendril Prowler
+Metadata/Monsters/Baron/BaronMinerPleb_	Crazed Guard
+Metadata/Monsters/Baron/BaronMinerPlebThrower1	Crazed Guard
+Metadata/Monsters/Baron/BaronMinerPlebThrower2	Crazed Guard
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcerer	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererPatrol	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererChurchAmbush	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererPreacher	Missionary Lorandis
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererGuardBoss	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererGuardBossAttack	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererGuardBossDefence_	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSorceror/TwilightOrderSorcererGuardBossUtility	Twilight Order Oathsworn
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderGuardBoss	Torvian, Hand of the Saviour
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderGuardBossMap	Brakkus, the Juggernaut
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderGuardBossSTANDALONE	Torvian, Hand of the Saviour
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderGuardBossSkyBeam	Invisible
+Metadata/Monsters/TwilightOrderSoldiers/TwilightOrderOfficerColdClone	Clone [DNT-UNUSED]
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataArcher_	Faithful Archer
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataArcherPatrol	Faithful Archer
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataMace_	Faithful Warrior
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataMacePatrol	Faithful Warrior
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataAxe_	Righteous Axewielder
+Metadata/Monsters/TwilightOrderStigmata/TwilightOrderStigmataAxePatrol	Righteous Axewielder
+Metadata/Monsters/InvisibleFire/BloodClanWaterWall	Invisible
+Metadata/Monsters/ScarecrowBeast/ScarecrowBeast	Scarecrow Beast
+Metadata/Monsters/PerennialKingStage2/PerennialKing	Jamanra, the Abomination
+Metadata/Monsters/PerennialKingStage2/PerennialKingMap	Jamanra, the Abomination
+Metadata/Monsters/PerennialKingStage2/PerennialKingStandalone_	Jamanra, the Abomination
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend1	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend2	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend3	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend4_	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend5	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend6	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend7	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend8	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend9	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend10__	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend11	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend12	King's Attendant
+Metadata/Monsters/PerennialKingStage2/PerennialKingCorpseFriend13	King's Attendant
+Metadata/Monsters/RootedGuys/Cocoons2/Cocoons2__	Infested Cadaver
+Metadata/Monsters/FallenGods/FallenGodsStalkerFoundry_	Forgotten Stalker
+Metadata/Monsters/FallenGods/FallenGodsCrawlerFoundry_	Forgotten Crawler
+Metadata/Monsters/FallenGods/FallenHooksFoundry	Forgotten Satyr
+Metadata/Monsters/FallenGods/FallenHooks	Forgotten Satyr
+Metadata/Monsters/MushroomFungus/MushroomFungus	[DNT-UNUSED] Mushroom Fungus
+Metadata/Monsters/MushroomFungus/MushroomFungusPurple	The Noxious Behemoth
+Metadata/Monsters/SpinningWheelHag/SpinningWheelHag	Wheelbound Hag
+Metadata/Monsters/VaalBossStatue/VaalStatueBoss	Zicoatl, Warden of the Core
+Metadata/Monsters/VaalBossStatue/VaalStatueBossMAP	Tetzcatl, the Blazing Guardian
+Metadata/Monsters/VaalBossStatue/VaalStatueBossMAP2	Tetzcatl, the Blazing Guardian
+Metadata/Monsters/VaalBossStatue/VaalStatueBossSTANDALONE	Tetzcatl, the Blazing Guardian
+Metadata/Monsters/VaalBossStatue/VaalStatueBossSTANDALONEExpedition	Tetzcatl, the Blazing Guardian
+Metadata/Monsters/HusbandMonster/HusbandMonster	Draven, the Eternal Praetor
+Metadata/Monsters/HusbandMonster/HusbandMonsterMAP	Tycho, the Black Praetor
+Metadata/Monsters/HusbandMonster/HusbandMonsterSTANDALONE	Tycho, the Black Praetor
+Metadata/Monsters/HusbandMonster/HusbandMonsterApparition	Draven, the Eternal Praetor
+Metadata/Monsters/SummonedPhantasm/HusbandWifeSpirits	Captured Soul
+Metadata/Monsters/SummonedPhantasm/HusbandWifeSpiritsWild	Captured Soul
+Metadata/Monsters/Wolves/WolfCompanionPlayerSummoned	Wolf Companion
+Metadata/Monsters/Wolves/WolfCompanionPlayerSummonedBloody	Wolf Companion
+Metadata/Monsters/Wolves/IceWolfPlayerSummoned	Wolf Companion
+Metadata/Monsters/HyenaMonster/HyenaCompanionPlayerSummoned	Cackling Companion
+Metadata/Monsters/TwilightOrderCleric/TwilightOrderCleric	Twilight Order Priest
+Metadata/Monsters/TwilightOrderCleric/TwilightOrderClericPatrol	Twilight Order Priest
+Metadata/Monsters/SaltGolem/VolcanicSaltGolem	Tectonic Golem
+Metadata/Monsters/SaltGolem/VolcanicSaltGolemNoEmerge	Tectonic Golem
+Metadata/Monsters/SaltGolem/VolcanicQuakeGolem	Volcanic Golem
+Metadata/Monsters/SaltGolem/VolcanicQuakeGolemNoEmerge	Volcanic Golem
+Metadata/Monsters/Clone/WereBearCloneImmobile_	Clone
+Metadata/Monsters/Clone/WereWolfCloneImmobile	Clone
+Metadata/Monsters/Clone/DemonCloneImmobile	Clone
+Metadata/Monsters/Clone/WyvernCloneImmobile	Clone
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossSanctified	The Immured Fury
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossSanctifiedChaos	Invisible
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossSanctifiedExalt	Invisible
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossSanctifiedDivine	Invisible
+Metadata/Monsters/FallenGodMiniboss/FallenGodMiniboss_	Phanos, Last Disciple of Auria
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossChaos	Invisible
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossExalt	Invisible
+Metadata/Monsters/FallenGodMiniboss/FallenGodMinibossDivine_	Invisible
+Metadata/Monsters/FallenGods/FallenGodMinibossBloaterMinion	Forgotten Mauler
+Metadata/Monsters/FallenGods/FallenGodMinibossSplitMinion	Forgotten Cloven
+Metadata/Monsters/FallenGods/FallenGodMinibossClubHandMinion	Forgotten Brutaliser
+Metadata/Monsters/FallenGods/FallenGodMinibossCrawlerMinion	Forgotten Crawler
+Metadata/Monsters/FallenGods/FallenGodMinibossStalkerMinion	Forgotten Stalker
+Metadata/Monsters/FallenGods/FallenGodMinibossStagMinion	Forgotten Stag
+Metadata/Monsters/FallenGods/FallenGodMinibossHooksMinion__	Forgotten Satyr
+Metadata/Monsters/RabidFeralDogMonster/RabidDog	Rabid Dog
+Metadata/Monsters/RabidFeralDogMonster/RabidDogLargeFarmlands	Vargir the Feral Mutt
+Metadata/Monsters/RabidFeralDogMonster/RabidDogLargeFarmlandsNoName	Rabid Dog
+Metadata/Monsters/SummonedMercenaryCompanion	Mercenary Companion
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonWarriorPlayerSummoned	Skeletal Warrior
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonReaverPlayerSummoned	Skeletal Reaver
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonBrutePlayerSummoned_	Skeletal Brute
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonArcherPlayerSummoned	Skeletal Sniper
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonFrostMagePlayerSummoned	Skeletal Frost Mage
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonStormMagePlayerSummoned_	Skeletal Storm Mage
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonArsonistPlayerSummoned	Skeletal Arsonist
+Metadata/Monsters/Skeletons/PlayerSummoned/SkeletonClericPlayerSummoned_	Skeletal Cleric
+Metadata/Monsters/Zombies/PlayerSummoned/PlayerSummonedZombie_	Raised Zombie
+Metadata/Monsters/Daemon/CreepyHagDebuffDaemon	Daemon
+Metadata/Monsters/OfferingSpike/PainOfferingSpike	Offering Spike
+Metadata/Monsters/OfferingSpike/PainOfferingSpikeSanguine	Offering Spike
+Metadata/Monsters/OfferingSpike/BoneOfferingSpike	Offering Spike
+Metadata/Monsters/OfferingSpike/BoneOfferingSpikeSanguine	Offering Spike
+Metadata/Monsters/OfferingSpike/PowerOfferingSpike	Offering Spike
+Metadata/Monsters/OfferingSpike/PowerOfferingSpikeSanguine	Offering Spike
+Metadata/Monsters/KaruiBoar/ExplosivePig	Volatile Boar
+Metadata/Monsters/KaruiBoar/ExplosivePigOnFire	Volatile Boar
+Metadata/Monsters/Ghouls/FarudinCrawler	Faridun Crawler
+Metadata/Monsters/Ghouls/FarudinCrawlerQuarry	Faridun Crawler
+Metadata/Monsters/DrudgeMiners/DrudgeBedrockBlaster	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgeBedrockBlasterStrongbox	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgeBedrockBlasterMinecart_	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgePickaxeMiner	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgePickaxeMinerStrongbox	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgeMinerHammer	Forsaken Miner
+Metadata/Monsters/DrudgeMiners/DrudgeMinerHammerStrongbox	Forsaken Miner
+Metadata/Monsters/Gargoyle/GargoyleBoss/ManorGargoyleBoss	Candlemass, the Living Rite
+Metadata/Monsters/Gargoyle/GargoyleBoss/ManorGargoyleBossCRUEL	Candlemass, the Living Rite
+Metadata/Monsters/Gargoyle/GargoyleBoss/ManorGargoyleBossMap	Meltwax, Mockery of Faith
+Metadata/Monsters/Gargoyle/GargoyleBoss/ManorGargoyleBossSTANDALONE	Meltwax, Mockery of Faith
+Metadata/Monsters/WifeMonster/WifeMonster	Asinia, the Praetor's Consort
+Metadata/Monsters/WifeMonster/WifeMonsterMap_	Saphira, The Dread Consort
+Metadata/Monsters/WifeMonster/WifeMonsterSTANDALONE	Saphira, The Dread Consort
+Metadata/Monsters/WifeMonster/WifeMonsterBoneWall	Bone Wall
+Metadata/Monsters/WifeMonster/WifeMonsterApparition_	Asinia, the Praetor's Consort
+Metadata/Monsters/TitanWalker/TitanWalker	Walking Goliath
+Metadata/Monsters/TitanWalker/TitanWalkerStrongbox	Walking Goliath
+Metadata/Monsters/TitanWalker/TitanWalkerSanctumTrial	Walking Goliath
+Metadata/Monsters/TitanWalker/TitanWalkerCorpse	Walking Goliath
+Metadata/Monsters/TitanWalker/TitanWalkerCorpseStrongbox	Walking Goliath
+Metadata/Monsters/SkeletalKnight/SkeletalKnight	Eternal Knight
+Metadata/Monsters/SkeletalKnight/SkeletalKnightLandmark	Eternal Knight
+Metadata/Monsters/SkeletalKnight/SkeletalKnightBossMinion	Eternal Knight
+Metadata/Monsters/SkeletalKnight/SkeletalKnightStrongbox	Eternal Knight
+Metadata/Monsters/SkeletalReaper/SkeletalReaper	Knight-Gaunt
+Metadata/Monsters/SkeletalReaper/SkeletalReaperStrongbox	Knight-Gaunt
+Metadata/Monsters/SkeletalConstruct/BoneConstructPlayerSummoned	Bone Crawler
+Metadata/Monsters/TwoheadedTitan/TwoHeadedTitan_	Goliath
+Metadata/Monsters/TwoheadedTitan/TwoHeadedTitanInterlude	Moltenmettle
+Metadata/Monsters/TwoheadedTitan/TwoHeadedTitanStrongbox	Goliath
+Metadata/Monsters/TwoheadedTitan/TwoHeadedTitanSanctumTrial	Goliath
+Metadata/Monsters/Mutewind/MutewindWomanSpearCorrodedEliteRareName	L'im the Impaler
+Metadata/Monsters/Mutewind/MutewindWomanSpearCorrodedElite	Faridun Impaler
+Metadata/Monsters/Mutewind/MutewindWomanSpearCorrodedEliteSpectre_	Faridun Impaler
+Metadata/Monsters/Totems/ancestor_totem/AncestralWarriorSpirit	Ancestral Warrior Spirit
+Metadata/Monsters/Totems/ShockwaveTotem	Totem
+Metadata/Monsters/RhoaPlayerSummoned/RhoaPlayerSummoned	Rhoa Companion
+Metadata/Monsters/RhoaPlayerSummoned/HonourGuardRhoaPlayerSummoned	Rhoa Companion
+Metadata/Monsters/RhoaPlayerSummoned/RitualRhoaPlayerSummoned	Rhoa Companion
+Metadata/Monsters/RhoaPlayerSummoned/DeliriumRhoaPlayerSummoned	Rhoa Companion
+Metadata/Monsters/RhoaPlayerSummoned/KaruiRhoaPlayerSummoned	Rhoa Companion
+Metadata/Monsters/CompanionBear/CompanionBearSummoned	[DNT] Companion Bear
+Metadata/Monsters/VaseMonster/VaseMonster_	Urnwalker
+Metadata/Monsters/VaseMonster/VaseMonsterSanctumTrial	Urnwalker
+Metadata/Monsters/VaseMonster/VaseMonsterSanctumTrialTime	Urnwalker
+Metadata/Monsters/VaseMonster/VaseMonsterSpectre	Urnwalker
+Metadata/Monsters/UndeadMarakethPriest/UndeadMarakethPriest	Risen Tale-woman
+Metadata/Monsters/UndeadMarakethPriest/UndeadMarakethPriestSanctumTrial	Risen Tale-woman
+Metadata/Monsters/UndeadMarakethPriest/UndeadMarakethPriestSanctumTrialTime	Risen Tale-woman
+Metadata/Monsters/GiantUglyToad/GiantUglyToadExplode_	Giant Ugly Toad
+Metadata/Monsters/NPC/AlvaSunkenCityPast	Alva
+Metadata/Monsters/Zombies/CourtGuardZombieAxe	Rotting Guard
+Metadata/Monsters/Zombies/CourtGuardZombieUnarmed	Rotting Guard
+Metadata/Monsters/BeehiveBehemoth/FungusBehemoth	The Rotten Druid
+Metadata/Monsters/BeehiveBehemoth/FungusBehemothMap	The Fungus Behemoth
+Metadata/Monsters/BeehiveBehemoth/FungusBehemothSTANDALONE	The Fungus Behemoth
+Metadata/Monsters/BeehiveBehemoth/FungusBehemothVine	Daemon
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterOldForest_	The Brambleghast
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterOldForestMap	Rootgrasp, the Hateful Forest
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterOldForestSTANDALONE	Rootgrasp, the Hateful Forest
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterOldForestKotMMinion	The Brambleghast
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterVineOldForest	Vicious Vine
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterHammerVine	Vicious Vine
+Metadata/Monsters/CarnivorousPlantEater/OldForest/CarnivorousPlantEaterTreeVolatile__	Volatile Orchard
+Metadata/Monsters/MushroomFungus/MushroomVolatile	Volatile Orchard
+Metadata/Monsters/BansheeRemake/WitchHutBanshee	Areagne, Forgotten Witch
+Metadata/Monsters/SummonRagingSpirit/RagingSpirit	Raging Spirit
+Metadata/Monsters/VoodooKing/VoodooKingDeathEffigy	Affliction Totem
+Metadata/Monsters/VoodooKing/VoodooKingBoss2	The King in the Mists
+Metadata/Monsters/VoodooKing/VoodooKingBoss2MAP	The King in the Mists
+Metadata/Monsters/VoodooKing/VoodooKingBoss2RitualPillar	Mystic Fetish
+Metadata/Monsters/VoodooKing/VoodooKingBoss3	The King in the Mists
+Metadata/Monsters/VoodooKing/VoodooKingBoss3MAP	The King in the Mists
+Metadata/Monsters/VoodooKing/VoodooKingBoss3Standalone	The King in the Mists
+Metadata/Monsters/VoodooKing/Critters/ExplosiveToad	Explosive Toad
+Metadata/Monsters/Totems/DarkEffigyTotem_	Totem
+Metadata/Monsters/Totems/DarkEffigyTotemDelirium_	Totem
+Metadata/Monsters/ChaosGodRangedFodder/ChaosGodRangedFodder_	Petulant Stonemaw
+Metadata/Monsters/ChaosGodRangedFodder/ChaosGodRangedFodderStrongbox	Petulant Stonemaw
+Metadata/Monsters/ChaosGodJaguar/ChaosGodJaguar_	Scute Lizard
+Metadata/Monsters/ChaosGodJaguar/ChaosGodJaguarStrongbox	Scute Lizard
+Metadata/Monsters/ChaosGodTriHeadBat/ChaosGodTri-headBat_	Cerberic Bat
+Metadata/Monsters/ChaosGodTriHeadBat/ChaosGodTri-headBatInterlude	Cerberic Bat
+Metadata/Monsters/ChaosGodTriHeadBat/ChaosGodTri-headBatStrongbox	Cerberic Bat
+Metadata/Monsters/ChaosGodGorilla/ChaosGodGorilla_	Stoneclad Gorilla
+Metadata/Monsters/ChaosGodGorilla/ChaosGodGorillaInterlude	Stoneclad Gorilla
+Metadata/Monsters/ChaosGodGorilla/ChaosGodGorillaStrongbox	Stoneclad Gorilla
+Metadata/Monsters/ChaosGodTriceratops/ChaosGodTriceratops_	Crested Behemoth
+Metadata/Monsters/ChaosGodTriceratops/ChaosGodTriceratopsStrongbox	Crested Behemoth
+Metadata/Monsters/ChaosGodOwlBoss/ChaosGodOwlBoss__	Bahlak, the Sky Seer
+Metadata/Monsters/ChaosGodOwlBoss/ChaosGodOwlBossMAP_	Bahlak, the Sky Seer
+Metadata/Monsters/ChaosGodOwlBoss/ChaosGodOwlBoss__Standalone	Bahlak, the Sky Seer
+Metadata/Monsters/ChaosGodOwlBoss/IcyOwlBoss	Rakkar, the Frozen Talon
+Metadata/Monsters/ChaosGodOwlBoss/IcyOwlBossMap	Thraeven, Wing of Winter
+Metadata/Monsters/ChaosGodOwlBoss/IcyOwlBossStandalone	Rakkar, the Frozen Talon
+Metadata/Monsters/Rhoas/Winged/WingedRhoa	Albino Rhoa
+Metadata/Monsters/Clone/WarriorFourCloneImmobile	Clone
+Metadata/Monsters/Clone/HuntressFourCloneImmobile	Clone
+Metadata/Monsters/Clone/SorceressFourCloneImmobile_	Clone
+Metadata/Monsters/Clone/MercenaryFourCloneImmobile	Clone
+Metadata/Monsters/Clone/DruidFourCloneImmobile	Clone
+Metadata/Monsters/Clone/MonkFourCloneImmobile_	Clone
+Metadata/Monsters/Mirage/HydraPlayer	[DNT-UNUSED] Scaled Abomination
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavationOverlord/TwilightOrderOverlord	Benedictus, First Herald of Utopia
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavationOverlord/TwilightOrderOverlordMAP_	Aurelian, the Grand Adjudicator
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavationOverlord/TwilightOrderOverlordSTANDALONE	Benedictus, First Herald of Utopia
+Metadata/Monsters/SerpentClanMonster/SerpentClanAuraVulnerability	[DNT-UNUSED] Serpent Clan's Curse
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelMaceBoss__	Rafiq of the Frozen Spring
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelUnarmedBoss__	Hadi of the Flaming River
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelMaceBossGothic	Sigbert of the Sullied Oath
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelUnarmedBossGothic	Godwin of the Shattered Creed
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelMaceBossSTANDALONE	Rafiq of the Frozen Spring
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelUnarmedBossSTANDALONE	Hadi of the Flaming River
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelMaceBossGothicSTANDALONE	Sigbert of the Sullied Oath
+Metadata/Monsters/MarakethSanctumTrial/Boss/SentinelUnarmedBossGothicSTANDALONE	Godwin of the Shattered Creed
+Metadata/Monsters/TrialMaster/TheTrialmaster_	The Trialmaster
+Metadata/Monsters/TrialMaster/TheTrialmasterSTANDALONE	The Trialmaster
+Metadata/Monsters/MarakethSanctumTrial/Boss/Shakari/Shakari_	Ashar, the Sand Mother
+Metadata/Monsters/MarakethSanctumTrial/Boss/Shakari/ShakariMap_	Karash, The Dune Dweller
+Metadata/Monsters/MarakethSanctumTrial/Boss/Shakari/ShakariSTANDALONE	Karash, The Dune Dweller
+Metadata/Monsters/MarakethSanctumTrial/Hazards/PressurePlate_DartLauncher	Daemon
+Metadata/Monsters/Hellhound/HellhoundPlayerSummoned	Infernal Hound
+Metadata/Monsters/MarakethSanctumTrial/Boss/Sentinels/ColdStatueDaemon	Invisible
+Metadata/Monsters/Breach/BreachEliteFallenLunarisMonster__	It That Hates
+Metadata/Monsters/Breach/BreachEliteCorruptedEliteBloater__	It That Lashes
+Metadata/Monsters/Breach/BreachFodderCorruptedEliteRanger	It That Hunts
+Metadata/Monsters/Breach/BreachFodderCorruptedEliteToothy__	It That Shreds
+Metadata/Monsters/Breach/BreachEliteCorruptedEliteGuard	It That Guards
+Metadata/Monsters/Breach/BreachFodderHellscapePaleFodder2	It That Claws
+Metadata/Monsters/LeagueDelirium/DeliriumDemonBossPhysicalWild	Omniphobia, Fear Manifest
+Metadata/Monsters/LeagueDelirium/DeliriumDemonBossPhysical	Omniphobia, Fear Manifest
+Metadata/Monsters/LeagueDelirium/DeliriumDemonBossFinalWild	Kosis, The Revelation
+Metadata/Monsters/LeagueDelirium/DeliriumDemonBossFinal	Kosis, The Revelation
+Metadata/Monsters/LeagueDelirium/DeliriumMinion1	Rage
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence1	Rage
+Metadata/Monsters/LeagueDelirium/DeliriumMinion2	Spite
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence2	Spite
+Metadata/Monsters/LeagueDelirium/DeliriumMinion3	Disgust
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence3	Disgust
+Metadata/Monsters/LeagueDelirium/DeliriumMinion4	Malice
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence4	Malice
+Metadata/Monsters/LeagueDelirium/DeliriumMinion5_	Fury
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence5	Fury
+Metadata/Monsters/LeagueDelirium/DeliriumMinion6_	Turmoil
+Metadata/Monsters/LeagueDelirium/DeliriumMinionEssence6	Turmoil
+Metadata/Monsters/LeagueDelirium/DeliriumDemonColdIceSpear	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonFireSword_	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonLightningElectricFlail	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonPhysicalPizzaSlam___	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonUniqueColdIceSpear	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonUniqueFireSword	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonUniqueLightningElectricFlail	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumDemonUniquePhysicalPizzaSlam	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumPackSpawnerDaemon	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumRoomVaporizerDaemon	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumDoodadVaporizerDaemon	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonGoatFillet1Vanish	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonGoatFillet2Vanish_	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonGoatRhoa1Vanish	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonGoatBone1Vanish	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonSpikes	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonSpikes2	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonEyes1	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonEyes2_	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonEyes3	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonPimple1_	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack1	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack2	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack3	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack4	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack5	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack6	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack7	Daemon
+Metadata/Monsters/LeagueDelirium/DoodadDaemons/DoodadDaemonShardPack8	Daemon
+Metadata/Monsters/LeagueDelirium/Volatile/DeliriumVolatile	Volatile Core
+Metadata/Monsters/LeagueDelirium/Volatile/DeliriumVomitile	Volatile Core
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterCorpseDegen_	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterCorpseProjectile	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterCorpseSpawnMonster__	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonLightningBolt	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonFireSnap	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonFrostOrbs	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonPackTeleport	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonSlamma	Daemon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterLightningBolt	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterFireSnap__	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterFrostOrbs	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterPackTeleport___	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSkillDaemonMonsterSlamma__	Manifested Demon
+Metadata/Monsters/LeagueDelirium/DeliriumSoulMortarDaemon_	Daemon
+Metadata/Monsters/Daemon/DeliriumCascadeDaemon	Daemon
+Metadata/Monsters/InvisibleFire/DeliriumBossFinalDeathZone	Expanding Explodable Death Zone
+Metadata/Monsters/InvisibleFire/DeliriumBossLeftWeapon	Left Weapon
+Metadata/Monsters/InvisibleFire/DeliriumBossRightWeapon	Right Weapon
+Metadata/Monsters/Daemon/DeliriumTeleportAndExplodeDaemon_	Daemon
+Metadata/Monsters/Daemon/DeliriumDestroyCorpseDegenDaemon	Daemon
+Metadata/Monsters/Daemon/DeliriumDestroyCorpseProjectileDaemon_	Daemon
+Metadata/Monsters/Daemon/DeliriumDestroyCorpseSpawnMonsterDaemon	Daemon
+Metadata/Monsters/Daemon/DeliriumFirestormOnDeathDaemon_	Daemon
+Metadata/Monsters/Daemon/DeliriumFlameblastOnDeathDaemon	Daemon
+Metadata/Monsters/Daemon/DeliriumSummonVolatileOnDeathDaemon	Daemon
+Metadata/Monsters/Daemon/DeliriumAnomalyOnDeathDaemon_	Daemon
+Metadata/Monsters/InvisibleFire/InvisibleFireDeliriumCorpseDegen	Invisible
+Metadata/Monsters/LeagueUltimatum/Daemon/StormcallerRuneSpawner1	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/StormcallerRune	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/VolatileOnDeath	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/UltimatumVolatile	Volatile Core
+Metadata/Monsters/LeagueUltimatum/Daemon/UltimatumVolatileRare	Volatile Core
+Metadata/Monsters/LeagueUltimatum/Daemon/TrackingSlam	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/TrackingSlam2	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/RotatingLaserPyramid	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/RotatingLaserPyramid2	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/ExpandingDonut1	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/ExpandingDonut2	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/BindingChains1	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/BindingChains2	Daemon
+Metadata/Monsters/LeagueUltimatum/Daemon/BloodFog	Daemon
+Metadata/Monsters/LeagueUltimatum/Revenant/Revenant	Revenant
+Metadata/Monsters/LeagueUltimatum/Revenant/RevenantRank2	Revenant
+Metadata/Monsters/LeagueUltimatum/Revenant/RevenantRank3	Revenant
+Metadata/Monsters/LeagueUltimatum/Omnitect/Omnitect	Omnitect
+Metadata/Monsters/LeagueUltimatum/Omnitect/Omnitect2	Omnitect
+Metadata/Monsters/LeagueUltimatum/Omnitect/Omnitect3	Omnitect
+Metadata/Monsters/LeagueUltimatum/Turrets/FireTurret1	Turret
+Metadata/Monsters/LeagueUltimatum/Turrets/LightningTurret1	Turret
+Metadata/Monsters/LeagueUltimatum/Turrets/LightningTurret2	Turret
+Metadata/Monsters/LeagueUltimatum/Turrets/PetrificationStatue1	Turret
+Metadata/Monsters/LeagueUltimatum/Turrets/PetrificationStatue2	Turret
+Metadata/Monsters/Breach/BreachElitePaleElite1	It That Controls
+Metadata/Monsters/Breach/BreachFodderHellscapeDemonElite2	It That Suspects
+Metadata/Monsters/Breach/Monsters/FingerDemon/FingerDemon	It That Grasps
+Metadata/Monsters/Breach/Monsters/HandSpider/HandSpider	It That Crawls
+Metadata/Monsters/Breach/Monsters/FingersBat/FingersBat	It That Watches
+Metadata/Monsters/Breach/Monsters/FingersBat/FingersBatEmerge	It That Watches
+Metadata/Monsters/Breach/BreachFodderDemonicSpikeThrower	It That Creeps
+Metadata/Monsters/Breach/BreachElitePaleElite2	It That Stalks
+Metadata/Monsters/Breach/WildBreachBoss/WildBreachBoss	Vruun, Marshal of Xesht
+Metadata/Monsters/Breach/WildBreachBoss/BellBreach	Flesh Bell
+Metadata/Monsters/Breach/BreachOverseerBoss/ItThatReturned	Xesht, We That Are One
+Metadata/Monsters/Breach/BreachOverseerBoss/Corpses/TulCorpse	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/Corpses/EshCorpse	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/HandSlamLeft	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/HandSlamRight	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/HandPortal	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/HandPortalMega	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/HandPortalWild	Daemon
+Metadata/Monsters/Breach/BreachOverseerBoss/BreachBossSpider	It That Crawls
+Metadata/Monsters/AtlasBosses/DemonClawBoss/DemonClawBoss	The Arbiter of Ash
+Metadata/Monsters/AtlasBosses/DemonClawBoss/DemonClawBossStandalone	The Arbiter of Ash
+Metadata/Monsters/MarakethSanctumTrial/Boss/Sentinels/FireStatueDaemon	Invisible
+Metadata/Monsters/ChaosGodTriHeadLizard/ChaosGodTriHeadLizard_	Saurian Servant
+Metadata/Monsters/ChaosGodTriHeadLizard/ChaosGodTriHeadLizardStrongbox	Saurian Servant
+Metadata/Monsters/VultureZombie/GrimdropGrappleclawCold	Mugin, Frost Bringer
+Metadata/Monsters/VultureZombie/GrimdropGrappleclawLightning	Hunin, Storm Caller
+Metadata/Monsters/LeagueRitual/DryadFaction/FungalZombie/DruidicFungusZombieTree	Treant Foulspawn
+Metadata/Monsters/LeagueRitual/DryadFaction/FungalZombie/DruidicFungusZombieTreeHollow	Treant Foulspawn
+Metadata/Monsters/LeagueRitual/DryadFaction/FungalZombie/DruidicFungusZombieTreeHollowWILDWOOD	Treant Foulspawn
+Metadata/Monsters/LeagueRitual/DryadFaction/FungalZombie/DruidicFungusZombieTreeHollowSpectre	Treant Foulspawn
+Metadata/Monsters/LeagueRitual/DryadFaction/SplitMonster/SplitMonster	Treant Splitbeast
+Metadata/Monsters/LeagueRitual/DryadFaction/SplitMonster/SplitMonsterSpectre	Treant Splitbeast
+Metadata/Monsters/LeagueRitual/DryadFaction/HooksMonster/HooksMonster	Treant Hookhorror
+Metadata/Monsters/LeagueRitual/DryadFaction/HooksMonster/HooksMonsterWILDWOOD	Treant Hookhorror
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/RootBehemoth	Treant Fungalreaver
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/RootBehemothWILDWOOD	Treant Fungalreaver
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterMeleeRitual_	Treant Spriggan
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterMeleeRitualWILDWOOD	Treant Spriggan
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterCasterRitual_	Treant Sage
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterCasterRitualWILDWOOD	Treant Sage
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterCasterRitual2	Treant Mystic
+Metadata/Monsters/LeagueRitual/DryadFaction/RootMonster/TwigMonsterCasterRitual2WILDWOOD	Treant Mystic
+Metadata/Monsters/LeagueRitual/DryadFaction/DruidicFallenStag	Forgotten Stag
+Metadata/Monsters/LeagueRitual/DryadFaction/DruidicFallenStagWILDWOOD	Forgotten Stag
+Metadata/Monsters/LeagueRitual/DemonFaction/CaveDweller_	Nameless Dweller
+Metadata/Monsters/LeagueRitual/DemonFaction/CaveDwellerWILDWOOD	Nameless Dweller
+Metadata/Monsters/LeagueRitual/DemonFaction/PrimordialMonster3_	Nameless Horror
+Metadata/Monsters/LeagueRitual/DemonFaction/PrimordialMonster3WILDWOOD	Nameless Horror
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonRhoa	Nameless Lurker
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonRhoaWILDWOOD	Nameless Lurker
+Metadata/Monsters/LeagueRitual/Daemons/BloodBurstDaemon	Daemon
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonRat	Nameless Vermin
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonRatWILDWOOD	Nameless Vermin
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonBurrower	Nameless Burrower
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonBurrowerWILDWOOD	Nameless Burrower
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonHulk_	Nameless Hulk
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonHulkWILDWOOD	Nameless Hulk
+Metadata/Monsters/LeagueRitual/DemonFaction/DemonMonkey	Nameless Imp
+Metadata/Monsters/LeagueRitual/Daemons/BloodWaveDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/BloodWave	Volatile Core
+Metadata/Monsters/LeagueRitual/Daemons/OrbitingInsectsDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/RatTornado	Creeping Fire
+Metadata/Monsters/LeagueRitual/Daemons/RatTornadoMoveDaemon	Creeping Fire
+Metadata/Monsters/LeagueRitual/Daemons/PurplePustuleDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/TreeRootDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/VolatilePlantsVolatile	Volatile Orchard
+Metadata/Monsters/LeagueRitual/Daemons/CrimsonWolfDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/CorpseFissureDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/ToadPortalDaemon	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/ProximityToadlDaemon_	Daemon
+Metadata/Monsters/LeagueRitual/Daemons/CreepingFogDaemon	Daemon
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleBow	Cultist Archer
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleBowWILDWOOD	Cultist Archer
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleDaggerDagger	Cultist Daggerdancer
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleDaggerDaggerWILDWOOD	Cultist Daggerdancer
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleStaff	Cultist Witch
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictFemaleStaff_WILDWOOD	Cultist Witch
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxe	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxeWILDWOOD	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxeDagger	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxeDaggerWILDWOOD	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxeShield	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictMaleAxeShieldWILDWOOD	Cultist Warrior
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictBigMale_	Cultist Brute
+Metadata/Monsters/LeagueRitual/HumanoidFaction/CrazedCannibalPicts/PictBigMaleWILDWOOD	Cultist Brute
+Metadata/Monsters/LeagueRitual/HumanoidFaction/PitifulFabrications/Canopy/PitifulFabrication01	Skullslinger
+Metadata/Monsters/LeagueRitual/HumanoidFaction/PitifulFabrications/Canopy/PitifulFabrication02	Ribrattle
+Metadata/Monsters/EtchedBeetles/MediumEtchedBeetleSummon	Volatile Scarab
+Metadata/Monsters/Daemon/Shrines/ShrineFireDaemon_	Daemon
+Metadata/Monsters/Daemon/Shrines/ShrineFireDaemonPlayer	Daemon
+Metadata/Monsters/Daemon/Shrines/ShrineColdDaemon	Daemon
+Metadata/Monsters/Daemon/Shrines/ShrineColdDaemonPlayer	Daemon
+Metadata/Monsters/Daemon/Shrines/ShrineLightningDaemon	Daemon
+Metadata/Monsters/Daemon/Shrines/ShrineLightningDaemonPlayer	Daemon
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodder1_	Demon Imp
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodderStrongbox1	Demon Imp
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodder2_	Demon Beast
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodderStrongbox2	Demon Beast
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodder3_	Demon Ghast
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonFodderStrongbox3	Demon Ghast
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonElite1_	Demon Harpy
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonEliteStrongbox1	Demon Harpy
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonElite2_	Demon Herder
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonEliteStrongbox2	Demon Herder
+Metadata/Monsters/LeagueHellscape/DemonFaction/HellscapeDemonBoss	The Skittermind
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodder1_	Ravenous Homunculus
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodderStrongbox1	Ravenous Homunculus
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodder2_	Ravenous Brute
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodderStrongbox2	Ravenous Brute
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodder3_	Ravenous Digester
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodderStrongbox3_	Ravenous Digester
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodder4_	Ravenous Misshapen
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshFodderStrongbox4	Ravenous Misshapen
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshElite1_	Ravenous Bloodshaper
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshEliteStrongbox1	Ravenous Bloodshaper
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshElite1BloodOrb	Bloodshaped Volatile
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshElite2_	Ravenous Macerator
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshEliteStrongbox2	Ravenous Macerator
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshBoss	The Eater of Flesh
+Metadata/Monsters/LeagueHellscape/FleshFaction/HellscapeFleshGiantTentacleSlam	Invisible
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodder1_	Pale Cherubim
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodderStrongbox1	Pale Cherubim
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodder2_	Pale Servitor
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodderStrongbox2	Pale Servitor
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodder3_	Pale Virtue
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleFodderStrongbox3	Pale Virtue
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleElite1_	Pale Angel
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleEliteStrongbox1_	Pale Angel
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleElite2__	Pale Seraphim
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleEliteStrongbox2	Pale Seraphim
+Metadata/Monsters/LeagueHellscape/PaleFaction/HellscapePaleBoss	The Pale Angel
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersBloodUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersBloodStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersChaosUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersChaosStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersCold_Ultimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersColdStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersFireUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersFireStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersLightningUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedDaggersLightningStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickBloodUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickBloodStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickChaosUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickChaosStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickColdUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickColdStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickFireUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickFireStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickLightning__Ultimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedKnifestickLightningStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearBloodUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearBloodStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearChaosUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearChaosStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearColdUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearColdStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearFireUltimatium	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearFireStrongbox	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearLightningUltimatium_	Chaos Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalFlayedSpearLightningStrongbox	Chaos Zealot
+Metadata/Monsters/Strongbox/Daemon/SummonRandomPackDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonVaalMonstersDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SingleRevivingMonsterDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonCorruptionMonstersDaemon_	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonAdditionalNormalPackDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonAdditionalMagicPackDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonAdditionalRarePackDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/SummonVentorsDelayDaemon	Daemon
+Metadata/Monsters/BloodBathers/BloodBatherDualWield/BloodBatherDualWieldUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherDualWield/BloodBatherDualWieldStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherMace/BloodBatherMaceUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherMace/BloodBatherMaceStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherShield/BloodBatherShieldUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherShield/BloodBatherShieldStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherFlail/BloodBatherFlailUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherFlail/BloodBatherFlailStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSpear/BloodBatherSpearUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSpear/BloodBatherSpearStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSword/BloodBatherSwordUltimatium	Bloodrite Guard
+Metadata/Monsters/BloodBathers/BloodBatherSword/BloodBatherSwordStrongbox	Bloodrite Guard
+Metadata/Monsters/BloodCultistDrones/BloodBatherMageUltimatium	Bloodrite Priest
+Metadata/Monsters/BloodCultistDrones/BloodBatherMageStrongbox	Bloodrite Priest
+Metadata/Monsters/LeagueAzmeri/GuidingLight/GuidingLightDaemonMaze_	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModFire1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModCold1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModLightning1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModSpeed1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModLife1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModMana1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModDefences1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModPhysical1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModChaos1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModAttack1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModCaster1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModAttribute1	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModFire2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModCold2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModLightning2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModLife2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModMana2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModDefences2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModPhysical2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModChaos2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModAttack2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModCaster2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterEssenceModAttribute2	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterCorruptedEssenceHysteria	Daemon
+Metadata/Monsters/EssenceModDaemons/HysteriaExplodingOrbDaemon	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterCorruptedEssenceInsanity	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterCorruptedEssenceInsanityProxTrigger	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterCorruptedEssenceDelirium	Daemon
+Metadata/Monsters/EssenceModDaemons/MonsterCorruptedEssenceHorror	Daemon
+Metadata/Monsters/EssenceModDaemons/HorrorReaperBoss	Essence of Horror
+Metadata/Monsters/EssenceModDaemons/EssenceModChaos1/ChaosEssenceVine	ChaosEssenceVine
+Metadata/Monsters/Skeletons/Essence/EssenceSkeletonCasterFire	Risen Rattler
+Metadata/Monsters/Skeletons/Essence/EssenceSkeletonCasterCold	Risen Rattler
+Metadata/Monsters/Skeletons/Essence/EssenceSkeletonCasterLightning	Risen Rattler
+Metadata/Monsters/EssenceModDaemons/EssenceModDefense1/EssenceBoneWall	Bone Wall
+Metadata/Monsters/MarakethSanctumTrial/Hazards/GroundSpike	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/LaserCrossBeamTurret	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/BulletHellTurret	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/ProxMine	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/PressurePlate_PoisonGas	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/QuicksandPit	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/ProjectilePortal	Daemon
+Metadata/Monsters/MarakethSanctumTrial/Hazards/TimeRewindTrap	Daemon
+Metadata/Monsters/Pirates/CampExplosion	Daemon
+Metadata/Monsters/Daemon/ChestDaemonFreeze	Daemon
+Metadata/Monsters/Strongbox/Daemon/StrongboxLightningDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/StrongboxIceSpikeDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/StrongboxFlameVolatileDaemon	Daemon
+Metadata/Monsters/Strongbox/Daemon/StrongboxChaosProjectileDaemon	Daemon
+Metadata/Monsters/SummonRagingSpirit/RagingFireSpirit	Raging Fire Spirit
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersBloodExpedition	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotDaggersColdExpedition	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickBloodExpedition	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotKnifestickColdExpedition	Gelid Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearBloodExpedition	Blood Zealot
+Metadata/Monsters/VaalMonsters/Zealots/VaalZealotSpearColdExpedition	Gelid Zealot
+Metadata/Monsters/LeagueRitual/RitualWispDaemon	Ritual Wisp
+Metadata/Monsters/RogueExiles/Str/ExileWarrior1	Taua, the Ruthless
+Metadata/Monsters/RogueExiles/Str/ExileWarrior2	Raok, the Bloodthirsty
+Metadata/Monsters/RogueExiles/Dex/ExileRanger1	Bronnach, the Manhunter
+Metadata/Monsters/RogueExiles/Dex/ExileRanger2	Adrienne, the Malignant Rose
+Metadata/Monsters/RogueExiles/Dex/ExileHuntress1	Nisha, the Fierce
+Metadata/Monsters/RogueExiles/Dex/ExileHuntress2	Izel, Atziri's Chosen
+Metadata/Monsters/RogueExiles/Int/ExileWitch1	Vasa, of the Death Akhara
+Metadata/Monsters/RogueExiles/Int/ExileWitch2	Ciara, the Curse Weaver
+Metadata/Monsters/RogueExiles/Int/ExileSorceress1	Nyassa, the Flaming Hand
+Metadata/Monsters/RogueExiles/Int/ExileSorceress2	Hesperia, the Arcane Tempest
+Metadata/Monsters/RogueExiles/StrDex/ExileMercenary1	Ulfred, the Afflicted
+Metadata/Monsters/RogueExiles/StrDex/ExileMercenary2	Drusian, the Artillerist
+Metadata/Monsters/RogueExiles/DexInt/ExileMonk1	Sondar, the Stormbinder
+Metadata/Monsters/RogueExiles/DexInt/ExileMonk2	Doran, the Deft
+Metadata/Monsters/TormentedSpirits/TormentedSpiritBase	Spirit Base
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOwlPrimal	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheSerpentPrimal	Spirit Of The Serpent
+Metadata/Monsters/TormentedSpirits/TormentedSpiritofthePrimatePrimal	Spirit Of The Primate
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBearWild	Spirit Of The Bear
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBoarWild	Spirit Of The Boar
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOxWild	Spirit Of The Ox
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheWolfVivid	Spirit Of The Wolf
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheStagVivid	Spirit Of The Stag
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheStagVividIntro	Spirit Of The Stag
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheCatVivid	Spirit Of The Cat
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOwlPrimalViper	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheSerpentPrimalViper	Spirit Of The Serpent
+Metadata/Monsters/TormentedSpirits/TormentedSpiritofthePrimatePrimalViper	Spirit Of The Primate
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBearWildViper	Spirit Of The Bear
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBoarWildViper	Spirit Of The Boar
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOxWildViper	Spirit Of The Ox
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheWolfVividViper	Spirit Of The Wolf
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheStagVividViper	Spirit Of The Stag
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheCatVividViper	Spirit Of The Cat
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheRabbitSacred_	Spirit Of The Rabbit
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheFoxSacred	Spirit Of The Fox
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOwlPrimalPossesedDaemon	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOwlPrimalPossesedDaemonPlayer	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/SpiritoftheOwl	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/SpiritoftheOwlOnDeath	Spirit Of The Owl
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheSerpentPrimalPossesedDaemon	Spirit Of The Serpent
+Metadata/Monsters/TormentedSpirits/TormentedSpiritofthePrimatePrimalPossesedDaemon	Spirit Of The Primate
+Metadata/Monsters/TormentedSpirits/TormentedSpiritBearProxySlam_	Spirit Of The Bear
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBearWildPossesedDaemon	Spirit Of The Bear
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheBoarWildPossesedDaemon	Spirit Of The Boar
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheOxWildPossesedDaemon	Spirit Of The Ox
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheWolfVividPossesedDaemon	Spirit Of The Wolf
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheStagVividPossesedDaemon	Spirit Of The Stag
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheCatVividPossesedDaemon	Spirit Of The Cat
+Metadata/Monsters/TormentedSpirits/TormentedSpiritoftheRabbitSacredPossesedDaemon	Spirit Of The Rabbit
+Metadata/Monsters/TormentedSpirits/Primates/PrimateChieftain	Primate Chieftain Spirit
+Metadata/Monsters/TormentedSpirits/Primates/PrimateSpirit	Primate Spirit
+Metadata/Monsters/TormentedSpirits/Stag/SpiritStag	Stag Spirit
+Metadata/Monsters/TormentedSpirits/Boar/ExplodingSpiritBoar	Volatile Spirit Boar
+Metadata/Monsters/TormentedSpirits/Ox/ChargingOx	Spirit Ox
+Metadata/Monsters/PlagueBringer/TwilightOrderPlagueBringer	Gargantuan Wasp
+Metadata/Monsters/PlagueNymph/TwilightOrderPlagueNymph	Nymph Wasp
+Metadata/Monsters/PlagueNymph/TwilightOrderPlagueNymphEmerge	Nymph Wasp
+Metadata/Monsters/PlagueSwarm/TwilightOrderPlagueSwarm	Swarming Wasp
+Metadata/Monsters/PlagueSwarm/LargeParasiticCrab	Clawcrunch
+Metadata/Monsters/Sanctified/Monstrosity/SanctifiedMonstrosity	Fettered Monstrosity
+Metadata/Monsters/TumourMonsters/Statue07/QimarMonstrosity	Bloodbilge
+Metadata/Monsters/TumourMonsters/Statue07/QimarMonstrositySpectre	Bloodbilge
+Metadata/Monsters/Sanctified/Scythe/SanctifiedScythe_	Fettered Scythe
+Metadata/Monsters/Sanctified/Snake/SanctifiedSnake	Fettered Snake
+Metadata/Monsters/Sanctified/Spider/SanctifiedSpider	Fettered Spider
+Metadata/Monsters/Sanctified/Tentacle/SanctifiedTentacle	Fettered Grasper
+Metadata/Monsters/Sanctified/TriClaw/SanctifiedTriClaw	Fettered Thresher
+Metadata/Monsters/Sanctified/Writhing/SanctifiedWrithing	Fettered Writher
+Metadata/Monsters/Sanctified/Floppy/SanctifiedFloppy	Fettered Hook
+Metadata/Monsters/Sanctified/Floppy/SanctifiedFloppyBig	Fettered Hook
+Metadata/Monsters/Sanctified/Floppy/SanctifiedFloppyMinion	Fettered Hook
+Metadata/Monsters/TormentedSpirits/Cat/SpiritOfTheCat	Spirit Of The Cat
+Metadata/Monsters/NPC/Torment/TormentNPC	Delwyn
+Metadata/Monsters/AnimatedItem/AnimatedWeaponPlayerSummoned	Animated Weapon
+Metadata/Monsters/Daemon/ArtilleryPlayer/SummonArtilleryDaemon	Artillery Squad
+Metadata/Monsters/Daemon/RavenousSwarmPlayer/RavenousSwarmPlayerSummoned	Ravenous Swarm
+Metadata/Monsters/NPC/Digsite/KaruiChieftainDigsite_	Tavakai
+Metadata/Monsters/NPC/Digsite/BoatCaptainDigsite__	Makoru
+Metadata/Monsters/Daemon/MapModTemporalChainsDaemon	Daemon
+Metadata/Monsters/Daemon/MapModElementalWeaknessDaemon	Daemon
+Metadata/Monsters/Daemon/MapModEnfeebleDaemon	Daemon
+Metadata/Monsters/Mtx/BrambleBash/BrambleBurrower	Bramble Burrower
+Metadata/Monsters/HusbandMonster/BloodKnightBoss	Thane Wulfric
+Metadata/Monsters/HusbandMonster/BloodKnightBossMAP_	Varloch, the Ashen Lord
+Metadata/Monsters/HusbandMonster/BloodKnightBossSTANDALONE	Thane Wulfric
+Metadata/Monsters/ReaperBoss/EzomyteReaperBoss	Siora, Blade of the Mists
+Metadata/Monsters/ReaperBoss/EzomyteReaperBossMAP	Thariel, the Umbral Wraith
+Metadata/Monsters/ReaperBoss/EzomyteReaperBossSTANDALONE	Siora, Blade of the Mists
+Metadata/Monsters/ReaperBoss/EzomyteReaperBoss/Objects/VolatileOrb	Shackled Wraith
+Metadata/Monsters/ReaperBoss/EzomyteReaperBoss/Objects/DarknessDaemon	Creeping Fire
+Metadata/Monsters/WifeMonster/VampireQueenBoss	Lady Elswyth
+Metadata/Monsters/WifeMonster/VampireQueenBossMAP_	Avelyne, the Withered Rose
+Metadata/Monsters/WifeMonster/VampireQueenBoneWall	Bone Wall
+Metadata/Monsters/WifeMonster/VampireQueenBossSTANDALONE	Lady Elswyth
+Metadata/Monsters/ForsakenSon/FrozenOneBoss	Oswin, the Dread Warden
+Metadata/Monsters/ForsakenSon/FrozenOneBossMAP_	Veynar, the Frostbane
+Metadata/Monsters/ForsakenSon/FrozenOneBossSTANDALONE__	Oswin, the Dread Warden
+Metadata/Monsters/Monsters/LivingLightningPlayerSummoned	Living Lightning
+Metadata/Monsters/Monsters/CorpseBeetlePlayerSummoned	Corpse Beetle
+Metadata/Monsters/Goblins/Beast/FireBeastBoss/FireBeastBoss	Vornas, the Fell Flame
+Metadata/Monsters/Goblins/Beast/FireBeastBoss/FireBeastBossMAP__	Morvak, the Infernal
+Metadata/Monsters/Goblins/Beast/FireBeastBoss/FireBeastBossSTANDALONE	Vornas, the Fell Flame
+Metadata/Monsters/MudBurrower/DevourerDuo/DevourerBossDuoHead	Anundr, the Sandworm
+Metadata/Monsters/MarakethSanctumTrial/Boss/Shakari/ShakariDuo	Akthi, the Final Sting
+Metadata/Monsters/LeagueIncursionNew/Garrison/ShakariPinata	Anub, the Pinata
+Metadata/Monsters/FaridunOlroth/FaridunOlroth_	Azmadi, the Faridun Prince
+Metadata/Monsters/FaridunOlroth/FaridunOlrothMAP	Zahmir, the Blade Sovereign
+Metadata/Monsters/FaridunOlroth/FaridunOlrothSTANDALONE	Azmadi, the Faridun Prince
+Metadata/Monsters/FaridunOlroth/FaridunOlrothClone	Azmadi, the Faridun Prince
+Metadata/Monsters/Pirates/CaptainSandstorm_	Elzarah, the Cobra Lord
+Metadata/Monsters/Pirates/CaptainSandstormMAP_	Serath, the Scaled One
+Metadata/Monsters/Pirates/CaptainSandstormSTANDALONE	Elzarah, the Cobra Lord
+Metadata/Monsters/Pirates/CaptainSnadStormBossWave	Volatile Core
+Metadata/Monsters/Pirates/SandArm	Sand Arm
+Metadata/Monsters/LeagueAbyss/Blackblood/Collector	Blackblooded Proboscite
+Metadata/Monsters/LeagueAbyss/Blackblood/CollectorSpectre	Blackblooded Proboscite
+Metadata/Monsters/LeagueAbyss/LichBoss/KulemakBoss	Vessel of Kulemak
+Metadata/Monsters/LeagueAbyss/Blackblood/Cretin	Blackblooded Cretin
+Metadata/Monsters/LeagueAbyss/Blackblood/CretinSpectre	Blackblooded Cretin
+Metadata/Monsters/LeagueAbyss/Blackblood/Cretin/BlackbloodRemnant	Blackblood Remnant
+Metadata/Monsters/LeagueAbyss/Blackblood/PaleElite	Blackblooded Elite
+Metadata/Monsters/LeagueAbyss/Blackblood/PaleEliteDepths	Blackblooded Elite
+Metadata/Monsters/LeagueAbyss/Blackblood/PaleElitePinnacle	Blackblooded Elite
+Metadata/Monsters/LeagueAbyss/Blackblood/PaleEliteSpectre_	Blackblooded Elite
+Metadata/Monsters/LeagueAbyss/Blackblood/RumCarrier	Blackblooded Blisterboil
+Metadata/Monsters/LeagueAbyss/Blackblood/RumCarrierSpectre	Blackblooded Blisterboil
+Metadata/Monsters/LeagueAbyss/Blackblood/TarHulk	Blackblooded Tarhulk
+Metadata/Monsters/LeagueAbyss/Blackblood/TarHulkDepths	Blackblooded Tarhulk
+Metadata/Monsters/LeagueAbyss/Blackblood/TarHulkSpectre	Blackblooded Tarhulk
+Metadata/Monsters/LeagueAbyss/Lightless/Cocoon3	Lightless Abomination
+Metadata/Monsters/LeagueAbyss/Lightless/Cocoon3Depths	Lightless Abomination
+Metadata/Monsters/LeagueAbyss/Lightless/Cocoon3Spectre	Lightless Abomination
+Metadata/Monsters/LeagueAbyss/Lightless/CarrionWingAbyss	Lightless Vengewing
+Metadata/Monsters/LeagueAbyss/Lightless/CarrionWingAbyssSpectre	Lightless Vengewing
+Metadata/Monsters/LeagueAbyss/Lightless/MorayClanCaster	Lightless Moray
+Metadata/Monsters/LeagueAbyss/Lightless/MorayClanCasterDepths	Lightless Moray
+Metadata/Monsters/LeagueAbyss/Lightless/MorayClanCasterSpectre	Lightless Moray
+Metadata/Monsters/LeagueAbyss/Lightless/SerpentClanCasterAbyss	Lightless Serpent
+Metadata/Monsters/LeagueAbyss/Lightless/SerpentClanCasterAbyssPinnacle	Lightless Serpent
+Metadata/Monsters/LeagueAbyss/Lightless/SerpentClanCasterAbyssSpectre	Lightless Serpent
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Cleaver/ExcavatorCleaver	Zealous Guard
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Maul/ExcavatorMaul	Zealous Pillarcrusher
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Maul/ExcavatorMaulSpectre	Zealous Pillarcrusher
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Orb/ExcavatorOrb	Zealous Excavator
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Raptor/ExcavatorRaptor	Zealous Courser
+Metadata/Monsters/TwilightOrder/TwilightOrderExcavators/Sceptre/ExcavatorSceptre	Zealous Shockwarden
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster/MonolithicSlug_	Igrulog, the Incubator Queen
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster/MonolithicSlugStandalone_	Igrulog, the Incubator Queen
+Metadata/Monsters/PitifulFabrications/Interlude/PitifulFabricationFarmlands1_	Skullslinger
+Metadata/Monsters/PitifulFabrications/Interlude/PitifulFabricationFarmlands2_	Ribrattle
+Metadata/Monsters/PitifulFabrications/Interlude/PitifulFabricationFarmlands3_	Spinesnatcher
+Metadata/Monsters/LeagueAbyss/Soulwrest/PhantasmalEye	Foul Eye
+Metadata/Monsters/LeagueAbyss/Soulwrest/LightlessStalker	Lightless Stalker
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker1/KulemaksGrip_	Abyssal Walker
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker1/KulemaksGripPinnacle	Abyssal Walker
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker1/KulemaksGripSpectre	Abyssal Walker
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker3/KulemaksClutch_	Abyssal Strangler
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker3/KulemaksClutchPinnacle	Abyssal Strangler
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker3/KulemaksClutchSpectre	Abyssal Strangler
+Metadata/Monsters/LeagueAbyss/Fodder/HuhuGrubLarvaeAbyss	Flesh Larva
+Metadata/Monsters/LeagueAbyss/Fodder/HuhuGrubLarvaeAbyssSpectre	Flesh Larva
+Metadata/Monsters/LeagueAbyss/Fodder/HuhuGrubLarvaeLargeAbyss	Gargantuan Larva
+Metadata/Monsters/LeagueAbyss/Fodder/HuhuGrubLarvaeLargeAbyss_Landmark	Gargantuan Larva
+Metadata/Monsters/LeagueAbyss/Fodder/HuhuGrubLarvaeLargeAbyssSpectre	Gargantuan Larva
+Metadata/Monsters/VaalMonsters/Living/BloodPriests/BloodPool	Invisible
+Metadata/Monsters/LeagueAbyss/Pit/FungalArtillery/FungalArtilleryAbyss	Fungoid of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/FungalArtillery/FungalArtilleryAbyssSpectre	Fungoid of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/CorpseStrider/CorpseStriderAbyss	Strider of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/CorpseStrider/CorpseStriderAbyssDepths	Strider of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/CorpseStrider/CorpseStriderAbyssNoEmerge	Strider of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/CorpseStrider/CorpseStriderAbyssSpectre	Strider of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2Abyss	Shepherd of the Pit
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker2/KulemaksGrasp_	Abyssal Shambler
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker2/KulemaksGraspPinnacle	Abyssal Shambler
+Metadata/Monsters/LeagueAbyss/Fodder/PaleWalker2/KulemaksGraspSpectre	Abyssal Shambler
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2Abyss_legs_inherit	Shepherd of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2Abyss_legs_inheritDepths	Shepherd of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2Abyss_legs_inheritNoEmerge	Shepherd of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2AbyssBoss	Strider of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/Cocoons2Abyss_legs_inheritBoss	Shepherd of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster3Abyss	Primordium of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster3AbyssNoEmerge	Primordium of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster3AbyssSpectre	Primordium of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster2	Hound of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster2NoEmerge	Hound of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster2Spectre	Hound of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster2Large	Hound of the Pit
+Metadata/Monsters/LeagueAbyss/Pit/PrimordialMonster2LargeSpectre	Hound of the Pit
+Metadata/Monsters/MonsterMods/LeagueAbyss/VolatileRocks	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/VolatileRocks	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/VolatileRocksVolatile	Volatile Rock
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/VolatileRocksVolatile	Volatile Rock
+Metadata/Monsters/MonsterMods/LeagueAbyss/ManaSiphoner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/ManaSiphoner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/KurgalsGasp	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/KurgalsGasp	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/ImmuneAura	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/AbyssalRunesSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/AbyssalRunesSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/BlackbloodRune	Blackblood Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/BlackbloodRune	Blackblood Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/LightlessRune	Lightless Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/LightlessRune	Lightless Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/PitRune_	Pit Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/PitRune	Pit Rune
+Metadata/Monsters/MonsterMods/LeagueAbyss/DelayedMeteor	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/DelayedMeteor	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/BeamcasterSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/BeamcasterSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/ApparitionBeamcaster	Abyssal Apparition
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/ApparitionBeamcaster	Abyssal Apparition
+Metadata/Monsters/MonsterMods/LeagueAbyss/PitSplitting	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/LightlessWells	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/LeechAura	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/ApparitionMirageSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/ApparitionMirage	Lich Apparition
+Metadata/Monsters/MonsterMods/LeagueAbyss/PustuleGroundSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/PustuleGroundSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/GeyserSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/GeyserSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/ShadeWalker	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/ShadeWalker	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/SoulcanoSpawner	Daemon
+Metadata/Monsters/MonsterMods/LeagueAbyss/Player/SoulcanoSpawner	Daemon
+Metadata/Monsters/TwilightOrder/TwilightOrderSorceror/TwilightOrderBarrierSegment	Bone Wall
+Metadata/NPC/Four_Interlude/Part1/UnaStoneCircleSummon	Una
+Metadata/Monsters/TwilightOrder/TwilightOrderCleric/TwilightOrderClericProximityShield	Daemon
+Metadata/NPC/Four_Act4/DoryaniShrikeIslandSummon	Doryani
+Metadata/NPC/Four_Act4/DoryaniSolitaryConfinementSummon	Doryani
+Metadata/NPC/Four_Act4/DoryaniSingingCavernsSummon	Doryani
+Metadata/NPC/Four_Act4/DoryaniVolcanicWarrensSummon	Doryani
+Metadata/NPC/Four_Interlude/Part3/DoryaniCauchicVaultSummon	Doryani
+Metadata/Monsters/LeagueAbyss/Blackblood/DoomBoss	Vandroth, Blackblooded Enslaver
+Metadata/Monsters/LeagueAbyss/Blackblood/DoomBossSTANDALONE	Vandroth, Blackblooded Enslaver
+Metadata/Monsters/LeagueAbyss/Lightless/ConsumeBoss	Tasgul, Swallower of Light
+Metadata/Monsters/LeagueAbyss/Lightless/ConsumeBossSTANDALONE	Tasgul, Swallower of Light
+Metadata/Monsters/LeagueAncestral/StandaloneTawhoa/Boar/TawhoaBoarStandalone	Tawhoa's Boar
+Metadata/Monsters/LeagueAncestral/StandaloneTawhoa/Tuatata/TawhoaTuataraStandalone	Tawhoa's Tuatara
+Metadata/Monsters/LeagueAncestral/StandaloneTawhoa/MedicineWoman/TawhoaMedicineWomanStandalone__	Tawhoa Mystic
+Metadata/Monsters/TerracottaGuardians/StoneGuardianSickleShieldAmbush	Stone Soldier
+Metadata/Monsters/SkeletonSnake/SandSkeletonSnake	Skeletal Cobra
+Metadata/Monsters/LeagueAbyss/LichBoss/LichApparitionPlayerSummoned	Steward of Kulemak
+Metadata/Monsters/CyclopsSpiderBoss/CyclopsSpiderBoss	[DNT] CyclopsSpiderBoss
+Metadata/Monsters/RitualWendigo/RitualWendigoBoss	[DNT] Ritual Wendigo Boss
+Metadata/Monsters/RitualWendigo/RitualWendigoDarknessArm	Daemon
+Metadata/Monsters/RitualWendigo/RitualWendigoVacuumDaemon	Daemon
+Metadata/Monsters/DeliriumTangmazu/TangmazuBoss	[DNT] TangmazuBoss
+Metadata/Monsters/DeliriumTangmazu/Minions/DeliriumMinionDisgust	[DNT] DeliriumMinionDisgust
+Metadata/Monsters/DeliriumTangmazu/Minions/DeliriumMinionFury	[DNT] DeliriumMinionFury
+Metadata/Monsters/DeliriumTangmazu/Minions/DeliriumMinionMalice	[DNT] DeliriumMinionMalice
+Metadata/Monsters/DeliriumTangmazu/Minions/DeliriumMinionRage	[DNT] DeliriumMinionRage
+Metadata/Monsters/DeliriumTangmazu/Minions/DeliriumMinionSpite	[DNT] DeliriumMinionSpite
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalTrainingDummyIncursion	Training Post
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionAxeShieldIncursion	Vaal Embalmed Axeman
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionSpearIncursion	Vaal Embalmed Spearman
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionDaggerIncursion	Vaal Embalmed Rogue
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionBowIncursion	Vaal Embalmed Archer
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionBannerIncursion	Vaal Embalmed Bearer
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionAxeThrowerIncursion	Vaal Embalmed Berserker
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionSwordShieldIncursion	Vaal Embalmed Warrior
+Metadata/Monsters/LeagueIncursionNew/Smithy/ProcessionCasterIncursion	Vaal Embalmed Mage
+Metadata/Monsters/LeagueIncursionNew/Smithy/VaalForgemanIncursion	Coztic, the Forgehand
+Metadata/Monsters/LeagueIncursionNew/Smithy/ForgemasterIncursionTier1__	Cualli, Kamasan Smith
+Metadata/Monsters/LeagueIncursionNew/Smithy/ForgemasterIncursionTier2	Cualli, Kamasan Smith
+Metadata/Monsters/LeagueIncursionNew/Smithy/ForgemasterIncursionTier3	Cualli, Kamasan Smith
+Metadata/Monsters/LeagueIncursionNew/Doctor/MechaQueenOfFilfthTier3	Micata, the Remade
+Metadata/Monsters/LeagueIncursionNew/Doctor/DoctorIncursionTier1_	Pakteni, Flesh Surgeon
+Metadata/Monsters/LeagueIncursionNew/Doctor/DoctorIncursionTier2	Pakteni, Flesh Surgeon
+Metadata/Monsters/LeagueIncursionNew/Doctor/DoctorIncursionTier3	Pakteni, Flesh Surgeon
+Metadata/Monsters/LeagueIncursionNew/Golemworks/DoryaniMechMiniIncursion	Imitation Triumph
+Metadata/Monsters/LeagueIncursionNew/Golemworks/LightningSkitterbotIncursion	Skitter Mine
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotDaggersBloodIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotDaggersChaosIncursion	Chaotic Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotDaggersColdIncursion	Gelid Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotDaggersFireIncursion	Fiery Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotDaggersLightningIncursion	Powered Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotKnifestickBloodIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotKnifestickChaosIncursion	Chaotic Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotKnifestickColdIncursion	Gelid Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotKnifestickFireIncursion	Fiery Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotKnifestickLightningIncursion	Powered Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotSpearBloodIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotSpearChaosIncursion	Chaotic Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotSpearColdIncursion	Gelid Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotSpearFireIncursion	Fiery Zealot
+Metadata/Monsters/LeagueIncursionNew/Generic/VaalZealotSpearLightningIncursion	Powered Zealot
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionAxeShield	Vaal Embalmed Axeman
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionSpear	Vaal Embalmed Spearman
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionDagger	Vaal Embalmed Rogue
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionBow	Vaal Embalmed Archer
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionAxeThrower	Vaal Embalmed Archer
+Metadata/Monsters/LeagueIncursionNew/GenericOld/ProcessionSwordShield	Vaal Embalmed Warrior
+Metadata/Monsters/LeagueIncursionNew/GenericOld/BoneRabbleJaguar	Vaal Skeletal Warrior
+Metadata/Monsters/LeagueIncursionNew/GenericOld/BoneRabbleSquire	Vaal Skeletal Squire
+Metadata/Monsters/LeagueIncursionNew/GenericOld/BoneRabblePriest	Vaal Skeletal Priest
+Metadata/Monsters/LeagueIncursionNew/GenericOld/BoneRabbleEagle	Vaal Skeletal Archer
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/BlackjawIncursionPast	Xolotl, Royal Commander
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/BlackjawIncursionPastTier2	Xolotl, Royal Commander
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/BlackjawIncursionPastTier3	Xolotl, Royal Commander
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardClawsIncursion	Vaal Excoriator
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardTrainingClawsIncursion	Vaal Excoriator
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardMortarIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardTrainingMortarIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardSpearIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/CommanderNew/VaalGuardTrainingSpearIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/BlackjawIncursionPresent	Xolotl, the Forgotten
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/BlackjawIncursionPresentTier2	Xolotl, the Forgotten
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/BlackjawIncursionPresentTier3	Xolotl, the Forgotten
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/UndeadVaalGuardDaggersIncursion	Undead Vaal Bladedancer
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/UndeadVaalGuardSpearIncursion	Undead Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/CommanderOld/UndeadVaalGuardTrapsIncursion	Undead Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalGuardClawsPatrolIncursion	Vaal Excoriator
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalGuardMortarPatrolIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalGuardSpearPatrolIncursion	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalGoliathPatrolIncursion	Vaal Goliath
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalOverseerLivingIncursion	Vaal Overseer
+Metadata/Monsters/LeagueIncursionNew/Garrison/VaalOverseerLivingIncursionRare	Temoc, Drill Overseer
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidBowIncursion	Archer Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidBowArmsIncursion	Archer Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidGoliathFistIncursion	Goliath Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalPyramidHandsIncursion	Brutal Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VallHumanoidShieldLegsIncursion	Shielded Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidSwordShieldIncursion	Fused Swordsman
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidCannonFireIncursion	Cannon Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidCannonLightningIncursion	Blasting Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidBladeHandsIncursion	Warrior Transcendent
+Metadata/Monsters/LeagueIncursionNew/Transcended/VaalHumanoidStalkerIncursion	Bladelash Transcendent
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireSwordIncursion	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireTrainingSwordIncursion	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireBowIncursion	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireTrainingBowIncursion	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireClawIncursion	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireTrainingClawIncursion_	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireShieldIncursion_	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaire/ViperLegionnaireTrainingShieldIncursion_	Viper Legionnaire
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaires/ViperLegionnaireSpymaster	Xalapa, Spy Master
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaires/ViperLegionnaireSpymasterTier2	Xalapa, Spy Master
+Metadata/Monsters/LeagueIncursionNew/ViperLegionnaires/ViperLegionnaireSpymasterTier3_	Xalapa, Spy Master
+Metadata/Monsters/LeagueIncursionNew/ViperLegionBarracks/QuadrillaIncursion	Quadrilla
+Metadata/Monsters/LeagueIncursionNew/ViperLegionBarracks/QuadrillaCaged	Quadrilla
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalCycloneConstructIncursion	Cyclonic Construct
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalCycloneConstructArmsIncursion	Cyclonic Construct Arms
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalCycloneConstructInertIncursion	Cyclonic Construct
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalBowlingPinIncursion	Vaal Construct
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalBowlingBallIncursion	Flame Sentry
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalBowlingBallInertIncursion	Flame Sentry
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalConstructPyramidIncursion	Reconstructor
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalConstructGolemIncursion	Shockblade Construct
+Metadata/Monsters/LeagueIncursionNew/Constructs/VaalConstructSkitterbotIncursion	Crawler Sentinel
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalCycloneConstructAncientIncursion	Cyclonic Construct
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalCycloneConstructArmsAncientIncursion	Cyclonic Construct Arms
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalCycloneConstructInertAncientIncursion	Cyclonic Construct
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalConstructSkitterbotAncientIncursion	Crawler Sentinel
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalBowlingBallAncientIncursion	Flame Sentry
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalBowlingBallInertAncientIncursion	Flame Sentry
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalConstructPyramidAncientIncursion	Reconstructor
+Metadata/Monsters/LeagueIncursionNew/ConstructsAncient/VaalConstructGolemAncientIncursion_	Shockblade Construct
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/StatueBossIncursion_	Menmek, Guardian Construct
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/VaalGoliathSoulCoreIncursion_	Vaal Goliath
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/VaalFlayedKnifestickIncursion	Chaos Zealot
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/ChaosGodRangedFodderIncursion	Petulant Stonemaw
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/ChaosGodJaguarIncursion	Scute Lizard
+Metadata/Monsters/LeagueIncursionNew/AlchemyLab/ChaosGodTriHeadBatIncursion	Cerberic Bat
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/MonkeyExperiment	Experimental Primate
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/GoreChargerExperiment	Experimental Boar
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/SpittingSnakeExperiment	Experimental Cobra
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/PlagueMorphExperiment1	Corrupted Corpse
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/PlagueMorphExperiment2	Corrupted Corpse
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/PlagueMorphExperiment3_	Corrupted Corpse
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/PlagueMorphExperiment4	Corrupted Corpse
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/VaalThaumaturgeSpear	Vaal Guard
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/VaalThaumaturgeClaws	Vaal Excoriator
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/DoryaniIncursionTier1	Kulka, Vaal Thaumaturge
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/DoryaniIncursionTier2	Kulka, Vaal Thaumaturge
+Metadata/Monsters/LeagueIncursionNew/Thaumaturge/DoryaniIncursionTier3	Kulka, Vaal Thaumaturge
+Metadata/NPC/League/Incursion/DoryaniIncursionHubSummon	Doryani
+Metadata/NPC/League/Incursion/AlvaIncursionHubSummon	Alva
+Metadata/NPC/League/Incursion/DoryaniIncursionAccessSummon	Doryani
+Metadata/NPC/League/Incursion/AlvaIncursionAccessSummon	Alva
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/BloodPriestBossIncursionTier1_	Huitzil, Royal Blood Priest
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/BloodPriestBossIncursionTier2	Huitzil, Royal Blood Priest
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/BloodPriestBossIncursionTier3	Huitzil, Royal Blood Priest
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalBloodPriestessIncursion	Blood Priestess
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalBloodPriestIncursion	Blood Priest
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalZealotDaggersBloodiedIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalZealotKnifestickBloodiedIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalZealotSpearBloodiedIncursion	Blood Zealot
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalAxeThrowerBloodiedIncursion	Vaal Axeman
+Metadata/Monsters/LeagueIncursionNew/SacrificialChamber/VaalGoliathBloodiedIncursion	Vaal Goliath
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherDualWieldIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherFlailIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherMaceIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherShieldIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherSpearIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherSwordIncursion	Bloodrite Guard
+Metadata/Monsters/LeagueIncursionNew/Corruption/BloodBatherMageIncursion	Bloodrite Priest
+Metadata/Monsters/LeagueIncursionNew/Corruption/SunVaalApparitionIncursion	Priest of the Sun
+Metadata/Monsters/LeagueIncursionNew/SynthfleshLab/VaalScientistIncursion	Surgical Experimentalist
+Metadata/Monsters/LeagueIncursionNew/SynthfleshLab/ExperimentBladeHands	Warrior Transcendent
+Metadata/Monsters/LeagueIncursionNew/SynthfleshLab/ExperimentStalker	Bladelash Transcendent
+Metadata/NPC/League/Incursion/AlvaIncursionTempleSummon	Alva
+Metadata/Monsters/LeagueIncursionNew/AtziriBossPhaseOne	Atziri, the Red Queen
+Metadata/Monsters/LeagueIncursionNew/AtziriBossPhaseOneClone	Atziri, the Red Queen
+Metadata/Monsters/LeagueIncursionNew/VaalZealotSacrifice	Royal Acolyte
+Metadata/Monsters/LeagueIncursionNew/AtziriBossPhaseTwo______	Atziri, the Fell Serpent
+Metadata/Monsters/LeagueIncursionNew/AtziriBossPhaseTwoClone	Atziri, the Fell Serpent
+Metadata/Monsters/LeagueIncursionNew/ArchitectBoss/TheArchitect	Xipocado, Royal Architect
+Metadata/Monsters/LeagueIncursionNew/ArchitectBoss/TheArchitectStandalone_	Xipocado, Royal Architect
+Metadata/Monsters/LeagueIncursionNew/ArchitectBoss/ArchitectBlackHole	Daemon
+Metadata/Monsters/Clone/RipFromTimeClone	Vision
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/SoulCoreQuadrillaBoss/SoulCoreQuadrilla	Quadrilla Sergeant
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/SoulCoreQuadrillaBoss/SoulCoreQuadrillaSTANDALONE	Quadrilla Sergeant
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/SoulCoreFusedSkeletonBoss/SoulcoreFusedSkeleton	Corrupted Abomination
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/SoulCoreFusedSkeletonBoss/SoulcoreFusedSkeletonSTANDALONE_	Corrupted Abomination
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionVaalSentinelBoss/VaalSentinelBoss	Royal Sentinel
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionVaalSentinelBoss/VaalSentinelBossSTANDALONE	Royal Sentinel
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionVaalColossusBoss/VaalColossusBoss	Royal Colossus
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionVaalColossusBoss/VaalColossusBossSTANDALONE	Royal Colossus
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionSunPriestBoss/VaalSunPriestBoss	High Priest
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionSunPriestBoss/VaalSunPriestBossSTANDALONE	High Priest
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionChainedBeastBoss/ChainedBeastBoss	Unchained Beast
+Metadata/Monsters/LeagueIncursionNew/MiniBosses/IncursionChainedBeastBoss/ChainedBeastBossSTANDALONE	Unchained Beast

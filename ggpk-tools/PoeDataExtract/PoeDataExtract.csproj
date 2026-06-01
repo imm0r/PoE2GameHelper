@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>PoeDataExtract</RootNamespace>
+    <AssemblyName>poe-data-extract</AssemblyName>
+    <!--
+      AOT-publishable. Keep reflection use to a minimum so the trimmer
+      doesn't choke. LibGGPK3 itself is mostly reflection-free.
+    -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!--
+    LibGGPK3 sub-projects, referenced directly from the cloned source
+    tree (see Directory.Build.props $(LibGGPK3Root)). We pick up the
+    bare minimum we need:
+      - LibGGPK3       : Content.ggpk parser
+      - LibBundle3     : Bundles2/*.bundle.bin (Oodle-compressed) parser
+      - LibBundledGGPK3: combines the two for the "modern" PoE2 layout
+                        where most files live inside bundles referenced
+                        from a small skeleton GGPK.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="$(LibGGPK3Root)\LibGGPK3\LibGGPK3.csproj" />
+    <ProjectReference Include="$(LibGGPK3Root)\LibBundle3\LibBundle3.csproj" />
+    <ProjectReference Include="$(LibGGPK3Root)\LibBundledGGPK3\LibBundledGGPK3.csproj" />
+  </ItemGroup>
+
+</Project>
