@@ -114,9 +114,10 @@ PushHotkeyBindingsToWebView()
     if !g_webViewReady
         return
 
-    ; Flask slots (1-5).
+    ; Flask slots — PoE2 only uses slots 1 (life) and 2 (mana) as user-pressable
+    ; flasks; slots 3-5 are charms that trigger automatically (no hotkey).
     flaskArr := []
-    loop 5
+    loop 2
     {
         s := A_Index
         if g_flaskKeyBySlot.Has(s)

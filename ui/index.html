@@ -5443,7 +5443,7 @@
       if (kind === 'flask') {
         const opts = (hkBindings.flaskSlots || []).length
           ? hkBindings.flaskSlots.map(f => `<option value="${f.slot}" ${+o.slot === +f.slot ? 'selected' : ''}>Flask ${f.slot} → ${hkEsc(f.key)}</option>`).join('')
-          : [1,2,3,4,5].map(s => `<option value="${s}" ${+o.slot === s ? 'selected' : ''}>Flask ${s}</option>`).join('');
+          : [1,2].map(s => `<option value="${s}" ${+o.slot === s ? 'selected' : ''}>Flask ${s}</option>`).join('');
         detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${opts}</select>`;
       } else if (kind === 'skill') {
         const slotOpts = (hkBindings.skillSlots || []).length
