@@ -90,6 +90,11 @@ The priority chain is *combat > loot > explore*; each stage claims a tick by ret
 
 A dedicated **Hotkeys** tab turns the helper into a programmable macro engine. The model is three nested levels — **Groups → Hotkeys → Actions** — all drag-to-reorder, collapsible, and individually toggleable, with per-item import/export to JSON.
 
+<div align="center">
+  <img src="assets/hotkeys1.png" width="800" alt="Hotkeys tab — groups, hotkeys, output binding and trigger mode">
+  <p><em>Hotkeys tab — a group of hotkeys, each with its output bound to an in-game slot and a manual/automated trigger.</em></p>
+</div>
+
 Every hotkey's **output is bound to a real in-game bind** picked from a dropdown of your actual flask/skill slots (parsed from `poe2_production_Config.ini`), so you never re-type key names — the trigger key is captured separately.
 
 - **Triggers** — *manual* (fires on the physical key press) or *automated* (auto-fires from the evaluation tick whenever the hotkey's conditions are met). An optional **one-shot per tick** guard limits automated firing to the highest-priority hotkey in list order.
@@ -98,11 +103,6 @@ Every hotkey's **output is bound to a real in-game bind** picked from a dropdown
 - **Conditions** — gate an action on live game state: **vitals** (life/ES/mana %), **buff** present/absent with min stacks & time-left, **charges** (power/frenzy/endurance/charged-staff), and **monster count** within a screen-pixel radius measured *around the cursor* or *around the player*.
 - **Auto-aim** — moves the cursor to the nearest matching entity inside a pixel radius (around cursor or player). Target type is chosen from a dropdown — *monster* (with rarity filter), *chest* (with a live dropdown of the chest types actually present in the area), *player/NPC*, *custom metadata path*, or *any (debug)* to scan everything — with an optional key press / hold after aiming.
 - **Per-action debug overlay** — a 🐞 toggle draws the action's range circle (cursor- or player-centred), live monster counts by rarity, cooldown and charge readouts right on the game overlay.
-
-<div align="center">
-  <img src="assets/hotkeys1.png" width="800" alt="Hotkeys tab — groups, hotkeys, output binding and trigger mode">
-  <p><em>Hotkeys tab — a group of hotkeys, each with its output bound to an in-game slot and a manual/automated trigger.</em></p>
-</div>
 
 <div align="center">
   <img src="assets/hotkeys2.png" width="800" alt="Hotkeys tab — action editor with conditions and auto-aim">
