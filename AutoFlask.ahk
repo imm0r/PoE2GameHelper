@@ -93,15 +93,15 @@ UpdateRadarFast()
         ; scoring picks the right InGameState by data, not by name). Conds 2-6
         ; below already filter out anything that isn't actually in-game.
         nonGameStates := Map(
-            "PreGameState",         true,
-            "LoginState",           true,
-            "WaitingState",         true,
+            "PreGameState", true,
+            "LoginState", true,
+            "WaitingState", true,
             "CreateCharacterState", true,
             "SelectCharacterState", true,
             "DeleteCharacterState", true,
-            "ChangePasswordState",  true,
-            "CreditsState",         true,
-            "LoadingState",         true
+            "ChangePasswordState", true,
+            "CreditsState", true,
+            "LoadingState", true
         )
         if (nonGameStates.Has(currentState))
         {
@@ -590,15 +590,15 @@ IsStrictInGameState(snapshot)
 
     ; Hard reject only the states that definitely have no character/area.
     nonGameStates := Map(
-        "PreGameState",         true,
-        "LoginState",           true,
-        "WaitingState",         true,
+        "PreGameState", true,
+        "LoginState", true,
+        "WaitingState", true,
         "CreateCharacterState", true,
         "SelectCharacterState", true,
         "DeleteCharacterState", true,
-        "ChangePasswordState",  true,
-        "CreditsState",         true,
-        "LoadingState",         true
+        "ChangePasswordState", true,
+        "CreditsState", true,
+        "LoadingState", true
     )
     name := snapshot.Has("currentStateName") ? snapshot["currentStateName"] : ""
     if (name != "" && nonGameStates.Has(name))
@@ -763,11 +763,7 @@ ProcessPendingFlaskVerification(slots)
 ; Returns: window handle, or 0 if the game is not running
 ResolvePoEWindow()
 {
-    if WinExist("ahk_exe PathOfExileSteam.exe")
-        return WinGetID("ahk_exe PathOfExileSteam.exe")
-    if WinExist("ahk_exe PathOfExile.exe")
-        return WinGetID("ahk_exe PathOfExile.exe")
-    return 0
+    return GetPoeMainWindowHwnd()
 }
 
 ; Sends a keystroke to the PoE2 window via keybd_event (Win32 API).

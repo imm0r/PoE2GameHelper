@@ -4,7 +4,7 @@
 -- ============================================================
 --
 -- SETUP:
---   1. Attach CE to PathOfExile.exe (or PathOfExileSteam.exe)
+--   1. Attach CE to any supported PoE executable (PathOfExile.exe, PathOfExile_x64.exe, PathOfExileSteam.exe, PathOfExile_x64Steam.exe)
 --   2. Be fully in-game (in an area, not login screen)
 --   3. Open Table -> Show Cheat Table Lua Script, paste this file and Execute
 --      OR: Ctrl+Alt+L -> Lua Engine, File -> Open, then Execute Script
@@ -741,7 +741,7 @@ function poe2_refresh()
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- CE Table hooks: auto-run when PathOfExile.exe is attached/detached
+-- CE Table hooks: auto-run when any PathOfExile process is attached/detached
 -- ─────────────────────────────────────────────────────────────────────────────
 
 function OnOpenProcess(processID)
@@ -785,6 +785,6 @@ if process and process:lower():find("pathofexile") then
     poe2_refresh()
     print("[PoE2] Bereit.")
 else
-    print("[PoE2] Warte auf PathOfExile.exe ...")
+    print("[PoE2] Warte auf einen PathOfExile-Prozess ...")
     print("[PoE2] Nach 'File > Open Process' wird OnOpenProcess automatisch ausgeloest.")
 end

@@ -11,7 +11,7 @@
 class PoE2GameStateReader extends PoE2InventoryReader
 {
     ; Initializes the reader state, pattern scan report, entity sample limits, and item name dictionaries.
-    __New(processName := "PathOfExileSteam.exe")
+    __New(processName := "")
     {
         this.Mem := ProcessMemory(processName)
         this.GameStatesAddress := 0
@@ -1240,7 +1240,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 if this.IsProbablyValidPointer(childrenDataPtr)
                 {
                     altLargePtr := this.Mem.ReadPtr(childrenDataPtr + 0 * 8)
-                    altMiniPtr  := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)
+                    altMiniPtr := this.Mem.ReadPtr(childrenDataPtr + 1 * 8)
                     if this.IsProbablyValidPointer(altLargePtr)
                     {
                         largeMapPtr := altLargePtr
@@ -2624,7 +2624,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarTerrainAttempts := 0
         }
         elapsedSinceZone := nowTick - (this.HasOwnProp("_radarTerrainZoneStartTick") ? this._radarTerrainZoneStartTick : nowTick)
-        retryIntervalMs  := (elapsedSinceZone < 15000) ? 400 : 1500
+        retryIntervalMs := (elapsedSinceZone < 15000) ? 400 : 1500
         needsTerrainRead := (!this._radarTerrainCache && (nowTick - this._radarTerrainRetryTick) > retryIntervalMs)
         if needsTerrainRead
         {
@@ -2840,10 +2840,10 @@ class PoE2GameStateReader extends PoE2InventoryReader
             ; sequence interleaves with a partial batch (very fast zone toggling
             ; in a hideout etc.), stale values could leak briefly. Cheap to be
             ; explicit.
-            this._tgtScanTileIdx       := 0
-            this._tgtScanTotalTiles    := 0
-            this._tgtScanTileVecFirst  := 0
-            this._tgtScanTotalTilesX   := 0
+            this._tgtScanTileIdx := 0
+            this._tgtScanTotalTiles := 0
+            this._tgtScanTileVecFirst := 0
+            this._tgtScanTotalTilesX := 0
             this._tgtScanPartialResults := Map()
             ; Drop the tile-template type cache — tgtFilePtr values are heap
             ; addresses that get recycled when the game generates a new map.

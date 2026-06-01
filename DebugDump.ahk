@@ -42,10 +42,10 @@ DumpTreeViewContent()
 {
     global g_treeControlsByTab, g_treeTabKeys
 
-    outDir  := A_ScriptDir "\debug"
+    outDir := A_ScriptDir "\debug"
     if !DirExist(outDir)
         DirCreate(outDir)
-    ts      := FormatTime(A_Now, "yyyyMMdd_HHmmss")
+    ts := FormatTime(A_Now, "yyyyMMdd_HHmmss")
     outPath := outDir "\treeview_dump_" ts ".json"
 
     ; Build JSON object: {"timestamp": "...", "tabs": {"tabKey": [...]}}
@@ -56,8 +56,8 @@ DumpTreeViewContent()
         if !g_treeControlsByTab.Has(tabKey)
             continue
         ctrl := g_treeControlsByTab[tabKey]
-        hwnd  := ctrl.Hwnd
-        root  := TV_GetRoot(hwnd)
+        hwnd := ctrl.Hwnd
+        root := TV_GetRoot(hwnd)
         nodes := root ? _DumpTreeNodeRecursiveJson(ctrl, hwnd, root) : "[]"
 
         escapedKey := StrReplace(tabKey, '"', '\"')
@@ -82,16 +82,14 @@ DumpTreeViewContent()
 ; Returns: path of the created file, or "" on error.
 CaptureGameWindowScreenshot()
 {
-    outDir  := A_ScriptDir "\debug"
+    outDir := A_ScriptDir "\debug"
     if !DirExist(outDir)
         DirCreate(outDir)
-    ts      := FormatTime(A_Now, "yyyyMMdd_HHmmss")
+    ts := FormatTime(A_Now, "yyyyMMdd_HHmmss")
     outPath := outDir "\screenshot_" ts ".png"
 
     ; Find the PoE2 window
-    gameHwnd := WinExist("ahk_exe PathOfExileSteam.exe")
-    if !gameHwnd
-        gameHwnd := WinExist("ahk_exe PathOfExile.exe")
+    gameHwnd := GetPoeMainWindowHwnd()
 
     if gameHwnd
     {
@@ -117,12 +115,12 @@ CaptureGameWindowScreenshot()
     NumPut("UInt", 1, si, 0)
     DllCall("gdiplus\GdiplusStartup", "Ptr*", &pToken, "Ptr", si, "Ptr", 0)
 
-    hDC     := DllCall("GetDC", "Ptr", 0, "Ptr")
-    hMemDC  := DllCall("CreateCompatibleDC", "Ptr", hDC, "Ptr")
+    hDC := DllCall("GetDC", "Ptr", 0, "Ptr")
+    hMemDC := DllCall("CreateCompatibleDC", "Ptr", hDC, "Ptr")
     hBitmap := DllCall("CreateCompatibleBitmap", "Ptr", hDC, "Int", w, "Int", h, "Ptr")
     DllCall("SelectObject", "Ptr", hMemDC, "Ptr", hBitmap)
     DllCall("BitBlt", "Ptr", hMemDC, "Int", 0, "Int", 0, "Int", w, "Int", h,
-            "Ptr", hDC, "Int", x, "Int", y, "UInt", 0x00CC0020)  ; SRCCOPY
+        "Ptr", hDC, "Int", x, "Int", y, "UInt", 0x00CC0020)  ; SRCCOPY
 
     ; Encode to PNG via GDI+
     pBitmap := 0
@@ -158,7 +156,7 @@ _GetEncoderClsid(mimeType, clsidBuf)
     {
         offset := (A_Index - 1) * 104
         mimePtr := NumGet(buf, offset + 64, "Ptr")
-        mime    := StrGet(mimePtr, "UTF-16")
+        mime := StrGet(mimePtr, "UTF-16")
         if (mime = mimeType)
         {
             DllCall("RtlCopyMemory", "Ptr", clsidBuf, "Ptr", buf.Ptr + offset, "Ptr", 16)
@@ -194,9 +192,9 @@ OnF3DebugDump()
     }
 
     msg := "F3 Debug Dump:`n"
-        . (tvPath  ? "  TreeView : " tvPath  "`n" : "  TreeView : FAILED`n")
-        . (ssPath  ? "  Screenshot: " ssPath "`n" : "  Screenshot: FAILED`n")
-        . (tsvPath ? "  Radar TSV : " tsvPath     : "  Radar TSV : FAILED (no snapshot?)")
+        . (tvPath ? "  TreeView : " tvPath "`n" : "  TreeView : FAILED`n")
+        . (ssPath ? "  Screenshot: " ssPath "`n" : "  Screenshot: FAILED`n")
+        . (tsvPath ? "  Radar TSV : " tsvPath : "  Radar TSV : FAILED (no snapshot?)")
     ToolTip(msg)
     SetTimer(() => ToolTip(), -4000)
 }
