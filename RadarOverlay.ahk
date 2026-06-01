@@ -1357,6 +1357,14 @@ class RadarOverlay
                 this._DrawPixelCircle(cx - this._lastGwX, cy - this._lastGwY,
                     rec["circleCursorPx"], COL_CUR)
             }
+            ; Player pixel circle (player projected to screen → client coords).
+            if (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
+            {
+                ps := this._PlayerScreenPos()
+                if (ps)
+                    this._DrawPixelCircle(ps["x"] - this._lastGwX, ps["y"] - this._lastGwY,
+                        rec["circlePlayerPx"], COL_CUR)
+            }
             ; Text block.
             this._DrawText(textX, textY, rec.Has("label") ? rec["label"] : "?", COL)
             textY += pitch
@@ -1370,6 +1378,32 @@ class RadarOverlay
             }
             textY += 4
         }
+    }
+
+    ; Projects the player's world position to screen via the last radar snapshot.
+    ; Returns Map("x","y") in screen coordinates, or 0 if unavailable.
+    _PlayerScreenPos()
+    {
+        global g_radarLastSnap
+        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+        if !snap
+            return 0
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+            return 0
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        if !(pwp && pwp is Map)
+            return 0
+        pX := pwp.Has("x") ? pwp["x"] : 0
+        pY := pwp.Has("y") ? pwp["y"] : 0
+        pZ := pwp.Has("z") ? pwp["z"] : 0
+        ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
+            "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+        return _WorldToScreen(ci, gameHwnd)
     }
 
     ; Draws a screen-space (non-isometric) circle of <radiusPx> around (cx,cy).

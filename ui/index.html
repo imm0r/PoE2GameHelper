@@ -4950,7 +4950,7 @@
           background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.08));
         }
         .hk-toolbar .hk-hint {
-          color: var(--codex-text-dim); font-size: 12px; font-style: italic; margin-left: auto;
+          color: #cbb88a; font-size: 13px; font-style: italic; margin-left: auto;
         }
         #panel-hotkeys .hk-groups-wrap, #hk-groups { padding: 0 18px 22px; }
 
@@ -4991,8 +4991,8 @@
         }
         .hk-card-name:focus { outline: 1px solid var(--codex-gold); }
         .hk-id {
-          color: var(--codex-text-dim); font-size: 11px;
-          font-family: var(--codex-mono-serif); letter-spacing: 0.05em;
+          color: #cbb88a; font-size: 12.5px;
+          font-family: var(--codex-mono-serif); letter-spacing: 0.04em;
         }
         .hk-key-btn { min-width: 70px; }
 
@@ -5015,7 +5015,7 @@
         .hk-action:last-child { border-bottom: none; }
         .hk-act-type {
           color: var(--codex-gold); font-family: var(--codex-display);
-          letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px; min-width: 104px;
+          letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; min-width: 168px;
         }
 
         /* Buttons — gilded two-tone, Cinzel small-caps (like the inv toolbar). */
@@ -5302,6 +5302,7 @@
     function updateHotkeys(jsonStr, oneShot) {
       try { hkConfig = JSON.parse(jsonStr); } catch (e) { hkConfig = []; }
       if (!Array.isArray(hkConfig)) hkConfig = [];
+      hkMigrateConfig(hkConfig);
       if (oneShot !== undefined) hkOneShot = !!oneShot;
       hkRender();
     }
@@ -5388,15 +5389,12 @@
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
             <select id="hk-addact-${gi}-${hi}">
-              <option value="press">Repeat / Press</option>
-              <option value="repeat">Repeat (loop)</option>
-              <option value="hold">Hold</option>
+              <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
               <option value="vitals">Condition: Vitals</option>
               <option value="buff">Condition: Buff</option>
               <option value="charges">Condition: Charges</option>
               <option value="monsterCount">Condition: Monster count</option>
-              <option value="monsterCountCursor">Condition: Monster count @ cursor</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
             <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
@@ -5487,6 +5485,24 @@
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
 
+    // Human-readable action labels — mirror the "+ Action" dropdown so the
+    // collapsed/expanded action header reads the same as where it was created
+    // (spaces & casing) instead of the raw camelCase type token.
+    const HK_ACT_LABELS = {
+      key: 'Key press / hold / loop',
+      chain: 'Chain (link hotkey)',
+      vitals: 'Condition: Vitals',
+      buff: 'Condition: Buff',
+      charges: 'Condition: Charges',
+      monsterCount: 'Condition: Monster count',
+      aim: 'Mouse move (auto-aim)',
+      // Legacy types — kept so pre-merge exports still read correctly.
+      press: 'Key press / hold / loop',
+      repeat: 'Key press / hold / loop',
+      hold: 'Key press / hold / loop',
+      monsterCountCursor: 'Condition: Monster count',
+    };
+
     // Aim chest-type picker: a dropdown of the chest types currently present in
     // the area (pushed live from AHK in hkBindings.chestTypes), plus a Custom…
     // option that reveals a free-text substring field for anything else.
@@ -5506,6 +5522,16 @@
       const a = hkConfig[gi].hotkeys[hi].actions[ai];
       if (v === '__custom__') { a.chestTypeCustom = 1; }
       else { a.chestTypeCustom = 0; a.chestType = v; }
+      hkChanged();
+    }
+
+    // Aim target picker: the synthetic "__all__" option maps to scanAll (aim at
+    // the nearest targetable entity); any real value clears scanAll and sets the
+    // concrete target type.
+    function hkSetAimTarget(gi, hi, ai, v) {
+      const a = hkConfig[gi].hotkeys[hi].actions[ai];
+      if (v === '__all__') { a.scanAll = 1; }
+      else { a.scanAll = 0; a.targetType = v; }
       hkChanged();
     }
 
@@ -5539,17 +5565,22 @@
       const open = !hkCollapsed.has(aKey);
       let body = '';
       switch (t) {
-        case 'press':
-          body = `<span style="color:var(--subtext);font-size:12px">presses the hotkey’s output key once</span>`;
+        case 'key': {
+          // One action, three behaviours chosen via Mode: press once, hold for
+          // a duration, or loop/repeat (finite count or infinite toggle).
+          const mode = a.mode || 'press';
+          let extra = '';
+          if (mode === 'hold')
+            extra = `Duration(ms) ${hkNum(a, 'durationMs', 200, gi, hi, ai)}`;
+          else if (mode === 'loop')
+            extra = `${hkChk(a, 'infinite', 'Infinite', gi, hi, ai)} `
+                  + `Count ${hkNum(a, 'count', 1, gi, hi, ai)} `
+                  + `Interval(ms) ${hkNum(a, 'intervalMs', 100, gi, hi, ai)}`;
+          else
+            extra = `<span style="color:var(--subtext);font-size:12px">presses the output key once</span>`;
+          body = `Mode ${hkSel(a, 'mode', [['press', 'Press once'], ['hold', 'Hold'], ['loop', 'Loop / repeat']], gi, hi, ai)} ${extra}`;
           break;
-        case 'repeat':
-          body = `${hkChk(a, 'infinite', 'Infinite', gi, hi, ai)} `
-               + `Count ${hkNum(a, 'count', 1, gi, hi, ai)} `
-               + `Interval(ms) ${hkNum(a, 'intervalMs', 100, gi, hi, ai)}`;
-          break;
-        case 'hold':
-          body = `Duration(ms) ${hkNum(a, 'durationMs', 200, gi, hi, ai)}`;
-          break;
+        }
         case 'chain':
           body = `Target <select onchange="hkSetAct(${gi},${hi},${ai},'targetId',this.value)">${hkHotkeyOptions(a.targetId)}</select> `
                + `Mode ${hkSel(a, 'triggerMode', [['always', 'Always'], ['program', 'Program only'], ['user', 'User only']], gi, hi, ai)} `
@@ -5572,38 +5603,41 @@
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
         case 'monsterCount':
+          // Counts targetable monsters inside a screen-pixel radius measured
+          // either from the mouse cursor or from the player's on-screen position.
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
-               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
-               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
-          break;
-        case 'monsterCountCursor':
-          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `Cursor radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
+               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
         case 'aim': {
+          // "Scan all" lives at the bottom of the Target dropdown as
+          // "any (debug)": it ignores the target type & sub-filter and aims at
+          // the nearest targetable entity. A real target hides that flag.
+          const scanned = !!a.scanAll;
           const tt = a.targetType || 'monster';
           let filt = '';
-          if (tt === 'monster')
-            filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
-          else if (tt === 'chest')
-            filt = hkChestTypeField(a, gi, hi, ai);
-          else if (tt === 'npc')
-            filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
-          else if (tt === 'custom')
-            filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
-          // Scan all ignores the target/sub-filter — grey those out to make that clear.
-          const scanned = !!a.scanAll;
-          const targetBlock = `<span class="${scanned ? 'hk-disabled' : ''}" title="${scanned ? 'Ignored while Scan all is on' : ''}">`
-               + `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} ${filt}</span>`;
-          body = targetBlock + ' '
-               + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['player', 'around player (world)'], ['cursor', 'around cursor (px)']], gi, hi, ai)} `
+          if (!scanned) {
+            if (tt === 'monster')
+              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
+            else if (tt === 'chest')
+              filt = hkChestTypeField(a, gi, hi, ai);
+            else if (tt === 'npc')
+              filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
+            else if (tt === 'custom')
+              filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
+          }
+          const targetOpts = [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path'], ['__all__', 'any (debug)']];
+          const selVal = scanned ? '__all__' : tt;
+          const targetSel = `<select title="any (debug) aims at the nearest targetable entity, ignoring the target type and its filter." onchange="hkSetAimTarget(${gi},${hi},${ai},this.value)">`
+               + targetOpts.map(([v, l]) => `<option value="${v}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('')
+               + `</select>`;
+          body = `Target ${targetSel} ${filt}`
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
+               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
-               + `${hkChk(a, 'scanAll', 'Scan all', gi, hi, ai)}`;
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}`;
           break;
         }
         default:
@@ -5613,7 +5647,7 @@
                 <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${open ? '▾' : '▸'}</span>
                 <span class="hk-grip" draggable="true" title="Drag to reorder action"
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
-                <span class="hk-act-type">${hkEsc(t)}</span>
+                <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
                 <span class="hk-spacer"></span>
                 <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
@@ -5727,21 +5761,38 @@
 
     function hkActionDefaults(type) {
       switch (type) {
-        case 'repeat':       return { type, infinite: 0, count: 1, intervalMs: 100 };
-        case 'hold':         return { type, durationMs: 200 };
+        case 'key':          return { type, mode: 'press', infinite: 0, count: 1, intervalMs: 100, durationMs: 200 };
         case 'chain':        return { type, targetId: 0, triggerMode: 'always', delayMs: 0 };
         case 'vitals':       return { type, resource: 'hp', op: '<=', value: 50 };
         case 'buff':         return { type, buffName: '', mode: 'present', minStacks: 0, minTimeLeftMs: 0 };
         case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
-        case 'monsterCount': return { type, rarity: 'any', radius: 1500, op: '>=', value: 1 };
-        case 'monsterCountCursor': return { type, rarity: 'any', radius: 120, op: '>=', value: 1 };
-        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, radiusMode: 'player', chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
-        default:             return { type: 'press' };
+        case 'monsterCount': return { type, rarity: 'any', radiusMode: 'player', radius: 120, op: '>=', value: 1 };
+        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 150, radiusMode: 'cursor', chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
+        default:             return { type: 'key', mode: 'press' };
       }
+    }
+
+    // Migrates legacy action shapes to the merged ones so older saved configs
+    // and exports keep working: press/repeat/hold → a single "key" action with
+    // a mode; monsterCountCursor → "monsterCount" with radiusMode "cursor".
+    function hkMigrateAction(a) {
+      if (!a || typeof a !== 'object') return a;
+      if (a.type === 'press') { a.type = 'key'; a.mode = 'press'; }
+      else if (a.type === 'repeat') { a.type = 'key'; a.mode = 'loop'; }
+      else if (a.type === 'hold') { a.type = 'key'; a.mode = 'hold'; }
+      else if (a.type === 'monsterCountCursor') { a.type = 'monsterCount'; if (!a.radiusMode) a.radiusMode = 'cursor'; }
+      if (a.type === 'monsterCount' && !a.radiusMode) a.radiusMode = 'player';
+      return a;
+    }
+    function hkMigrateConfig(cfg) {
+      (cfg || []).forEach(g => (g.hotkeys || []).forEach(hk => {
+        hk.actions = (hk.actions || []).map(hkMigrateAction);
+      }));
+      return cfg;
     }
     function hkAddAction(gi, hi) {
       const sel = document.getElementById('hk-addact-' + gi + '-' + hi);
-      const type = sel ? sel.value : 'press';
+      const type = sel ? sel.value : 'key';
       hkConfig[gi].hotkeys[hi].actions.push(hkActionDefaults(type));
       hkChanged();
     }
