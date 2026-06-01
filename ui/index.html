@@ -5600,6 +5600,7 @@
                + `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} ${filt}</span>`;
           body = targetBlock + ' '
                + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
+               + `${hkSel(a, 'radiusMode', [['player', 'around player (world)'], ['cursor', 'around cursor (px)']], gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
                + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
                + `${hkChk(a, 'scanAll', 'Scan all', gi, hi, ai)}`;
@@ -5734,7 +5735,7 @@
         case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
         case 'monsterCount': return { type, rarity: 'any', radius: 1500, op: '>=', value: 1 };
         case 'monsterCountCursor': return { type, rarity: 'any', radius: 120, op: '>=', value: 1 };
-        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
+        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 1500, radiusMode: 'player', chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
         default:             return { type: 'press' };
       }
     }
