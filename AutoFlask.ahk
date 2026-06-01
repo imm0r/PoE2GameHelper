@@ -986,11 +986,9 @@ NormalizeConfigKeyToSend(rawKey)
 
     if RegExMatch(key, "^\d+$")
     {
-        code := Integer(key)
-        if (code >= 48 && code <= 57)
-            return Chr(code)
-        if (code >= 96 && code <= 105)
-            return "Numpad" (code - 96)
+        sk := _ConfigVkToSendKey(Integer(key))
+        if (sk != "")
+            return sk
     }
 
     if RegExMatch(key, "^F([1-9]|1[0-2])$", &f)
@@ -1008,4 +1006,33 @@ NormalizeConfigKeyToSend(rawKey)
         return "="
 
     return key
+}
+
+; Converts a decimal Windows Virtual-Key code (as stored in poe2_production_Config.ini,
+; e.g. use_bound_skill4=81) into an AHK send-key string. Returns "" if unmapped.
+; Letters map to lowercase; mouse buttons and OEM punctuation map to AHK names / vk codes.
+_ConfigVkToSendKey(code)
+{
+    static m := Map(
+        1, "LButton", 2, "RButton", 4, "MButton", 5, "XButton1", 6, "XButton2",
+        8, "Backspace", 9, "Tab", 13, "Enter", 16, "Shift", 17, "Control", 18, "Alt",
+        19, "Pause", 20, "CapsLock", 27, "Escape", 32, "Space",
+        33, "PgUp", 34, "PgDn", 35, "End", 36, "Home",
+        37, "Left", 38, "Up", 39, "Right", 40, "Down", 45, "Insert", 46, "Delete",
+        106, "NumpadMult", 107, "NumpadAdd", 109, "NumpadSub", 110, "NumpadDot", 111, "NumpadDiv",
+        144, "NumLock", 145, "ScrollLock",
+        186, "vkBA", 187, "vkBB", 188, "vkBC", 189, "vkBD", 190, "vkBE", 191, "vkBF",
+        192, "vkC0", 219, "vkDB", 220, "vkDC", 221, "vkDD", 222, "vkDE"
+    )
+    if m.Has(code)
+        return m[code]
+    if (code >= 48 && code <= 57)        ; 0-9
+        return Chr(code)
+    if (code >= 65 && code <= 90)        ; A-Z -> lowercase
+        return Chr(code + 32)
+    if (code >= 96 && code <= 105)       ; Numpad 0-9
+        return "Numpad" (code - 96)
+    if (code >= 112 && code <= 135)      ; F1-F24
+        return "F" (code - 111)
+    return ""
 }

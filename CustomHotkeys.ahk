@@ -127,10 +127,27 @@ _HotkeysNormalizeHotkey(hk)
         "skillName", outRaw.Has("skillName") ? outRaw["skillName"] : "",
         "key", outRaw.Has("key") ? outRaw["key"] : (hk.Has("key") ? hk["key"] : "")
     )
+    ; Trigger mode: "manual" fires only on a physical key press; "automated"
+    ; auto-fires from the eval tick whenever the hotkey's conditions are met.
+    ; Default for legacy configs: automated if it has a condition action.
+    hasCond := false
+    for a in actions
+    {
+        if (a is Map && a.Has("type"))
+        {
+            ct := a["type"]
+            if (ct = "vitals" || ct = "buff" || ct = "charges" || ct = "monsterCount" || ct = "monsterCountCursor")
+                hasCond := true
+        }
+    }
+    trigger := hk.Has("trigger") ? hk["trigger"] : (hasCond ? "automated" : "manual")
+    if (trigger != "automated" && trigger != "manual")
+        trigger := "manual"
     return Map(
         "id", id,
         "name", hk.Has("name") ? hk["name"] : ("Hotkey #" id),
         "enabled", _HkBool(hk, "enabled", 1),
+        "trigger", trigger,
         "focusOnly", _HkBool(hk, "focusOnly", 1),
         "safeZoneDisabled", _HkBool(hk, "safeZoneDisabled", 0),
         "passThrough", _HkBool(hk, "passThrough", 0),
@@ -322,8 +339,10 @@ HotkeysEvaluateTick()
         {
             if !hk["enabled"]
                 continue
-            if !_HotkeysHasConditionAction(hk)
-                continue   ; manual / chain-only hotkey
+            ; Only "automated"-trigger hotkeys auto-fire here; manual ones fire
+            ; on a physical key press (via their registered Hotkey()).
+            if (hk["trigger"] != "automated")
+                continue
 
             id := hk["id"]
             rt := _HotkeysRuntime(id)
@@ -962,6 +981,15 @@ _HotkeysSendKey(key)
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
         return
+    ; X1/X2 mouse buttons aren't handled by _SendSkillKey — route via the
+    ; local down/up helpers (which support them) as a quick click.
+    kl := StrLower(Trim(key))
+    if (kl = "xbutton1" || kl = "xbutton2")
+    {
+        if _HotkeysKeyDown(key)
+            SetTimer(() => _HotkeysKeyUp(key), -20)
+        return
+    }
     _HotkeysMarkInjected(key)
     try _SendSkillKey(key, gameHwnd)
 }
@@ -1226,6 +1254,16 @@ _HotkeysKeyDown(key)
         DllCall("mouse_event", "uint", 0x0020, "int", 0, "int", 0, "uint", 0, "uptr", 0)
         return true
     }
+    if (kl = "xbutton1")
+    {
+        DllCall("mouse_event", "uint", 0x0080, "int", 0, "int", 0, "uint", 1, "uptr", 0)   ; XDOWN, XBUTTON1
+        return true
+    }
+    if (kl = "xbutton2")
+    {
+        DllCall("mouse_event", "uint", 0x0080, "int", 0, "int", 0, "uint", 2, "uptr", 0)   ; XDOWN, XBUTTON2
+        return true
+    }
     vk := GetKeyVK(key)
     if (!vk)
         return false
@@ -1250,6 +1288,16 @@ _HotkeysKeyUp(key)
     if (kl = "mbutton")
     {
         DllCall("mouse_event", "uint", 0x0040, "int", 0, "int", 0, "uint", 0, "uptr", 0)
+        return true
+    }
+    if (kl = "xbutton1")
+    {
+        DllCall("mouse_event", "uint", 0x0100, "int", 0, "int", 0, "uint", 1, "uptr", 0)   ; XUP, XBUTTON1
+        return true
+    }
+    if (kl = "xbutton2")
+    {
+        DllCall("mouse_event", "uint", 0x0100, "int", 0, "int", 0, "uint", 2, "uptr", 0)   ; XUP, XBUTTON2
         return true
     }
     vk := GetKeyVK(key)
