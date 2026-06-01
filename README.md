@@ -26,7 +26,7 @@
 - [Highlights](#highlights)
 - [Features](#features)
   - [Automation](#-automation)
-  - [Custom Hotkeys](#-custom-hotkeys)
+  - [Custom Hotkeys](#-hotkeys)
   - [Loot Pickup](#-loot-pickup)
   - [Overlays](#-overlays)
   - [GGPK Maphack](#-ggpk-maphack)
@@ -413,7 +413,6 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 - [**DAT-Schema**](https://github.com/poe-tool-dev/dat-schema) — PoE/PoE2 game-data schema
 - [**poe-data-tools**](https://github.com/LocalIdentity/poe_data_tools) — PoE data file utilities
 - [**repoe-fork (PoE2 base items)**](https://repoe-fork.github.io/poe2/base_items.json) — base-item registry source
-- [**AHK v2 docs**](https://www.autohotkey.com/docs/v2/)
 
 Detailed developer notes: [`DEV_README.md`](DEV_README.md). Contribution conventions: [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
