@@ -5483,6 +5483,7 @@
                 <span class="hk-act-type">${hkEsc(t)}</span>
                 ${open ? body : ''}
                 <span class="hk-spacer"></span>
+                <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
                 <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                 <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
               </div>`;

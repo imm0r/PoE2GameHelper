@@ -35,6 +35,7 @@ HotkeysInit()
     global g_hkEvalInterval := 120        ; ms between auto-trigger evaluations
     global g_hkInjectGuard := Map()       ; lowercased key -> expiry tick (self-injection guard)
     global g_hkOneShotPerTick := false    ; when true, at most one hotkey auto-fires per eval tick
+    global g_hkDebugItems := []           ; per-frame debug records for actions with debug on (read by the overlay)
 }
 
 ; ── Persistence ────────────────────────────────────────────────────────────
@@ -312,6 +313,7 @@ _HotkeysSnap()
 HotkeysEvaluateTick()
 {
     global g_hotkeyGroups, g_hkRuntime, g_hkOneShotPerTick
+    _HotkeysCollectDebug()
     for grp in g_hotkeyGroups
     {
         if !grp["enabled"]
@@ -350,6 +352,168 @@ HotkeysEvaluateTick()
             }
         }
     }
+}
+
+; Rebuilds g_hkDebugItems for this frame: one record per action that has its
+; debug flag on, holding what the overlay should draw (name/id, range circle,
+; per-rarity monster counts, skill cooldown, charge count). Cheap data only;
+; the overlay does the drawing.
+_HotkeysCollectDebug()
+{
+    global g_hotkeyGroups, g_hkDebugItems
+    items := []
+    snap := _HotkeysSnap()
+    for grp in g_hotkeyGroups
+    {
+        if !grp["enabled"]
+            continue
+        for hk in grp["hotkeys"]
+        {
+            if !hk["enabled"]
+                continue
+            ai := 0
+            for a in hk["actions"]
+            {
+                ai += 1
+                if !(a is Map && a.Has("debug") && a["debug"])
+                    continue
+                items.Push(_HotkeysBuildDebugRecord(hk, a, ai, snap))
+            }
+        }
+    }
+    g_hkDebugItems := items
+}
+
+; Builds a single debug record Map for one action. Fields are kept generic so
+; the overlay can render whatever is present:
+;   label, kind, circleWorld | circleCursorPx, counts(Map rarity->n),
+;   countTotal, cooldownMs, ready, charges
+_HotkeysBuildDebugRecord(hk, a, ai, snap)
+{
+    t := a.Has("type") ? a["type"] : ""
+    rec := Map(
+        "label", hk["name"] " #" hk["id"] " · " t,
+        "kind", t,
+        "lines", []
+    )
+
+    if (t = "monsterCount")
+    {
+        radius := a.Has("radius") ? (a["radius"] + 0) : 1500
+        rec["circleWorld"] := radius
+        counts := _HotkeysCountByRarity(snap, radius, "world")
+        rec["counts"] := counts
+        rec["lines"].Push("N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+    }
+    else if (t = "monsterCountCursor")
+    {
+        px := a.Has("radius") ? (a["radius"] + 0) : 120
+        rec["circleCursorPx"] := px
+        counts := _HotkeysCountByRarity(snap, px, "cursor")
+        rec["counts"] := counts
+        rec["lines"].Push("@cursor N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+    }
+    else if (t = "aim")
+    {
+        radius := a.Has("radius") ? (a["radius"] + 0) : 1500
+        rec["circleWorld"] := radius
+        rec["lines"].Push("aim radius " radius)
+    }
+    else if (t = "charges")
+    {
+        type := a.Has("chargeType") ? a["chargeType"] : "power"
+        nameMap := Map("power", "power_charge", "frenzy", "frenzy_charge", "endurance", "endurance_charge", "charged_staff", "charged_staff_stack")
+        eff := _HotkeysFindBuff(snap, nameMap.Has(type) ? nameMap[type] : type)
+        n := (eff && eff.Has("charges")) ? (eff["charges"] + 0) : 0
+        rec["charges"] := n
+        rec["lines"].Push(type " charges: " n)
+    }
+    else if (t = "buff")
+    {
+        nm := a.Has("buffName") ? a["buffName"] : ""
+        eff := (nm != "") ? _HotkeysFindBuff(snap, nm) : 0
+        if (eff)
+            rec["lines"].Push("buff '" nm "' x" (eff.Has("charges") ? eff["charges"] : 0) " " (eff.Has("timeLeft") ? Round(eff["timeLeft"]) "ms" : ""))
+        else
+            rec["lines"].Push("buff '" nm "' absent")
+    }
+    else if (t = "vitals")
+    {
+        rec["lines"].Push("vitals " (a.Has("resource") ? a["resource"] : "hp") " " (a.Has("op") ? a["op"] : "<=") " " (a.Has("value") ? a["value"] : 0) "%")
+    }
+
+    ; Output skill cooldown / readiness (applies to any debugged action).
+    rdy := _HotkeysOutputReadiness(hk)
+    if (rdy["cooldownMs"] > 0 || !rdy["ready"])
+        rec["lines"].Push("skill " (rdy["ready"] ? "READY" : "on CD") (rdy["cooldownMs"] > 0 ? " (" rdy["cooldownMs"] "ms)" : ""))
+    return rec
+}
+
+; Counts hostile entities by rarity within a radius. mode "world" uses the
+; per-entity world distance; "cursor" projects to screen and measures pixels
+; from the cursor. Returns Map("normal","magic","rare","unique","total").
+_HotkeysCountByRarity(snap, radius, mode)
+{
+    out := Map("normal", 0, "magic", 0, "rare", 0, "unique", 0, "total", 0)
+    if !snap
+        return out
+    cx := 0, cy := 0, gameHwnd := 0, w2sMatrix := 0, pX := 0, pY := 0, pZ := 0
+    if (mode = "cursor")
+    {
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+            return out
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&cx, &cy)
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
+        pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
+        pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
+    }
+    rarKeys := Map(0, "normal", 1, "magic", 2, "rare", 3, "unique")
+    for entry in _HotkeysAwakeSample(snap)
+    {
+        entity := entry.Has("entity") ? entry["entity"] : 0
+        if !(entity && entity is Map)
+            continue
+        dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
+        if !(dc && dc is Map) || !_HotkeysIsTargetable(dc)
+            continue
+        if (mode = "world")
+        {
+            dist := entry.Has("distance") ? entry["distance"] : -1
+            if (dist < 0 || dist > radius)
+                continue
+        }
+        else
+        {
+            dist := entry.Has("distance") ? entry["distance"] : -1
+            if (dist < 0 || dist > 4000)
+                continue
+            render := dc.Has("render") ? dc["render"] : 0
+            wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
+            if !(wp && wp is Map)
+                continue
+            ci := Map("nearestWorldX", wp.Has("x") ? wp["x"] : 0, "nearestWorldY", wp.Has("y") ? wp["y"] : 0,
+                "nearestWorldZ", wp.Has("z") ? wp["z"] : 0, "w2sMatrix", w2sMatrix,
+                "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+            sp := _WorldToScreen(ci, gameHwnd)
+            if !sp
+                continue
+            ddx := sp["x"] - cx, ddy := sp["y"] - cy
+            if (Sqrt(ddx * ddx + ddy * ddy) > radius)
+                continue
+        }
+        rid := dc.Has("rarityId") ? dc["rarityId"] : -1
+        if rarKeys.Has(rid)
+            out[rarKeys[rid]] += 1
+        out["total"] += 1
+    }
+    return out
 }
 
 ; Returns the runtime-state Map for a hotkey id, creating it on first use.
