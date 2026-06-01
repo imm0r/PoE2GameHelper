@@ -5043,6 +5043,7 @@
         .hk-grip:active { cursor: grabbing; }
         .hk-dragover { outline: 2px dashed var(--codex-gold); outline-offset: 1px; }
         .hk-dragging { opacity: .45; }
+        .hk-disabled { opacity: .4; pointer-events: none; }
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
@@ -5593,8 +5594,11 @@
             filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
           else if (tt === 'custom')
             filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
-          body = `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} `
-               + filt
+          // Scan all ignores the target/sub-filter — grey those out to make that clear.
+          const scanned = !!a.scanAll;
+          const targetBlock = `<span class="${scanned ? 'hk-disabled' : ''}" title="${scanned ? 'Ignored while Scan all is on' : ''}">`
+               + `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} ${filt}</span>`;
+          body = targetBlock + ' '
                + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
                + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
