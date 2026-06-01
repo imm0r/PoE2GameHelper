@@ -252,6 +252,11 @@ HotkeysRegisterAll()
         {
             if (!hk["enabled"] || Trim(hk["key"]) = "")
                 continue
+            ; Automated hotkeys have no manual trigger key — don't register one,
+            ; otherwise a leftover key from a former manual binding would keep
+            ; firing the macro (and suppress the native key when passThrough is off).
+            if (hk["trigger"] = "automated")
+                continue
             binding := _HotkeysBuildBinding(hk)
             if (binding = "")
                 continue
@@ -342,6 +347,11 @@ HotkeysEvaluateTick()
             ; Only "automated"-trigger hotkeys auto-fire here; manual ones fire
             ; on a physical key press (via their registered Hotkey()).
             if (hk["trigger"] != "automated")
+                continue
+            ; Automated firing is condition-driven: a hotkey with no condition
+            ; gate would otherwise spam its effects every tick. Require at least
+            ; one condition action before auto-firing.
+            if !_HotkeysHasConditionAction(hk)
                 continue
 
             id := hk["id"]
