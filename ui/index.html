@@ -5487,6 +5487,22 @@
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
 
+    // Human-readable action labels — mirror the "+ Action" dropdown so the
+    // collapsed/expanded action header reads the same as where it was created
+    // (spaces & casing) instead of the raw camelCase type token.
+    const HK_ACT_LABELS = {
+      press: 'Repeat / Press',
+      repeat: 'Repeat (loop)',
+      hold: 'Hold',
+      chain: 'Chain (link hotkey)',
+      vitals: 'Condition: Vitals',
+      buff: 'Condition: Buff',
+      charges: 'Condition: Charges',
+      monsterCount: 'Condition: Monster count',
+      monsterCountCursor: 'Condition: Monster count @ cursor',
+      aim: 'Mouse move (auto-aim)',
+    };
+
     // Aim chest-type picker: a dropdown of the chest types currently present in
     // the area (pushed live from AHK in hkBindings.chestTypes), plus a Custom…
     // option that reveals a free-text substring field for anything else.
@@ -5506,6 +5522,16 @@
       const a = hkConfig[gi].hotkeys[hi].actions[ai];
       if (v === '__custom__') { a.chestTypeCustom = 1; }
       else { a.chestTypeCustom = 0; a.chestType = v; }
+      hkChanged();
+    }
+
+    // Aim target picker: the synthetic "__all__" option maps to scanAll (aim at
+    // the nearest targetable entity); any real value clears scanAll and sets the
+    // concrete target type.
+    function hkSetAimTarget(gi, hi, ai, v) {
+      const a = hkConfig[gi].hotkeys[hi].actions[ai];
+      if (v === '__all__') { a.scanAll = 1; }
+      else { a.scanAll = 0; a.targetType = v; }
       hkChanged();
     }
 
@@ -5584,26 +5610,32 @@
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
         case 'aim': {
+          // "Scan all" lives at the bottom of the Target dropdown as
+          // "any (debug)": it ignores the target type & sub-filter and aims at
+          // the nearest targetable entity. A real target hides that flag.
+          const scanned = !!a.scanAll;
           const tt = a.targetType || 'monster';
           let filt = '';
-          if (tt === 'monster')
-            filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
-          else if (tt === 'chest')
-            filt = hkChestTypeField(a, gi, hi, ai);
-          else if (tt === 'npc')
-            filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
-          else if (tt === 'custom')
-            filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
-          // Scan all ignores the target/sub-filter — grey those out to make that clear.
-          const scanned = !!a.scanAll;
-          const targetBlock = `<span class="${scanned ? 'hk-disabled' : ''}" title="${scanned ? 'Ignored while Scan all is on' : ''}">`
-               + `Target ${hkSel(a, 'targetType', [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path']], gi, hi, ai)} ${filt}</span>`;
-          body = targetBlock + ' '
+          if (!scanned) {
+            if (tt === 'monster')
+              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
+            else if (tt === 'chest')
+              filt = hkChestTypeField(a, gi, hi, ai);
+            else if (tt === 'npc')
+              filt = `Name ${hkTxt(a, 'name', 'NPC name (substring)', gi, hi, ai)} `;
+            else if (tt === 'custom')
+              filt = `Path ${hkTxt(a, 'metadataPath', 'metadata path (substring)', gi, hi, ai)} `;
+          }
+          const targetOpts = [['monster', 'Monster'], ['chest', 'Chest'], ['npc', 'Player/NPC'], ['custom', 'Custom path'], ['__all__', 'any (debug)']];
+          const selVal = scanned ? '__all__' : tt;
+          const targetSel = `<select title="any (debug) aims at the nearest targetable entity, ignoring the target type and its filter." onchange="hkSetAimTarget(${gi},${hi},${ai},this.value)">`
+               + targetOpts.map(([v, l]) => `<option value="${v}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('')
+               + `</select>`;
+          body = `Target ${targetSel} ${filt}`
                + `Radius ${hkNum(a, 'radius', 1500, gi, hi, ai)} `
                + `${hkSel(a, 'radiusMode', [['player', 'around player (world)'], ['cursor', 'around cursor (px)']], gi, hi, ai)} `
                + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)} `
-               + `${hkChk(a, 'scanAll', 'Scan all', gi, hi, ai)}`;
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}`;
           break;
         }
         default:
@@ -5613,7 +5645,7 @@
                 <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${open ? '▾' : '▸'}</span>
                 <span class="hk-grip" draggable="true" title="Drag to reorder action"
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
-                <span class="hk-act-type">${hkEsc(t)}</span>
+                <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
                 <span class="hk-spacer"></span>
                 <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
