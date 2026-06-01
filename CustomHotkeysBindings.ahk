@@ -173,7 +173,7 @@ _CollectChestTypes()
             if !(entity is Map)
                 continue
             path := entity.Has("path") ? StrLower(entity["path"]) : ""
-            if (path = "" || !InStr(path, "chest"))
+            if (path = "" || (!InStr(path, "chest") && !InStr(path, "strongbox")))
                 continue
             tok := ""
             if RegExMatch(path, "chests/([^/]+)", &m)
@@ -261,4 +261,19 @@ HotkeysSkillReadiness(skillName)
         }
     }
     return out
+}
+
+; Called on every radar tick. Re-pushes hotkey bindings (including the
+; chest-type list) to the UI when the area instance address changes,
+; so the dropdown reflects the new area without requiring a tab reload.
+; Params: snap - current radar snapshot Map.
+HotkeyBindingsOnAreaChange(snap)
+{
+    static _lastAreaAddr := 0
+    inGs := (snap && snap.Has("inGameState")) ? snap["inGameState"] : 0
+    addr := (inGs && inGs.Has("areaInstanceData")) ? inGs["areaInstanceData"] : 0
+    if (addr = 0 || addr = _lastAreaAddr)
+        return
+    _lastAreaAddr := addr
+    SetTimer(PushHotkeyBindingsToWebView, -1)
 }
