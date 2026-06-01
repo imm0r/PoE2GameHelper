@@ -11,9 +11,11 @@
 class PoE2GameStateReader extends PoE2InventoryReader
 {
     ; Initializes the reader state, pattern scan report, entity sample limits, and item name dictionaries.
-    __New(processName := "PathOfExileSteam.exe")
+    ; processNames may be a single exe name or an array of candidates (Steam /
+    ; standalone, 32-/64-bit) — ProcessMemory attaches to whichever is running.
+    __New(processNames := "PathOfExileSteam.exe")
     {
-        this.Mem := ProcessMemory(processName)
+        this.Mem := ProcessMemory(processNames)
         this.GameStatesAddress := 0
         this.StaticAddresses := Map()
         this.MemChrMode := -1

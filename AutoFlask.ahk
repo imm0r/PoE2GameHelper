@@ -759,14 +759,21 @@ ProcessPendingFlaskVerification(slots)
     return text
 }
 
-; Returns the HWND of the running Path of Exile 2 window, checking both Steam and standalone executables.
+; Returns the HWND of the running Path of Exile 2 window, checking every known
+; executable name (Steam / standalone, 32-/64-bit) so it resolves regardless of
+; how the game was installed/launched.
 ; Returns: window handle, or 0 if the game is not running
 ResolvePoEWindow()
 {
-    if WinExist("ahk_exe PathOfExileSteam.exe")
-        return WinGetID("ahk_exe PathOfExileSteam.exe")
-    if WinExist("ahk_exe PathOfExile.exe")
-        return WinGetID("ahk_exe PathOfExile.exe")
+    global g_poeProcessNames
+    names := (IsSet(g_poeProcessNames) && g_poeProcessNames is Array)
+        ? g_poeProcessNames
+        : ["PathOfExileSteam.exe", "PathOfExile_x64Steam.exe", "PathOfExile.exe", "PathOfExile_x64.exe"]
+    for name in names
+    {
+        if WinExist("ahk_exe " name)
+            return WinGetID("ahk_exe " name)
+    }
     return 0
 }
 

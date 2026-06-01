@@ -72,7 +72,12 @@ if A_IsCompiled
 ; Tray icon
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
 
-g_reader := PoE2GameStateReader("PathOfExileSteam.exe")
+; Candidate PoE2 executable names, tried in order. Covers the Steam client,
+; the standalone client, and their 32-/64-bit variants so the helper attaches
+; regardless of how the game was installed/launched.
+g_poeProcessNames := ["PathOfExileSteam.exe", "PathOfExile_x64Steam.exe", "PathOfExile.exe", "PathOfExile_x64.exe"]
+
+g_reader := PoE2GameStateReader(g_poeProcessNames)
 ; Connection state — flipped by EnsureConnected(). When false, the
 ; game-tick timers (radar, flask, ReadAndShow) short-circuit so we
 ; don't spam ReadProcessMemory failures against a dead handle.
@@ -442,15 +447,15 @@ return
 ;   - WebView header push:  surfaces connection state in the title bar
 EnsureConnected()
 {
-    global g_reader, g_isConnected, g_lastConnectedPid, g_valueTree
+    global g_reader, g_isConnected, g_lastConnectedPid, g_valueTree, g_poeProcessNames
 
-    pid := ProcessExist("PathOfExileSteam.exe")
-    if (!pid)
-        pid := ProcessExist("PathOfExile_x64Steam.exe")
-    if (!pid)
-        pid := ProcessExist("PathOfExile.exe")
-    if (!pid)
-        pid := ProcessExist("PathOfExile_x64.exe")
+    pid := 0
+    for name in g_poeProcessNames
+    {
+        pid := ProcessExist(name)
+        if (pid)
+            break
+    }
 
     if (!pid)
     {

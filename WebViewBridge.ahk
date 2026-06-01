@@ -55,7 +55,19 @@ PushHeaderToWebView()
     global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
     global g_lootRarityUnique, g_lootRarityCurrency, g_lootCache, g_lootLastReason
 
-    poeRunning := (ProcessExist("PathOfExileSteam.exe") || ProcessExist("PathOfExile.exe")) ? "true" : "false"
+    global g_poeProcessNames
+    poeRunning := "false"
+    if (IsSet(g_poeProcessNames) && g_poeProcessNames is Array)
+    {
+        for name in g_poeProcessNames
+        {
+            if (ProcessExist(name))
+            {
+                poeRunning := "true"
+                break
+            }
+        }
+    }
     slot1Key := g_flaskKeyBySlot.Has(1) ? g_flaskKeyBySlot[1] : "?"
     slot2Key := g_flaskKeyBySlot.Has(2) ? g_flaskKeyBySlot[2] : "?"
     connected := (IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle) ? "true" : "false"

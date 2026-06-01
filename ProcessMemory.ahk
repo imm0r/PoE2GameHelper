@@ -1,9 +1,14 @@
 class ProcessMemory
 {
     ; Initializes all process, handle, and module tracking fields to zero/default.
-    __New(processName := "PathOfExileSteam.exe")
+    ; processNames may be a single exe name or an array of candidates (Steam,
+    ; standalone, 32/64-bit). Open() picks the first one that is running.
+    __New(processNames := "PathOfExileSteam.exe")
     {
-        this.ProcessName := processName
+        this.ProcessNames := (processNames is Array) ? processNames : [processNames]
+        ; The candidate actually matched by Open() — kept current so module
+        ; lookup in RefreshMainModuleInfo() targets the right executable.
+        this.ProcessName := this.ProcessNames[1]
         this.Pid := 0
         this.Handle := 0
         this.ModuleBase := 0
@@ -31,11 +36,20 @@ class ProcessMemory
     {
         this.Close()
 
-        pid := ProcessExist(this.ProcessName)
-        if (!pid)
+        ; Try each candidate executable (Steam / standalone / 32-/64-bit). The
+        ; first one that is running wins and becomes the active ProcessName so
+        ; the module enumeration below matches it.
+        pid := 0
+        for name in this.ProcessNames
         {
-            baseName := StrReplace(this.ProcessName, ".exe")
-            pid := ProcessExist(baseName)
+            pid := ProcessExist(name)
+            if (!pid)
+                pid := ProcessExist(StrReplace(name, ".exe"))
+            if (pid)
+            {
+                this.ProcessName := name
+                break
+            }
         }
 
         if (!pid)

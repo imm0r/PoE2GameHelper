@@ -73,10 +73,9 @@ class ItemSizeRegistry
                 ;   4 cols → id, name, w, h      (our PoeDataExtract output)
                 ; Width/height are always the last two columns.
                 key := parts[1]
-                w   := Integer(parts[parts.Length - 1])
-                h   := Integer(parts[parts.Length])
-                ; First non-empty line of the new 4-col format is a
-                ; header row ("id\tname\twidth\theight") — skip it.
+                ; First non-empty line of the new 4-col format is a header row
+                ; ("id\tname\twidth\theight"). Skip it BEFORE the numeric parse
+                ; below — otherwise Integer("width") throws and aborts the load.
                 if (firstLine && StrLower(parts[1]) = "id"
                     && (parts.Length >= 4 ? StrLower(parts[2]) = "name" : true))
                 {
@@ -84,6 +83,16 @@ class ItemSizeRegistry
                     continue
                 }
                 firstLine := false
+                ; Width/height must be integers; a stray non-numeric row (an
+                ; unexpected header/comment) is skipped rather than crashing the
+                ; whole registry load.
+                if (!IsInteger(parts[parts.Length - 1]) || !IsInteger(parts[parts.Length]))
+                {
+                    skipped += 1
+                    continue
+                }
+                w := Integer(parts[parts.Length - 1])
+                h := Integer(parts[parts.Length])
                 if (w <= 0 || w > 16 || h <= 0 || h > 16)
                 {
                     skipped += 1
