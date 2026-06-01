@@ -47,9 +47,12 @@ GetPoeMainWindowHwnd()
 
 ResolvePoeExeNameFromCachedInstall()
 {
-    ; _ConfigPath() is defined in ConfigManager.ahk and always available in the
-    ; included app build; it resolves to the same gamehelper_config.ini path.
-    configPath := _ConfigPath()
+    ; Resolve the config path inline rather than calling _ConfigPath():
+    ; ProcessMemory.ahk is included by standalone entrypoints (SmokeTest.ahk,
+    ; PatternScanDemo.ahk, GgpkMemoryMonitorApp.ahk) that don't include
+    ; ConfigManager.ahk, where _ConfigPath() lives — and a call to an undefined
+    ; function is a load-time error in v2. This mirrors _ConfigPath() exactly.
+    configPath := A_ScriptDir "\gamehelper_config.ini"
 
     indexPath := IniRead(configPath, "GgpkTools", "lastIndexPath", "")
     if (!FileExist(indexPath))
