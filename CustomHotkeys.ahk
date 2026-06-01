@@ -127,10 +127,27 @@ _HotkeysNormalizeHotkey(hk)
         "skillName", outRaw.Has("skillName") ? outRaw["skillName"] : "",
         "key", outRaw.Has("key") ? outRaw["key"] : (hk.Has("key") ? hk["key"] : "")
     )
+    ; Trigger mode: "manual" fires only on a physical key press; "automated"
+    ; auto-fires from the eval tick whenever the hotkey's conditions are met.
+    ; Default for legacy configs: automated if it has a condition action.
+    hasCond := false
+    for a in actions
+    {
+        if (a is Map && a.Has("type"))
+        {
+            ct := a["type"]
+            if (ct = "vitals" || ct = "buff" || ct = "charges" || ct = "monsterCount" || ct = "monsterCountCursor")
+                hasCond := true
+        }
+    }
+    trigger := hk.Has("trigger") ? hk["trigger"] : (hasCond ? "automated" : "manual")
+    if (trigger != "automated" && trigger != "manual")
+        trigger := "manual"
     return Map(
         "id", id,
         "name", hk.Has("name") ? hk["name"] : ("Hotkey #" id),
         "enabled", _HkBool(hk, "enabled", 1),
+        "trigger", trigger,
         "focusOnly", _HkBool(hk, "focusOnly", 1),
         "safeZoneDisabled", _HkBool(hk, "safeZoneDisabled", 0),
         "passThrough", _HkBool(hk, "passThrough", 0),
@@ -322,8 +339,10 @@ HotkeysEvaluateTick()
         {
             if !hk["enabled"]
                 continue
-            if !_HotkeysHasConditionAction(hk)
-                continue   ; manual / chain-only hotkey
+            ; Only "automated"-trigger hotkeys auto-fire here; manual ones fire
+            ; on a physical key press (via their registered Hotkey()).
+            if (hk["trigger"] != "automated")
+                continue
 
             id := hk["id"]
             rt := _HotkeysRuntime(id)

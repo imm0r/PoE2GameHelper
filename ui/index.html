@@ -5413,7 +5413,13 @@
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
             <span class="hk-id">ID #${hk.id}</span>
             <span class="hk-id" style="color:var(--text)">Trigger:</span>
-            <button class="hk-btn hk-key-btn" title="Key you press to fire this macro" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
+            <select title="Manual = fires on key press. Automated = fires automatically when this hotkey's conditions are met." onchange="hkSetHk(${gi},${hi},'trigger',this.value)">
+              <option value="manual" ${hk.trigger !== 'automated' ? 'selected' : ''}>Manual (key)</option>
+              <option value="automated" ${hk.trigger === 'automated' ? 'selected' : ''}>Automated (conditions)</option>
+            </select>
+            ${hk.trigger === 'automated'
+              ? `<span class="hk-id" style="font-style:italic">auto-fires when conditions met</span>`
+              : `<button class="hk-btn hk-key-btn" title="Key you press to fire this macro" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
             <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
             <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
@@ -5421,7 +5427,7 @@
             <label><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)">Alt</label>
             <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>
+                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>`}
             <span class="hk-spacer"></span>
             <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
@@ -5663,7 +5669,7 @@
 
     function hkAddHotkey(gi) {
       hkConfig[gi].hotkeys.push({
-        id: 0, name: 'New hotkey', enabled: 1, focusOnly: 1, safeZoneDisabled: 0,
+        id: 0, name: 'New hotkey', enabled: 1, trigger: 'manual', focusOnly: 1, safeZoneDisabled: 0,
         key: '', output: { kind: 'flask', slot: 1, skillName: '', key: '' },
         mods: { ctrl: 0, shift: 0, alt: 0, gamepadLT: 0 }, actions: []
       });
