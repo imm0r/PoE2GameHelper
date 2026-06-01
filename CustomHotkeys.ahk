@@ -426,27 +426,22 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         "lines", []
     )
 
-    if (t = "monsterCount")
-    {
-        radius := a.Has("radius") ? (a["radius"] + 0) : 1500
-        rec["circleWorld"] := radius
-        counts := _HotkeysCountByRarity(snap, radius, "world")
-        rec["counts"] := counts
-        rec["lines"].Push("N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
-    }
-    else if (t = "monsterCountCursor")
+    if (t = "monsterCount" || t = "monsterCountCursor")
     {
         px := a.Has("radius") ? (a["radius"] + 0) : 120
-        rec["circleCursorPx"] := px
-        counts := _HotkeysCountByRarity(snap, px, "cursor")
+        ; Legacy "monsterCountCursor" is always cursor-origin.
+        mode := (t = "monsterCountCursor" || (a.Has("radiusMode") && a["radiusMode"] = "cursor")) ? "cursor" : "player"
+        rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
+        counts := _HotkeysCountByRarity(snap, px, mode)
         rec["counts"] := counts
-        rec["lines"].Push("@cursor N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
     }
     else if (t = "aim")
     {
-        radius := a.Has("radius") ? (a["radius"] + 0) : 1500
-        rec["circleWorld"] := radius
-        rec["lines"].Push("aim radius " radius)
+        px := a.Has("radius") ? (a["radius"] + 0) : 150
+        mode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
+        rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
+        rec["lines"].Push("aim radius " px "px @" mode)
     }
     else if (t = "charges")
     {
@@ -479,29 +474,20 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
 }
 
 ; Counts hostile entities by rarity within a radius. mode "world" uses the
-; per-entity world distance; "cursor" projects to screen and measures pixels
-; from the cursor. Returns Map("normal","magic","rare","unique","total").
+; per-entity world distance; "cursor"/"player" project to screen and measure
+; pixels from the cursor / the player's on-screen position. Returns
+; Map("normal","magic","rare","unique","total").
 _HotkeysCountByRarity(snap, radius, mode)
 {
     out := Map("normal", 0, "magic", 0, "rare", 0, "unique", 0, "total", 0)
     if !snap
         return out
-    cx := 0, cy := 0, gameHwnd := 0, w2sMatrix := 0, pX := 0, pY := 0, pZ := 0
-    if (mode = "cursor")
+    octx := 0
+    if (mode != "world")
     {
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
+        octx := _HotkeysPxOrigin(snap, mode)
+        if !octx
             return out
-        CoordMode("Mouse", "Screen")
-        MouseGetPos(&cx, &cy)
-        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-        w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-        prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-        pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
-        pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
-        pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
     }
     rarKeys := Map(0, "normal", 1, "magic", 2, "rare", 3, "unique")
     for entry in _HotkeysAwakeSample(snap)
@@ -527,14 +513,8 @@ _HotkeysCountByRarity(snap, radius, mode)
             wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
             if !(wp && wp is Map)
                 continue
-            ci := Map("nearestWorldX", wp.Has("x") ? wp["x"] : 0, "nearestWorldY", wp.Has("y") ? wp["y"] : 0,
-                "nearestWorldZ", wp.Has("z") ? wp["z"] : 0, "w2sMatrix", w2sMatrix,
-                "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
-            sp := _WorldToScreen(ci, gameHwnd)
-            if !sp
-                continue
-            ddx := sp["x"] - cx, ddy := sp["y"] - cy
-            if (Sqrt(ddx * ddx + ddy * ddy) > radius)
+            d := _HotkeysPxDist(octx, wp.Has("x") ? wp["x"] : 0, wp.Has("y") ? wp["y"] : 0, wp.Has("z") ? wp["z"] : 0)
+            if (d < 0 || d > radius)
                 continue
         }
         rid := dc.Has("rarityId") ? dc["rarityId"] : -1
@@ -572,7 +552,10 @@ _HotkeysReFireGap(hk)
     gap := 250
     for a in hk["actions"]
     {
-        if (a.Has("type") && a["type"] = "repeat")
+        t := a.Has("type") ? a["type"] : ""
+        ; "repeat" is the legacy type; "key" with mode "loop" is the merged form.
+        isLoop := (t = "repeat") || (t = "key" && a.Has("mode") && a["mode"] = "loop")
+        if (isLoop)
         {
             iv := a.Has("intervalMs") ? (a["intervalMs"] + 0) : 0
             if (iv > 0 && iv < gap)
@@ -712,6 +695,8 @@ _HotkeysRunActions(hk, context, depth)
             case "monsterCountCursor":
                 if !_HotkeysCheckMonsterCountCursor(a, snap)
                     return
+            case "key":
+                _HotkeysDoKey(hk, a)
             case "press":
                 _HotkeysSendKey(_HotkeysResolveKey(hk))
             case "repeat":
@@ -827,71 +812,15 @@ _HotkeysFindBuff(snap, name)
     return 0
 }
 
-; Monster-count gate: counts hostile (targetable) entities within radius,
-; optionally filtered by rarity, and compares to the threshold.
-; action: Map("radius", r, "rarity","any"|"normal"|"magic"|"rare"|"unique",
-;             "op",">=", "value", n)
-_HotkeysCheckMonsterCount(a, snap)
+; Builds the screen-projection origin for a pixel-radius test. originMode
+; "cursor" uses the mouse position; "player" uses the player's own projected
+; screen position. Returns a Map (hwnd, w2sMatrix, player world pos, origin
+; screen point ox/oy) or 0 if the game/window/projection is unavailable.
+_HotkeysPxOrigin(snap, originMode)
 {
-    if !snap
-        return false
-    radius := a.Has("radius") ? (a["radius"] + 0) : 1500
-    rarity := a.Has("rarity") ? a["rarity"] : "any"
-    rarMap := Map("normal", 0, "magic", 1, "rare", 2, "unique", 3)
-    wantRar := rarMap.Has(rarity) ? rarMap[rarity] : -1
-
-    count := 0
-    for entry in _HotkeysAwakeSample(snap)
-    {
-        entity := entry.Has("entity") ? entry["entity"] : 0
-        if !(entity && entity is Map)
-            continue
-        dist := entry.Has("distance") ? entry["distance"] : -1
-        if (dist < 0 || dist > radius)
-            continue
-        dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
-        if !(dc && dc is Map)
-            continue
-        if !_HotkeysIsTargetable(dc)
-            continue
-        if (wantRar >= 0)
-        {
-            rid := dc.Has("rarityId") ? dc["rarityId"] : -1
-            if (rid != wantRar)
-                continue
-        }
-        count += 1
-    }
-    return _HotkeysCompare(count, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
-}
-
-; Monster-count-at-cursor gate: like _HotkeysCheckMonsterCount but measures the
-; screen-pixel distance from the mouse cursor instead of world distance from the
-; player. Each hostile entity is projected to screen via _WorldToScreen and
-; counted if within <radius> pixels of the cursor.
-; action: Map("radius", px, "rarity","any"|..., "op",">=", "value", n,
-;             "worldRadius", maxWorldDist)  -- worldRadius pre-filters far
-;             entities before projection (default 4000) for performance.
-_HotkeysCheckMonsterCountCursor(a, snap)
-{
-    if !snap
-        return false
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
-        return false
-
-    pxRadius := a.Has("radius") ? (a["radius"] + 0) : 120
-    worldRadius := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 4000
-    rarity := a.Has("rarity") ? a["rarity"] : "any"
-    rarMap := Map("normal", 0, "magic", 1, "rare", 2, "unique", 3)
-    wantRar := rarMap.Has(rarity) ? rarMap[rarity] : -1
-
-    ; Current cursor position in screen coordinates.
-    cx := 0, cy := 0
-    CoordMode("Mouse", "Screen")
-    MouseGetPos(&cx, &cy)
-
-    ; Player world pos + W2S matrix for projection.
+        return 0
     inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
     w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
     area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
@@ -900,6 +829,60 @@ _HotkeysCheckMonsterCountCursor(a, snap)
     pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
     pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
     pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
+    ox := 0, oy := 0
+    if (originMode = "cursor")
+    {
+        CoordMode("Mouse", "Screen")
+        MouseGetPos(&ox, &oy)
+    }
+    else
+    {
+        ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
+            "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+        sp := _WorldToScreen(ci, gameHwnd)
+        if !sp
+            return 0
+        ox := sp["x"], oy := sp["y"]
+    }
+    return Map("hwnd", gameHwnd, "w2sMatrix", w2sMatrix,
+        "px", pX, "py", pY, "pz", pZ, "ox", ox, "oy", oy)
+}
+
+; Screen-pixel distance from a px-origin (see _HotkeysPxOrigin) to a world
+; point projected via the same W2S matrix. Returns -1 if not projectable.
+_HotkeysPxDist(octx, wx, wy, wz)
+{
+    ci := Map("nearestWorldX", wx, "nearestWorldY", wy, "nearestWorldZ", wz,
+        "w2sMatrix", octx["w2sMatrix"],
+        "playerWorldX", octx["px"], "playerWorldY", octx["py"], "playerWorldZ", octx["pz"])
+    sp := _WorldToScreen(ci, octx["hwnd"])
+    if !sp
+        return -1
+    ddx := sp["x"] - octx["ox"]
+    ddy := sp["y"] - octx["oy"]
+    return Sqrt(ddx * ddx + ddy * ddy)
+}
+
+; Monster-count gate: counts hostile (targetable) entities within a screen-pixel
+; radius of the chosen origin (cursor or the player's on-screen position),
+; optionally filtered by rarity, and compares to the threshold.
+; action: Map("radius", px, "radiusMode","cursor"|"player",
+;             "rarity","any"|"normal"|"magic"|"rare"|"unique", "op",">=",
+;             "value", n, "worldRadius", maxWorldDist)
+;   worldRadius pre-filters far entities before projection (default 4000).
+_HotkeysCheckMonsterCount(a, snap)
+{
+    if !snap
+        return false
+    pxRadius := a.Has("radius") ? (a["radius"] + 0) : 120
+    worldRadius := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 4000
+    rarity := a.Has("rarity") ? a["rarity"] : "any"
+    rarMap := Map("normal", 0, "magic", 1, "rare", 2, "unique", 3)
+    wantRar := rarMap.Has(rarity) ? rarMap[rarity] : -1
+    originMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
+    octx := _HotkeysPxOrigin(snap, originMode)
+    if !octx
+        return false
 
     count := 0
     for entry in _HotkeysAwakeSample(snap)
@@ -907,7 +890,6 @@ _HotkeysCheckMonsterCountCursor(a, snap)
         entity := entry.Has("entity") ? entry["entity"] : 0
         if !(entity && entity is Map)
             continue
-        ; Cheap world-distance pre-filter to avoid projecting the whole map.
         dist := entry.Has("distance") ? entry["distance"] : -1
         if (dist < 0 || dist > worldRadius)
             continue
@@ -926,22 +908,21 @@ _HotkeysCheckMonsterCountCursor(a, snap)
         wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
         if !(wp && wp is Map)
             continue
-        combatInfo := Map(
-            "nearestWorldX", wp.Has("x") ? wp["x"] : 0,
-            "nearestWorldY", wp.Has("y") ? wp["y"] : 0,
-            "nearestWorldZ", wp.Has("z") ? wp["z"] : 0,
-            "w2sMatrix", w2sMatrix,
-            "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ
-        )
-        sp := _WorldToScreen(combatInfo, gameHwnd)
-        if !sp
+        d := _HotkeysPxDist(octx, wp.Has("x") ? wp["x"] : 0, wp.Has("y") ? wp["y"] : 0, wp.Has("z") ? wp["z"] : 0)
+        if (d < 0 || d > pxRadius)
             continue
-        ddx := sp["x"] - cx
-        ddy := sp["y"] - cy
-        if (Sqrt(ddx * ddx + ddy * ddy) <= pxRadius)
-            count += 1
+        count += 1
     }
     return _HotkeysCompare(count, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
+}
+
+; Legacy alias: the old "monsterCountCursor" action is now just a monster-count
+; gate with radiusMode "cursor". Kept so pre-merge configs/exports still run.
+_HotkeysCheckMonsterCountCursor(a, snap)
+{
+    a2 := a.Clone()
+    a2["radiusMode"] := "cursor"
+    return _HotkeysCheckMonsterCount(a2, snap)
 }
 
 ; Returns the awake-entity sample array from a snapshot, or an empty array.
@@ -1002,6 +983,19 @@ _HotkeysSendKey(key)
     }
     _HotkeysMarkInjected(key)
     try _SendSkillKey(key, gameHwnd)
+}
+
+; Merged key action: dispatches on "mode" to the press / hold / loop behaviour.
+; action: Map("mode","press"|"hold"|"loop", ...mode-specific fields)
+_HotkeysDoKey(hk, a)
+{
+    mode := a.Has("mode") ? a["mode"] : "press"
+    if (mode = "hold")
+        _HotkeysDoHold(hk, a)
+    else if (mode = "loop")
+        _HotkeysDoRepeat(hk, a)
+    else
+        _HotkeysSendKey(_HotkeysResolveKey(hk))
 }
 
 ; Repeat action: presses the output key repeatedly.
@@ -1157,35 +1151,22 @@ _HotkeysDoAim(hk, a, snap)
     }
 }
 
-; Selects the nearest entity matching the aim filter within radius.
+; Selects the nearest entity matching the aim filter within a screen-pixel
+; radius of the chosen origin (mouse cursor or the player's on-screen position).
 ; Returns Map("x","y","z") of the target world position, or 0.
 _HotkeysSelectAimTarget(a, snap)
 {
-    radius := a.Has("radius") ? (a["radius"] + 0) : 1500
+    radius := a.Has("radius") ? (a["radius"] + 0) : 150
     scanAll := a.Has("scanAll") && a["scanAll"]
     targetType := a.Has("targetType") ? a["targetType"] : "monster"
-    ; Radius origin: "player" measures world distance from the player; "cursor"
-    ; measures screen-pixel distance from the mouse cursor (projected via W2S).
-    cursorMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor")
+    ; Radius origin: pixel distance measured either from the cursor or from the
+    ; player's projected screen position (both in screen pixels).
+    originMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
+    worldPre := 4000   ; cheap world pre-filter before projecting
 
-    cx := 0, cy := 0, gameHwnd := 0, w2sMatrix := 0, pX := 0, pY := 0, pZ := 0
-    worldPre := 4000   ; world pre-filter before projecting, in cursor mode
-    if cursorMode
-    {
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
-            return 0
-        CoordMode("Mouse", "Screen")
-        MouseGetPos(&cx, &cy)
-        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-        w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-        prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-        pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
-        pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
-        pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
-    }
+    octx := _HotkeysPxOrigin(snap, originMode)
+    if !octx
+        return 0
 
     bestDist := radius + 1
     best := 0
@@ -1195,11 +1176,7 @@ _HotkeysSelectAimTarget(a, snap)
         if !(entity && entity is Map)
             continue
         dist := entry.Has("distance") ? entry["distance"] : -1
-        if (dist < 0)
-            continue
-        if (!cursorMode && dist > radius)
-            continue
-        if (cursorMode && dist > worldPre)
+        if (dist < 0 || dist > worldPre)
             continue
         if (!scanAll && !_HotkeysAimMatches(entity, a, targetType))
             continue
@@ -1212,20 +1189,9 @@ _HotkeysSelectAimTarget(a, snap)
         wy := wp.Has("y") ? wp["y"] : 0
         wz := wp.Has("z") ? wp["z"] : 0
 
-        metric := dist
-        if cursorMode
-        {
-            ci := Map("nearestWorldX", wx, "nearestWorldY", wy, "nearestWorldZ", wz,
-                "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
-            sp := _WorldToScreen(ci, gameHwnd)
-            if !sp
-                continue
-            ddx := sp["x"] - cx, ddy := sp["y"] - cy
-            metric := Sqrt(ddx * ddx + ddy * ddy)
-            if (metric > radius)
-                continue
-        }
-
+        metric := _HotkeysPxDist(octx, wx, wy, wz)
+        if (metric < 0 || metric > radius)
+            continue
         if (metric < bestDist)
         {
             bestDist := metric
