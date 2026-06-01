@@ -31,7 +31,7 @@ class PoE2Offsets
         "WorldAreaDetailsPtr", 0x98,
         "WorldAreaDetailsRowPtr", 0xA0,
         "CameraStructure", 0xA0,
-        "W2SMatrix", 0x1A0   ; CameraStructure(0xA0) + Matrix4x4 offset(0x100)
+        "W2SMatrix", 0x1A8   ; CameraStructure(0xA0) + Matrix4x4 offset(0x108) — PoE2 v0.5
     )
 
     static AreaInstance := Map(
