@@ -47,9 +47,12 @@ GetPoeMainWindowHwnd()
 
 ResolvePoeExeNameFromCachedInstall()
 {
+    ; Resolve the config path inline rather than calling _ConfigPath():
+    ; ProcessMemory.ahk is included by standalone entrypoints (SmokeTest.ahk,
+    ; PatternScanDemo.ahk, GgpkMemoryMonitorApp.ahk) that don't include
+    ; ConfigManager.ahk, where _ConfigPath() lives — and a call to an undefined
+    ; function is a load-time error in v2. This mirrors _ConfigPath() exactly.
     configPath := A_ScriptDir "\gamehelper_config.ini"
-    if IsFunc("_ConfigPath")
-        configPath := _ConfigPath()
 
     indexPath := IniRead(configPath, "GgpkTools", "lastIndexPath", "")
     if (!FileExist(indexPath))
@@ -112,9 +115,10 @@ ParseSteamLibraryPaths(vdfPath)
     paths := []
     for line in StrSplit(contents, "`n")
     {
-        if RegExMatch(line, '"path"\s*"([^"]+)"', m)
+        if RegExMatch(line, '"path"\s*"([^"]+)"', &m)
         {
-            path := StrReplace(m1, "\\", "\\")
+            ; libraryfolders.vdf escapes backslashes ("C:\\Games") — unescape.
+            path := StrReplace(m[1], "\\", "\")
             if (path != "" && DirExist(path))
                 paths.Push(path)
         }
@@ -126,8 +130,8 @@ ParseAcfKey(manifestPath, key)
 {
     contents := FileRead(manifestPath)
     pattern := '"' key '"\s*"([^"]+)"'
-    if RegExMatch(contents, pattern, m)
-        return m1
+    if RegExMatch(contents, pattern, &m)
+        return m[1]
     return ""
 }
 
@@ -144,7 +148,10 @@ class ProcessMemory
     ; Initializes all process, handle, and module tracking fields to zero/default.
     __New(processName := "")
     {
-        this.ProcessName := (processName != "") ? processName : DetectPoeExeName()
+        ; Initialize all fields first so the object is fully formed even if the
+        ; executable detection below throws — otherwise __Delete/Close() would
+        ; later fault on a missing this.Handle.
+        this.ProcessName := ""
         this.Pid := 0
         this.Handle := 0
         this.ModuleBase := 0
@@ -158,6 +165,7 @@ class ProcessMemory
         this.ModuleSnapshotSize := 0
         this.ScanBase := 0
         this.ScanSize := 0
+        this.ProcessName := (processName != "") ? processName : DetectPoeExeName()
     }
 
     ; Closes the process handle when the object is destroyed.
@@ -202,7 +210,9 @@ class ProcessMemory
     ; Closes the process handle and resets all cached module, snapshot, and scan state.
     Close()
     {
-        if (this.Handle)
+        ; Guard against a partially-constructed object (e.g. if __New threw
+        ; during executable detection before Handle was assigned).
+        if (this.HasOwnProp("Handle") && this.Handle)
             DllCall("CloseHandle", "Ptr", this.Handle)
 
         this.Pid := 0
