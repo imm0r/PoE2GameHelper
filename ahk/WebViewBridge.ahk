@@ -1237,9 +1237,10 @@ _FmtChainHex(addr)
 ; so all diagnostic outputs live with the same prefix.
 _WriteChainLog(text)
 {
-    path := A_ScriptDir "\InGameStateMonitor.inventory_chain.log"
+    path := A_ScriptDir "\logs\InGameStateMonitor.inventory_chain.log"
     try
     {
+        try DirCreate(A_ScriptDir "\logs")
         f := FileOpen(path, "w", "UTF-8")
         if !f
             return "FileOpen-failed path=" path

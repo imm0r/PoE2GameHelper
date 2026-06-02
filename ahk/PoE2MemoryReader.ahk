@@ -169,14 +169,14 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this.ModNameMap := Map()
         this.BaseItemNameMap := Map()
         this.UniqueItemNameMap := Map()
-        this.LoadModNameMap(A_ScriptDir "\\data\\mod_name_map.tsv")
+        this.LoadModNameMap(AppRoot() "\\data\\mod_name_map.tsv")
         ; base_item_sizes.tsv has 4 cols (id, name, width, height); the
         ; LoadBaseItemNameMap reader only consumes the first two, so one
         ; TSV feeds both ItemSizeRegistry and BaseItemNameMap. The old
         ; data/base_item_name_map.tsv is obsolete (was a strict subset of
         ; base_item_sizes.tsv) and is no longer generated.
-        this.LoadBaseItemNameMap(A_ScriptDir "\\data\\base_item_sizes.tsv")
-        this.LoadUniqueItemNameMap(A_ScriptDir "\\data\\unique_item_name_map.tsv")
+        this.LoadBaseItemNameMap(AppRoot() "\\data\\base_item_sizes.tsv")
+        this.LoadUniqueItemNameMap(AppRoot() "\\data\\unique_item_name_map.tsv")
     }
 
     ; Opens the process and resolves the GameStates address via pattern scan, falling back to heuristic scan.
@@ -591,7 +591,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (outputPath = "")
         {
             stamp := FormatTime(, "yyyyMMdd_HHmmss")
-            outputPath := A_ScriptDir "\\PatternScanDebug_" stamp ".log"
+            try DirCreate(AppRoot() "\logs")
+            outputPath := AppRoot() "\logs\PatternScanDebug_" stamp ".log"
         }
 
         patterns := this.GetStaticPatterns()
@@ -648,7 +649,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (outputPath = "")
         {
             stamp := FormatTime(, "yyyyMMdd_HHmmss")
-            outputPath := A_ScriptDir "\\PatternScanDebug_" stamp ".csv"
+            try DirCreate(AppRoot() "\logs")
+            outputPath := AppRoot() "\logs\PatternScanDebug_" stamp ".csv"
         }
 
         patterns := this.GetStaticPatterns()
@@ -2447,7 +2449,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                             }
                             lines .= line "`n"
                         }
-                        FileAppend lines, A_ScriptDir "\debug\terrain_dump.txt"
+                        FileAppend lines, AppRoot() "\debug\terrain_dump.txt"
                     }
                 }
             }
@@ -3340,7 +3342,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
     {
         if !outDir
         {
-            outDir := A_ScriptDir "\debug"
+            outDir := AppRoot() "\debug"
             if !DirExist(outDir)
                 DirCreate(outDir)
         }

@@ -71,8 +71,8 @@ class GgpkMemoryMonitor
     {
         if (jsonFilePath = "")
         {
-            uiOnly := A_ScriptDir "\ggpk_ui_files_only.json"
-            full := A_ScriptDir "\ggpk_directory_tree.json"
+            uiOnly := AppRoot() "\ggpk_ui_files_only.json"
+            full := AppRoot() "\ggpk_directory_tree.json"
             if FileExist(uiOnly)
                 jsonFilePath := uiOnly
             else if FileExist(full)

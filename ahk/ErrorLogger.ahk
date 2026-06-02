@@ -10,6 +10,9 @@ InitializeErrorLog()
     global g_errorLogPath
     try
     {
+        SplitPath(g_errorLogPath, , &logDir)
+        if (logDir != "")
+            DirCreate(logDir)
         header := "`n===== Start " FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") " | PID=" DllCall("GetCurrentProcessId", "UInt") " =====`n"
         FileAppend(header, g_errorLogPath, "UTF-8")
     }

@@ -4,7 +4,7 @@
 ; Included by InGameStateMonitor.ahk
 
 ; Returns the full path to the configuration INI file.
-_ConfigPath() => A_ScriptDir "\gamehelper_config.ini"
+_ConfigPath() => AppRoot() "\gamehelper_config.ini"
 
 ; Normalises a stored maphack color hex string into a clean 8-char
 ; RRGGBBAA form. Strips an optional leading '#', upper-cases, and

@@ -26,6 +26,7 @@
 - [Highlights](#highlights)
 - [Features](#features)
   - [Automation](#-automation)
+  - [Custom Hotkeys](#️-custom-hotkeys))
   - [Loot Pickup](#-loot-pickup)
   - [Overlays](#-overlays)
   - [GGPK Maphack](#-ggpk-maphack)
@@ -56,9 +57,13 @@
 
 📜 **Arcane Codex UI** — leather-bound grimoire aesthetic, with a full-height logo rail anchoring three stacked navigation rows, a sliding gold underline that glides between active tabs, and a header pill vocabulary that pulses copper when paused and crimson when disconnected.
 
+⌨️ **Custom Hotkeys** — a full macro editor (Groups → Hotkeys → Actions) whose output binds to your real in-game flask/skill slots. Manual or condition-driven *automated* triggers, a merged key action (press / hold / loop), chaining, gameplay conditions (vitals / buffs / charges / monster count), and a pixel-radius **auto-aim** around the cursor or the player.
+
 🛰 **Radar overlay** — high-performance GDI render with full-zone reveal, entity icons, A\* path drawing.
 
 💧 **AutoFlask** — life/mana threshold automation with cooldown-aware fallbacks.
+
+🔌 **Automatic executable detection** — attaches to PoE2 whether it's the Steam or standalone client (32-/64-bit), no configuration needed.
 
 ---
 
@@ -79,6 +84,29 @@ The priority chain is *combat > loot > explore*; each stage claims a tick by ret
 <div align="center">
   <img src="assets/configuration1.png" width="800" alt="AutoPilot configuration">
   <p><em>AutoPilot configuration — master toggle, F10 hotkey, status feed, with the advanced tuning collapsed.</em></p>
+</div>
+
+### ⌨️ Custom Hotkeys
+
+A dedicated **Hotkeys** tab turns the helper into a programmable macro engine. The model is three nested levels — **Groups → Hotkeys → Actions** — all drag-to-reorder, collapsible, and individually toggleable, with per-item import/export to JSON.
+
+<div align="center">
+  <img src="assets/hotkeys1.png" width="800" alt="Hotkeys tab — groups, hotkeys, output binding and trigger mode">
+  <p><em>Hotkeys tab — a group of hotkeys, each with its output bound to an in-game slot and a manual/automated trigger.</em></p>
+</div>
+
+Every hotkey's **output is bound to a real in-game bind** picked from a dropdown of your actual flask/skill slots (parsed from `poe2_production_Config.ini`), so you never re-type key names — the trigger key is captured separately.
+
+- **Triggers** — *manual* (fires on the physical key press) or *automated* (auto-fires from the evaluation tick whenever the hotkey's conditions are met). An optional **one-shot per tick** guard limits automated firing to the highest-priority hotkey in list order.
+- **Key action** — a single action with a **Mode** selector: *press once*, *hold* (configurable duration), or *loop / repeat* (finite count + interval, or an infinite toggle). Repeats are cooldown-aware so a skill isn't spammed during its cooldown.
+- **Chain** — trigger another hotkey by id (with a delay and a user/program trigger filter) to compose multi-step macros.
+- **Conditions** — gate an action on live game state: **vitals** (life/ES/mana %), **buff** present/absent with min stacks & time-left, **charges** (power/frenzy/endurance/charged-staff), and **monster count** within a screen-pixel radius measured *around the cursor* or *around the player*.
+- **Auto-aim** — moves the cursor to the nearest matching entity inside a pixel radius (around cursor or player). Target type is chosen from a dropdown — *monster* (with rarity filter), *chest* (with a live dropdown of the chest types actually present in the area), *player/NPC*, *custom metadata path*, or *any (debug)* to scan everything — with an optional key press / hold after aiming.
+- **Per-action debug overlay** — a 🐞 toggle draws the action's range circle (cursor- or player-centred), live monster counts by rarity, cooldown and charge readouts right on the game overlay.
+
+<div align="center">
+  <img src="assets/hotkeys2.png" width="800" alt="Hotkeys tab — action editor with conditions and auto-aim">
+  <p><em>The action editor — key/condition/aim actions with per-action debug toggles and drag-to-reorder.</em></p>
 </div>
 
 ### 💎 Loot Pickup
@@ -232,7 +260,7 @@ The top of the app is a single visual frame around three stacked rows on the rig
 | Row | Contents |
 |---|---|
 | Pills row | State pills (Connect · Pause · Debug · AutoFlask · AutoPilot · Radar · HUD · Map · FPS) + `↺ Snap` / `▶ PoE2` dual button + window controls (min / max / close) |
-| Category bar | `GAME` · `RE` · `DATA` · `CONFIG` + the **📌 Always-on-Top** pin (next to Config, tilted -25° when off, upright + gilded when on; state persisted to the config INI) |
+| Category bar | `GAME` · `RE` · `DATA` · `HOTKEYS` · `CONFIG` + the **📌 Always-on-Top** pin (next to Config, tilted -25° when off, upright + gilded when on; state persisted to the config INI) |
 | Sub-tab bar | Sub-tabs of the active category — sliding underline marker glides between selections |
 
 The logo on the left fills the whole topbar height. **Hover it** for a popover with the project name + game/app versions; **click it** to open the GitHub repo in your default browser.
@@ -246,7 +274,7 @@ Two compact-mode tiers kick in as the window narrows: pills shrink at ≤ 1300 p
 ## Requirements
 
 - **AutoHotkey v2.0+** — [download](https://www.autohotkey.com/)
-- **Path of Exile 2** — Steam or standalone, both supported
+- **Path of Exile 2** — Steam or standalone, both supported and **detected automatically** (Steam / standalone, 32-/64-bit executables)
 - **Administrator privileges** — required for `ReadProcessMemory` against an elevated game process
 - **WebView2 Runtime** — pre-installed on Windows 11; Windows 10 may need the [Evergreen runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 - **.NET 8 SDK** *(only if you want to use the GGPK Maphack or rebuild the data extractor)* — [download](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -264,7 +292,7 @@ cd PoE2GameHelper
 "C:\Program Files\AutoHotkey\v2\AutoHotkey.exe" InGameStateMonitor.ahk
 ```
 
-The WebView UI window opens immediately. Start *Path of Exile 2* (or have it running already). The header `Disconnected` pill flips to `Connected` once the helper attaches to the process; from there everything is live.
+The WebView UI window opens immediately. Start *Path of Exile 2* (or have it running already). The helper scans for every known PoE2 executable — Steam and standalone, 32- and 64-bit — and attaches to whichever is running, so no path or process name needs to be configured. The header `Disconnected` pill flips to `Connected` once it attaches; from there everything is live.
 
 If you also want the **GGPK Maphack**, build the C# tools once:
 
@@ -293,14 +321,20 @@ The AHK side shells out to the resulting `.exe`s — rebuild whenever you pull u
 
 Most other toggles live in the **Config** tab (split into six sub-tabs — General · Automation · Overlay · GGPK · Filters · Debug) — AutoPilot tuning, AutoFlask thresholds, radar entity filters, loot rarity filter, GGPK maphack apply/revert + colour pickers, and per-skill slot configuration.
 
+User-defined macros live in their own **Hotkeys** category (see [Custom Hotkeys](#-custom-hotkeys)) — define a trigger key there and its output is bound to one of your in-game flask/skill slots.
+
 ---
 
 ## Project Structure
 
 ```
-InGameStateMonitor.ahk          ─ main entry / WebView host
+InGameStateMonitor.ahk          ─ main entry / WebView host (the only .ahk in repo root)
 │
-├── Automation
+│   All other .ahk modules live in ahk/ (shown below grouped by area). Non-.ahk
+│   paths — ui/, Lib/, ggpk-tools/, data/, external/, .github/ — keep their own
+│   top-level folders. Logs are written to logs/.
+│
+├── Automation  (ahk/)
 │   ├── AutoPilot.ahk           ─ master state machine (combat > loot > explore)
 │   ├── CombatAutomation.ahk    ─ LoS-aware aim, skill rotation, A* approach
 │   ├── ExplorationModule.ahk   ─ visited-cell tracking, frontier finding
@@ -308,6 +342,11 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 │   ├── AvoidZones.ahk          ─ shared screen-rect keep-out registry
 │   ├── ItemSizeRegistry.ahk    ─ base-item dimensions (loads data/base_item_sizes.tsv)
 │   └── AutoFlask.ahk           ─ life/mana threshold flask automation
+│
+├── Custom Hotkeys
+│   ├── CustomHotkeys.ahk          ─ macro engine: groups/hotkeys/actions, conditions, auto-aim
+│   ├── CustomHotkeysBindings.ahk  ─ resolves in-game flask/skill binds + chest types for the UI
+│   └── CustomHotkeysBridge.ahk    ─ config persistence + import/export bridge
 │
 ├── Memory reading
 │   ├── PoE2MemoryReader.ahk         ─ core: pattern-scan, RIP-relative, panel diff
@@ -378,7 +417,6 @@ InGameStateMonitor.ahk          ─ main entry / WebView host
 - [**DAT-Schema**](https://github.com/poe-tool-dev/dat-schema) — PoE/PoE2 game-data schema
 - [**poe-data-tools**](https://github.com/LocalIdentity/poe_data_tools) — PoE data file utilities
 - [**repoe-fork (PoE2 base items)**](https://repoe-fork.github.io/poe2/base_items.json) — base-item registry source
-- [**AHK v2 docs**](https://www.autohotkey.com/docs/v2/)
 
 Detailed developer notes: [`DEV_README.md`](DEV_README.md). Contribution conventions: [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 

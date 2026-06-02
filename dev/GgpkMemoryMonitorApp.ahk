@@ -1,8 +1,8 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
-#Include PoE2MemoryReader.ahk
-#Include GgpkMemoryMonitor.ahk
+#Include ../ahk/PoE2MemoryReader.ahk
+#Include ../ahk/GgpkMemoryMonitor.ahk
 
 class GgpkOffsets
 {
@@ -31,11 +31,11 @@ reader := PoE2GameStateReader()
 monitor := GgpkMemoryMonitor(reader)
 monitor.SetLogger(AppendLog)
 
-defaultUiOnly := A_ScriptDir "\ggpk_ui_files_only.json"
-defaultFull := A_ScriptDir "\ggpk_directory_tree.json"
-defaultExportPath := A_ScriptDir "\GgpkMemoryDiscoveries.txt"
-defaultPreloadDump := A_ScriptDir "\preload_dumps\latest.txt"
-defaultPreloadOutDir := A_ScriptDir "\preload_dumps"
+defaultUiOnly := AppRoot() "\ggpk_ui_files_only.json"
+defaultFull := AppRoot() "\ggpk_directory_tree.json"
+defaultExportPath := AppRoot() "\GgpkMemoryDiscoveries.txt"
+defaultPreloadDump := AppRoot() "\preload_dumps\latest.txt"
+defaultPreloadOutDir := AppRoot() "\preload_dumps"
 
 autoPreloadDumpEnabled := false
 lastAutoDumpAreaHash := ""
@@ -504,7 +504,7 @@ DumpCurrentAreaPreloads(&outPath, &count, &msg)
 
         outDir := Trim(preloadOutDirEdit.Value)
         if (outDir = "")
-            outDir := A_ScriptDir "\preload_dumps"
+            outDir := AppRoot() "\preload_dumps"
         if !DirExist(outDir)
             DirCreate(outDir)
 

@@ -19,13 +19,13 @@
 
 SetWorkingDir(A_ScriptDir)
 #Include Lib/WebViewToo.ahk
-#Include PoE2MemoryReader.ahk
-#Include PatchChecker.ahk
+#Include ahk/PoE2MemoryReader.ahk
+#Include ahk/PatchChecker.ahk
 #Include Lib/TerrainPathfinder.ahk
-#Include RadarOverlay.ahk
-#Include PlayerHUD.ahk
-#Include UiTreeBrowser.ahk
-#Include UiBrowserHandler.ahk
+#Include ahk/RadarOverlay.ahk
+#Include ahk/PlayerHUD.ahk
+#Include ahk/UiTreeBrowser.ahk
+#Include ahk/UiBrowserHandler.ahk
 
 /*
 Das Projekt mit all seinen Dateien in welchen ich entwickle befindet sich bei mir lokal unter "E:\PoE2GameHelper\"
@@ -120,6 +120,7 @@ g_treeTabKeys := ["Overview", "Buffs", "Entities", "UI", "gameState"]
 g_activeTreeTabKey := "Overview"
 g_activeTreeTabIdx := 1
 g_webViewReady := false
+g_pendingPatchNotice := ""   ; queued showPatchUpdate(...) JS until the WebView is ready
 g_bridge := 0
 g_webGui := 0
 g_alwaysOnTop := true   ; main window AoT — toggle via header pin button
@@ -256,7 +257,10 @@ g_winH := 850
 g_winMaximized := false
 
 g_flaskKeyLoadStatus := "default"
-g_errorLogPath := A_ScriptDir "\InGameStateMonitor.error.log"
+; Logs live under logs\ to keep the repo root tidy. Ensure the folder exists
+; before the error logger writes its header.
+try DirCreate(A_ScriptDir "\logs")
+g_errorLogPath := A_ScriptDir "\logs\InGameStateMonitor.error.log"
 g_errorLogMaxBytes := 1024 * 512
 
 ; ── Hidden data GUI: holds the 5 TreeView controls for data building ────────
@@ -286,6 +290,7 @@ LoadCombatAutoConfig()
 LoadExplorationConfig()
 LoadLootPickupConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
+AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 
 ; Custom hotkey / macro engine — init defaults then load persisted hotkeys.json
 HotkeysInit()
@@ -558,9 +563,16 @@ _DebouncedGeometrySave()
 ; Fires when the WebView finishes loading a page — triggers the first data push.
 OnNavigationCompleted(wv, args, *)
 {
-    global g_webViewReady
+    global g_webViewReady, g_pendingPatchNotice
     g_webViewReady := true
     SetTimer(PushAllDataToWebView, -100)
+    ; Flush a patch-update notice that was raised before the page was ready.
+    if (IsSet(g_pendingPatchNotice) && g_pendingPatchNotice != "")
+    {
+        notice := g_pendingPatchNotice
+        g_pendingPatchNotice := ""
+        SetTimer(() => WebViewExec(notice), -300)
+    }
 }
 
 ; Receives JSON messages posted from JS via window.chrome.webview.postMessage({method, args}).
@@ -855,33 +867,35 @@ OnTreeTabChanged(*)
     ReadAndShow()
 }
 
-#Include TreeViewWatchlistPanel.ahk
+#Include ahk/TreeViewWatchlistPanel.ahk
 
 ; ── Extracted single-responsibility modules ──────────────────────────────────
-#Include JsonParser.ahk
-#Include JsonFull.ahk
-#Include ErrorLogger.ahk
-#Include ConfigManager.ahk
-#Include SnapshotSerializers.ahk
-#Include WebViewBridge.ahk
-#Include DebugDump.ahk
-#Include ToggleHandlers.ahk
-#Include BridgeDispatch.ahk
-#Include GgpkToolBridge.ahk
+#Include ahk/JsonParser.ahk
+#Include ahk/JsonFull.ahk
+#Include ahk/ErrorLogger.ahk
+#Include ahk/ConfigManager.ahk
+#Include ahk/SnapshotSerializers.ahk
+#Include ahk/WebViewBridge.ahk
+#Include ahk/DebugDump.ahk
+#Include ahk/ToggleHandlers.ahk
+#Include ahk/BridgeDispatch.ahk
+#Include ahk/GgpkToolBridge.ahk
 
-#Include AutoFlask.ahk
-#Include AvoidZones.ahk
-#Include CombatAutomation.ahk
-#Include ItemSizeRegistry.ahk
-#Include LootPickup.ahk
-#Include ExplorationModule.ahk
-#Include AutoPilot.ahk
-#Include CustomHotkeys.ahk
-#Include CustomHotkeysBindings.ahk
-#Include CustomHotkeysBridge.ahk
-#Include MemoryDiff.ahk
-#Include MemoryDissect.ahk
-#Include UIHelpers.ahk
+#Include ahk/AutoFlask.ahk
+#Include ahk/AvoidZones.ahk
+#Include ahk/CombatAutomation.ahk
+#Include ahk/ItemSizeRegistry.ahk
+#Include ahk/LootPickup.ahk
+#Include ahk/ExplorationModule.ahk
+#Include ahk/AutoPilot.ahk
+#Include ahk/CustomHotkeys.ahk
+#Include ahk/CustomHotkeysBindings.ahk
+#Include ahk/CustomHotkeysBridge.ahk
+#Include ahk/AtlasData.ahk
+#Include ahk/PoE2AtlasReader.ahk
+#Include ahk/MemoryDiff.ahk
+#Include ahk/MemoryDissect.ahk
+#Include ahk/UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
 F3:: OnF3DebugDump()

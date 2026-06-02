@@ -14,7 +14,7 @@
   -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English+SC&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English+SC&family=Lobster&display=swap">
   <style>
     * {
       box-sizing: border-box;
@@ -58,6 +58,7 @@
       --codex-lapis:      #6b86cd;          /* secondary cool accent — used sparingly */
       --codex-serif:      'EB Garamond', Constantia, 'Palatino Linotype', Palatino, Georgia, serif;
       --codex-display:    'Cinzel', 'Trajan Pro', Constantia, 'Palatino Linotype', Georgia, serif;
+      --codex-heading:    'Lobster', 'Cinzel', cursive;
       --codex-mono-serif: 'IM Fell English SC', 'Cinzel', Constantia, Georgia, serif;
     }
 
@@ -1248,6 +1249,7 @@
       --codex-shadow:     0 1px 2px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(200,168,90,0.06);
       --codex-serif:      'EB Garamond', Constantia, 'Palatino Linotype', Palatino, Georgia, serif;
       --codex-display:    'Cinzel', 'Trajan Pro', Constantia, 'Palatino Linotype', Georgia, serif;
+      --codex-heading:    'Lobster', 'Cinzel', cursive;
       --codex-mono-serif: 'IM Fell English SC', 'Cinzel', Constantia, Georgia, serif;
     }
 
@@ -1408,12 +1410,12 @@
     }
 
     .inv-section-header {
-      font-family: var(--codex-display);
+      font-family: var(--codex-heading);
       color: var(--codex-gold-hi);
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
+      font-size: 22px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      text-transform: none;
       margin: 0 auto 10px;
       padding: 6px 0 0;
       text-align: center;
@@ -2823,11 +2825,11 @@
        (no fleuron) so the config tab stays scannable. */
     .cfg-header {
       color: var(--codex-gold-hi);
-      font-family: var(--codex-display);
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
+      font-family: var(--codex-heading);
+      font-size: 17px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0.02em;
       padding: 4px 0 6px;
       border-bottom: 1px solid var(--codex-rule);
       flex: 1;
@@ -3610,6 +3612,42 @@
     }
     .cp-swatch:hover { border-color: var(--accent) }
 
+    /* PoE2 patch-update notice — Codex-styled modal shown via showPatchUpdate().
+       Mirrors the parchment/gold look of the rest of the Helper UI. */
+    #patch-modal {
+      position: fixed; inset: 0; z-index: 2000; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+    }
+    #patch-modal.open { display: flex }
+    .patch-card {
+      width: 460px; max-width: 86vw; padding: 20px 24px 16px;
+      color: var(--codex-text);
+      background:
+        radial-gradient(ellipse at center, rgba(232,220,184,0.05), transparent 70%),
+        linear-gradient(180deg, var(--codex-parchment) 0%, var(--codex-vellum) 100%);
+      border: 1px solid var(--codex-rule);
+      box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 26px rgba(0,0,0,0.5), 0 12px 34px rgba(0,0,0,0.6);
+    }
+    .patch-head {
+      font-family: var(--codex-heading, var(--codex-display)); color: var(--codex-gold-hi);
+      font-size: 22px; text-align: center; letter-spacing: 0.02em;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+    }
+    .patch-rule {
+      height: 2px; margin: 10px 0 14px;
+      background: linear-gradient(90deg, transparent, var(--codex-gold) 25%, var(--codex-gold-hi) 50%, var(--codex-gold) 75%, transparent);
+    }
+    .patch-body { font-family: var(--codex-serif); font-size: 14px; line-height: 1.5; }
+    .patch-vers { display: grid; grid-template-columns: auto 1fr; gap: 3px 16px; margin-bottom: 12px; }
+    .patch-label { color: var(--codex-text-dim); }
+    .patch-ver { font-family: var(--codex-mono-serif); color: var(--codex-gold-hi); letter-spacing: 0.04em; }
+    .patch-section { margin-bottom: 4px; }
+    .patch-files { margin: 0 0 12px; padding-left: 20px; }
+    .patch-files li { font-family: 'Cascadia Mono', 'Consolas', monospace; font-size: 12.5px; color: #cbb88a; }
+    .patch-note { color: var(--codex-text-dim); font-style: italic; }
+    .patch-actions { text-align: right; margin-top: 8px; }
+
     /* Modal backdrop. Fixed-positioned over the whole UI so the picker
        floats above whatever tab is active. */
     #cp-modal {
@@ -4152,6 +4190,7 @@
               <button class="cfg-btn" onclick="ahkCall('WatchNpc')">👁 Add NPC Watch</button>
               <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
               <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
+              <button class="cfg-btn" title="Atlas RE: open the Atlas/World map, then dump node data + raw hex to debug\atlas_debug_*.txt" onclick="ahkCall('DumpAtlas')">🗺 Dump Atlas</button>
             </div>
           </details>
         </div>
@@ -4971,8 +5010,8 @@
         }
         .hk-group-name {
           background: transparent; border: none; color: var(--codex-gold-hi);
-          font-family: var(--codex-display); letter-spacing: 0.14em; text-transform: uppercase;
-          font-size: 13px; min-width: 140px;
+          font-family: var(--codex-heading); letter-spacing: 0.02em; text-transform: none;
+          font-size: 18px; min-width: 140px;
         }
         .hk-group-name:focus { outline: 1px solid var(--codex-gold); }
         .hk-group-body { padding: 10px 12px; }
@@ -4985,6 +5024,10 @@
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
         .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        /* The per-hotkey option checkboxes ride on the Output row when wide, but
+           wrap to the next line together (never split) when space runs short. */
+        .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
+        .hk-chk-group label { white-space: nowrap; }
         .hk-card-name {
           background: transparent; border: none; color: var(--codex-text);
           font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 130px;
@@ -5005,6 +5048,29 @@
         }
         #panel-hotkeys input:focus, #panel-hotkeys select:focus { outline: 1px solid var(--codex-gold); }
         #panel-hotkeys input[type=number] { width: 74px; }
+        /* Themed number stepper — hide the native spin button and overlay our
+           own gold ▲▼ controls so editboxes match the codex palette. */
+        #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
+        #panel-hotkeys .hk-num > input[type=number] { padding-right: 18px; }
+        #panel-hotkeys .hk-num > input[type=number]::-webkit-inner-spin-button,
+        #panel-hotkeys .hk-num > input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #panel-hotkeys .hk-num-spin {
+          position: absolute; top: 1px; bottom: 1px; right: 1px; width: 15px;
+          display: flex; flex-direction: column; overflow: hidden; border-radius: 0 1px 1px 0;
+        }
+        #panel-hotkeys .hk-num-btn {
+          flex: 1; min-height: 0; padding: 0; margin: 0; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          border: none; border-left: 1px solid rgba(90,62,34,0.6);
+          background: linear-gradient(180deg, rgba(60,42,22,0.92), rgba(28,18,10,0.92));
+          color: var(--codex-gold); font-size: 7px; line-height: 1;
+        }
+        #panel-hotkeys .hk-num-btn:first-child { border-bottom: 1px solid rgba(90,62,34,0.6); }
+        #panel-hotkeys .hk-num-btn:hover {
+          color: var(--codex-gold-hi);
+          background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
+        }
+        #panel-hotkeys .hk-num-btn:active { color: var(--codex-text); }
         #panel-hotkeys label {
           color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 4px; align-items: center;
         }
@@ -5035,6 +5101,15 @@
         .hk-btn.danger:hover { border-color: var(--codex-blood-hi); color: #ff8d8d; box-shadow: 0 2px 6px -2px rgba(197,72,72,0.5); }
 
         .hk-spacer { margin-left: auto; }
+        /* Action row tools (debug / export / remove): always pinned to the right
+           and kept together — they wrap as one unit and never drift left when
+           the window narrows. */
+        .hk-act-tools { margin-left: auto; display: inline-flex; flex-wrap: nowrap; gap: 6px; align-items: center; }
+        /* Give the export/remove buttons a shared fixed height and center their
+           glyphs, and match the debug checkbox label height so the bug icon
+           lines up vertically with the buttons. */
+        .hk-act-tools .hk-btn { height: 26px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-act-tools > label { height: 26px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 20px; text-align: center; font-style: italic; }
         .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
         .hk-caret:hover { color: var(--codex-gold-hi); }
@@ -5046,10 +5121,10 @@
         .hk-disabled { opacity: .4; pointer-events: none; }
       </style>
       <div class="hk-toolbar">
-        <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
-        <button class="hk-btn" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
-        <button class="hk-btn" onclick="hkCollapseAll()">⊟ Collapse all</button>
-        <button class="hk-btn" onclick="hkExpandAll()">⊞ Expand all</button>
+        <button class="hk-btn" title="Add a new hotkey group" onclick="hkAddGroup()">+ Add Group</button>
+        <button class="hk-btn" title="Import a hotkey group from a JSON file in hotkeys_export/" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
+        <button class="hk-btn" title="Collapse all groups, hotkeys and actions" onclick="hkCollapseAll()">⊟ Collapse all</button>
+        <button class="hk-btn" title="Expand all groups, hotkeys and actions" onclick="hkExpandAll()">⊞ Expand all</button>
         <label style="margin-left:8px" title="When on, at most one hotkey auto-fires per evaluation tick (highest in list order wins)."><input type="checkbox" id="hk-oneshot" onchange="hkSetOneShot(this.checked)">One-shot per tick</label>
         <span class="hk-hint">Output is bound to your in-game flask/skill slots; trigger key is captured separately.</span>
       </div>
@@ -5068,6 +5143,24 @@
   <!-- STATUS BAR -->
   <div id="status-bar"><span id="status-left">Initializing…</span><span id="status-right"></span></div>
 
+  <!-- PoE2 patch-update notice (Codex-styled; populated via showPatchUpdate) -->
+  <div id="patch-modal" role="dialog" aria-modal="true" onclick="if(event.target===this)closePatchUpdate()">
+    <div class="patch-card">
+      <div class="patch-head">⚠ PoE2 Patch Update detected</div>
+      <div class="patch-rule"></div>
+      <div class="patch-body">
+        <div class="patch-vers">
+          <span class="patch-label">Previous</span><span id="patch-prev" class="patch-ver"></span>
+          <span class="patch-label">Current</span><span id="patch-cur" class="patch-ver"></span>
+        </div>
+        <div class="patch-section">The following files should be rebuilt:</div>
+        <ul id="patch-files" class="patch-files"></ul>
+        <div id="patch-note" class="patch-note"></div>
+      </div>
+      <div class="patch-actions"><button class="cfg-btn" onclick="closePatchUpdate()">OK</button></div>
+    </div>
+  </div>
+
   <script src="animation_names.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════════════
@@ -5076,6 +5169,38 @@
     function ahkCall(method, ...args) {
       try { window.chrome.webview.postMessage({ method, args }); } catch (e) { }
     }
+
+    // Patch-update notice — populated + shown from AHK (PatchChecker) so the
+    // "new version detected" message matches the Codex theme instead of a
+    // native MsgBox. d = { previous, current, files:[...], note }.
+    function showPatchUpdate(d) {
+      try {
+        d = d || {};
+        var prev = document.getElementById('patch-prev');
+        var cur = document.getElementById('patch-cur');
+        if (prev) prev.textContent = d.previous || '?';
+        if (cur) cur.textContent = d.current || '?';
+        var ul = document.getElementById('patch-files');
+        if (ul) {
+          ul.innerHTML = '';
+          (d.files || []).forEach(function (f) { var li = document.createElement('li'); li.textContent = f; ul.appendChild(li); });
+        }
+        var note = document.getElementById('patch-note');
+        if (note) note.textContent = d.note || '';
+        var m = document.getElementById('patch-modal');
+        if (m) m.classList.add('open');
+      } catch (e) { }
+    }
+    function closePatchUpdate() {
+      var m = document.getElementById('patch-modal');
+      if (m) m.classList.remove('open');
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var m = document.getElementById('patch-modal');
+        if (m && m.classList.contains('open')) { closePatchUpdate(); e.stopPropagation(); }
+      }
+    });
 
     // Snap / Start dual-button click handler. The button's data-mode is
     // set by updateHeader() based on whether PoE2 is running, so a single
@@ -5358,9 +5483,9 @@
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
             <span class="hk-spacer"></span>
-            <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
+            <button class="hk-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
             <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
-            <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
+            <button class="hk-btn danger" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
           ${body}
         </div>`;
@@ -5377,18 +5502,18 @@
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
-          </div>
-          <div class="hk-row">
-            <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
-            <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
-            <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+            <span class="hk-chk-group">
+              <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
+              <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
+              <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+            </span>
           </div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <select id="hk-addact-${gi}-${hi}">
+            <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
               <option value="vitals">Condition: Vitals</option>
@@ -5397,7 +5522,7 @@
               <option value="monsterCount">Condition: Monster count</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
-            <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+            <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
           </div>` : `<span class="hk-id" style="margin-left:30px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>`;
       return `
@@ -5428,7 +5553,7 @@
             <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>`}
             <span class="hk-spacer"></span>
-            <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
+            <button class="hk-btn danger" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           ${body}
         </div>`;
@@ -5466,21 +5591,43 @@
       return `<span class="hk-id" style="color:var(--text)">Output:</span> ${kindSel} ${detail}`;
     }
 
-    function hkNum(a, k, def, gi, hi, ai) {
-      return `<input type="number" value="${a[k] != null ? hkEsc(a[k]) : def}"
-              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
+    function hkNum(a, k, def, gi, hi, ai, title = '') {
+      const v = a[k] != null ? hkEsc(a[k]) : def;
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      // Custom themed stepper: the native spin button is hidden via CSS and
+      // replaced with gold ▲▼ buttons (see .hk-num styles + hkNumStep).
+      return `<span class="hk-num"${tt}>`
+           + `<input type="number" min="0" value="${v}" onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    // Steps the sibling number input by its step (default 1), clamps to
+    // min/max, and fires a change event so the normal save path runs.
+    function hkNumStep(btn, dir) {
+      const inp = btn.closest('.hk-num').querySelector('input[type=number]');
+      if (!inp) return;
+      const step = parseFloat(inp.step) || 1;
+      let next = (parseFloat(inp.value) || 0) + dir * step;
+      if (inp.min !== '' && next < parseFloat(inp.min)) next = parseFloat(inp.min);
+      if (inp.max !== '' && next > parseFloat(inp.max)) next = parseFloat(inp.max);
+      inp.value = next;
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
     }
     function hkTxt(a, k, ph, gi, hi, ai) {
       return `<input type="text" placeholder="${ph}" value="${hkEsc(a[k] || '')}"
               onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
     }
-    function hkSel(a, k, opts, gi, hi, ai) {
+    function hkSel(a, k, opts, gi, hi, ai, title = '') {
       const cur = a[k] != null ? String(a[k]) : '';
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
       const o = opts.map(([v, lbl]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`).join('');
-      return `<select onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">${o}</select>`;
+      return `<select${tt} onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">${o}</select>`;
     }
-    function hkChk(a, k, lbl, gi, hi, ai) {
-      return `<label><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
+    function hkChk(a, k, lbl, gi, hi, ai, title = '') {
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      return `<label${tt}><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
               onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.checked?1:0)">${lbl}</label>`;
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
@@ -5578,7 +5725,7 @@
                   + `Interval(ms) ${hkNum(a, 'intervalMs', 100, gi, hi, ai)}`;
           else
             extra = `<span style="color:var(--subtext);font-size:12px">presses the output key once</span>`;
-          body = `Mode ${hkSel(a, 'mode', [['press', 'Press once'], ['hold', 'Hold'], ['loop', 'Loop / repeat']], gi, hi, ai)} ${extra}`;
+          body = `Mode ${hkSel(a, 'mode', [['press', 'Press once'], ['hold', 'Hold'], ['loop', 'Loop / repeat']], gi, hi, ai, 'How the output key is sent: press once, hold for a duration, or loop/repeat')} ${extra}`;
           break;
         }
         case 'chain':
@@ -5605,11 +5752,11 @@
         case 'monsterCount':
           // Counts targetable monsters inside a screen-pixel radius measured
           // either from the mouse cursor or from the player's on-screen position.
-          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
-               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
-               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
-               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
+          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only count monsters of this rarity (Any = all)')} `
+               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai, 'Comparison operator for the monster count')} `
+               + `${hkNum(a, 'value', 1, gi, hi, ai, 'Monster-count threshold to compare against')}`;
           break;
         case 'aim': {
           // "Scan all" lives at the bottom of the Target dropdown as
@@ -5620,7 +5767,7 @@
           let filt = '';
           if (!scanned) {
             if (tt === 'monster')
-              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
+              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only aim at monsters of this rarity (Any = all)')} `;
             else if (tt === 'chest')
               filt = hkChestTypeField(a, gi, hi, ai);
             else if (tt === 'npc')
@@ -5633,11 +5780,15 @@
           const targetSel = `<select title="any (debug) aims at the nearest targetable entity, ignoring the target type and its filter." onchange="hkSetAimTarget(${gi},${hi},${ai},this.value)">`
                + targetOpts.map(([v, l]) => `<option value="${v}" ${selVal === v ? 'selected' : ''}>${hkEsc(l)}</option>`).join('')
                + `</select>`;
+          // Hold(ms) only matters when "Press key" is on — grey it out otherwise.
+          const pressed = !!a.press;
+          const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? 'How long to hold the output key down after aiming, in milliseconds' : 'Enable "Press key" to use Hold(ms)'}">`
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai, 'How long to hold the output key down after aiming, in milliseconds')}</span>`;
           body = `Target ${targetSel} ${filt}`
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)']], gi, hi, ai)} `
-               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai)} `
-               + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}`;
+               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai, 'Radius in screen pixels to search for an aim target')} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + `${hkChk(a, 'press', 'Press key', gi, hi, ai, 'After aiming, also press the output key (enables Hold(ms))')} `
+               + holdBlock;
           break;
         }
         default:
@@ -5649,10 +5800,11 @@
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
-                <span class="hk-spacer"></span>
-                <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
-                <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
-                <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
+                <span class="hk-act-tools">
+                  <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
+                  <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
+                  <button class="hk-btn danger" title="Remove this action" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
+                </span>
               </div>`;
     }
 
@@ -5799,9 +5951,13 @@
     function hkDelAction(gi, hi, ai) { hkConfig[gi].hotkeys[hi].actions.splice(ai, 1); hkChanged(); }
     function hkSetAct(gi, hi, ai, k, v) {
       const a = hkConfig[gi].hotkeys[hi].actions[ai];
-      a[k] = (k === 'buffName' || k === 'name' || k === 'metadataPath' || k === 'chestType'
+      const isText = (k === 'buffName' || k === 'name' || k === 'metadataPath' || k === 'chestType'
               || k === 'op' || k === 'resource' || k === 'mode' || k === 'chargeType'
-              || k === 'rarity' || k === 'targetType' || k === 'triggerMode') ? v : (isNaN(+v) ? v : +v);
+              || k === 'rarity' || k === 'targetType' || k === 'triggerMode');
+      let val = isText ? v : (isNaN(+v) ? v : +v);
+      // Numeric action fields are never negative — clamp at 0.
+      if (!isText && typeof val === 'number' && val < 0) val = 0;
+      a[k] = val;
       hkChanged();
     }
 

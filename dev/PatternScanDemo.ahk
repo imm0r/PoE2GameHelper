@@ -1,7 +1,7 @@
 #Requires AutoHotkey v2.0
 #SingleInstance Force
 
-#Include PoE2MemoryReader.ahk
+#Include ../ahk/PoE2MemoryReader.ahk
 
 reader := PoE2GameStateReader()
 strictOk := reader.Connect(true)

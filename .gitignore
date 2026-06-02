@@ -13,11 +13,14 @@ __pycache__/
 # IDE / Editor
 .vscode/
 .continue/
+# downloaded VS Code extension packages — not project source
+*.vsix
 
 # Per-user Claude Code settings
 .claude/settings.local.json
 
 # Logs & temp files
+logs/
 *.error.log
 *.error.log.*
 

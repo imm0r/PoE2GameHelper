@@ -1,9 +1,9 @@
 #Requires AutoHotkey v2.0
-#Include PoE2MemoryReader.ahk
+#Include ../ahk/PoE2MemoryReader.ahk
 
 debugMode := 0
 
-outPath := A_ScriptDir "\SmokeTestResult.txt"
+outPath := AppRoot() "\SmokeTestResult.txt"
 if FileExist(outPath)
     FileDelete(outPath)
 LogLine("version=3")

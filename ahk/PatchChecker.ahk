@@ -34,9 +34,9 @@ _PatchChecker_MigrateLegacyFile()
 CheckPoePatchVersion()
 {
     _PatchChecker_MigrateLegacyFile()
-    iniFile     := _ConfigPath()
-    tempOut     := A_Temp "\poe_patch_out_" A_TickCount ".txt"
-    tempScript  := A_Temp "\poe_patch_" A_TickCount ".ps1"
+    iniFile := _ConfigPath()
+    tempOut := A_Temp "\poe_patch_out_" A_TickCount ".txt"
+    tempScript := A_Temp "\poe_patch_" A_TickCount ".ps1"
 
     ; Write a PS1 script to temp — avoids all inline quoting issues
     psContent := ""
@@ -79,7 +79,7 @@ CheckPoePatchVersion()
         return
 
     currentPatch := raw
-    lastPatch    := IniRead(iniFile, "General", "lastKnownPatch", "")
+    lastPatch := IniRead(iniFile, "General", "lastKnownPatch", "")
 
     ; Always persist the latest known version
     IniWrite(currentPatch, iniFile, "General", "lastKnownPatch")
@@ -88,15 +88,30 @@ CheckPoePatchVersion()
         return  ; First run — silently store, no popup
 
     if (currentPatch != lastPatch)
+        ShowPatchUpdateNotice(lastPatch, currentPatch)
+}
+
+; Shows the "patch update detected" notice in the WebView, styled to match the
+; Helper UI (Codex theme), instead of a native MsgBox. If the WebView isn't
+; ready yet (this runs at startup, while the page is still navigating), the
+; payload is queued in g_pendingPatchNotice and flushed by OnNavigationCompleted.
+; Params: prevPatch / curPatch — the previous and current patch version strings.
+ShowPatchUpdateNotice(prevPatch, curPatch)
+{
+    global g_webViewReady, g_pendingPatchNotice
+    payload := Map(
+        "previous", prevPatch,
+        "current", curPatch,
+        "files", ["python build_stat_desc_map.py", "python build_item_names.py"],
+        "note", "Offsets may also have changed — verify pattern scanning.")
+    js := "showPatchUpdate(" JsonFull_Stringify(payload, false) ")"
+    if (IsSet(g_webViewReady) && g_webViewReady)
     {
-        msg := "⚠️  PoE2 Patch Update detected!`n`n"
-            . "Previous: " lastPatch "`n"
-            . "Current:  " currentPatch "`n`n"
-            . "The following files should be rebuilt:`n"
-            . "  python build_stat_desc_map.py`n"
-            . "  python build_item_names.py`n`n"
-            . "Offsets may also have changed — verify pattern scanning."
-        MsgBox(msg, "PoE2 Patch Update", "Icon! 48")
+        try WebViewExec(js)
+    }
+    else
+    {
+        g_pendingPatchNotice := js
     }
 }
 
