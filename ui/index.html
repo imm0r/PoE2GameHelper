@@ -5009,6 +5009,29 @@
         }
         #panel-hotkeys input:focus, #panel-hotkeys select:focus { outline: 1px solid var(--codex-gold); }
         #panel-hotkeys input[type=number] { width: 74px; }
+        /* Themed number stepper — hide the native spin button and overlay our
+           own gold ▲▼ controls so editboxes match the codex palette. */
+        #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
+        #panel-hotkeys .hk-num > input[type=number] { padding-right: 18px; }
+        #panel-hotkeys .hk-num > input[type=number]::-webkit-inner-spin-button,
+        #panel-hotkeys .hk-num > input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #panel-hotkeys .hk-num-spin {
+          position: absolute; top: 1px; bottom: 1px; right: 1px; width: 15px;
+          display: flex; flex-direction: column; overflow: hidden; border-radius: 0 1px 1px 0;
+        }
+        #panel-hotkeys .hk-num-btn {
+          flex: 1; min-height: 0; padding: 0; margin: 0; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          border: none; border-left: 1px solid rgba(90,62,34,0.6);
+          background: linear-gradient(180deg, rgba(60,42,22,0.92), rgba(28,18,10,0.92));
+          color: var(--codex-gold); font-size: 7px; line-height: 1;
+        }
+        #panel-hotkeys .hk-num-btn:first-child { border-bottom: 1px solid rgba(90,62,34,0.6); }
+        #panel-hotkeys .hk-num-btn:hover {
+          color: var(--codex-gold-hi);
+          background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
+        }
+        #panel-hotkeys .hk-num-btn:active { color: var(--codex-text); }
         #panel-hotkeys label {
           color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 4px; align-items: center;
         }
@@ -5039,6 +5062,15 @@
         .hk-btn.danger:hover { border-color: var(--codex-blood-hi); color: #ff8d8d; box-shadow: 0 2px 6px -2px rgba(197,72,72,0.5); }
 
         .hk-spacer { margin-left: auto; }
+        /* Action row tools (debug / export / remove): always pinned to the right
+           and kept together — they wrap as one unit and never drift left when
+           the window narrows. */
+        .hk-act-tools { margin-left: auto; display: inline-flex; flex-wrap: nowrap; gap: 6px; align-items: center; }
+        /* Give the export/remove buttons a shared fixed height and center their
+           glyphs, and match the debug checkbox label height so the bug icon
+           lines up vertically with the buttons. */
+        .hk-act-tools .hk-btn { height: 26px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-act-tools > label { height: 26px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 20px; text-align: center; font-style: italic; }
         .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
         .hk-caret:hover { color: var(--codex-gold-hi); }
@@ -5050,10 +5082,10 @@
         .hk-disabled { opacity: .4; pointer-events: none; }
       </style>
       <div class="hk-toolbar">
-        <button class="hk-btn" onclick="hkAddGroup()">+ Add Group</button>
-        <button class="hk-btn" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
-        <button class="hk-btn" onclick="hkCollapseAll()">⊟ Collapse all</button>
-        <button class="hk-btn" onclick="hkExpandAll()">⊞ Expand all</button>
+        <button class="hk-btn" title="Add a new hotkey group" onclick="hkAddGroup()">+ Add Group</button>
+        <button class="hk-btn" title="Import a hotkey group from a JSON file in hotkeys_export/" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
+        <button class="hk-btn" title="Collapse all groups, hotkeys and actions" onclick="hkCollapseAll()">⊟ Collapse all</button>
+        <button class="hk-btn" title="Expand all groups, hotkeys and actions" onclick="hkExpandAll()">⊞ Expand all</button>
         <label style="margin-left:8px" title="When on, at most one hotkey auto-fires per evaluation tick (highest in list order wins)."><input type="checkbox" id="hk-oneshot" onchange="hkSetOneShot(this.checked)">One-shot per tick</label>
         <span class="hk-hint">Output is bound to your in-game flask/skill slots; trigger key is captured separately.</span>
       </div>
@@ -5362,9 +5394,9 @@
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
             <span class="hk-spacer"></span>
-            <button class="hk-btn" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
+            <button class="hk-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
             <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
-            <button class="hk-btn danger" onclick="hkDelGroup(${gi})">Delete group</button>
+            <button class="hk-btn danger" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
           ${body}
         </div>`;
@@ -5392,7 +5424,7 @@
           </div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <select id="hk-addact-${gi}-${hi}">
+            <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
               <option value="vitals">Condition: Vitals</option>
@@ -5401,7 +5433,7 @@
               <option value="monsterCount">Condition: Monster count</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
-            <button class="hk-btn" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+            <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
           </div>` : `<span class="hk-id" style="margin-left:30px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>`;
       return `
@@ -5432,7 +5464,7 @@
             <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>`}
             <span class="hk-spacer"></span>
-            <button class="hk-btn danger" onclick="hkDelHk(${gi},${hi})">✕</button>
+            <button class="hk-btn danger" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           ${body}
         </div>`;
@@ -5470,21 +5502,43 @@
       return `<span class="hk-id" style="color:var(--text)">Output:</span> ${kindSel} ${detail}`;
     }
 
-    function hkNum(a, k, def, gi, hi, ai) {
-      return `<input type="number" value="${a[k] != null ? hkEsc(a[k]) : def}"
-              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
+    function hkNum(a, k, def, gi, hi, ai, title = '') {
+      const v = a[k] != null ? hkEsc(a[k]) : def;
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      // Custom themed stepper: the native spin button is hidden via CSS and
+      // replaced with gold ▲▼ buttons (see .hk-num styles + hkNumStep).
+      return `<span class="hk-num"${tt}>`
+           + `<input type="number" min="0" value="${v}" onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    // Steps the sibling number input by its step (default 1), clamps to
+    // min/max, and fires a change event so the normal save path runs.
+    function hkNumStep(btn, dir) {
+      const inp = btn.closest('.hk-num').querySelector('input[type=number]');
+      if (!inp) return;
+      const step = parseFloat(inp.step) || 1;
+      let next = (parseFloat(inp.value) || 0) + dir * step;
+      if (inp.min !== '' && next < parseFloat(inp.min)) next = parseFloat(inp.min);
+      if (inp.max !== '' && next > parseFloat(inp.max)) next = parseFloat(inp.max);
+      inp.value = next;
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
     }
     function hkTxt(a, k, ph, gi, hi, ai) {
       return `<input type="text" placeholder="${ph}" value="${hkEsc(a[k] || '')}"
               onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">`;
     }
-    function hkSel(a, k, opts, gi, hi, ai) {
+    function hkSel(a, k, opts, gi, hi, ai, title = '') {
       const cur = a[k] != null ? String(a[k]) : '';
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
       const o = opts.map(([v, lbl]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`).join('');
-      return `<select onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">${o}</select>`;
+      return `<select${tt} onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.value)">${o}</select>`;
     }
-    function hkChk(a, k, lbl, gi, hi, ai) {
-      return `<label><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
+    function hkChk(a, k, lbl, gi, hi, ai, title = '') {
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      return `<label${tt}><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
               onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.checked?1:0)">${lbl}</label>`;
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
@@ -5582,7 +5636,7 @@
                   + `Interval(ms) ${hkNum(a, 'intervalMs', 100, gi, hi, ai)}`;
           else
             extra = `<span style="color:var(--subtext);font-size:12px">presses the output key once</span>`;
-          body = `Mode ${hkSel(a, 'mode', [['press', 'Press once'], ['hold', 'Hold'], ['loop', 'Loop / repeat']], gi, hi, ai)} ${extra}`;
+          body = `Mode ${hkSel(a, 'mode', [['press', 'Press once'], ['hold', 'Hold'], ['loop', 'Loop / repeat']], gi, hi, ai, 'How the output key is sent: press once, hold for a duration, or loop/repeat')} ${extra}`;
           break;
         }
         case 'chain':
@@ -5609,11 +5663,11 @@
         case 'monsterCount':
           // Counts targetable monsters inside a screen-pixel radius measured
           // either from the mouse cursor or from the player's on-screen position.
-          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `
-               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
-               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
-               + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
+          body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only count monsters of this rarity (Any = all)')} `
+               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + `${hkSel(a, 'op', HK_OPS, gi, hi, ai, 'Comparison operator for the monster count')} `
+               + `${hkNum(a, 'value', 1, gi, hi, ai, 'Monster-count threshold to compare against')}`;
           break;
         case 'aim': {
           // "Scan all" lives at the bottom of the Target dropdown as
@@ -5624,7 +5678,7 @@
           let filt = '';
           if (!scanned) {
             if (tt === 'monster')
-              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai)} `;
+              filt = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only aim at monsters of this rarity (Any = all)')} `;
             else if (tt === 'chest')
               filt = hkChestTypeField(a, gi, hi, ai);
             else if (tt === 'npc')
@@ -5639,12 +5693,12 @@
                + `</select>`;
           // Hold(ms) only matters when "Press key" is on — grey it out otherwise.
           const pressed = !!a.press;
-          const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? '' : 'Enable "Press key" to use Hold(ms)'}">`
-               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai)}</span>`;
+          const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? 'How long to hold the output key down after aiming, in milliseconds' : 'Enable "Press key" to use Hold(ms)'}">`
+               + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai, 'How long to hold the output key down after aiming, in milliseconds')}</span>`;
           body = `Target ${targetSel} ${filt}`
-               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai)} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai)} `
-               + `${hkChk(a, 'press', 'Press key', gi, hi, ai)} `
+               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai, 'Radius in screen pixels to search for an aim target')} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + `${hkChk(a, 'press', 'Press key', gi, hi, ai, 'After aiming, also press the output key (enables Hold(ms))')} `
                + holdBlock;
           break;
         }
@@ -5657,10 +5711,11 @@
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
-                <span class="hk-spacer"></span>
-                <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
-                <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
-                <button class="hk-btn danger" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
+                <span class="hk-act-tools">
+                  <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
+                  <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
+                  <button class="hk-btn danger" title="Remove this action" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
+                </span>
               </div>`;
     }
 
@@ -5807,9 +5862,13 @@
     function hkDelAction(gi, hi, ai) { hkConfig[gi].hotkeys[hi].actions.splice(ai, 1); hkChanged(); }
     function hkSetAct(gi, hi, ai, k, v) {
       const a = hkConfig[gi].hotkeys[hi].actions[ai];
-      a[k] = (k === 'buffName' || k === 'name' || k === 'metadataPath' || k === 'chestType'
+      const isText = (k === 'buffName' || k === 'name' || k === 'metadataPath' || k === 'chestType'
               || k === 'op' || k === 'resource' || k === 'mode' || k === 'chargeType'
-              || k === 'rarity' || k === 'targetType' || k === 'triggerMode') ? v : (isNaN(+v) ? v : +v);
+              || k === 'rarity' || k === 'targetType' || k === 'triggerMode');
+      let val = isText ? v : (isNaN(+v) ? v : +v);
+      // Numeric action fields are never negative — clamp at 0.
+      if (!isText && typeof val === 'number' && val < 0) val = 0;
+      a[k] = val;
       hkChanged();
     }
 
