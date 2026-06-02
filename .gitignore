@@ -38,3 +38,6 @@ STAT_EXTRACTION_README.md
 # Raw extraction output (regenerated from game files)
 data/raw_csv/
 data/raw_extracted/
+
+# Local-only dev / test entrypoints (not part of the shipped helper)
+dev/
