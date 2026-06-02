@@ -19,13 +19,13 @@
 
 SetWorkingDir(A_ScriptDir)
 #Include Lib/WebViewToo.ahk
-#Include PoE2MemoryReader.ahk
-#Include PatchChecker.ahk
+#Include ahk/PoE2MemoryReader.ahk
+#Include ahk/PatchChecker.ahk
 #Include Lib/TerrainPathfinder.ahk
-#Include RadarOverlay.ahk
-#Include PlayerHUD.ahk
-#Include UiTreeBrowser.ahk
-#Include UiBrowserHandler.ahk
+#Include ahk/RadarOverlay.ahk
+#Include ahk/PlayerHUD.ahk
+#Include ahk/UiTreeBrowser.ahk
+#Include ahk/UiBrowserHandler.ahk
 
 /*
 Das Projekt mit all seinen Dateien in welchen ich entwickle befindet sich bei mir lokal unter "E:\PoE2GameHelper\"
@@ -256,7 +256,10 @@ g_winH := 850
 g_winMaximized := false
 
 g_flaskKeyLoadStatus := "default"
-g_errorLogPath := A_ScriptDir "\InGameStateMonitor.error.log"
+; Logs live under logs\ to keep the repo root tidy. Ensure the folder exists
+; before the error logger writes its header.
+try DirCreate(A_ScriptDir "\logs")
+g_errorLogPath := A_ScriptDir "\logs\InGameStateMonitor.error.log"
 g_errorLogMaxBytes := 1024 * 512
 
 ; ── Hidden data GUI: holds the 5 TreeView controls for data building ────────
@@ -856,35 +859,35 @@ OnTreeTabChanged(*)
     ReadAndShow()
 }
 
-#Include TreeViewWatchlistPanel.ahk
+#Include ahk/TreeViewWatchlistPanel.ahk
 
 ; ── Extracted single-responsibility modules ──────────────────────────────────
-#Include JsonParser.ahk
-#Include JsonFull.ahk
-#Include ErrorLogger.ahk
-#Include ConfigManager.ahk
-#Include SnapshotSerializers.ahk
-#Include WebViewBridge.ahk
-#Include DebugDump.ahk
-#Include ToggleHandlers.ahk
-#Include BridgeDispatch.ahk
-#Include GgpkToolBridge.ahk
+#Include ahk/JsonParser.ahk
+#Include ahk/JsonFull.ahk
+#Include ahk/ErrorLogger.ahk
+#Include ahk/ConfigManager.ahk
+#Include ahk/SnapshotSerializers.ahk
+#Include ahk/WebViewBridge.ahk
+#Include ahk/DebugDump.ahk
+#Include ahk/ToggleHandlers.ahk
+#Include ahk/BridgeDispatch.ahk
+#Include ahk/GgpkToolBridge.ahk
 
-#Include AutoFlask.ahk
-#Include AvoidZones.ahk
-#Include CombatAutomation.ahk
-#Include ItemSizeRegistry.ahk
-#Include LootPickup.ahk
-#Include ExplorationModule.ahk
-#Include AutoPilot.ahk
-#Include CustomHotkeys.ahk
-#Include CustomHotkeysBindings.ahk
-#Include CustomHotkeysBridge.ahk
-#Include AtlasData.ahk
-#Include PoE2AtlasReader.ahk
-#Include MemoryDiff.ahk
-#Include MemoryDissect.ahk
-#Include UIHelpers.ahk
+#Include ahk/AutoFlask.ahk
+#Include ahk/AvoidZones.ahk
+#Include ahk/CombatAutomation.ahk
+#Include ahk/ItemSizeRegistry.ahk
+#Include ahk/LootPickup.ahk
+#Include ahk/ExplorationModule.ahk
+#Include ahk/AutoPilot.ahk
+#Include ahk/CustomHotkeys.ahk
+#Include ahk/CustomHotkeysBindings.ahk
+#Include ahk/CustomHotkeysBridge.ahk
+#Include ahk/AtlasData.ahk
+#Include ahk/PoE2AtlasReader.ahk
+#Include ahk/MemoryDiff.ahk
+#Include ahk/MemoryDissect.ahk
+#Include ahk/UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
 F3:: OnF3DebugDump()

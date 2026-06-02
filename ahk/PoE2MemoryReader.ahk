@@ -591,7 +591,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (outputPath = "")
         {
             stamp := FormatTime(, "yyyyMMdd_HHmmss")
-            outputPath := A_ScriptDir "\\PatternScanDebug_" stamp ".log"
+            try DirCreate(A_ScriptDir "\logs")
+            outputPath := A_ScriptDir "\logs\PatternScanDebug_" stamp ".log"
         }
 
         patterns := this.GetStaticPatterns()
@@ -648,7 +649,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (outputPath = "")
         {
             stamp := FormatTime(, "yyyyMMdd_HHmmss")
-            outputPath := A_ScriptDir "\\PatternScanDebug_" stamp ".csv"
+            try DirCreate(A_ScriptDir "\logs")
+            outputPath := A_ScriptDir "\logs\PatternScanDebug_" stamp ".csv"
         }
 
         patterns := this.GetStaticPatterns()

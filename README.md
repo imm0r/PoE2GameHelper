@@ -328,9 +328,13 @@ User-defined macros live in their own **Hotkeys** category (see [Custom Hotkeys]
 ## Project Structure
 
 ```
-InGameStateMonitor.ahk          ─ main entry / WebView host
+InGameStateMonitor.ahk          ─ main entry / WebView host (the only .ahk in repo root)
 │
-├── Automation
+│   All other .ahk modules live in ahk/ (shown below grouped by area). Non-.ahk
+│   paths — ui/, Lib/, ggpk-tools/, data/, external/, .github/ — keep their own
+│   top-level folders. Logs are written to logs/.
+│
+├── Automation  (ahk/)
 │   ├── AutoPilot.ahk           ─ master state machine (combat > loot > explore)
 │   ├── CombatAutomation.ahk    ─ LoS-aware aim, skill rotation, A* approach
 │   ├── ExplorationModule.ahk   ─ visited-cell tracking, frontier finding
