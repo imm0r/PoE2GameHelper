@@ -879,6 +879,7 @@ OnTreeTabChanged(*)
 #Include CustomHotkeys.ahk
 #Include CustomHotkeysBindings.ahk
 #Include CustomHotkeysBridge.ahk
+#Include PoE2AtlasReader.ahk
 #Include MemoryDiff.ahk
 #Include MemoryDissect.ahk
 #Include UIHelpers.ahk
