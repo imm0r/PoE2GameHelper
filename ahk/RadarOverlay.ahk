@@ -588,6 +588,8 @@ class RadarOverlay
     ; _FlushBatch() is called here — this is the single flush point per frame.
     _BlitWithHighlight(gameWindowWidth, gameWindowHeight)
     {
+        ; Atlas overlay (dormant until g_atlasRender is populated by the reader).
+        this._RenderAtlas()
         ; Flush all queued draw operations before the optional highlight rect and blit.
         this._FlushBatch()
 
@@ -1377,6 +1379,85 @@ class RadarOverlay
                 }
             }
             textY += 4
+        }
+    }
+
+    ; Draws the Atlas overlay from the global g_atlasRender snapshot (built by the
+    ; Atlas reader once node offsets are confirmed). Inert while g_atlasRender is
+    ; 0. Expected shape (all coords in SCREEN space):
+    ;   g_atlasRender := Map(
+    ;     "nodes", [ Map("x","y","name","biomeId","content"(array of tag strings),"flags"), ... ],
+    ;     "connections", [ Map("x1","y1","x2","y2"), ... ],
+    ;     "path", [ Map("x","y"), ... ]   ; e.g. player → selected map
+    ;   )
+    _RenderAtlas()
+    {
+        global g_atlasRender
+        if !(IsSet(g_atlasRender) && g_atlasRender is Map)
+            return
+        nodes := g_atlasRender.Has("nodes") ? g_atlasRender["nodes"] : 0
+        if !(nodes is Array) || !nodes.Length
+            return
+
+        ox := this._lastGwX, oy := this._lastGwY
+        COL_CONN := 0x707070    ; node-graph connections (grey, BGR)
+        COL_NAME := 0x8AD6F0    ; map names (gold-ish, BGR)
+        COL_PATH := 0xFFC040    ; player → target route (cyan, BGR)
+
+        ; Node-graph connections (under everything else).
+        conns := g_atlasRender.Has("connections") ? g_atlasRender["connections"] : 0
+        if (conns is Array)
+        {
+            for c in conns
+            {
+                if (c is Map && c.Has("x1"))
+                    this._DrawLine(Round(c["x1"] - ox), Round(c["y1"] - oy),
+                        Round(c["x2"] - ox), Round(c["y2"] - oy), COL_CONN, 1)
+            }
+        }
+
+        ; Per-node: biome ring, name label, content badges.
+        for nd in nodes
+        {
+            if !(nd is Map && nd.Has("x"))
+                continue
+            sx := Round(nd["x"] - ox), sy := Round(nd["y"] - oy)
+
+            bi := AtlasBiome(nd.Has("biomeId") ? nd["biomeId"] : -1)
+            if (bi && bi["show"])
+                this._DrawPixelCircle(sx, sy, 14, bi["color"])
+
+            nm := nd.Has("name") ? nd["name"] : ""
+            if (nm != "")
+                this._DrawText(sx + 16, sy - 6, nm, COL_NAME)
+
+            if (nd.Has("content") && nd["content"] is Array)
+            {
+                bx := sx + 16, by := sy + 8
+                for tag in nd["content"]
+                {
+                    ci := AtlasContent(tag)
+                    if !(ci && ci["show"])
+                        continue
+                    this._DrawText(bx, by, "[" ci["abbrev"] "]", ci["bg"])
+                    bx += (StrLen(ci["abbrev"]) + 2) * 8
+                }
+            }
+        }
+
+        ; Optional path from player to a selected map.
+        path := g_atlasRender.Has("path") ? g_atlasRender["path"] : 0
+        if (path is Array && path.Length >= 2)
+        {
+            i := 1
+            while (i < path.Length)
+            {
+                a := path[i], b := path[i + 1]
+                if (a is Map && b is Map)
+                    this._DrawLine(Round(a["x"] - ox), Round(a["y"] - oy),
+                        Round(b["x"] - ox), Round(b["y"] - oy), COL_PATH, 2)
+                i += 1
+            }
         }
     }
 

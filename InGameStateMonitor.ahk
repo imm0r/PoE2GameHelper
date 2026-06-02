@@ -289,6 +289,7 @@ LoadCombatAutoConfig()
 LoadExplorationConfig()
 LoadLootPickupConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
+AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 
 ; Custom hotkey / macro engine — init defaults then load persisted hotkeys.json
 HotkeysInit()
@@ -882,6 +883,8 @@ OnTreeTabChanged(*)
 #Include ahk/CustomHotkeys.ahk
 #Include ahk/CustomHotkeysBindings.ahk
 #Include ahk/CustomHotkeysBridge.ahk
+#Include ahk/AtlasData.ahk
+#Include ahk/PoE2AtlasReader.ahk
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
 #Include ahk/UIHelpers.ahk

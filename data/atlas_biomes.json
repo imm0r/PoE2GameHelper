@@ -1,0 +1,12 @@
+{
+  "_comment": "Atlas biome id -> label + border colour (RGBA 0..1). BiomeId is the byte at AtlasNode+0x293. Verify ids against the live game once the reader is confirmed. Schema mirrors github.com/danthespal/Atlas.",
+  "0": { "Label": "Water",        "BorderColor": [ 0.028, 0.0,   0.911, 0.9 ], "Show": true },
+  "1": { "Label": "Mountain",     "BorderColor": [ 0.842, 0.842, 0.842, 0.9 ], "Show": true },
+  "2": { "Label": "Grass",        "BorderColor": [ 0.0,   0.923, 0.335, 0.9 ], "Show": true },
+  "3": { "Label": "Forest",       "BorderColor": [ 0.0,   0.266, 0.097, 0.9 ], "Show": true },
+  "4": { "Label": "Swamp",        "BorderColor": [ 0.028, 0.0,   0.911, 0.9 ], "Show": true },
+  "5": { "Label": "Desert",       "BorderColor": [ 0.799, 0.518, 0.0,   0.9 ], "Show": true },
+  "6": { "Label": "Ezomyte City", "BorderColor": [ 1.0,   1.0,   1.0,   0.9 ], "Show": true },
+  "7": { "Label": "Faridun City", "BorderColor": [ 1.0,   1.0,   1.0,   0.9 ], "Show": true },
+  "8": { "Label": "Vaal City",    "BorderColor": [ 1.0,   1.0,   1.0,   0.9 ], "Show": true }
+}

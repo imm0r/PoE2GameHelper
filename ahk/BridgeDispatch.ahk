@@ -111,6 +111,8 @@ _DispatchBridgeCall(method, args)
             SetTimer(PushHeaderToWebView, -50)
         case "DumpEntities":
             SetTimer(OnDumpEntitiesClicked, -1)
+        case "DumpAtlas":
+            SetTimer(OnDumpAtlasClicked, -1)
         case "HighlightEntity":
             g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
         case "ClearEntityHighlight":
