@@ -18,6 +18,7 @@ __pycache__/
 .claude/settings.local.json
 
 # Logs & temp files
+logs/
 *.error.log
 *.error.log.*
 
