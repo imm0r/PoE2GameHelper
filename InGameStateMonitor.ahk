@@ -120,6 +120,7 @@ g_treeTabKeys := ["Overview", "Buffs", "Entities", "UI", "gameState"]
 g_activeTreeTabKey := "Overview"
 g_activeTreeTabIdx := 1
 g_webViewReady := false
+g_pendingPatchNotice := ""   ; queued showPatchUpdate(...) JS until the WebView is ready
 g_bridge := 0
 g_webGui := 0
 g_alwaysOnTop := true   ; main window AoT — toggle via header pin button
@@ -562,9 +563,16 @@ _DebouncedGeometrySave()
 ; Fires when the WebView finishes loading a page — triggers the first data push.
 OnNavigationCompleted(wv, args, *)
 {
-    global g_webViewReady
+    global g_webViewReady, g_pendingPatchNotice
     g_webViewReady := true
     SetTimer(PushAllDataToWebView, -100)
+    ; Flush a patch-update notice that was raised before the page was ready.
+    if (IsSet(g_pendingPatchNotice) && g_pendingPatchNotice != "")
+    {
+        notice := g_pendingPatchNotice
+        g_pendingPatchNotice := ""
+        SetTimer(() => WebViewExec(notice), -300)
+    }
 }
 
 ; Receives JSON messages posted from JS via window.chrome.webview.postMessage({method, args}).

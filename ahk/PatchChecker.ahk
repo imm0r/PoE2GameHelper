@@ -88,16 +88,28 @@ CheckPoePatchVersion()
         return  ; First run — silently store, no popup
 
     if (currentPatch != lastPatch)
-    {
-        msg := "⚠️  PoE2 Patch Update detected!`n`n"
-            . "Previous: " lastPatch "`n"
-            . "Current:  " currentPatch "`n`n"
-            . "The following files should be rebuilt:`n"
-            . "  python build_stat_desc_map.py`n"
-            . "  python build_item_names.py`n`n"
-            . "Offsets may also have changed — verify pattern scanning."
-        MsgBox(msg, "PoE2 Patch Update", "Icon! 48")
-    }
+        ShowPatchUpdateNotice(lastPatch, currentPatch)
+}
+
+; Shows the "patch update detected" notice in the WebView, styled to match the
+; Helper UI (Codex theme), instead of a native MsgBox. If the WebView isn't
+; ready yet (this runs at startup, while the page is still navigating), the
+; payload is queued in g_pendingPatchNotice and flushed by OnNavigationCompleted.
+; Params: prevPatch / curPatch — the previous and current patch version strings.
+ShowPatchUpdateNotice(prevPatch, curPatch)
+{
+    global g_webViewReady, g_pendingPatchNotice
+    payload := Map(
+        "previous", prevPatch,
+        "current", curPatch,
+        "files", ["python build_stat_desc_map.py", "python build_item_names.py"],
+        "note", "Offsets may also have changed — verify pattern scanning."
+    )
+    js := "showPatchUpdate(" JsonFull_Stringify(payload, false) ")"
+    if (IsSet(g_webViewReady) && g_webViewReady)
+        try WebViewExec(js)
+    else
+        g_pendingPatchNotice := js
 }
 
 ; Returns the last known patch version string, or "" if never checked.

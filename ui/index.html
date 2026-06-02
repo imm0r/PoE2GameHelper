@@ -3612,6 +3612,42 @@
     }
     .cp-swatch:hover { border-color: var(--accent) }
 
+    /* PoE2 patch-update notice — Codex-styled modal shown via showPatchUpdate().
+       Mirrors the parchment/gold look of the rest of the Helper UI. */
+    #patch-modal {
+      position: fixed; inset: 0; z-index: 2000; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+    }
+    #patch-modal.open { display: flex }
+    .patch-card {
+      width: 460px; max-width: 86vw; padding: 20px 24px 16px;
+      color: var(--codex-text);
+      background:
+        radial-gradient(ellipse at center, rgba(232,220,184,0.05), transparent 70%),
+        linear-gradient(180deg, var(--codex-parchment) 0%, var(--codex-vellum) 100%);
+      border: 1px solid var(--codex-rule);
+      box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 26px rgba(0,0,0,0.5), 0 12px 34px rgba(0,0,0,0.6);
+    }
+    .patch-head {
+      font-family: var(--codex-heading, var(--codex-display)); color: var(--codex-gold-hi);
+      font-size: 22px; text-align: center; letter-spacing: 0.02em;
+      text-shadow: 0 1px 0 rgba(0,0,0,0.5);
+    }
+    .patch-rule {
+      height: 2px; margin: 10px 0 14px;
+      background: linear-gradient(90deg, transparent, var(--codex-gold) 25%, var(--codex-gold-hi) 50%, var(--codex-gold) 75%, transparent);
+    }
+    .patch-body { font-family: var(--codex-serif); font-size: 14px; line-height: 1.5; }
+    .patch-vers { display: grid; grid-template-columns: auto 1fr; gap: 3px 16px; margin-bottom: 12px; }
+    .patch-label { color: var(--codex-text-dim); }
+    .patch-ver { font-family: var(--codex-mono-serif); color: var(--codex-gold-hi); letter-spacing: 0.04em; }
+    .patch-section { margin-bottom: 4px; }
+    .patch-files { margin: 0 0 12px; padding-left: 20px; }
+    .patch-files li { font-family: 'Cascadia Mono', 'Consolas', monospace; font-size: 12.5px; color: #cbb88a; }
+    .patch-note { color: var(--codex-text-dim); font-style: italic; }
+    .patch-actions { text-align: right; margin-top: 8px; }
+
     /* Modal backdrop. Fixed-positioned over the whole UI so the picker
        floats above whatever tab is active. */
     #cp-modal {
@@ -5107,6 +5143,24 @@
   <!-- STATUS BAR -->
   <div id="status-bar"><span id="status-left">Initializing…</span><span id="status-right"></span></div>
 
+  <!-- PoE2 patch-update notice (Codex-styled; populated via showPatchUpdate) -->
+  <div id="patch-modal" role="dialog" aria-modal="true" onclick="if(event.target===this)closePatchUpdate()">
+    <div class="patch-card">
+      <div class="patch-head">⚠ PoE2 Patch Update detected</div>
+      <div class="patch-rule"></div>
+      <div class="patch-body">
+        <div class="patch-vers">
+          <span class="patch-label">Previous</span><span id="patch-prev" class="patch-ver"></span>
+          <span class="patch-label">Current</span><span id="patch-cur" class="patch-ver"></span>
+        </div>
+        <div class="patch-section">The following files should be rebuilt:</div>
+        <ul id="patch-files" class="patch-files"></ul>
+        <div id="patch-note" class="patch-note"></div>
+      </div>
+      <div class="patch-actions"><button class="cfg-btn" onclick="closePatchUpdate()">OK</button></div>
+    </div>
+  </div>
+
   <script src="animation_names.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════════════
@@ -5115,6 +5169,38 @@
     function ahkCall(method, ...args) {
       try { window.chrome.webview.postMessage({ method, args }); } catch (e) { }
     }
+
+    // Patch-update notice — populated + shown from AHK (PatchChecker) so the
+    // "new version detected" message matches the Codex theme instead of a
+    // native MsgBox. d = { previous, current, files:[...], note }.
+    function showPatchUpdate(d) {
+      try {
+        d = d || {};
+        var prev = document.getElementById('patch-prev');
+        var cur = document.getElementById('patch-cur');
+        if (prev) prev.textContent = d.previous || '?';
+        if (cur) cur.textContent = d.current || '?';
+        var ul = document.getElementById('patch-files');
+        if (ul) {
+          ul.innerHTML = '';
+          (d.files || []).forEach(function (f) { var li = document.createElement('li'); li.textContent = f; ul.appendChild(li); });
+        }
+        var note = document.getElementById('patch-note');
+        if (note) note.textContent = d.note || '';
+        var m = document.getElementById('patch-modal');
+        if (m) m.classList.add('open');
+      } catch (e) { }
+    }
+    function closePatchUpdate() {
+      var m = document.getElementById('patch-modal');
+      if (m) m.classList.remove('open');
+    }
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var m = document.getElementById('patch-modal');
+        if (m && m.classList.contains('open')) { closePatchUpdate(); e.stopPropagation(); }
+      }
+    });
 
     // Snap / Start dual-button click handler. The button's data-mode is
     // set by updateHeader() based on whether PoE2 is running, so a single
