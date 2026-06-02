@@ -216,7 +216,11 @@ class PoE2Offsets
 
     ; GrantedEffects DAT row — ActiveSkill foreignrow at 0x6F (row_ptr=0x6F, dat_name=0x77)
     static GrantedEffectsDat := Map(
-        "ActiveSkillRowPtr", 0x6F
+        ; ActiveSkills.dat row pointer inside a GrantedEffects.dat row.
+        ; Confirmed from the GameHelper source for PoE2 0.5.x
+        ; (GameOffsets/Objects/FilesStructures/GrantedEffectsDatOffset.cs:
+        ; [FieldOffset(0x57)] IntPtr ActiveSkillDatPtr).
+        "ActiveSkillRowPtr", 0x57
     )
 
     ; ActiveSkills DAT row — DisplayedName at 0x08 is the human-readable skill name
