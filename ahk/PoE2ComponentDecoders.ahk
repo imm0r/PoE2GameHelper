@@ -1013,6 +1013,13 @@ class PoE2ComponentDecoders
     ; Returns the offset, or 0 if not found.
     _FindActiveSkillOffset(grantedEffectDatPtr)
     {
+        ; Phase 0: try the C#-confirmed offset first (GrantedEffectsDatOffset.cs,
+        ; PoE2 0.5.x). When it validates we skip the scan entirely; otherwise we
+        ; fall back to the heuristic scans below for robustness across patches.
+        knownOff := PoE2Offsets.GrantedEffectsDat["ActiveSkillRowPtr"]
+        if (this._TryReadActiveSkillRow(grantedEffectDatPtr, knownOff)["displayName"] != "")
+            return knownOff
+
         ; Phase 1: Dat-name scan — look for "ActiveSkills" string ref at offset+8
         off := 0x40
         while (off <= 0xC0)
