@@ -638,6 +638,18 @@ _DispatchBridgeCall(method, args)
             pathArg := (args.Length >= 1) ? String(args[1]) : ""
             if (pathArg != "")
                 SetTimer(() => GgpkInstallPathUi_Save(pathArg), -1)
+        case "OffsetCompareRun":
+            ; Fetch upstream (arsenic) + diff local offsets/patterns on a timer;
+            ; the result is pushed back via updateOffsetComparison().
+            SetTimer(() => OffsetCompareRun(), -1)
+        case "OffsetCompareRecord":
+            ; args[1] = JSON array of {key, change_type, notes} classifications.
+            ocPayload := (args.Length >= 1) ? String(args[1]) : ""
+            SetTimer(() => OffsetCompareRecord(ocPayload), -1)
+        case "OffsetCompareShowHistory":
+            SetTimer(() => OffsetCompareShowHistory(), -1)
+        case "OffsetComparePredict":
+            SetTimer(() => OffsetComparePredict(), -1)
     }
 }
 

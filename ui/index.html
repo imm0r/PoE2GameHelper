@@ -4805,6 +4805,33 @@
             </div>
           </details>
         </div>
+        <div class="cfg-section">
+          <details id="det-offset-compare">
+            <summary>
+              <div class="cfg-header">🔀 Offset Comparison vs g0rdin@arsenic (DEV)</div>
+            </summary>
+            <div style="padding:8px 0;font-size:11px;color:var(--subtext)">
+              Diff local <b>PoE2Offsets.ahk</b> / <b>StaticOffsetsPatterns.ahk</b> against the upstream
+              C# reference (clones/pulls the <b>arsenic</b> branch into <code>.upstream_cache</code>).
+              Classify each change as <b>fix</b> or <b>game_update</b> and record it to
+              <code>offset_history.json</code>.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 0 8px">
+              <button class="tree-tbtn" onclick="ahkCall('OffsetCompareRun')" style="font-size:11px">🔍 Run Compare</button>
+              <button class="tree-tbtn" onclick="offsetCompareRecord()" style="font-size:11px">💾 Record classified</button>
+              <button class="tree-tbtn" onclick="ahkCall('OffsetCompareShowHistory')" style="font-size:11px">🕑 History</button>
+              <button class="tree-tbtn" onclick="ahkCall('OffsetComparePredict')" style="font-size:11px">🔮 Predict</button>
+            </div>
+            <div id="offset-compare-status" style="font-size:10px;color:var(--subtext);padding:2px 0"></div>
+            <div id="offset-compare-summary" style="font-size:11px;padding:2px 0"></div>
+            <div class="cfg-body" id="offset-compare-results">
+              <div class="no-data-msg">Click "Run Compare" to diff against upstream.</div>
+            </div>
+            <div class="cfg-body" id="offset-compare-patterns" style="margin-top:6px"></div>
+            <div class="cfg-body" id="offset-compare-history" style="margin-top:6px"></div>
+            <div class="cfg-body" id="offset-compare-predict" style="margin-top:6px"></div>
+          </details>
+        </div>
 
         </div><!-- /cfg-subpanel debug -->
 
@@ -5262,6 +5289,123 @@
     }
     function escAttr(s) {
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // ── Offset Comparison (DEV) — bridge to ahk/OffsetCompare.ahk ─────────────
+    function _ocDeltaHex(d) {
+      d = Number(d) || 0;
+      return (d < 0 ? '-' : '+') + '0x' + Math.abs(d).toString(16).toUpperCase();
+    }
+    function _ocClsSelect(key) {
+      return '<select data-ockey="' + escAttr(key) + '" style="font-size:10px">'
+        + '<option value="game_update" selected>game_update</option>'
+        + '<option value="fix">fix</option></select>';
+    }
+    function updateOffsetComparison(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false, msg: 'parse error: ' + e }; }
+      var sEl = document.getElementById('offset-compare-status');
+      var sumEl = document.getElementById('offset-compare-summary');
+      var el = document.getElementById('offset-compare-results');
+      var pEl = document.getElementById('offset-compare-patterns');
+      if (!el) return;
+      if (sEl) sEl.textContent = (r.fetchMsg ? ('upstream: ' + r.fetchMsg) : '') + (r.msg ? ('  ' + r.msg) : '');
+      if (!r.ok) {
+        el.innerHTML = '<div class="no-data-msg">' + escHtml(r.msg || 'compare failed') + '</div>';
+        if (pEl) pEl.innerHTML = '';
+        return;
+      }
+      if (sumEl) {
+        sumEl.innerHTML = 'Version <b>' + escHtml(r.version || '?') + '</b> · upstream commit <b>'
+          + escHtml(r.commit || '?') + '</b><br>'
+          + 'AHK: ' + r.ahkOffsetCount + ' offsets / ' + r.ahkMapCount + ' maps · '
+          + 'C#: ' + r.csFieldCount + ' fields / ' + r.csStructCount + ' structs · '
+          + r.matchCount + ' maps matched';
+      }
+      var diffs = r.offsetDiffs || [];
+      if (!diffs.length) {
+        el.innerHTML = '<div class="no-data-msg" style="color:#4ade80">✓ No offset differences — AHK is in sync with C#.</div>';
+      } else {
+        var html = '<table class="tsv-table" style="width:100%"><thead><tr>'
+          + '<th>Map / Field</th><th>Struct [file]</th><th>Local</th><th>Upstream</th><th>Type</th><th>Notes</th></tr></thead><tbody>';
+        diffs.forEach(function (d) {
+          html += '<tr><td>' + escHtml(d.ahk_map + '/' + d.field) + '</td>'
+            + '<td style="color:var(--subtext);font-size:10px">' + escHtml(d.cs_struct + ' [' + d.cs_file + ']') + '</td>'
+            + '<td style="font-family:monospace;color:#ef4444">' + escHtml(d.ahk_val) + '</td>'
+            + '<td style="font-family:monospace;color:#4ade80">' + escHtml(d.cs_val) + '</td>'
+            + '<td>' + _ocClsSelect(d.key) + '</td>'
+            + '<td><input data-ocnotes="' + escAttr(d.key) + '" style="width:140px;font-size:10px" /></td></tr>';
+        });
+        el.innerHTML = html + '</tbody></table>';
+      }
+      var pats = r.patternDiffs || [];
+      if (pEl) {
+        if (!pats.length) { pEl.innerHTML = ''; }
+        else {
+          var ph = '<div style="font-weight:600;color:var(--accent);margin:4px 0">Pattern differences (' + pats.length + ')</div>'
+            + '<table class="tsv-table" style="width:100%"><thead><tr><th>Name</th><th>Local</th><th>Upstream</th><th>Type</th><th>Notes</th></tr></thead><tbody>';
+          pats.forEach(function (p) {
+            ph += '<tr><td>' + escHtml(p.name) + '</td>'
+              + '<td style="font-family:monospace;color:#ef4444;font-size:9px;word-break:break-all">' + escHtml(p.ahk) + '</td>'
+              + '<td style="font-family:monospace;color:#4ade80;font-size:9px;word-break:break-all">' + escHtml(p.cs) + '</td>'
+              + '<td>' + _ocClsSelect('pattern:' + p.name) + '</td>'
+              + '<td><input data-ocnotes="' + escAttr('pattern:' + p.name) + '" style="width:120px;font-size:10px" /></td></tr>';
+          });
+          pEl.innerHTML = ph + '</tbody></table>';
+        }
+      }
+    }
+    function offsetCompareRecord() {
+      var rows = [];
+      document.querySelectorAll('[data-ockey]').forEach(function (sel) {
+        var key = sel.getAttribute('data-ockey');
+        var row = sel.closest('tr');
+        var notesEl = row ? row.querySelector('[data-ocnotes]') : null;
+        rows.push({ key: key, change_type: sel.value, notes: notesEl ? notesEl.value : '' });
+      });
+      if (!rows.length) return;
+      ahkCall('OffsetCompareRecord', JSON.stringify(rows));
+    }
+    function updateOffsetRecordStatus(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = {}; }
+      var sEl = document.getElementById('offset-compare-status');
+      if (sEl) sEl.textContent = (r.ok ? '✓ ' : '⚠ ') + (r.msg || '');
+    }
+    function updateOffsetHistory(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false }; }
+      var el = document.getElementById('offset-compare-history');
+      if (!el) return;
+      var evs = (r.events || []).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+      if (!evs.length) { el.innerHTML = '<div class="no-data-msg">No recorded changes (initial baselines only).</div>'; return; }
+      var html = '<div style="font-weight:600;color:var(--accent);margin:4px 0">History (' + evs.length + ')</div>'
+        + '<table class="tsv-table" style="width:100%"><thead><tr><th>Date</th><th>Type</th><th>Key</th><th>Local→Upstream</th><th>Ver</th><th>Notes</th></tr></thead><tbody>';
+      evs.forEach(function (e) {
+        var col = e.type === 'fix' ? '#e8c44a' : '#60a5fa';
+        html += '<tr><td>' + escHtml(e.date) + '</td>'
+          + '<td style="color:' + col + '">' + escHtml(e.type) + '</td>'
+          + '<td>' + escHtml((e.kind === 'pattern' ? '⬡ ' : '') + e.key) + '</td>'
+          + '<td style="font-family:monospace">' + escHtml(e.ahk) + ' → ' + escHtml(e.cs) + '</td>'
+          + '<td>' + escHtml(e.version) + '</td>'
+          + '<td style="color:var(--subtext)">' + escHtml(e.notes || '') + '</td></tr>';
+      });
+      el.innerHTML = html + '</tbody></table>';
+    }
+    function updateOffsetPredict(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false }; }
+      var el = document.getElementById('offset-compare-predict');
+      if (!el) return;
+      var html = '<div style="font-weight:600;color:var(--accent);margin:4px 0">Delta prediction (game_update history)</div>';
+      var any = false;
+      (r.structs || []).forEach(function (s) {
+        (s.versions || []).forEach(function (v) {
+          if (v.uniform) {
+            any = true;
+            html += '<div style="font-size:11px;padding:2px 0"><b>' + escHtml(s.struct) + '</b> @ '
+              + escHtml(v.version) + ': all ' + v.count + ' known fields shifted <b>' + _ocDeltaHex(v.delta)
+              + '</b> (' + escHtml((v.fields || []).join(', ')) + ')</div>';
+          }
+        });
+      });
+      el.innerHTML = html + (any ? '' : '<div class="no-data-msg">No uniform game_update shifts recorded yet.</div>');
     }
 
     // Notify AHK we are ready

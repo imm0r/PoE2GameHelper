@@ -3,7 +3,7 @@ dumped_tables/
 preload_dumps/
 debug/
 
-# Upstream-Cache (auto-cloned by compare_offsets.py)
+# Upstream-Cache (auto-cloned by ahk/OffsetCompare.ahk)
 .upstream_cache/
 
 # Python cache
