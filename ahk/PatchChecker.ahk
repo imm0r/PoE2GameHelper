@@ -153,7 +153,12 @@ ShowPatchUpdateNotice(prevPatch, curPatch)
     )
     js := "showPatchUpdate(" JsonFull_Stringify(payload, false) ")"
     if (IsSet(g_webViewReady) && g_webViewReady)
+    {
+        ; Braces are required: a bare one-line `try` lets AHK v2 bind the
+        ; following `else` to the Try (which supports its own Else), producing
+        ; an "Unexpected Else" load error on some builds (issue #78).
         try WebViewExec(js)
+    }
     else
         g_pendingPatchNotice := js
 }
