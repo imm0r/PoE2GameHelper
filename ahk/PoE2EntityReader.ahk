@@ -576,19 +576,19 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         if !this.IsProbablyValidPointer(entityPtr)
             return 0
 
-        ; Batch-read full entity header in ONE RPM call: 0x08..0x87 covers
+        ; Batch-read full entity header in ONE RPM call: 0x08..0x8F covers
         ;   EntityDetailsPtr(0x08), ComponentsVec(0x10), ComponentsVecLast(0x18),
-        ;   Id(0x80), Flags(0x84).
-        ; Replaces 2 separate reads (was 0x18 + 8 = 32 B in two RPMs) with one 0x80-byte read.
-        ; Extra ~96 bytes are discarded — the saved kernel-mode switch outweighs the transfer cost.
-        hdrBuf := this.Mem.ReadBytes(entityPtr + 0x08, 0x80)
+        ;   Id(0x80), Flags/IsValid(0x8C).
+        ; Replaces 2 separate reads (was 0x18 + 8 = 32 B in two RPMs) with one 0x88-byte read.
+        ; Extra bytes are discarded — the saved kernel-mode switch outweighs the transfer cost.
+        hdrBuf := this.Mem.ReadBytes(entityPtr + 0x08, 0x88)
         if !hdrBuf
             return 0
         entityDetailsPtr := NumGet(hdrBuf.Ptr, 0x00, "Ptr")    ; entity 0x08
         compVecFirst     := NumGet(hdrBuf.Ptr, 0x08, "Int64")  ; entity 0x10
         compVecLast      := NumGet(hdrBuf.Ptr, 0x10, "Int64")  ; entity 0x18
         entityId         := NumGet(hdrBuf.Ptr, 0x78, "UInt")   ; entity 0x80
-        flags            := NumGet(hdrBuf.Ptr, 0x7C, "UChar")  ; entity 0x84
+        flags            := NumGet(hdrBuf.Ptr, 0x84, "UChar")  ; entity 0x8C (IsValid, g0rdin@arsenic)
 
         ; ── Inline validation (replaces separate IsEntityLikePointer pre-check) ──
         ; Same rules as IsEntityLikePointer — but operates on the buffer we already read,

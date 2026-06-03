@@ -101,7 +101,10 @@ class PoE2Offsets
         "ComponentsVec", 0x10,
         "ComponentsVecLast", 0x18,
         "Id", 0x88,
-        "Flags", 0x84
+        ; IsValid byte per g0rdin@arsenic EntityOffsets.cs (was 0x84).
+        ; Semantics unchanged: bit 0 clear => entity valid. NEEDS IN-GAME VERIFY —
+        ; the v0.5 client may still use 0x84; revert this commit if validity regresses.
+        "Flags", 0x8C
     )
 
     static EntityDetails := Map(
