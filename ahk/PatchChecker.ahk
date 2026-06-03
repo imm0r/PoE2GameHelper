@@ -134,7 +134,7 @@ CheckPoePatchVersion()
         return  ; First run — silently store, no popup
 
     if (currentPatch != lastPatch)
-        ShowPatchUpdateNotice(lastPatch, currentPatch)
+        TriggerPatchMaintenance(lastPatch, currentPatch)   ; runs data + offset jobs with live progress
 }
 
 ; Shows the "patch update detected" notice in the WebView, styled to match the

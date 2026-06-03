@@ -121,6 +121,9 @@ g_activeTreeTabKey := "Overview"
 g_activeTreeTabIdx := 1
 g_webViewReady := false
 g_pendingPatchNotice := ""   ; queued showPatchUpdate(...) JS until the WebView is ready
+g_patchMaint := ""           ; active post-patch maintenance run, Map("prev","cur") or ""
+g_patchMaintPending := ""    ; maintenance request queued until the WebView is ready
+g_patchMaintBusy := false    ; true while GGPK extraction runs (auto-refresh dedup guard)
 g_bridge := 0
 g_webGui := 0
 g_alwaysOnTop := true   ; main window AoT — toggle via header pin button
@@ -563,7 +566,7 @@ _DebouncedGeometrySave()
 ; Fires when the WebView finishes loading a page — triggers the first data push.
 OnNavigationCompleted(wv, args, *)
 {
-    global g_webViewReady, g_pendingPatchNotice
+    global g_webViewReady, g_pendingPatchNotice, g_patchMaint, g_patchMaintPending
     g_webViewReady := true
     SetTimer(PushAllDataToWebView, -100)
     ; Flush a patch-update notice that was raised before the page was ready.
@@ -572,6 +575,13 @@ OnNavigationCompleted(wv, args, *)
         notice := g_pendingPatchNotice
         g_pendingPatchNotice := ""
         SetTimer(() => WebViewExec(notice), -300)
+    }
+    ; Start a post-patch maintenance run that was queued before the page loaded.
+    if (IsSet(g_patchMaintPending) && g_patchMaintPending != "")
+    {
+        g_patchMaint := g_patchMaintPending
+        g_patchMaintPending := ""
+        SetTimer(() => RunPatchMaintenance(), -300)
     }
 }
 
@@ -896,6 +906,7 @@ OnTreeTabChanged(*)
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
 #Include ahk/OffsetCompare.ahk
+#Include ahk/PatchMaintenance.ahk
 #Include ahk/UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
