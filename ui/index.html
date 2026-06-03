@@ -5358,8 +5358,8 @@
       var rows = [];
       document.querySelectorAll('[data-ockey]').forEach(function (sel) {
         var key = sel.getAttribute('data-ockey');
-        var esc = (window.CSS && CSS.escape) ? CSS.escape(key) : key.replace(/"/g, '\\"');
-        var notesEl = document.querySelector('[data-ocnotes="' + esc + '"]');
+        var row = sel.closest('tr');
+        var notesEl = row ? row.querySelector('[data-ocnotes]') : null;
         rows.push({ key: key, change_type: sel.value, notes: notesEl ? notesEl.value : '' });
       });
       if (!rows.length) return;
