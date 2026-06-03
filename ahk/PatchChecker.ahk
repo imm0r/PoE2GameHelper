@@ -2,9 +2,13 @@
 ; Queries the PoE2 patch server on startup to detect game updates.
 ; Ported from: https://github.com/poe-tool-dev/poe-patch-update
 ;
-; Protocol: TCP connect to patch.pathofexile.com:12995, send [0x01, 0x06],
-; read response. The patch version string is UTF-16LE starting at byte 35,
-; with length (in chars) at byte 34.
+; Protocol: TCP connect to patch.pathofexile2.com:13060, send [0x01, 0x06],
+; read the response. The patch version string is UTF-16LE starting at byte 35,
+; with its length (in chars) at byte 34; the final '/'-separated segment is the
+; patch version (e.g. "4.4.0.10").
+;
+; The TCP probe runs natively via Winsock (ws2_32.dll, DllCall) — no PowerShell
+; child process is spawned.
 ;
 ; Storage: persisted in the main config INI under [General] lastKnownPatch.
 ; Older builds stashed it in `last_known_patch.txt`; if that file exists
@@ -31,55 +35,97 @@ _PatchChecker_MigrateLegacyFile()
     try FileDelete(legacy)
 }
 
+; Queries the PoE2 patch server over a raw TCP socket (Winsock) and returns the
+; current patch-version string (the final '/'-separated segment), or "" on any
+; failure (offline, timeout, malformed packet). No external process is spawned.
+; Params: host/port - patch-server endpoint; timeoutMs - send/recv timeout.
+_PatchChecker_FetchVersion(host := "patch.pathofexile2.com", port := 13060, timeoutMs := 5000)
+{
+    static AF_INET := 2, SOCK_STREAM := 1, IPPROTO_TCP := 6
+    static SOL_SOCKET := 0xFFFF, SO_RCVTIMEO := 0x1006, SO_SNDTIMEO := 0x1005
+    static INVALID_SOCKET := -1
+
+    ; Winsock 2.2 init — bail quietly if it fails.
+    wsaData := Buffer(512, 0)
+    if DllCall("ws2_32\WSAStartup", "UShort", 0x0202, "Ptr", wsaData)
+        return ""
+
+    sock := INVALID_SOCKET
+    pResult := 0
+    version := ""
+    try
+    {
+        ; Resolve host:port into a TCP/IPv4 sockaddr (ANSI addrinfo). The int
+        ; fields (ai_family/socktype/protocol) sit at the same offsets on x86/x64;
+        ; the pointer fields are addressed via A_PtrSize so this stays bitness-safe.
+        hints := Buffer(64, 0)
+        NumPut("Int", AF_INET,     hints, 4)    ; addrinfo.ai_family
+        NumPut("Int", SOCK_STREAM, hints, 8)    ; addrinfo.ai_socktype
+        NumPut("Int", IPPROTO_TCP, hints, 12)   ; addrinfo.ai_protocol
+        if DllCall("ws2_32\getaddrinfo", "AStr", host, "AStr", String(port), "Ptr", hints, "Ptr*", &pResult, "Int")
+            return ""
+        aiAddrLen := NumGet(pResult, 16, "Ptr")                  ; addrinfo.ai_addrlen
+        aiAddr    := NumGet(pResult, 16 + 2 * A_PtrSize, "Ptr")  ; addrinfo.ai_addr (sockaddr*)
+
+        sock := DllCall("ws2_32\socket", "Int", AF_INET, "Int", SOCK_STREAM, "Int", IPPROTO_TCP, "Ptr")
+        if (sock = INVALID_SOCKET)
+            return ""
+
+        ; Apply send/recv timeouts (ms) so a stalled server can't hang startup.
+        tv := Buffer(4, 0)
+        NumPut("Int", timeoutMs, tv)
+        DllCall("ws2_32\setsockopt", "Ptr", sock, "Int", SOL_SOCKET, "Int", SO_RCVTIMEO, "Ptr", tv, "Int", 4)
+        DllCall("ws2_32\setsockopt", "Ptr", sock, "Int", SOL_SOCKET, "Int", SO_SNDTIMEO, "Ptr", tv, "Int", 4)
+
+        if DllCall("ws2_32\connect", "Ptr", sock, "Ptr", aiAddr, "Int", aiAddrLen, "Int")
+            return ""
+
+        ; Request packet: [0x01, 0x06].
+        reqBuf := Buffer(2, 0)
+        NumPut("UChar", 1, reqBuf, 0)
+        NumPut("UChar", 6, reqBuf, 1)
+        if (DllCall("ws2_32\send", "Ptr", sock, "Ptr", reqBuf, "Int", 2, "Int", 0, "Int") = INVALID_SOCKET)
+            return ""
+
+        ; Single response read — the version sits near the start of the packet.
+        rcvBuf := Buffer(1024, 0)
+        n := DllCall("ws2_32\recv", "Ptr", sock, "Ptr", rcvBuf, "Int", 1024, "Int", 0, "Int")
+        if (n < 36)
+            return ""
+
+        len := NumGet(rcvBuf, 34, "UChar")         ; version length in chars (byte 34)
+        if (len <= 0 || 35 + len * 2 > n)          ; bounds-check against bytes received
+            return ""
+        ver := StrGet(rcvBuf.Ptr + 35, len, "UTF-16")
+
+        ; Keep the final non-empty '/'-separated segment (e.g. ".../4.4.0.10").
+        for i, seg in StrSplit(ver, "/")
+            if (Trim(seg) != "")
+                version := seg
+    }
+    finally
+    {
+        if (sock != INVALID_SOCKET)
+            DllCall("ws2_32\closesocket", "Ptr", sock)
+        if (pResult)
+            DllCall("ws2_32\freeaddrinfo", "Ptr", pResult)
+        DllCall("ws2_32\WSACleanup")
+    }
+    return version
+}
+
 CheckPoePatchVersion()
 {
     _PatchChecker_MigrateLegacyFile()
-    iniFile     := _ConfigPath()
-    tempOut     := A_Temp "\poe_patch_out_" A_TickCount ".txt"
-    tempScript  := A_Temp "\poe_patch_" A_TickCount ".ps1"
+    iniFile := _ConfigPath()
 
-    ; Write a PS1 script to temp — avoids all inline quoting issues
-    psContent := ""
-        . "try {`r`n"
-        . "    $c = New-Object System.Net.Sockets.TcpClient`r`n"
-        . "    $c.ReceiveTimeout = 5000`r`n"
-        . "    $c.SendTimeout = 5000`r`n"
-        . "    $c.Connect('patch.pathofexile2.com', 13060)`r`n"
-        . "    $s = $c.GetStream()`r`n"
-        . "    $s.Write([byte[]](1, 6), 0, 2)`r`n"
-        . "    $b = New-Object byte[] 1024`r`n"
-        . "    $null = $s.Read($b, 0, 1024)`r`n"
-        . "    $len = $b[34]`r`n"
-        . "    $ver = [System.Text.Encoding]::Unicode.GetString($b, 35, $len * 2)`r`n"
-        . "    $patch = ($ver -split '/') | Where-Object { $_ } | Select-Object -Last 1`r`n"
-        . "    [System.IO.File]::WriteAllText('" tempOut "', $patch)`r`n"
-        . "    $c.Close()`r`n"
-        . "} catch {`r`n"
-        . "    [System.IO.File]::WriteAllText('" tempOut "', 'ERROR: ' + $_.Exception.Message)`r`n"
-        . "}`r`n"
+    currentPatch := _PatchChecker_FetchVersion()
 
-    try {
-        fh := FileOpen(tempScript, "w", "UTF-8")
-        fh.Write(psContent)
-        fh.Close()
-    }
-
-    RunWait('powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' tempScript '"', , "Hide")
-
-    try FileDelete(tempScript)
-
-    if !FileExist(tempOut)
+    ; Bail on empty/invalid response (offline, timeout, or malformed packet).
+    if (!currentPatch || !RegExMatch(currentPatch, "^\d+\.\d+"))
         return
 
-    raw := Trim(FileRead(tempOut))
-    try FileDelete(tempOut)
-
-    ; Bail on error or empty/invalid response
-    if (!raw || SubStr(raw, 1, 5) = "ERROR" || !RegExMatch(raw, "^\d+\.\d+"))
-        return
-
-    currentPatch := raw
-    lastPatch    := IniRead(iniFile, "General", "lastKnownPatch", "")
+    lastPatch := IniRead(iniFile, "General", "lastKnownPatch", "")
 
     ; Always persist the latest known version
     IniWrite(currentPatch, iniFile, "General", "lastKnownPatch")
