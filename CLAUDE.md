@@ -28,6 +28,6 @@ inline when authoring commit messages, PR bodies, etc.
   parameters, and return value.
 - Variable names follow existing camelCase / snake_case style of
   surrounding code.
-- Check `https://gitlab.com/bylafko/gamehelper2` (the original C#
-  reference project) when starting on a new feature — solutions or
-  approaches may already exist there.
+- Check `https://gitlab.com/g0rdin/gamehelper2` (branch `arsenic`, the
+  original C# reference project) when starting on a new feature —
+  solutions or approaches may already exist there.

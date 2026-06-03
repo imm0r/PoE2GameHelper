@@ -94,7 +94,7 @@ def _cache_matches_config() -> bool:
 def fetch_upstream(verbose=True) -> bool:
     """Klont oder pullt den arsenic-Branch des GitLab-Repos in CACHE_DIR."""
     # Vorhandenen Cache verwerfen, wenn er auf ein anderes Repo/Branch zeigt
-    # (z. B. nach dem Wechsel von bylafko -> g0rdin@arsenic).
+    # (z. B. nach einem Wechsel von Repo oder Branch).
     if CACHE_DIR.exists() and not _cache_matches_config():
         print(c("  Cache zeigt auf anderes Repo/Branch — wird neu geklont …", YELLOW))
         shutil.rmtree(CACHE_DIR, ignore_errors=True)

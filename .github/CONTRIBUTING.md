@@ -136,7 +136,7 @@ By submitting a contribution you confirm that you have the right to license it u
 
 ## Reference projects
 
-When you start on a new feature, it's worth a quick look at **`https://gitlab.com/bylafko/gamehelper2`** — the C# reference project this codebase originated from. Solutions or pattern-scanning approaches you'll need may already be solved there in a form you can port.
+When you start on a new feature, it's worth a quick look at **`https://gitlab.com/g0rdin/gamehelper2`** (branch `arsenic`) — the C# reference project this codebase originated from. Solutions or pattern-scanning approaches you'll need may already be solved there in a form you can port.
 
 For PoE2-specific data structures, `DEV_README.md` carries the running inventory of known offsets and components.
 
