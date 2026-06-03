@@ -20,16 +20,14 @@ class PoE2StaticOffsetsPatterns
 
     ; Returns a Map of pattern names that are non-critical during FindStaticAddresses() scanning.
     ; Patterns listed here will not set critical failure flags if they are missing or ambiguous.
+    ;
+    ; Currently empty: all six scan patterns in GetStaticPatterns() are critical
+    ; anchors (the GameHelper source confirms exactly those six). The previous
+    ; entries (NoAtlasFog / RevealMap / InfiniteZoom / ToggleHiddenIcon /
+    ; PlayerLight / EnemyHealthBars / MiniMapZoom) were client graphics tweaks
+    ; with no corresponding pattern here — dead placeholders — and were removed.
     static GetOptionalNames()
     {
-        return Map(
-            "NoAtlasFog", true,
-            "RevealMap", true,
-            "InfiniteZoom", true,
-            "ToggleHiddenIcon", true,
-            "PlayerLight", true,
-            "EnemyHealthBars", true,
-            "MiniMapZoom", true
-        )
+        return Map()
     }
 }

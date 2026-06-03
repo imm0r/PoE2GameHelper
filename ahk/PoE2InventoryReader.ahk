@@ -1307,11 +1307,16 @@ class PoE2InventoryReader extends PoE2PlayerReader
             ; numeric rolls for those stats. A "+Life and +Mana" mod has 2 values,
             ; a single "+Strength" mod has 1 value, etc.
             ;
-            ; Reading the actual stat IDs would require mapping the Mods.dat schema
-            ; (offsets into the dat row for the stat-id columns), which isn't in
-            ; PoE2Offsets.ahk yet — so we can show values but not yet templated text
-            ; like "+38 to Spirit". TODO: add Mods.dat schema and rejoin to
-            ; stat_desc_map for full template rendering.
+            ; Per-mod stat IDs would require the Mods.dat row schema (offsets into
+            ; the dat row for the stat-id columns), which isn't available: the
+            ; GameHelper source (GameOffsets/.../ModsAndObjectMagicProperties.cs)
+            ; exposes only the same component offsets we have — there is no Mods.dat
+            ; offset file to copy. So per-mod attribution stays values-only.
+            ;
+            ; NOTE: item-level templated text ("+38 to Spirit") is NOT blocked by
+            ; this — _BuildItemModsJson renders it from the aggregated StatsFromMods
+            ; (statKey, statValue) list via stat_desc_map. This Values vector only
+            ; feeds the per-mod fallback breakdown.
             valuesVecAddr := entryAddr + PoE2Offsets.ModArray["Values"]
             vFirst := this.Mem.ReadInt64(valuesVecAddr + PoE2Offsets.StdVector["First"])
             vLast  := this.Mem.ReadInt64(valuesVecAddr + PoE2Offsets.StdVector["Last"])
