@@ -34,7 +34,16 @@ class GgpkToolBridge
     {
         indexPath := this._ResolveGameDataPath()
         if (indexPath = "")
-            return this._Fail("PoE2 not running — start the game once so we can locate the install path.")
+        {
+            ; Fall back to a previously cached / manually-entered index path so
+            ; we can regenerate even while the game is closed — used by the
+            ; patch-maintenance flow that prompts the user for the path.
+            cached := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+            if (cached != "" && FileExist(cached))
+                indexPath := cached
+        }
+        if (indexPath = "")
+            return this._Fail("PoE2 not running and no install path saved — point us at Bundles2\_.index.bin (or Content.ggpk).")
 
         exe := this._FindExe("PoeDataExtract")
         if (exe["path"] = "")
@@ -193,8 +202,17 @@ class GgpkToolBridge
     ; instead of fingerprinting _.index.bin's mtime.
     static MaybeAutoRefresh(retryAttempt := 0)
     {
+        global g_patchMaintBusy
         try
         {
+            ; Don't extract concurrently with the visible patch-maintenance
+            ; flow — reschedule and let it finish (it records lastRefreshedAtPatch
+            ; on success, after which this pass sees nothing to do).
+            if (IsSet(g_patchMaintBusy) && g_patchMaintBusy)
+            {
+                SetTimer(() => GgpkToolBridge.MaybeAutoRefresh(retryAttempt), -15000)
+                return
+            }
             tsvPath := A_ScriptDir "\data\base_item_sizes.tsv"
             tsvOk := FileExist(tsvPath) && FileGetSize(tsvPath) >= 100
             iniFile := _ConfigPath()

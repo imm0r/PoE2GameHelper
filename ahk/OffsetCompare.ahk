@@ -376,8 +376,9 @@ _OC_LastValue(events)
 
 ; ── Bridge handlers (called from BridgeDispatch via SetTimer) ────────────────────
 
-; Runs a full comparison and pushes the result to the WebView.
-OffsetCompareRun()
+; Computes the full comparison result Map (no UI push). Shared by the dev-panel
+; handler (OffsetCompareRun) and the patch-maintenance flow.
+_OC_RunCompareData()
 {
     result := Map("ok", false, "msg", "", "version", "", "fetchMsg", "")
     try
@@ -390,8 +391,7 @@ OffsetCompareRun()
         if !DirExist(csDir)
         {
             result["msg"] := "C# sources not found in cache: " csDir
-            _OC_PushRun(result)
-            return
+            return result
         }
 
         ahk      := _OC_ParseAhkOffsets(_OC_AhkOffsets())
@@ -423,7 +423,13 @@ OffsetCompareRun()
         result["msg"] := ex.Message
         try LogError("OffsetCompareRun", ex)
     }
-    _OC_PushRun(result)
+    return result
+}
+
+; Runs a full comparison and pushes the result to the WebView dev panel.
+OffsetCompareRun()
+{
+    _OC_PushRun(_OC_RunCompareData())
 }
 
 _OC_PushRun(result)

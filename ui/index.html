@@ -3647,6 +3647,28 @@
     .patch-files li { font-family: 'Cascadia Mono', 'Consolas', monospace; font-size: 12.5px; color: #cbb88a; }
     .patch-note { color: var(--codex-text-dim); font-style: italic; }
     .patch-actions { text-align: right; margin-top: 8px; }
+    /* Post-patch maintenance progress (data regen + offset check) */
+    .patch-steps { margin: 6px 0 10px; display: flex; flex-direction: column; gap: 9px; }
+    .patch-step { display: grid; grid-template-columns: 20px 1fr; gap: 2px 10px; align-items: start; }
+    .patch-step-ico { font-size: 14px; line-height: 1.4; text-align: center; color: var(--codex-text-dim); }
+    .patch-step-main { display: flex; flex-direction: column; min-width: 0; }
+    .patch-step-label { color: var(--codex-text); font-family: var(--codex-serif); }
+    .patch-step-msg { color: var(--codex-text-dim); font-size: 12px; font-style: italic; min-height: 14px; word-break: break-word; }
+    .patch-step.state-ok .patch-step-ico { color: var(--codex-gold-hi); }
+    .patch-step.state-ok .patch-step-label { color: var(--codex-gold-hi); }
+    .patch-step.state-warn .patch-step-ico,
+    .patch-step.state-warn .patch-step-msg { color: #d8b75a; }
+    .patch-step.state-fail .patch-step-ico,
+    .patch-step.state-fail .patch-step-msg { color: #d98b7a; }
+    @keyframes patch-spin { to { transform: rotate(360deg); } }
+    .patch-step.state-running .patch-step-ico { display: inline-block; color: var(--codex-gold); animation: patch-spin 0.9s linear infinite; }
+    .patch-path { margin: 0 0 10px; display: flex; flex-direction: column; gap: 6px; }
+    .patch-path-input {
+      width: 100%; box-sizing: border-box; padding: 6px 8px;
+      font-family: var(--codex-mono-serif); font-size: 12px; color: var(--codex-text);
+      background: rgba(0,0,0,0.25); border: 1px solid var(--codex-rule);
+    }
+    .patch-path-btns { display: flex; gap: 8px; justify-content: flex-end; }
 
     /* Modal backdrop. Fixed-positioned over the whole UI so the picker
        floats above whatever tab is active. */
@@ -5180,11 +5202,24 @@
           <span class="patch-label">Previous</span><span id="patch-prev" class="patch-ver"></span>
           <span class="patch-label">Current</span><span id="patch-cur" class="patch-ver"></span>
         </div>
-        <div class="patch-section">The following files should be rebuilt:</div>
-        <ul id="patch-files" class="patch-files"></ul>
+        <!-- Live progress of the auto-run maintenance (data regen + offset check) -->
+        <div id="patch-steps" class="patch-steps"></div>
+        <!-- Shown only when the data step needs the PoE2 install path -->
+        <div id="patch-path-prompt" class="patch-path" style="display:none">
+          <div id="patch-path-msg" class="patch-note"></div>
+          <input type="text" id="patch-path-input" class="patch-path-input"
+                 placeholder="C:\Path of Exile 2\Bundles2\_.index.bin"
+                 onkeydown="if(event.key==='Enter')patchMaintSubmitPath()">
+          <div class="patch-path-btns">
+            <button class="cfg-btn" onclick="patchMaintSubmitPath()">Set path &amp; continue</button>
+            <button class="cfg-btn" onclick="ahkCall('PatchMaintSkipData')">Skip data step</button>
+          </div>
+        </div>
+        <!-- Legacy static list kept for showPatchUpdate() compatibility -->
+        <ul id="patch-files" class="patch-files" style="display:none"></ul>
         <div id="patch-note" class="patch-note"></div>
       </div>
-      <div class="patch-actions"><button class="cfg-btn" onclick="closePatchUpdate()">OK</button></div>
+      <div class="patch-actions"><button class="cfg-btn" onclick="closePatchUpdate()">Close</button></div>
     </div>
   </div>
 
@@ -5228,6 +5263,87 @@
         if (m && m.classList.contains('open')) { closePatchUpdate(); e.stopPropagation(); }
       }
     });
+
+    // ── Post-patch maintenance — driven by ahk/PatchMaintenance.ahk ──────────
+    // patchMaintStart shows the modal with pending step rows; patchMaintStep
+    // streams each step's live state; patchMaintDone marks completion.
+    function _patchStepIcon(state) {
+      switch (state) {
+        case 'running': return '⟳';
+        case 'ok': return '✔';
+        case 'warn': return '⚠';
+        case 'fail': return '✖';
+        case 'skip': return '⊘';
+        case 'needpath': return '✎';
+        default: return '○';
+      }
+    }
+    function patchMaintStart(d) {
+      try {
+        d = (typeof d === 'string') ? JSON.parse(d) : (d || {});
+        var prev = document.getElementById('patch-prev');
+        var cur = document.getElementById('patch-cur');
+        if (prev) prev.textContent = d.previous || '?';
+        if (cur) cur.textContent = d.current || '?';
+        var ul = document.getElementById('patch-files'); if (ul) ul.style.display = 'none';
+        var note = document.getElementById('patch-note'); if (note) note.textContent = '';
+        var pp = document.getElementById('patch-path-prompt'); if (pp) pp.style.display = 'none';
+        var steps = document.getElementById('patch-steps');
+        if (steps) {
+          steps.innerHTML = '';
+          (d.steps || []).forEach(function (s) {
+            var row = document.createElement('div');
+            row.className = 'patch-step state-pending';
+            row.id = 'patch-step-' + s.id;
+            row.innerHTML = '<div class="patch-step-ico">○</div>'
+              + '<div class="patch-step-main"><div class="patch-step-label"></div>'
+              + '<div class="patch-step-msg"></div></div>';
+            row.querySelector('.patch-step-label').textContent = s.label || s.id;
+            steps.appendChild(row);
+          });
+        }
+        var m = document.getElementById('patch-modal');
+        if (m) m.classList.add('open');
+      } catch (e) { }
+    }
+    function patchMaintStep(d) {
+      try {
+        d = (typeof d === 'string') ? JSON.parse(d) : (d || {});
+        var row = document.getElementById('patch-step-' + d.id);
+        if (row) {
+          row.className = 'patch-step state-' + (d.state || 'running');
+          var ico = row.querySelector('.patch-step-ico');
+          if (ico) ico.textContent = _patchStepIcon(d.state);
+          var msg = row.querySelector('.patch-step-msg');
+          if (msg) msg.textContent = d.msg || '';
+        }
+        var pp = document.getElementById('patch-path-prompt');
+        if (d.state === 'needpath') {
+          var pm = document.getElementById('patch-path-msg');
+          if (pm) pm.textContent = d.msg || '';
+          if (pp) pp.style.display = 'flex';
+          var inp = document.getElementById('patch-path-input');
+          if (inp) inp.focus();
+        } else if (d.id === 'data' && pp) {
+          pp.style.display = 'none';
+        }
+      } catch (e) { }
+    }
+    function patchMaintDone(d) {
+      try {
+        d = (typeof d === 'string') ? JSON.parse(d) : (d || {});
+        var note = document.getElementById('patch-note');
+        if (note) note.textContent = d.msg || 'Done.';
+      } catch (e) { }
+    }
+    function patchMaintSubmitPath() {
+      var inp = document.getElementById('patch-path-input');
+      var val = inp ? inp.value.trim() : '';
+      if (!val) return;
+      var pp = document.getElementById('patch-path-prompt');
+      if (pp) pp.style.display = 'none';
+      ahkCall('PatchMaintSetPath', val);
+    }
 
     // Snap / Start dual-button click handler. The button's data-mode is
     // set by updateHeader() based on whether PoE2 is running, so a single
