@@ -895,6 +895,7 @@ OnTreeTabChanged(*)
 #Include ahk/PoE2AtlasReader.ahk
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
+#Include ahk/OffsetCompare.ahk
 #Include ahk/UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.

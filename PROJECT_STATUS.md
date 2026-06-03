@@ -91,7 +91,6 @@ GameHelper/
 │   ├── animation_enum.json     — Animation Enum (953 Einträge)
 │   └── ggpk_directory_tree.json — GGPK Directory Index
 ├── tools/
-│   ├── compare_offsets.py      — Offset-Vergleich AHK↔C# (GitLab)
 │   ├── build_item_names.py     — Generiert alle item/mod/unique TSVs
 │   ├── build_stat_desc_map.py  — Generiert stat_desc_map.tsv
 │   ├── extract_stats_dat.py    — Generiert stat_name_map.tsv
@@ -122,14 +121,15 @@ python extract_monster_names.py
 
 **Offset-Vergleich mit C#-Upstream nach Patch:**
 
-```
-cd tools
-python compare_offsets.py              # Diff anzeigen (fetcht automatisch)
-python compare_offsets.py --no-fetch   # Diff ohne Online-Abfrage
-python compare_offsets.py --record     # Änderungen in offset_history.json aufnehmen
-python compare_offsets.py --history    # Historische Änderungen anzeigen
-python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysieren
-```
+Direkt im Helper unter Config → Debug → „🔀 Offset Comparison vs g0rdin@arsenic (DEV)"
+(portiert von `tools/compare_offsets.py` nach `ahk/OffsetCompare.ahk`; die
+Patch-Version wird live via `_PatchChecker_FetchVersion` ermittelt):
+
+- **Run Compare** — klont/pullt den `arsenic`-Branch nach `.upstream_cache` und
+  zeigt Offset- und Pattern-Diffs (AHK ↔ C#).
+- **Record classified** — schreibt klassifizierte Änderungen (fix/game_update)
+  nach `offset_history.json`.
+- **History** / **Predict** — Änderungsverlauf bzw. Delta-Muster-Vorhersage.
 
 ---
 
