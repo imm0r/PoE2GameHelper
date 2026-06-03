@@ -411,7 +411,7 @@ InGameStateMonitor.ahk          ─ main entry / WebView host (the only .ahk in 
 
 ## References
 
-- [**C# Original (GameHelper2)**](https://gitlab.com/bylafko/gamehelper2) — the original tool this AHK port draws inspiration from
+- [**C# Original (GameHelper2)**](https://gitlab.com/g0rdin/gamehelper2/-/tree/arsenic) — the original tool this AHK port draws inspiration from (branch `arsenic`)
 - [**LibGGPK3**](https://github.com/aianlinb/LibGGPK3) — the Content.ggpk + Bundles2 parser that powers `ggpk-tools` (vendored as a submodule under `external/`)
 - [**Wraedar (Zone Nav)**](https://github.com/diesal/Wraedar) — terrain pathfinding reference
 - [**DAT-Schema**](https://github.com/poe-tool-dev/dat-schema) — PoE/PoE2 game-data schema

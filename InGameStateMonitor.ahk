@@ -34,7 +34,7 @@ Große Aufgaben in kleinere Teilschritte zerlegen und bei Bedarf klärende Frage
 Erläutern Sie bei Ihrem Feedback den Denkprozess und weisen Sie auf Probleme und Möglichkeiten hin.
 Schritt für Schritt denken und bei komplexen Problemen die Überlegungen aufzeigen.
 Konkrete Beispiele verwenden.
-Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/bylafko/gamehelper2") geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
+Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/g0rdin/gamehelper2" — Branch arsenic) geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
 Wenn Sie neue Funktionen anlegen, sollten diese vorab immer mit 2 bis 3 Zeilen kommentiert werden.Wofür ist die Funktion, welche Parameter benutzt sie und gibt es return Werte.
 Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen und dem bisherigen allgemeinen style folgen.
 */

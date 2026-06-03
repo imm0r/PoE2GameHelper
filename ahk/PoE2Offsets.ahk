@@ -44,11 +44,11 @@ class PoE2Offsets
         "Entities", 0x6C0,
         "AwakeEntities", 0x6C0,
         "SleepingEntities", 0x6D0,
-        "TerrainMetadata", 0x8A0   ; bylafko/gamehelper2 reference: TerrainStruct at AreaInstance+0x8A0
+        "TerrainMetadata", 0x8A0   ; g0rdin/gamehelper2 (arsenic) reference: TerrainStruct at AreaInstance+0x8A0
     )
 
     ; Offsets within TerrainStruct (base = AreaInstance + 0x8A0).
-    ; Source: https://gitlab.com/bylafko/gamehelper2 -- AreaInstanceOffsets.cs
+    ; Source: https://gitlab.com/g0rdin/gamehelper2 (arsenic) -- AreaInstanceOffsets.cs
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
     static TerrainMetadata := Map(

@@ -10,7 +10,7 @@ Das Projekt ist ein **vollständiger AHK v2-Port** der Path of Exile 2 Memory-Re
 
 **Referenz-Projekte (immer als Maßstab nutzen):**
 
-1. C# Original: https://gitlab.com/bylafko/gamehelper2
+1. C# Original: https://gitlab.com/g0rdin/gamehelper2 (Branch arsenic)
 2. DAT-Schema (für TSV-Generierung): https://github.com/poe-tool-dev/dat-schema
 3. PoE2 Patch-Server: `patch.pathofexile2.com:13060` (gibt aktuelle Version z.B. `4.4.0.10`)
 4. AHK v2 Docs: https://www.autohotkey.com/docs/v2/
@@ -332,7 +332,7 @@ python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysier
 
 ## Referenzen
 
-- **C# Original:** https://gitlab.com/bylafko/gamehelper2
+- **C# Original:** https://gitlab.com/g0rdin/gamehelper2 (Branch arsenic)
 - **DAT-Schema:** https://github.com/poe-tool-dev/dat-schema
 - **Wraedar (Zone Nav):** https://github.com/diesal/Wraedar
 - **Patch-Update:** https://github.com/poe-tool-dev/poe-patch-update
