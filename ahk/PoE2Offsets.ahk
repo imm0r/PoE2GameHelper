@@ -101,7 +101,10 @@ class PoE2Offsets
         "ComponentsVec", 0x10,
         "ComponentsVecLast", 0x18,
         "Id", 0x88,
-        "Flags", 0x84
+        ; IsValid byte per g0rdin@arsenic EntityOffsets.cs (was 0x84).
+        ; Semantics unchanged: bit 0 clear => entity valid. NEEDS IN-GAME VERIFY —
+        ; the v0.5 client may still use 0x84; revert this commit if validity regresses.
+        "Flags", 0x8C
     )
 
     static EntityDetails := Map(
@@ -190,8 +193,8 @@ class PoE2Offsets
         "ActiveSkillsLast", 0xB10,
         "Cooldowns", 0xB20,           ; CooldownsPtr StdVector start
         "CooldownsLast", 0xB28,
-        "DeployedEntities", 0xCF8,    ; DeployedEntityArray StdVector start
-        "DeployedEntitiesLast", 0xD00
+        "DeployedEntities", 0xC18,    ; DeployedEntityArray StdVector start (g0rdin@arsenic Actor.cs)
+        "DeployedEntitiesLast", 0xC20
     )
 
     static ActiveSkillStructure := Map(
@@ -205,8 +208,8 @@ class PoE2Offsets
         "UnknownIdAndEquipmentInfo", 0x40,
         "GrantedEffectsPerLevelDatRow", 0x48,
         "GrantedEffectStatSetsPerLevelDatRow", 0x50,
-        "TotalUses", 0x98,
-        "TotalCooldownTimeInMs", 0xA8
+        "TotalUses", 0xE4,            ; g0rdin@arsenic Actor.cs (was 0x98)
+        "TotalCooldownTimeInMs", 0xE8 ; g0rdin@arsenic Actor.cs (was 0xA8)
     )
 
     ; GrantedEffectsPerLevel DAT row — first field is a pointer to the GrantedEffects DAT row
@@ -357,8 +360,8 @@ class PoE2Offsets
     )
 
     static Inventory := Map(
-        "TotalBoxes", 0x14C,
-        "TotalBoxesY", 0x150,
+        "TotalBoxes", 0x150,          ; g0rdin@arsenic InventoryOffset.cs (was 0x14C)
+        "TotalBoxesY", 0x154,         ; StdTuple2D<int>.Y of TotalBoxes (was 0x150)
         "ItemList", 0x170,
         "ItemListLast", 0x178,
         "ServerRequestCounter", 0x1E8
