@@ -34,7 +34,7 @@
       --surface: #1c140c;
       --surface2: #2a1e14;
       --border: #3a2818;
-      --accent: #7eb0e0;
+      --accent: var(--codex-gold);   /* unified with codex palette (was blue #7eb0e0) */
       --text: #e8dcb8;
       --subtext: #9c8a64;
 
@@ -855,36 +855,14 @@
       align-items: center
     }
 
-    #tsv-file-select {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      padding: 4px 8px;
-      font-size: 11px;
+    #tsv-file-select {   /* visuals inherit the shared codex input theme */
       min-width: 200px;
       cursor: pointer
     }
 
-    #tsv-file-select:focus {
-      outline: none;
-      border-color: var(--accent)
-    }
-
-    #tsv-search {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      padding: 4px 8px;
-      font-size: 11px;
+    #tsv-search {   /* visuals inherit the shared codex input theme */
       flex: 1;
       min-width: 120px
-    }
-
-    #tsv-search:focus {
-      outline: none;
-      border-color: var(--accent)
     }
 
     #tsv-search:disabled {
@@ -904,25 +882,33 @@
       gap: 4px
     }
 
-    .tsv-pg-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
+    .tsv-pg-btn {   /* unified with .cfg-btn (codex gold) */
+      background: linear-gradient(180deg, var(--codex-edge), var(--codex-parchment));
+      border: 1px solid var(--codex-rule);
+      border-radius: 1px;
+      color: var(--codex-gold-hi);
       padding: 3px 10px;
-      font-size: 12px;
+      font-family: var(--codex-display);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: background .12s, border-color .12s
+      transition: color .15s, border-color .15s, box-shadow .15s, transform .1s
     }
 
     .tsv-pg-btn:hover:not(:disabled) {
-      background: var(--border);
-      border-color: var(--accent)
+      color: #fff5d0;
+      border-color: var(--codex-gold);
+      box-shadow: 0 2px 6px -2px rgba(200,168,90,0.45);
+      transform: translateY(-1px)
     }
 
     .tsv-pg-btn:disabled {
-      opacity: .3;
-      cursor: default
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none
     }
 
     .tsv-page-info {
@@ -1206,7 +1192,8 @@
       text-align: center;
       font-family: var(--codex-serif);
       font-style: italic;
-      font-size: 13px
+      font-size: 14px;
+      letter-spacing: 0.02em
     }
 
     /* Empty-state message — italic Garamond as if scribed in the page corner. */
@@ -1765,7 +1752,7 @@
     /* RE TAB — memory diff */
     .re-toolbar { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px }
     .re-row     { display: flex; align-items: center; gap: 6px; flex-wrap: wrap }
-    .re-label   { font-size: 11px; color: var(--subtext) }
+    .re-label   { font-family: var(--codex-serif); font-size: 13px; color: var(--codex-text) }
     .re-result  { padding: 8px 12px; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px; flex: 1 }
     .re-run     { border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; background: rgba(255,255,255,0.02) }
     .re-run-head { display: flex; gap: 12px; align-items: baseline; margin-bottom: 4px }
@@ -1800,7 +1787,7 @@
     .dis-asc  { color: #888ea8; width: 80px }
     .dis-ptr-link { color: #7ec8e3; cursor: pointer; text-decoration: underline dotted }
     .dis-ptr-link:hover { color: #b0e0f5 }
-    .dis-status { font-size: 10px; color: var(--subtext); margin-left: 8px }
+    .dis-status { font-family: var(--codex-serif); font-size: 11px; color: var(--codex-text-dim); margin-left: 8px }
     /* Mod categories — saturated, period-correct inks chosen for legibility
        against the warm parchment background. Avoid washed-out pastels:
        deep amethyst for implicits, illuminated gold for enchants, and a
@@ -1896,11 +1883,14 @@
       background: linear-gradient(90deg, #8b4a1a, #cc7733)
     }
 
-    .buff-empty {
-      color: var(--subtext);
-      padding: 32px;
+    .buff-empty {   /* unified with .no-data-msg */
+      color: var(--codex-text-dim);
+      padding: 24px;
       text-align: center;
-      font-size: 13px
+      font-family: var(--codex-serif);
+      font-style: italic;
+      font-size: 14px;
+      letter-spacing: 0.02em
     }
 
     /* ENTITIES */
@@ -3390,35 +3380,31 @@
       align-items: center
     }
 
-    #uib-search-input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
-      padding: 3px 8px;
-      font-size: 11px;
-      width: 180px;
-      outline: none
+    #uib-search-input {   /* visuals inherit the shared codex input theme */
+      width: 180px
     }
 
-    #uib-search-input:focus {
-      border-color: var(--accent)
-    }
-
-    .uib-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--text);
+    .uib-btn {   /* unified with .cfg-btn (codex gold) */
+      background: linear-gradient(180deg, var(--codex-edge), var(--codex-parchment));
+      border: 1px solid var(--codex-rule);
+      border-radius: 1px;
+      color: var(--codex-gold-hi);
       padding: 3px 10px;
+      font-family: var(--codex-display);
       font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
       cursor: pointer;
       white-space: nowrap;
-      transition: background .12s
+      transition: color .15s, border-color .15s, box-shadow .15s, transform .1s
     }
 
     .uib-btn:hover {
-      background: var(--border)
+      color: #fff5d0;
+      border-color: var(--codex-gold);
+      box-shadow: 0 2px 6px -2px rgba(200,168,90,0.45);
+      transform: translateY(-1px)
     }
 
     #uib-body {
@@ -3557,11 +3543,14 @@
       margin-top: 4px
     }
 
-    .uib-empty {
-      padding: 12px 10px;
-      font-size: 11px;
-      color: var(--subtext);
-      text-align: center
+    .uib-empty {   /* unified with .no-data-msg */
+      color: var(--codex-text-dim);
+      padding: 24px;
+      text-align: center;
+      font-family: var(--codex-serif);
+      font-style: italic;
+      font-size: 14px;
+      letter-spacing: 0.02em
     }
 
     .uib-sr-row {
@@ -4057,7 +4046,7 @@
     <div class="tab-panel" id="panel-groups">
       <div style="padding:10px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:11px;color:var(--subtext);flex:1">Comma-separated terms match against the entity path and metaGroup. First enabled group wins. Used for the entity-list pill, radar coloring and group alerts.</span>
+          <span class="al-desc" style="flex:1;margin:0">Comma-separated terms match against the entity path and metaGroup. First enabled group wins. Used for the entity-list pill, radar coloring and group alerts.</span>
           <button class="hk-btn" onclick="grpAdd()">+ Add Group</button>
         </div>
         <div id="grp-list"></div>
@@ -4816,7 +4805,7 @@
                 Skills tab; remove with the ✕ button next to its name below.
               </div>
               <div id="cfg-blacklist">
-                <div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>
+                <div class="no-data-msg">No blacklisted items</div>
               </div>
             </div>
           </details>
@@ -4833,7 +4822,7 @@
         <div class="cfg-subpanel" data-cfgtab="debug">
 
         <div class="cfg-section">
-          <details id="det-radar-debug" open>
+          <details id="det-radar-debug" open ontoggle="syncCfgSections()">
             <summary>
               <div class="cfg-header">📊 Radar Render Debug</div>
             </summary>
@@ -4851,7 +4840,7 @@
              vertically on narrow window widths. -->
         <div style="display:flex;gap:12px;flex-wrap:wrap">
           <div class="cfg-section" style="flex:1;min-width:280px">
-            <details id="det-debug-panels" open>
+            <details id="det-debug-panels" open ontoggle="syncCfgSections()">
               <summary>
                 <div class="cfg-header">🎛 Panel Visibility (Live)</div>
               </summary>
@@ -4866,7 +4855,7 @@
             </details>
           </div>
           <div class="cfg-section" style="flex:1;min-width:280px">
-            <details id="det-debug-discovery">
+            <details id="det-debug-discovery" ontoggle="syncCfgSections()">
               <summary>
                 <div class="cfg-header">🔍 Panel Discovery Results</div>
               </summary>
@@ -4879,7 +4868,7 @@
           </div>
         </div>
         <div class="cfg-section">
-          <details id="det-debug-diff" open>
+          <details id="det-debug-diff" open ontoggle="syncCfgSections()">
             <summary>
               <div class="cfg-header">🧪 Struct Diff Diagnostic</div>
             </summary>
@@ -4903,7 +4892,7 @@
           </details>
         </div>
         <div class="cfg-section">
-          <details id="det-debug-overlay">
+          <details id="det-debug-overlay" ontoggle="syncCfgSections()">
             <summary>
               <div class="cfg-header">🖥 Overlay State</div>
             </summary>
@@ -4913,7 +4902,7 @@
           </details>
         </div>
         <div class="cfg-section">
-          <details id="det-offset-compare">
+          <details id="det-offset-compare" ontoggle="syncCfgSections()">
             <summary>
               <div class="cfg-header">🔀 Offset Comparison vs g0rdin@arsenic (DEV)</div>
             </summary>
@@ -5027,7 +5016,7 @@
               </tr>
             </thead>
             <tbody id="dis-body">
-              <tr><td colspan="9" style="color:var(--subtext);padding:16px">Enter an address or click a symbol to begin.</td></tr>
+              <tr><td colspan="9" class="no-data-msg">Enter an address or click a symbol to begin.</td></tr>
             </tbody>
           </table>
         </div>
@@ -5079,7 +5068,7 @@
             </thead>
             <tbody id="wl-body">
               <tr>
-                <td colspan="2" style="color:var(--subtext);padding:16px">No pinned paths</td>
+                <td colspan="2" class="no-data-msg">No pinned paths</td>
               </tr>
             </tbody>
           </table>
@@ -5161,7 +5150,7 @@
         /* The per-hotkey option checkboxes ride on the Output row when wide, but
            wrap to the next line together (never split) when space runs short. */
         .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
-        .hk-chk-group label { white-space: nowrap; }
+        .hk-chk-group .hk-cap { white-space: nowrap; }
         .hk-card-name {
           background: transparent; border: none; color: var(--codex-text);
           font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 130px;
@@ -5173,14 +5162,8 @@
         }
         .hk-key-btn { min-width: 70px; }
 
-        /* Inputs / selects — sunken parchment fields. */
-        #panel-hotkeys input[type=text], #panel-hotkeys input[type=number], #panel-hotkeys select {
-          background: linear-gradient(180deg, rgba(10,6,4,0.85), rgba(20,12,6,0.7));
-          color: var(--codex-text);
-          border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
-          padding: 3px 6px; font-size: 12px; font-family: var(--codex-serif);
-        }
-        #panel-hotkeys input:focus, #panel-hotkeys select:focus { outline: 1px solid var(--codex-gold); }
+        /* Inputs / selects inherit the shared codex theme (see the generic
+           input/select rule). Only the hotkeys-specific layout is kept here. */
         #panel-hotkeys input[type=number] { width: 74px; }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
@@ -5206,7 +5189,7 @@
         }
         #panel-hotkeys .hk-num-btn:active { color: var(--codex-text); }
         /* Alerts tab — reuse the themed number stepper + codex inputs */
-        #panel-alerts .al-desc { font-family: var(--codex-serif); font-size: 12px; color: var(--subtext); margin: 0 0 8px; }
+        #panel-alerts .al-desc, #panel-groups .al-desc { font-family: var(--codex-serif); font-size: 12px; color: var(--subtext); margin: 0 0 8px; }
         #panel-alerts .al-line { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-bottom: 8px; }
         #panel-alerts .al-line:last-child { margin-bottom: 0; }
         #panel-alerts .al-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-family: var(--codex-serif); font-size: 13px; color: var(--codex-text); }
@@ -5233,10 +5216,11 @@
           background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
         }
         #panel-alerts .hk-num-btn:active { color: var(--codex-text); }
-        #panel-hotkeys label {
-          color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 4px; align-items: center;
+        /* Caption next to a pill toggle — carries the text style the old
+           wrapping label element used to provide, now that the switch is a .toggle. */
+        #panel-hotkeys .hk-cap {
+          color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 5px; align-items: center;
         }
-        #panel-hotkeys input[type=checkbox] { accent-color: var(--codex-gold); }
 
         .hk-actions { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
         .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
@@ -5271,8 +5255,8 @@
            glyphs, and match the debug checkbox label height so the bug icon
            lines up vertically with the buttons. */
         .hk-act-tools .hk-btn { height: 26px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
-        .hk-act-tools > label { height: 26px; margin: 0; display: inline-flex; align-items: center; }
-        .hk-empty { color: var(--codex-text-dim); padding: 20px; text-align: center; font-style: italic; }
+        .hk-act-tools > .hk-cap { height: 26px; margin: 0; display: inline-flex; align-items: center; }
+        .hk-empty { color: var(--codex-text-dim); padding: 24px; text-align: center; font-family: var(--codex-serif); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }
         .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
         .hk-caret:hover { color: var(--codex-gold-hi); }
         .hk-grip { cursor: grab; color: var(--codex-text-dim); padding: 0 5px; user-select: none; font-size: 14px; line-height: 1; }
@@ -5287,7 +5271,7 @@
         <button class="hk-btn" title="Import a hotkey group from a JSON file in hotkeys_export/" onclick="ahkCall('ImportHotkeysGroup')">⤒ Import group</button>
         <button class="hk-btn" title="Collapse all groups, hotkeys and actions" onclick="hkCollapseAll()">⊟ Collapse all</button>
         <button class="hk-btn" title="Expand all groups, hotkeys and actions" onclick="hkExpandAll()">⊞ Expand all</button>
-        <label style="margin-left:8px" title="When on, at most one hotkey auto-fires per evaluation tick (highest in list order wins)."><input type="checkbox" id="hk-oneshot" onchange="hkSetOneShot(this.checked)">One-shot per tick</label>
+        <span class="hk-cap" style="margin-left:8px" title="When on, at most one hotkey auto-fires per evaluation tick (highest in list order wins)."><label class="toggle"><input type="checkbox" id="hk-oneshot" onchange="hkSetOneShot(this.checked)"><span class="toggle-slider"></span></label>One-shot per tick</span>
         <span class="hk-hint">Output is bound to your in-game flask/skill slots; trigger key is captured separately.</span>
       </div>
       <div id="hk-groups" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'group',0,0)"><div class="hk-empty">Loading hotkeys…</div></div>
@@ -5959,8 +5943,8 @@
             <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder group"
                   ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
-                   onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"></label>
+            <label class="toggle" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
+                   onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-group-name" value="${hkEsc(g.name)}"
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
@@ -5985,12 +5969,12 @@
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
             <span class="hk-chk-group">
-              <label><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
-                     onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)">Focus (game foreground only)</label>
-              <label><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
-                     onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)">Disable in safe zone</label>
-              <label title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
-                     onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)">Pass through native key</label>
+              <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)"><span class="toggle-slider"></span></label>Focus (game foreground only)</span>
+              <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)"><span class="toggle-slider"></span></label>Disable in safe zone</span>
+              <span class="hk-cap" title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><label class="toggle"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
+                     onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)"><span class="toggle-slider"></span></label>Pass through native key</span>
             </span>
           </div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
@@ -6013,8 +5997,8 @@
             <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
                   ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
-                   onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"></label>
+            <label class="toggle" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
+                   onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
             <span class="hk-id">ID #${hk.id}</span>
@@ -6026,14 +6010,14 @@
             ${hk.trigger === 'automated'
               ? `<span class="hk-id" style="font-style:italic">auto-fires when conditions met</span>`
               : `<button class="hk-btn hk-key-btn" title="Key you press to fire this macro" onclick="hkCaptureKey(${gi},${hi})">${keyLabel}</button>
-            <label><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)">Ctrl</label>
-            <label><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'shift',this.checked?1:0)">Shift</label>
-            <label><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)">Alt</label>
-            <label><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
-                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)">LT</label>`}
+            <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.ctrl) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'ctrl',this.checked?1:0)"><span class="toggle-slider"></span></label>Ctrl</span>
+            <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.shift) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'shift',this.checked?1:0)"><span class="toggle-slider"></span></label>Shift</span>
+            <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.alt) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'alt',this.checked?1:0)"><span class="toggle-slider"></span></label>Alt</span>
+            <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
+                   onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)"><span class="toggle-slider"></span></label>LT</span>`}
             <span class="hk-spacer"></span>
             <button class="hk-btn danger" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
@@ -6109,8 +6093,8 @@
     }
     function hkChk(a, k, lbl, gi, hi, ai, title = '') {
       const tt = title ? ` title="${hkEsc(title)}"` : '';
-      return `<label${tt}><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
-              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.checked?1:0)">${lbl}</label>`;
+      return `<span class="hk-cap"${tt}><label class="toggle"><input type="checkbox" ${hkBool(a[k]) ? 'checked' : ''}
+              onchange="hkSetAct(${gi},${hi},${ai},'${k}',this.checked?1:0)"><span class="toggle-slider"></span></label>${lbl}</span>`;
     }
     const HK_OPS = [['<', '<'], ['<=', '≤'], ['>', '>'], ['>=', '≥'], ['=', '='], ['!=', '≠']];
 
@@ -6283,7 +6267,7 @@
                 <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
                 <span class="hk-act-tools">
-                  <label title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)">🐞</label>
+                  <span class="hk-cap" title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><label class="toggle"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)"><span class="toggle-slider"></span></label>🐞</span>
                   <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                   <button class="hk-btn danger" title="Remove this action" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
                 </span>
@@ -6657,7 +6641,7 @@
       if (!tbody) return;
       const rows = d.rows;
       if (!Array.isArray(rows) || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="color:var(--subtext);padding:16px">'
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data-msg">'
           + escHtml(d.status || 'No data') + '</td></tr>';
         return;
       }
@@ -7897,7 +7881,7 @@
     function _renderBlacklistConfig() {
       const el = document.getElementById('cfg-blacklist'); if (!el) return;
       if (_blacklist.size === 0) {
-        el.innerHTML = '<div style="color:var(--subtext);padding:8px;font-size:11px">No blacklisted items</div>';
+        el.innerHTML = '<div class="no-data-msg">No blacklisted items</div>';
         return;
       }
       const toTitle = s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -8912,7 +8896,7 @@
       const body = document.getElementById('wl-body'); if (!body) return;
       const filtered = _wlData.filter(r => !filter || (r.path || '').toLowerCase().includes(filter));
       if (filtered.length === 0) {
-        body.innerHTML = '<tr><td colspan="2" style="color:var(--subtext);padding:16px">No pinned paths</td></tr>';
+        body.innerHTML = '<tr><td colspan="2" class="no-data-msg">No pinned paths</td></tr>';
         return;
       }
       body.innerHTML = filtered.map(r => {
@@ -8932,7 +8916,7 @@
     // ═══════════════════════════════════════════════════════════════════
     //  CONFIG HELPERS
     // ═══════════════════════════════════════════════════════════════════
-    const _cfgSectionIds = ['status', 'overview', 'toggles', 'autoflask', 'combatauto', 'explore', 'radar', 'blacklist', 'entities', 'actions', 'al-conditions', 'al-timing', 'al-output'];
+    const _cfgSectionIds = ['status', 'overview', 'toggles', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output'];
     let _cfgSectionsGuard = 0;
     let _cfgSectionsLoaded = false;
 
