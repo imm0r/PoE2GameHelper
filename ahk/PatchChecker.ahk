@@ -59,13 +59,13 @@ _PatchChecker_FetchVersion(host := "patch.pathofexile2.com", port := 13060, time
         ; fields (ai_family/socktype/protocol) sit at the same offsets on x86/x64;
         ; the pointer fields are addressed via A_PtrSize so this stays bitness-safe.
         hints := Buffer(64, 0)
-        NumPut("Int", AF_INET, hints, 4)    ; addrinfo.ai_family
+        NumPut("Int", AF_INET,     hints, 4)    ; addrinfo.ai_family
         NumPut("Int", SOCK_STREAM, hints, 8)    ; addrinfo.ai_socktype
         NumPut("Int", IPPROTO_TCP, hints, 12)   ; addrinfo.ai_protocol
         if DllCall("ws2_32\getaddrinfo", "AStr", host, "AStr", String(port), "Ptr", hints, "Ptr*", &pResult, "Int")
             return ""
         aiAddrLen := NumGet(pResult, 16, "Ptr")                  ; addrinfo.ai_addrlen
-        aiAddr := NumGet(pResult, 16 + 2 * A_PtrSize, "Ptr")  ; addrinfo.ai_addr (sockaddr*)
+        aiAddr    := NumGet(pResult, 16 + 2 * A_PtrSize, "Ptr")  ; addrinfo.ai_addr (sockaddr*)
 
         sock := DllCall("ws2_32\socket", "Int", AF_INET, "Int", SOCK_STREAM, "Int", IPPROTO_TCP, "Ptr")
         if (sock = INVALID_SOCKET)
@@ -134,7 +134,7 @@ CheckPoePatchVersion()
         return  ; First run — silently store, no popup
 
     if (currentPatch != lastPatch)
-        ShowPatchUpdateNotice(lastPatch, currentPatch)
+        TriggerPatchMaintenance(lastPatch, currentPatch)   ; runs data + offset jobs with live progress
 }
 
 ; Shows the "patch update detected" notice in the WebView, styled to match the
@@ -154,6 +154,9 @@ ShowPatchUpdateNotice(prevPatch, curPatch)
     js := "showPatchUpdate(" JsonFull_Stringify(payload, false) ")"
     if (IsSet(g_webViewReady) && g_webViewReady)
     {
+        ; Braces are required: a bare one-line `try` lets AHK v2 bind the
+        ; following `else` to the Try (which supports its own Else), producing
+        ; an "Unexpected Else" load error on some builds (issue #78).
         try WebViewExec(js)
     }
     else
