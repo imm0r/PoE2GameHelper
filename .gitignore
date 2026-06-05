@@ -26,6 +26,8 @@ logs/
 offset_history.json
 last_known_patch.txt  # legacy — PatchChecker now stores this in the config INI
 gamehelper_config.ini
+# EntityAlerts self-persist (user-specific)
+alerts.ini
 hotkeys.json
 hotkeys_export/
 desktop.ini
