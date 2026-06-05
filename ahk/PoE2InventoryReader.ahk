@@ -499,7 +499,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
         if (!slots[5] && otherCandidates.Length >= 1)
             this.AssignFlaskSlot(slots, 5, otherCandidates[1], "semantic")
 
-        ; Fallback: falls Life/Mana fehlen, versuche verbleibende Nicht-Charms in Slot 1/2
+        ; Fallback: if Life/Mana are missing, try remaining non-charms in slot 1/2
         if !slots[1] && otherCandidates.Length
             this.AssignFlaskSlot(slots, 1, otherCandidates[1], "semantic-fallback")
         if !slots[2] && otherCandidates.Length >= 2

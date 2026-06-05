@@ -1,5 +1,5 @@
 ; TreeViewWatchlistPanel.ahk
-; Watchlist-Panel, TreeView-Rendering und Panel-Steuerungsfunktionen
+; Watchlist panel, TreeView rendering and panel control functions
 
 #Include TreeView_EntityScanner.ahk
 #Include TreeView_StatsFormatting.ahk

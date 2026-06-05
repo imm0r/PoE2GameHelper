@@ -583,7 +583,7 @@ AddImportantUiElementsNode(parentId, snapshot, expandedPaths)
 
     if !uiElems
     {
-        g_valueTree.Add("(keine Daten)", rootNode)
+        g_valueTree.Add("(no data)", rootNode)
         g_valueTree.Modify(rootNode, "Expand")
         return
     }
@@ -628,7 +628,7 @@ AddImportantUiElementsNode(parentId, snapshot, expandedPaths)
     if (expandedPaths.Has(mapPath))
         g_valueTree.Modify(mapNode, "Expand")
     else
-        g_valueTree.Modify(mapNode, "Expand")   ; immer aufgeklappt, da wenig Einträge
+        g_valueTree.Modify(mapNode, "Expand")   ; always expanded, since there are few entries
 
     if (expandedPaths.Has(basePath))
         g_valueTree.Modify(rootNode, "Expand")
@@ -946,7 +946,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
         counters["nodes"] += 1
         if (StrLower(nodePath) = "snapshot/ingamestate")
         {
-            ; Leichte Felder zuerst rendern — areaInstance ist teuer und kommt ans Ende
+            ; Render lightweight fields first — areaInstance is expensive and comes last
             preferredKeys := [
                 "address",
                 "areaInstanceData",
@@ -1045,7 +1045,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             pathLower := StrLower(nodePath)
             if (pathLower = "snapshot")
             {
-                ; Leichte Felder zuerst, inGameState (teuerste) zuletzt
+                ; Lightweight fields first, inGameState (most expensive) last
                 preferredKeys := [
                     "snapshotMode",
                     "gameStatesAddress",
@@ -1093,7 +1093,7 @@ BuildTreeNode(parentId, name, value, depth, counters, expandedPaths, nodePath)
             }
         }
         autoExpand := (depth <= 1 || expandedPaths.Has(nodePath))
-        ; allStates ist ein statischer Satz von Slots und sollte standardmaessig eingeklappt bleiben.
+        ; allStates is a static set of slots and should stay collapsed by default.
         if (nameLower = "allstates")
             autoExpand := expandedPaths.Has(nodePath)
 

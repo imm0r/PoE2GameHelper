@@ -21,14 +21,14 @@ _liveTimer=createTimer(nil,false)
 _liveTimer.Interval=2000
 _liveTimer.OnTimer=function() poe2_refresh() end
 _liveTimer.Enabled=true
-print("[PoE2] Live-Refresh aktiv")
+print("[PoE2] Live refresh active")
 {$asm}
 </Script>
       <DropScript>{$lua}
-if _liveTimer then _liveTimer.Enabled=false _liveTimer.destroy() _liveTimer=nil print("[PoE2] Live-Refresh gestoppt") end
+if _liveTimer then _liveTimer.Enabled=false _liveTimer.destroy() _liveTimer=nil print("[PoE2] Live refresh stopped") end
 {$asm}
 </DropScript><VariableType>Auto Assembler Script</VariableType></CheatEntry>
-      <CheatEntry><ID>20</ID><Description>"--- Dynamische Adressen ---"</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries/></CheatEntry>
+      <CheatEntry><ID>20</ID><Description>"--- Dynamic addresses ---"</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries/></CheatEntry>
     </Entries></CheatEntry>
   </CheatEntries>
   <LuaScript><![CDATA[
@@ -785,21 +785,21 @@ function OnOpenProcess(processID)
     t.OnTimer = function()
         t.Enabled = false
         t.destroy()
-        print("[PoE2] Prozess erkannt  -- starte Pattern-Scan ...")
+        print("[PoE2] Process detected  -- starting pattern scan ...")
         poe2_scan()
         poe2_refresh()
-        print("[PoE2] Bereit.")
+        print("[PoE2] Ready.")
     end
     t.Enabled = true
 end
 
 function OnCloseProcess(processID)
-    print("[PoE2] Prozess getrennt  -- G wird zurueckgesetzt.")
+    print("[PoE2] Process detached  -- G is reset.")
     G = {}
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Banner + Sofortstart wenn bereits attached
+-- Banner + immediate start if already attached
 -- ─────────────────────────────────────────────────────────────────────────────
 print("==========================================================")
 print("  PoE2 Memory Inspector  (GameHelper CE bridge)")
@@ -814,13 +814,13 @@ print("  Output: Lua Engine -> View -> Output")
 print("==========================================================")
 
 if process and process:lower():find("pathofexile") then
-    print("[PoE2] Bereits attached  -- starte sofort ...")
+    print("[PoE2] Already attached  -- starting now ...")
     poe2_scan()
     poe2_refresh()
-    print("[PoE2] Bereit.")
+    print("[PoE2] Ready.")
 else
-    print("[PoE2] Warte auf einen PathOfExile-Prozess ...")
-    print("[PoE2] Nach 'File > Open Process' wird OnOpenProcess automatisch ausgeloest.")
+    print("[PoE2] Waiting for a PathOfExile process ...")
+    print("[PoE2] After 'File > Open Process', OnOpenProcess is triggered automatically.")
 end
 ]]></LuaScript>
 </CheatTable>

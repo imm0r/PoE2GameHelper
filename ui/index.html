@@ -4163,7 +4163,7 @@
         <div id="uib-children-panel">
           <div class="uib-panel-hdr">Children</div>
           <div id="uib-children-list">
-            <div class="uib-empty">Wähle "⌂ Root" um zu starten.</div>
+            <div class="uib-empty">Select "⌂ Root" to start.</div>
           </div>
         </div>
         <div id="uib-props-panel">
@@ -8300,7 +8300,7 @@
     }
 
     function updateUIState(jsonStr) {
-      // Browser wird via switchTab('ui') → ahkCall('UiBrowseRoot') geladen.
+      // The browser is loaded via switchTab('ui') → ahkCall('UiBrowseRoot').
     }
 
     function updateUiBrowser(jsonStr) {
@@ -8342,11 +8342,11 @@
           + ip.map(i => `<span style="color:#9adff7">[${i}]</span>`).join(' <span style="color:#666">›</span> ')
           + ' <span style="color:#666">›</span> <span style="color:#9adff7">*</span>';
       }
-      // Kinder
+      // Children
       const ch = data.children || [];
       const chEl = document.getElementById('uib-children-list');
       if (ch.length === 0) {
-        chEl.innerHTML = '<div class="uib-empty">Keine Kinder</div>';
+        chEl.innerHTML = '<div class="uib-empty">No children</div>';
       } else {
         chEl.innerHTML = ch.map(c => {
           const sid = c.stringId || '';
@@ -8464,7 +8464,7 @@
       const panel = document.getElementById('uib-search-results');
       document.getElementById('uib-search-results-badge').textContent = `(${results.length})`;
       document.getElementById('uib-search-results-list').innerHTML = results.length === 0
-        ? `<div class="uib-empty">Keine Treffer für "${escHtml(query)}"</div>`
+        ? `<div class="uib-empty">No matches for "${escHtml(query)}"</div>`
         : results.map(r =>
           `<div class="uib-sr-row" onclick="ahkCall('UiBrowseAddress','${escAttr(r.ptr)}')" data-tip="${escAttr(r.ptr)}">
            <span class="uib-child-vis ${r.isVisible ? 'visible' : 'hidden'}"></span>

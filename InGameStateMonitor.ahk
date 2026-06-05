@@ -30,15 +30,15 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/UiBrowserHandler.ahk
 
 /*
-Das Projekt mit all seinen Dateien in welchen ich entwickle befindet sich bei mir lokal unter "E:\PoE2GameHelper\"
-Für maximale Lesbarkeit sind sämtliche ahk Dateien so klein wie möglich zu halten.Sollten Sie feststellen, dass Sie mitterweile eine ganze Reihe an neuem Code zu einem bestimmten Bereich entwickelt haben, so ist dieser in eine neue ahk Datei zu verschieben und diese dann mittel #include einzubinden.
-Große Aufgaben in kleinere Teilschritte zerlegen und bei Bedarf klärende Fragen stellen.
-Erläutern Sie bei Ihrem Feedback den Denkprozess und weisen Sie auf Probleme und Möglichkeiten hin.
-Schritt für Schritt denken und bei komplexen Problemen die Überlegungen aufzeigen.
-Konkrete Beispiele verwenden.
-Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/g0rdin/gamehelper2" — Branch arsenic) geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
-Wenn Sie neue Funktionen anlegen, sollten diese vorab immer mit 2 bis 3 Zeilen kommentiert werden.Wofür ist die Funktion, welche Parameter benutzt sie und gibt es return Werte.
-Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen und dem bisherigen allgemeinen style folgen.
+The project and all the files I develop in are located locally at "E:\PoE2GameHelper\"
+For maximum readability, keep all .ahk files as small as possible. If you notice that you have developed a substantial amount of new code for a particular area, move it into a new .ahk file and include it via #include.
+Break large tasks into smaller steps and ask clarifying questions when needed.
+In your feedback, explain your reasoning and point out problems and opportunities.
+Think step by step and lay out your reasoning for complex problems.
+Use concrete examples.
+In general, at the start of a new task, always check the original C# project ("https://gitlab.com/g0rdin/gamehelper2" — branch arsenic) to see whether a solution or approach for the current task already exists there.
+When you create new functions, always add a 2-3 line comment beforehand: what the function is for, which parameters it uses, and whether it returns values.
+When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
 GAMEHELPER_VERSION := "0.4.12.2"
@@ -97,7 +97,7 @@ g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
-g_radarOverlay := 0   ; lazy-init beim ersten Render-Aufruf
+g_radarOverlay := 0   ; lazy-init on first render call
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
 g_playerHud := 0   ; lazy-init on first render
 g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)

@@ -3,7 +3,7 @@
 ; Included by TreeViewWatchlistPanel.ahk
 
 ; TreeViewWatchlistPanel.ahk
-; Watchlist-Panel, TreeView-Rendering und Panel-Steuerungsfunktionen
+; Watchlist panel, TreeView rendering and panel control functions
 
 ; Populates the offset table ListView with current values for all pinned watch paths.
 ; Also syncs NPC watch entries and applies column sorting and filter.
@@ -378,7 +378,7 @@ AddPinnedWatchNode(parentId, snapshot, expandedPaths)
 
     if (g_pinnedNodePaths.Length = 0)
     {
-        g_valueTree.Add("Nutze 'PinSel', um den aktuell selektierten Tree-Knoten live zu verfolgen", node)
+        g_valueTree.Add("Use 'PinSel' to track the currently selected tree node live", node)
         if (expandedPaths.Has(basePath))
             g_valueTree.Modify(node, "Expand")
         return
@@ -504,7 +504,7 @@ AddDecodedEntityHighlightsNode(parentId, snapshot, expandedPaths)
 
     if (items.Length = 0)
     {
-        g_valueTree.Add("Keine passenden Entities in den aktuellen Samples", highlightsNode)
+        g_valueTree.Add("No matching entities in the current samples", highlightsNode)
     }
     else
     {
@@ -576,7 +576,7 @@ AddEntityScannerNode(parentId, snapshot, expandedPaths)
 
     if (scannerItems.Length = 0)
     {
-        g_valueTree.Add("Keine Scanner-Treffer in den aktuellen Samples", node)
+        g_valueTree.Add("No scanner matches in the current samples", node)
     }
     else
     {

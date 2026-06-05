@@ -65,7 +65,7 @@ ShouldHideNode(nodePath, name)
     if InStr(pathLower, "/patternscanreport")
         return true
 
-    ; Legacy-Compat: Vitaldaten nur einmal anzeigen (top-level vitalStruct unter areaInstance).
+    ; Legacy compat: show vital data only once (top-level vitalStruct under areaInstance).
     if (pathLower = "snapshot/ingamestate/areainstance/playervitals")
         return true
     if (pathLower = "snapshot/ingamestate/areainstance/playerstruct/playervitals")
