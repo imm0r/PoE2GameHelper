@@ -136,6 +136,8 @@ PushHeaderToWebView()
         . '"lootCacheCount":' _GetLootCacheCount() ","
         . '"lootReason":' _JsStr(_GetLootLastReason()) ","
         . '"zoneScan":' _SerializeZoneScanStatus()
+        . ',"groups":' BuildGroupsHeaderJson()
+        . ',"alerts":' BuildAlertsHeaderJson()
         . "}"
     WebViewExec("updateHeader(" json ")")
 }

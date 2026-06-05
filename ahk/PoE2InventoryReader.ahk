@@ -230,7 +230,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
         }
         if (stashIdx.Length > 0)
         {
-            try names := this.ReadStashTabNames(playerDataPtr, 1)
+            try names := this.ReadStashTabNames(playerDataPtr, 1, stashIdx.Length)
             catch
                 names := []
             ; Apply names by position. When the tab-name vector is shorter than
@@ -1049,11 +1049,27 @@ class PoE2InventoryReader extends PoE2PlayerReader
     ; Params: playerDataPtr - the dereferenced ServerData[PlayerServerData] pointer
     ;         minTabs       - minimum non-empty name count required
     ; Returns: Array of name strings (positionally aligned with that vector's entries).
-    ReadStashTabNames(playerDataPtr, minTabs := 1)
+    ReadStashTabNames(playerDataPtr, minTabs := 1, expectedCount := 0)
     {
         result := []
         if !this.IsProbablyValidPointer(playerDataPtr)
             return result
+
+        ; ── Per-session cache ──────────────────────────────────────────────
+        ; Reuse the last good (offset, stride) for this ServerData pointer,
+        ; revalidated each call. Avoids re-scanning 96 KB on every inventory
+        ; read and keeps results stable. Auto-invalidated when revalidation
+        ; fails (zone / character change relocates the struct).
+        if !this.HasOwnProp("_stashVecCache")
+            this._stashVecCache := Map()
+        if this._stashVecCache.Has(playerDataPtr)
+        {
+            c := this._stashVecCache[playerDataPtr]
+            cachedNames := this._ReadStashVecAt(playerDataPtr + c["off"], c["stride"])
+            if (this._StashNonEmptyCount(cachedNames) >= minTabs)
+                return cachedNames
+            this._stashVecCache.Delete(playerDataPtr)   ; stale → rescan below
+        }
 
         ; Wide scan window — 96 KB. PoE2 has more inventory metadata than PoE1
         ; (we see 100+ inventory entries), so the stash-tab vector may have
@@ -1066,8 +1082,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
         ; Strides to probe. 0x40 is the PoE1 ServerStashTab size; 0x48 / 0x50 /
         ; 0x60 cover plausible PoE2 expansions with extra fields.
         strides := [0x40, 0x48, 0x50, 0x60]
-        bestNames    := []
-        bestNonEmpty := 0
+        best := 0   ; Map("names","off","stride","count","nonEmpty","score") | 0
 
         for _, stride in strides
         {
@@ -1077,28 +1092,31 @@ class PoE2InventoryReader extends PoE2PlayerReader
                 first := NumGet(buf.Ptr, off,      "Int64")
                 last  := NumGet(buf.Ptr, off + 8,  "Int64")
                 end   := NumGet(buf.Ptr, off + 16, "Int64")
+                thisOff := off
                 off += 8   ; pointer-aligned step
 
                 if !this.IsProbablyValidPointer(first)
                     continue
+                ; StdVector triple sanity: last>first, end>=last, and BOTH the
+                ; used span and the capacity are stride-aligned with capacity
+                ; >= span. The capacity check rejects most coincidental triples.
                 if (last <= first || end < last)
                     continue
                 span := last - first
-                if (span <= 0 || Mod(span, stride) != 0)
+                cap  := end - first
+                if (span <= 0 || Mod(span, stride) != 0 || Mod(cap, stride) != 0 || cap < span)
                     continue
                 count := span // stride
-                if (count < minTabs || count > 500)
+                if (count < Max(minTabs, 1) || count > 200)
                     continue
 
-                ; Probe at least the first entry. If it doesn't resolve, try
-                ; entries 1 and 2 — special/system tabs sometimes lead with an
-                ; empty slot before user-named tabs begin.
+                ; Probe the first few entries before reading all. Special/system
+                ; tabs sometimes lead with an empty slot before user-named tabs.
                 probeOk := false
                 probeI := 0
                 while (probeI < Min(3, count))
                 {
-                    n := this._ReadNativeStringU(first + (probeI * stride) + 0x08)
-                    if (n != "")
+                    if (this._ReadNativeStringU(first + (probeI * stride) + 0x08) != "")
                     {
                         probeOk := true
                         break
@@ -1108,44 +1126,114 @@ class PoE2InventoryReader extends PoE2PlayerReader
                 if !probeOk
                     continue
 
-                ; Collect all names in order
-                names := []
-                nonEmpty := 0
-                idx := 0
-                while (idx < count)
-                {
-                    n := this._ReadNativeStringU(first + (idx * stride) + 0x08)
-                    names.Push(n)
-                    if (n != "")
-                        nonEmpty += 1
-                    idx += 1
-                }
+                names := this._ReadStashVecEntries(first, stride, count)
+                nonEmpty := this._StashNonEmptyCount(names)
                 if (nonEmpty < minTabs)
                     continue
-                if (nonEmpty > bestNonEmpty)
+                ; Reject a vector dominated by a single repeated string (garbage
+                ; that happens to read as the same text) once it's non-trivial.
+                if (count > 2 && this._StashDistinctCount(names) < 2)
+                    continue
+
+                ; Score: a vector that has at least one named entry per loaded
+                ; stash tab (expectedCount) is almost certainly the real one, so
+                ; it gets a large bonus; otherwise rank by non-empty names. Ties
+                ; keep the lowest offset (we iterate ascending with strict >).
+                score := nonEmpty
+                if (expectedCount > 0 && count >= expectedCount && nonEmpty >= expectedCount)
+                    score += 10000
+                if (!best || score > best["score"])
                 {
-                    bestNonEmpty := nonEmpty
-                    bestNames    := names
-                    ; Diagnostic: log which stride+offset+count won — helps narrow
-                    ; the real PoE2 offset later without re-scanning. Single-line
-                    ; structured context string; LogError treats it as freeform.
-                    sample := ""
-                    sIdx := 1
-                    while (sIdx <= Min(5, names.Length))
-                    {
-                        sample .= (sIdx > 1 ? "," : "") . names[sIdx]
-                        sIdx += 1
-                    }
-                    try LogError("StashTabScan stride=" Format("0x{:X}", stride)
-                        . " ofs=" Format("0x{:X}", off - 8)
-                        . " count=" count
-                        . " nonEmpty=" nonEmpty
-                        . " sample=[" sample "]")
+                    best := Map("names", names, "off", thisOff, "stride", stride,
+                        "count", count, "nonEmpty", nonEmpty, "score", score)
                 }
             }
         }
 
-        return bestNames
+        if !best
+            return result
+
+        ; Cache the winner for this ServerData pointer + log a diagnostic so a
+        ; future in-game run still reveals the real offset for a deterministic
+        ; hardcode later.
+        this._stashVecCache[playerDataPtr] := Map("off", best["off"], "stride", best["stride"])
+        try {
+            sample := ""
+            sIdx := 1
+            while (sIdx <= Min(5, best["names"].Length))
+            {
+                sample .= (sIdx > 1 ? "," : "") best["names"][sIdx]
+                sIdx += 1
+            }
+            countMatch := (expectedCount > 0 && best["count"] >= expectedCount && best["nonEmpty"] >= expectedCount) ? 1 : 0
+            LogError("StashTabScan stride=" Format("0x{:X}", best["stride"])
+                . " ofs=" Format("0x{:X}", best["off"])
+                . " count=" best["count"]
+                . " nonEmpty=" best["nonEmpty"]
+                . " expected=" expectedCount
+                . " countMatch=" countMatch
+                . " sample=[" sample "]")
+        }
+        return best["names"]
+    }
+
+    ; Reads <count> tab names (NativeStringU at entry+0x08) from a stash-tab
+    ; vector whose first entry is at <first>, stepping by <stride>.
+    _ReadStashVecEntries(first, stride, count)
+    {
+        names := []
+        idx := 0
+        while (idx < count)
+        {
+            names.Push(this._ReadNativeStringU(first + (idx * stride) + 0x08))
+            idx += 1
+        }
+        return names
+    }
+
+    ; Revalidates + reads a cached stash-tab vector given the address of its
+    ; StdVector header (first/last/end) and the stride. Returns the name array,
+    ; or [] if the header no longer looks like a valid vector of names.
+    _ReadStashVecAt(vecFieldAddr, stride)
+    {
+        out := []
+        hdr := this.Mem.ReadBytes(vecFieldAddr, 24)
+        if !hdr
+            return out
+        first := NumGet(hdr.Ptr, 0,  "Int64")
+        last  := NumGet(hdr.Ptr, 8,  "Int64")
+        end   := NumGet(hdr.Ptr, 16, "Int64")
+        if !this.IsProbablyValidPointer(first)
+            return out
+        if (last <= first || end < last)
+            return out
+        span := last - first
+        if (span <= 0 || Mod(span, stride) != 0)
+            return out
+        count := span // stride
+        if (count < 1 || count > 200)
+            return out
+        return this._ReadStashVecEntries(first, stride, count)
+    }
+
+    ; Counts non-empty names in an array.
+    _StashNonEmptyCount(names)
+    {
+        n := 0
+        for _, s in names
+            if (s != "")
+                n += 1
+        return n
+    }
+
+    ; Counts distinct non-empty names in an array.
+    _StashDistinctCount(names)
+    {
+        seen := Map()
+        for _, s in names
+            if (s != "")
+                seen[s] := true
+        return seen.Count
     }
 
     ; Reads the StatsFromMods StdVector — a flat list of (statKey, statValue) pairs

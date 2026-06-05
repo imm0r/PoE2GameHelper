@@ -3934,6 +3934,14 @@
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>Watchlist <span id="wl-badge"></span></div>
+      <div class="tab" data-tab="groups" onclick="switchTab('groups')"><svg viewBox="0 0 24 24">
+          <circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="12" r="3" />
+          <path d="M9 6h6M9 18h6M8.5 7.5l7 3M8.5 16.5l7-3" />
+        </svg>Groups</div>
+      <div class="tab" data-tab="alerts" onclick="switchTab('alerts')"><svg viewBox="0 0 24 24">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+        </svg>Alerts</div>
       <div class="bar-marker tab-marker"></div>
     </div>
 
@@ -4020,6 +4028,83 @@
     <div class="tab-panel active" id="panel-entities">
       <div id="tab-entities-content">
         <div class="no-data-msg">Waiting for data…</div>
+      </div>
+    </div>
+
+    <!-- GROUPS TAB — path-based entity grouping -->
+    <div class="tab-panel" id="panel-groups">
+      <div style="padding:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--subtext);flex:1">Comma-separated terms match against the entity path and metaGroup. First enabled group wins. Used for the entity-list pill, radar coloring and group alerts.</span>
+          <button class="hk-btn" onclick="grpAdd()">+ Add Group</button>
+        </div>
+        <div id="grp-list"></div>
+      </div>
+    </div>
+
+    <!-- ALERTS TAB — entity alert engine -->
+    <div class="tab-panel" id="panel-alerts">
+      <div style="padding:10px">
+        <div class="cfg-section">
+          <div class="cfg-row"><span class="cfg-label">Enable entity alerts</span>
+            <label class="toggle"><input type="checkbox" id="al-enabled" onchange="alertChk('enabled',this); alertSync()"><span class="toggle-slider"></span></label></div>
+          <div class="al-desc" style="padding:0 2px">Suppressed in town / hideout. One consolidated alert per tick for the highest-severity match.</div>
+        </div>
+
+        <div class="cfg-section" id="al-sec-conditions">
+          <details id="det-al-conditions" open ontoggle="syncCfgSections()"><summary><div class="cfg-header">Conditions</div></summary>
+          <div class="cfg-subsection">
+            <div class="al-desc">Which entities trigger an alert. Terms / groups match against the entity path; the distance gate is optional.</div>
+            <div class="al-line">
+              <span class="al-item"><span class="al-cap">Unique / boss</span><label class="toggle"><input type="checkbox" id="al-onUnique" onchange="alertChk('onUnique',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Rare</span><label class="toggle"><input type="checkbox" id="al-onRare" onchange="alertChk('onRare',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Strongbox</span><label class="toggle"><input type="checkbox" id="al-catStrongbox" onchange="alertChk('catStrongbox',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Shrine</span><label class="toggle"><input type="checkbox" id="al-catShrine" onchange="alertChk('catShrine',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Boss (type)</span><label class="toggle"><input type="checkbox" id="al-catBoss" onchange="alertChk('catBoss',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Chest</span><label class="toggle"><input type="checkbox" id="al-catChest" onchange="alertChk('catChest',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">NPC</span><label class="toggle"><input type="checkbox" id="al-catNpc" onchange="alertChk('catNpc',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Area transition</span><label class="toggle"><input type="checkbox" id="al-catAreaTransition" onchange="alertChk('catAreaTransition',this)"><span class="toggle-slider"></span></label></span>
+            </div>
+            <div class="al-line">
+              <label class="al-field"><span class="al-cap">Watch path terms</span><input type="text" class="cfg-input" id="al-pathWatch" placeholder="e.g. breach, expedition" style="width:240px" onchange="alertStr('pathWatch',this)"></label>
+              <label class="al-field"><span class="al-cap">Watch groups</span><input type="text" class="cfg-input" id="al-groups" placeholder="group names" style="width:200px" onchange="alertStr('groups',this)"></label>
+              <label class="al-field" id="al-row-maxdist"><span class="al-cap">Max distance (0 = any)</span><span class="hk-num"><input type="number" id="al-maxDistance" min="0" onchange="alertNum('maxDistance',this.value)"><span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span></label>
+            </div>
+          </div></details>
+        </div>
+
+        <div class="cfg-section" id="al-sec-timing">
+          <details id="det-al-timing" open ontoggle="syncCfgSections()"><summary><div class="cfg-header">Timing</div></summary>
+          <div class="cfg-subsection">
+            <div class="al-desc">When a matching entity fires — once on entering the zone, and/or repeatedly while it stays in range.</div>
+            <div class="al-line">
+              <span class="al-item"><span class="al-cap">Once per zone (first sighting)</span><label class="toggle"><input type="checkbox" id="al-zoneEntry" onchange="alertChk('zoneEntry',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Repeat while in range</span><label class="toggle"><input type="checkbox" id="al-proximity" onchange="alertChk('proximity',this); alertSync()"><span class="toggle-slider"></span></label></span>
+              <label class="al-field" id="al-row-cooldown"><span class="al-cap">Repeat cooldown (ms)</span><span class="hk-num"><input type="number" id="al-cooldownMs" min="0" step="500" onchange="alertNum('cooldownMs',this.value)"><span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span></label>
+            </div>
+          </div></details>
+        </div>
+
+        <div class="cfg-section" id="al-sec-output">
+          <details id="det-al-output" open ontoggle="syncCfgSections()"><summary><div class="cfg-header">Output</div></summary>
+          <div class="cfg-subsection">
+            <div class="al-desc">How alerts notify you.</div>
+            <div class="al-line">
+              <span class="al-item"><span class="al-cap">Banner overlay</span><label class="toggle"><input type="checkbox" id="al-banner" onchange="alertChk('banner',this); alertSync()"><span class="toggle-slider"></span></label></span>
+              <label class="al-field" id="al-row-bannerMs"><span class="al-cap">Banner duration (ms)</span><span class="hk-num"><input type="number" id="al-bannerMs" min="500" step="250" onchange="alertNum('bannerMs',this.value)"><span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span></label>
+            </div>
+            <div class="al-line">
+              <span class="al-item"><span class="al-cap">Sound</span><label class="toggle"><input type="checkbox" id="al-sound" onchange="alertChk('sound',this); alertSync()"><span class="toggle-slider"></span></label></span>
+              <label class="al-field" id="al-row-soundMode"><span class="al-cap">Sound mode</span><select id="al-soundMode" onchange="alertStr('soundMode',this); alertSync()"><option value="beep">Beep</option><option value="file">WAV file</option></select></label>
+              <label class="al-field" id="al-row-soundFile"><span class="al-cap">Sound file (WAV)</span><select id="al-soundFile" onchange="alertStr('soundFile',this)"></select></label>
+            </div>
+            <div class="al-line">
+              <span class="al-item"><span class="al-cap">Flash tool window</span><label class="toggle"><input type="checkbox" id="al-flash" onchange="alertChk('flash',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Highlight on radar</span><label class="toggle"><input type="checkbox" id="al-highlight" onchange="alertChk('highlight',this)"><span class="toggle-slider"></span></label></span>
+              <span class="al-item"><span class="al-cap">Log to file</span><label class="toggle"><input type="checkbox" id="al-log" onchange="alertChk('log',this)"><span class="toggle-slider"></span></label></span>
+            </div>
+          </div></details>
+        </div>
       </div>
     </div>
 
@@ -4805,6 +4890,33 @@
             </div>
           </details>
         </div>
+        <div class="cfg-section">
+          <details id="det-offset-compare">
+            <summary>
+              <div class="cfg-header">🔀 Offset Comparison vs g0rdin@arsenic (DEV)</div>
+            </summary>
+            <div style="padding:8px 0;font-size:11px;color:var(--subtext)">
+              Diff local <b>PoE2Offsets.ahk</b> / <b>StaticOffsetsPatterns.ahk</b> against the upstream
+              C# reference (clones/pulls the <b>arsenic</b> branch into <code>.upstream_cache</code>).
+              Classify each change as <b>fix</b> or <b>game_update</b> and record it to
+              <code>offset_history.json</code>.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:0 0 8px">
+              <button class="tree-tbtn" onclick="ahkCall('OffsetCompareRun')" style="font-size:11px">🔍 Run Compare</button>
+              <button class="tree-tbtn" onclick="offsetCompareRecord()" style="font-size:11px">💾 Record classified</button>
+              <button class="tree-tbtn" onclick="ahkCall('OffsetCompareShowHistory')" style="font-size:11px">🕑 History</button>
+              <button class="tree-tbtn" onclick="ahkCall('OffsetComparePredict')" style="font-size:11px">🔮 Predict</button>
+            </div>
+            <div id="offset-compare-status" style="font-size:10px;color:var(--subtext);padding:2px 0"></div>
+            <div id="offset-compare-summary" style="font-size:11px;padding:2px 0"></div>
+            <div class="cfg-body" id="offset-compare-results">
+              <div class="no-data-msg">Click "Run Compare" to diff against upstream.</div>
+            </div>
+            <div class="cfg-body" id="offset-compare-patterns" style="margin-top:6px"></div>
+            <div class="cfg-body" id="offset-compare-history" style="margin-top:6px"></div>
+            <div class="cfg-body" id="offset-compare-predict" style="margin-top:6px"></div>
+          </details>
+        </div>
 
         </div><!-- /cfg-subpanel debug -->
 
@@ -5071,6 +5183,34 @@
           background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
         }
         #panel-hotkeys .hk-num-btn:active { color: var(--codex-text); }
+        /* Alerts tab — reuse the themed number stepper + codex inputs */
+        #panel-alerts .al-desc { font-family: var(--codex-serif); font-size: 12px; color: var(--subtext); margin: 0 0 8px; }
+        #panel-alerts .al-line { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-bottom: 8px; }
+        #panel-alerts .al-line:last-child { margin-bottom: 0; }
+        #panel-alerts .al-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-family: var(--codex-serif); font-size: 13px; color: var(--codex-text); }
+        #panel-alerts .al-field { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+        #panel-alerts .al-cap { font-family: var(--codex-serif); font-size: 13px; color: var(--codex-text); white-space: nowrap; }
+        #panel-alerts .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
+        #panel-alerts .hk-num > input[type=number] { width: 90px; padding-right: 18px; }
+        #panel-alerts .hk-num > input[type=number]::-webkit-inner-spin-button,
+        #panel-alerts .hk-num > input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #panel-alerts .hk-num-spin {
+          position: absolute; top: 1px; bottom: 1px; right: 1px; width: 15px;
+          display: flex; flex-direction: column; overflow: hidden; border-radius: 0 1px 1px 0;
+        }
+        #panel-alerts .hk-num-btn {
+          flex: 1; min-height: 0; padding: 0; margin: 0; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          border: none; border-left: 1px solid rgba(90,62,34,0.6);
+          background: linear-gradient(180deg, rgba(60,42,22,0.92), rgba(28,18,10,0.92));
+          color: var(--codex-gold); font-size: 7px; line-height: 1;
+        }
+        #panel-alerts .hk-num-btn:first-child { border-bottom: 1px solid rgba(90,62,34,0.6); }
+        #panel-alerts .hk-num-btn:hover {
+          color: var(--codex-gold-hi);
+          background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
+        }
+        #panel-alerts .hk-num-btn:active { color: var(--codex-text); }
         #panel-hotkeys label {
           color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 4px; align-items: center;
         }
@@ -5264,6 +5404,123 @@
       return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    // ── Offset Comparison (DEV) — bridge to ahk/OffsetCompare.ahk ─────────────
+    function _ocDeltaHex(d) {
+      d = Number(d) || 0;
+      return (d < 0 ? '-' : '+') + '0x' + Math.abs(d).toString(16).toUpperCase();
+    }
+    function _ocClsSelect(key) {
+      return '<select data-ockey="' + escAttr(key) + '" style="font-size:10px">'
+        + '<option value="game_update" selected>game_update</option>'
+        + '<option value="fix">fix</option></select>';
+    }
+    function updateOffsetComparison(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false, msg: 'parse error: ' + e }; }
+      var sEl = document.getElementById('offset-compare-status');
+      var sumEl = document.getElementById('offset-compare-summary');
+      var el = document.getElementById('offset-compare-results');
+      var pEl = document.getElementById('offset-compare-patterns');
+      if (!el) return;
+      if (sEl) sEl.textContent = (r.fetchMsg ? ('upstream: ' + r.fetchMsg) : '') + (r.msg ? ('  ' + r.msg) : '');
+      if (!r.ok) {
+        el.innerHTML = '<div class="no-data-msg">' + escHtml(r.msg || 'compare failed') + '</div>';
+        if (pEl) pEl.innerHTML = '';
+        return;
+      }
+      if (sumEl) {
+        sumEl.innerHTML = 'Version <b>' + escHtml(r.version || '?') + '</b> · upstream commit <b>'
+          + escHtml(r.commit || '?') + '</b><br>'
+          + 'AHK: ' + r.ahkOffsetCount + ' offsets / ' + r.ahkMapCount + ' maps · '
+          + 'C#: ' + r.csFieldCount + ' fields / ' + r.csStructCount + ' structs · '
+          + r.matchCount + ' maps matched';
+      }
+      var diffs = r.offsetDiffs || [];
+      if (!diffs.length) {
+        el.innerHTML = '<div class="no-data-msg" style="color:#4ade80">✓ No offset differences — AHK is in sync with C#.</div>';
+      } else {
+        var html = '<table class="tsv-table" style="width:100%"><thead><tr>'
+          + '<th>Map / Field</th><th>Struct [file]</th><th>Local</th><th>Upstream</th><th>Type</th><th>Notes</th></tr></thead><tbody>';
+        diffs.forEach(function (d) {
+          html += '<tr><td>' + escHtml(d.ahk_map + '/' + d.field) + '</td>'
+            + '<td style="color:var(--subtext);font-size:10px">' + escHtml(d.cs_struct + ' [' + d.cs_file + ']') + '</td>'
+            + '<td style="font-family:monospace;color:#ef4444">' + escHtml(d.ahk_val) + '</td>'
+            + '<td style="font-family:monospace;color:#4ade80">' + escHtml(d.cs_val) + '</td>'
+            + '<td>' + _ocClsSelect(d.key) + '</td>'
+            + '<td><input data-ocnotes="' + escAttr(d.key) + '" style="width:140px;font-size:10px" /></td></tr>';
+        });
+        el.innerHTML = html + '</tbody></table>';
+      }
+      var pats = r.patternDiffs || [];
+      if (pEl) {
+        if (!pats.length) { pEl.innerHTML = ''; }
+        else {
+          var ph = '<div style="font-weight:600;color:var(--accent);margin:4px 0">Pattern differences (' + pats.length + ')</div>'
+            + '<table class="tsv-table" style="width:100%"><thead><tr><th>Name</th><th>Local</th><th>Upstream</th><th>Type</th><th>Notes</th></tr></thead><tbody>';
+          pats.forEach(function (p) {
+            ph += '<tr><td>' + escHtml(p.name) + '</td>'
+              + '<td style="font-family:monospace;color:#ef4444;font-size:9px;word-break:break-all">' + escHtml(p.ahk) + '</td>'
+              + '<td style="font-family:monospace;color:#4ade80;font-size:9px;word-break:break-all">' + escHtml(p.cs) + '</td>'
+              + '<td>' + _ocClsSelect('pattern:' + p.name) + '</td>'
+              + '<td><input data-ocnotes="' + escAttr('pattern:' + p.name) + '" style="width:120px;font-size:10px" /></td></tr>';
+          });
+          pEl.innerHTML = ph + '</tbody></table>';
+        }
+      }
+    }
+    function offsetCompareRecord() {
+      var rows = [];
+      document.querySelectorAll('[data-ockey]').forEach(function (sel) {
+        var key = sel.getAttribute('data-ockey');
+        var row = sel.closest('tr');
+        var notesEl = row ? row.querySelector('[data-ocnotes]') : null;
+        rows.push({ key: key, change_type: sel.value, notes: notesEl ? notesEl.value : '' });
+      });
+      if (!rows.length) return;
+      ahkCall('OffsetCompareRecord', JSON.stringify(rows));
+    }
+    function updateOffsetRecordStatus(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = {}; }
+      var sEl = document.getElementById('offset-compare-status');
+      if (sEl) sEl.textContent = (r.ok ? '✓ ' : '⚠ ') + (r.msg || '');
+    }
+    function updateOffsetHistory(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false }; }
+      var el = document.getElementById('offset-compare-history');
+      if (!el) return;
+      var evs = (r.events || []).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+      if (!evs.length) { el.innerHTML = '<div class="no-data-msg">No recorded changes (initial baselines only).</div>'; return; }
+      var html = '<div style="font-weight:600;color:var(--accent);margin:4px 0">History (' + evs.length + ')</div>'
+        + '<table class="tsv-table" style="width:100%"><thead><tr><th>Date</th><th>Type</th><th>Key</th><th>Local→Upstream</th><th>Ver</th><th>Notes</th></tr></thead><tbody>';
+      evs.forEach(function (e) {
+        var col = e.type === 'fix' ? '#e8c44a' : '#60a5fa';
+        html += '<tr><td>' + escHtml(e.date) + '</td>'
+          + '<td style="color:' + col + '">' + escHtml(e.type) + '</td>'
+          + '<td>' + escHtml((e.kind === 'pattern' ? '⬡ ' : '') + e.key) + '</td>'
+          + '<td style="font-family:monospace">' + escHtml(e.ahk) + ' → ' + escHtml(e.cs) + '</td>'
+          + '<td>' + escHtml(e.version) + '</td>'
+          + '<td style="color:var(--subtext)">' + escHtml(e.notes || '') + '</td></tr>';
+      });
+      el.innerHTML = html + '</tbody></table>';
+    }
+    function updateOffsetPredict(jsonStr) {
+      var r; try { r = JSON.parse(jsonStr); } catch (e) { r = { ok: false }; }
+      var el = document.getElementById('offset-compare-predict');
+      if (!el) return;
+      var html = '<div style="font-weight:600;color:var(--accent);margin:4px 0">Delta prediction (game_update history)</div>';
+      var any = false;
+      (r.structs || []).forEach(function (s) {
+        (s.versions || []).forEach(function (v) {
+          if (v.uniform) {
+            any = true;
+            html += '<div style="font-size:11px;padding:2px 0"><b>' + escHtml(s.struct) + '</b> @ '
+              + escHtml(v.version) + ': all ' + v.count + ' known fields shifted <b>' + _ocDeltaHex(v.delta)
+              + '</b> (' + escHtml((v.fields || []).join(', ')) + ')</div>';
+          }
+        });
+      });
+      el.innerHTML = html + (any ? '' : '<div class="no-data-msg">No uniform game_update shifts recorded yet.</div>');
+    }
+
     // Notify AHK we are ready
     window.addEventListener('load', () => ahkCall('PageReady'));
     window.onerror = (msg, src, line) => console.error(`[JS] ${msg} @ ${src}:${line}`);
@@ -5279,6 +5536,8 @@
       skills:    'game',
       inventory: 'game',
       watchlist: 'game',
+      groups:    'game',
+      alerts:    'game',
       ui:        're',
       gamestate: 're',
       memdiff:   're',
@@ -5339,6 +5598,113 @@
         switchTab(target);
       else if (target)   // already on it — still re-run the side-effects (e.g. MemDiffRequestState)
         _runTabSideEffects(activeTab, activeTab);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  ENTITY GROUPS TAB — path-based grouping editor
+    // ═══════════════════════════════════════════════════════════════════
+    // Local-authoritative: the first header push seeds _grpConfig; afterwards
+    // the UI owns the list (AHK only changes groups via our SetGroups call),
+    // so frequent header pushes never clobber an in-progress edit.
+    let _grpConfig = [];
+    let _grpLoaded = false;
+    function applyGroupsFromHeader(groups) {
+      if (_grpLoaded) return;
+      _grpConfig = Array.isArray(groups) ? groups : [];
+      _grpLoaded = true;
+      grpRender();
+      if (typeof eiRender === "function") eiRender();
+    }
+    function grpColorFor(name) {
+      if (!name) return "";
+      const g = (_grpConfig || []).find(x => x && x.name === name);
+      return g ? (g.color || "#3aa0ff") : "";
+    }
+    function grpRender() {
+      const root = document.getElementById("grp-list");
+      if (!root) return;
+      if (!_grpConfig.length) {
+        root.innerHTML = '<div class="hk-empty">No groups yet. Click \u201c+ Add Group\u201d.</div>';
+        return;
+      }
+      root.innerHTML = _grpConfig.map((g, i) => grpRow(g, i)).join("");
+    }
+    function grpRow(g, i) {
+      return `<div style="display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+        <label class="toggle" title="Enabled"><input type="checkbox" ${hkBool(g.enabled) ? "checked" : ""} onchange="grpSet(${i},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
+        <input class="cfg-input" placeholder="Name" value="${hkEsc(g.name)}" style="width:120px" onchange="grpSet(${i},'name',this.value)">
+        <input class="cfg-input" placeholder="terms, comma-separated (e.g. leaguebreach,strongbox)" value="${hkEsc(g.terms)}" style="flex:1;min-width:160px" onchange="grpSet(${i},'terms',this.value)">
+        <span class="cp-swatch" style="--swatch-color:${hkEsc(g.color || '#3aa0ff')}" title="Color" onclick="grpOpenColor(${i}, this)"></span>
+        <button class="hk-btn danger" title="Delete this group" onclick="grpDel(${i})">Delete</button>
+      </div>`;
+    }
+    function grpAdd() { _grpConfig.push({ name: "New group", terms: "", color: "#3aa0ff", enabled: 1 }); grpChanged(); }
+    function grpDel(i) { _grpConfig.splice(i, 1); grpChanged(); }
+    function grpSet(i, k, v) { if (_grpConfig[i]) { _grpConfig[i][k] = v; grpChanged(); } }
+    function grpChanged() {
+      try { ahkCall("SetGroups", _grpConfig); } catch (e) {}
+      grpRender();
+      if (typeof eiRender === "function") eiRender();
+    }
+    // Opens the shared GGPK-maphack color picker for group row <i>, writing the
+    // chosen RGB (alpha dropped) back into the group.
+    function grpOpenColor(i, el) {
+      const cur = (_grpConfig[i] && _grpConfig[i].color) || "#3aa0ff";
+      openColorPicker("group", {
+        title: "Group color",
+        hex: cur,
+        swatchEl: el,
+        onConfirm: hex => grpSet(i, "color", "#" + hex.slice(0, 6))
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  ALERTS TAB — entity alert engine (header-driven)
+    // ═══════════════════════════════════════════════════════════════════
+    // Each control sends one SetAlert(key,value); AHK persists + re-pushes the header,
+    // and applyAlertsFromHeader mirrors state back. Text/number fields are not
+    // overwritten while focused, so typing is never clobbered.
+    function alertSet(key, value) { try { ahkCall("SetAlert", key, value); } catch (e) {} }
+    function alertChk(key, el) { alertSet(key, el.checked ? 1 : 0); }
+    function alertNum(key, el) { alertSet(key, el.value); }
+    function alertStr(key, el) { alertSet(key, el.value); }
+    function applyAlertsFromHeader(a) {
+      if (!a || typeof a !== "object") return;
+      ["enabled","onUnique","onRare","catBoss","catStrongbox","catShrine","catNpc","catChest","catAreaTransition","zoneEntry","proximity","banner","sound","flash","highlight","log"]
+        .forEach(k => { const el = document.getElementById("al-" + k); if (el && a[k] !== undefined) el.checked = !!a[k]; });
+      // Populate the WAV dropdown from the \wav\ folder (rebuild only when the list changes).
+      const sf = document.getElementById("al-soundFile");
+      if (sf && Array.isArray(a.wavFiles)) {
+        const sig = a.wavFiles.join("|");
+        if (sf.dataset.sig !== sig && document.activeElement !== sf) {
+          sf.innerHTML = '<option value="">(none)</option>' + a.wavFiles.map(f => '<option value="' + escAttr(f) + '">' + escHtml(f) + '</option>').join("");
+          sf.dataset.sig = sig;
+        }
+      }
+      const setVal = (k, v) => { const el = document.getElementById("al-" + k); if (el && v !== undefined && document.activeElement !== el) el.value = v; };
+      setVal("maxDistance", a.maxDistance);
+      setVal("cooldownMs", a.cooldownMs);
+      setVal("bannerMs", a.bannerMs);
+      setVal("pathWatch", a.pathWatch);
+      setVal("groups", a.groups);
+      setVal("soundFile", a.soundFile);
+      setVal("soundMode", a.soundMode);
+      alertSync();
+    }
+    // Shows/hides dependent fields so the panel only displays what is currently relevant.
+    function alertSync() {
+      const on = id => { const e = document.getElementById(id); return !!(e && e.checked); };
+      const show = (id, vis) => { const e = document.getElementById(id); if (e) e.style.display = vis ? "" : "none"; };
+      const enabled = on("al-enabled");
+      show("al-sec-conditions", enabled);
+      show("al-sec-timing", enabled);
+      show("al-sec-output", enabled);
+      show("al-row-cooldown", on("al-proximity"));
+      show("al-row-bannerMs", on("al-banner"));
+      const sound = on("al-sound");
+      const sm = document.getElementById("al-soundMode");
+      show("al-row-soundMode", sound);
+      show("al-row-soundFile", sound && sm && sm.value === "file");
     }
 
     function switchTab(key) {
@@ -6560,6 +6926,8 @@
     // ═══════════════════════════════════════════════════════════════════
     function updateHeader(json) {
       let d; try { d = typeof json === 'string' ? JSON.parse(json) : json; } catch (e) { return; }
+      if (d.groups !== undefined) applyGroupsFromHeader(d.groups);
+      if (d.alerts !== undefined) applyAlertsFromHeader(d.alerts);
 
       // Version tags
       const verGh = document.getElementById('ver-gh');
@@ -7492,7 +7860,7 @@
     // survive re-renders triggered by snapshot pushes.
     window._eiState = window._eiState || {
       items: [],
-      filters: { id: '', path: '', type: 'all', state: 'all' },
+      filters: { id: '', path: '', type: 'all', state: 'all', group: 'all' },
       expanded: new Set(),
       compExpanded: new Set(),  // keys are `<entityAddr>::<componentName>`
       // Lazy-decode cache. Keys are `<entityAddr>::<componentName>`,
@@ -7529,7 +7897,7 @@
       const el = document.getElementById('tab-entities-content');
       if (!el) return;
       const st = window._eiState;
-      const { id: fId, path: fPath, type: fType, state: fState } = st.filters;
+      const { id: fId, path: fPath, type: fType, state: fState, group: fGroup } = st.filters;
       const lowId = fId.toLowerCase().trim();
       const lowPath = fPath.toLowerCase().trim();
 
@@ -7545,6 +7913,7 @@
         if (lowId && String(e.id || '').indexOf(lowId) === -1) return false;
         if (lowPath && String(e.path || '').toLowerCase().indexOf(lowPath) === -1) return false;
         if (fType !== 'all' && e.type !== fType) return false;
+        if (fGroup && fGroup !== 'all' && e.group !== fGroup) return false;
         if (fState === 'awake' && e.sleep === true) return false;
         if (fState === 'sleeping' && e.sleep !== true) return false;
         if (fState === 'dead' && e.alive !== false) return false;
@@ -7555,6 +7924,7 @@
       // Build the unique type list from the live snapshot so the dropdown
       // only ever offers types the user can actually see right now.
       const typesPresent = [...new Set(st.items.map(e => e.type).filter(Boolean))].sort();
+      const groupsPresent = [...new Set(st.items.map(e => e.group).filter(Boolean))].sort();
 
       const cards = filtered.map(eiCard).join('');
       const body = cards || '<div class="ei-empty">No entities match the current filters.</div>';
@@ -7579,6 +7949,10 @@
                 <option value="alive"${fState === 'alive' ? ' selected' : ''}>Alive</option>
                 <option value="dead"${fState === 'dead' ? ' selected' : ''}>Dead</option>
               </select></div>
+              <div class="ei-filter"><label>Group</label><select id="ei-f-group" onchange="eiFilterChange('group', this.value)">
+                <option value="all"${fGroup === 'all' ? ' selected' : ''}>All</option>
+                ${groupsPresent.map(g => `<option value="${escAttr(g)}"${g === fGroup ? ' selected' : ''}>${escHtml(g)}</option>`).join('')}
+              </select></div>
             </div>
           </div>
           <div class="ei-list">${body}</div>
@@ -7602,6 +7976,7 @@
         lifeStr ? `<span class="ei-head-life">${lifeStr}</span>` : '',
         distStr ? `<span class="ei-head-dist">${distStr}</span>` : ''
       ].filter(Boolean).join('');
+      const grpPill = e.group ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:9px;color:var(--subtext)"><span style="width:8px;height:8px;border-radius:50%;background:${escAttr(grpColorFor(e.group) || '#3aa0ff')}"></span>${escHtml(e.group)}</span>` : '';
       const body = expanded ? eiBody(e) : '';
       return `
         <div class="${klass.join(' ')}" data-addr="${escAttr(e.addr)}">
@@ -7609,7 +7984,7 @@
             <span class="ei-caret">▶</span>
             <span class="ei-head-id">#${e.id ?? '?'}</span>
             <span class="ei-head-name">${shortName} <span class="ei-head-path">${pathTail}</span></span>
-            <span class="ei-head-meta">${meta}</span>
+            <span class="ei-head-meta">${grpPill}${meta}</span>
           </div>
           <div class="ei-body">${body}</div>
         </div>
@@ -8441,7 +8816,7 @@
     // ═══════════════════════════════════════════════════════════════════
     //  CONFIG HELPERS
     // ═══════════════════════════════════════════════════════════════════
-    const _cfgSectionIds = ['status', 'overview', 'toggles', 'autoflask', 'combatauto', 'explore', 'radar', 'blacklist', 'entities', 'actions'];
+    const _cfgSectionIds = ['status', 'overview', 'toggles', 'autoflask', 'combatauto', 'explore', 'radar', 'blacklist', 'entities', 'actions', 'al-conditions', 'al-timing', 'al-output'];
     let _cfgSectionsGuard = 0;
     let _cfgSectionsLoaded = false;
 
@@ -8654,15 +9029,23 @@
     let _cpCtx = null;
 
     // Public entry — wire up onclick="openColorPicker('outline')" etc.
-    function openColorPicker(which) {
-      const cur = (which === 'outline')
-        ? (window._lastHeader && window._lastHeader.maphackOutlineHex)
-        : (window._lastHeader && window._lastHeader.maphackBackgroundHex);
-      const hex = cpNormalizeHex8(cur || (which === 'outline' ? '8080FFCC' : '66FF6619'));
-      _cpCtx = { which, original: hex };
+    function openColorPicker(which, opts) {
+      let hex, titleText, onConfirm = null, swatchEl = null;
+      if (opts) {
+        hex = cpNormalizeHex8(opts.hex || '8080FFCC');
+        titleText = opts.title || 'Color';
+        onConfirm = opts.onConfirm || null;
+        swatchEl = opts.swatchEl || null;
+      } else {
+        const cur = (which === 'outline')
+          ? (window._lastHeader && window._lastHeader.maphackOutlineHex)
+          : (window._lastHeader && window._lastHeader.maphackBackgroundHex);
+        hex = cpNormalizeHex8(cur || (which === 'outline' ? '8080FFCC' : '66FF6619'));
+        titleText = which === 'outline' ? 'Outline color' : 'Background unrevealed area';
+      }
+      _cpCtx = { which, original: hex, onConfirm, swatchEl };
       const title = document.getElementById('cp-title');
-      if (title) title.textContent =
-        which === 'outline' ? 'Outline color' : 'Background unrevealed area';
+      if (title) title.textContent = titleText;
       cpSetFromHex(hex);
       document.getElementById('cp-modal').classList.add('cp-open');
       const inp = document.getElementById('cp-hex');
@@ -8677,12 +9060,18 @@
     function cpConfirm() {
       if (!_cpCtx) { cpCancel(); return; }
       const hex = cpCurrentHex();
-      ahkCall('SetMaphackColor', _cpCtx.which, hex);
-      // Optimistic UI update — AHK's PushHeaderToWebView will overwrite
-      // shortly anyway, but this avoids a visual flicker between OK and
-      // the next header tick.
-      const swatch = document.getElementById('cp-swatch-' + _cpCtx.which);
-      if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
+      if (_cpCtx.onConfirm) {
+        // Generic consumer (e.g. Groups tab) supplies its own write-back.
+        try { _cpCtx.onConfirm(hex); } catch (e) {}
+        if (_cpCtx.swatchEl) _cpCtx.swatchEl.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
+      } else {
+        ahkCall('SetMaphackColor', _cpCtx.which, hex);
+        // Optimistic UI update — AHK's PushHeaderToWebView will overwrite
+        // shortly anyway, but this avoids a visual flicker between OK and
+        // the next header tick.
+        const swatch = document.getElementById('cp-swatch-' + _cpCtx.which);
+        if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
+      }
       cpCancel();
     }
 

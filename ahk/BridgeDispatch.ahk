@@ -117,6 +117,15 @@ _DispatchBridgeCall(method, args)
             g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
         case "ClearEntityHighlight":
             g_highlightedEntityPath := ""
+        case "SetGroups":
+            _ApplyEntityGroups((args.Length >= 1) ? args[1] : 0)
+            SaveEntityGroups()
+            SetTimer(PushHeaderToWebView, -50)
+        case "SetAlert":
+            if (args.Length >= 2)
+                _ApplyAlertSetting(args[1], args[2])
+            SaveEntityAlertsConfig()
+            SetTimer(PushHeaderToWebView, -50)
         case "DecodeComponent":
             ; Lazy-decode a single component for the Entity Inspector. The
             ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine
@@ -638,6 +647,18 @@ _DispatchBridgeCall(method, args)
             pathArg := (args.Length >= 1) ? String(args[1]) : ""
             if (pathArg != "")
                 SetTimer(() => GgpkInstallPathUi_Save(pathArg), -1)
+        case "OffsetCompareRun":
+            ; Fetch upstream (arsenic) + diff local offsets/patterns on a timer;
+            ; the result is pushed back via updateOffsetComparison().
+            SetTimer(() => OffsetCompareRun(), -1)
+        case "OffsetCompareRecord":
+            ; args[1] = JSON array of {key, change_type, notes} classifications.
+            ocPayload := (args.Length >= 1) ? String(args[1]) : ""
+            SetTimer(() => OffsetCompareRecord(ocPayload), -1)
+        case "OffsetCompareShowHistory":
+            SetTimer(() => OffsetCompareShowHistory(), -1)
+        case "OffsetComparePredict":
+            SetTimer(() => OffsetComparePredict(), -1)
     }
 }
 

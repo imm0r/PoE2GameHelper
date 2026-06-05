@@ -923,6 +923,12 @@ class RadarOverlay
                           : isEnemyBoss      ? RadarOverlay.COLOR_ENEMY_BOSS
                           : isEnemyRare      ? RadarOverlay.COLOR_ENEMY_RARE
                           :                    RadarOverlay.COLOR_ENEMY_NORMAL
+                ; Group color override — a matching path group wins over the type color
+                if (entityPath != "") {
+                    _grp := ResolveEntityGroupByPath(entityPath)
+                    if (_grp)
+                        dotColor := GroupColorToBgr(_grp["color"])
+                }
 
                 dotRadius := (isAreaTransition || isWaypoint || isCheckpoint) ? (isLargeMap ? 6 : 4)
                            : (isLargeMap ? 4 : 3)

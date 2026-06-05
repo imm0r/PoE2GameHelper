@@ -22,8 +22,10 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/PoE2MemoryReader.ahk
 #Include ahk/PatchChecker.ahk
 #Include Lib/TerrainPathfinder.ahk
+#Include ahk/GdiOverlayBase.ahk
 #Include ahk/RadarOverlay.ahk
 #Include ahk/PlayerHUD.ahk
+#Include ahk/NotificationOverlay.ahk
 #Include ahk/UiTreeBrowser.ahk
 #Include ahk/UiBrowserHandler.ahk
 
@@ -34,7 +36,7 @@ Große Aufgaben in kleinere Teilschritte zerlegen und bei Bedarf klärende Frage
 Erläutern Sie bei Ihrem Feedback den Denkprozess und weisen Sie auf Probleme und Möglichkeiten hin.
 Schritt für Schritt denken und bei komplexen Problemen die Überlegungen aufzeigen.
 Konkrete Beispiele verwenden.
-Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/bylafko/gamehelper2") geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
+Generell sollte immer bei Start einer neuen Aufgabe in das original C#Projekt ("https://gitlab.com/g0rdin/gamehelper2" — Branch arsenic) geschaut werden ob es hier bereits eine Lösung oder Lösungsansätze für die aktuelle Aufgabe gibt.
 Wenn Sie neue Funktionen anlegen, sollten diese vorab immer mit 2 bis 3 Zeilen kommentiert werden.Wofür ist die Funktion, welche Parameter benutzt sie und gibt es return Werte.
 Sollten Sie neue Variablen erstellen, so sind diese immer sinnvoll zu benennen und dem bisherigen allgemeinen style folgen.
 */
@@ -94,10 +96,11 @@ g_lastSnapshotForUi := 0
 g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
-g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions"  ; comma-separated open detail sections
+g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
 g_radarOverlay := 0   ; lazy-init beim ersten Render-Aufruf
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
 g_playerHud := 0   ; lazy-init on first render
+g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
 g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
@@ -289,6 +292,8 @@ LoadConfig()
 LoadCombatAutoConfig()
 LoadExplorationConfig()
 LoadLootPickupConfig()
+LoadEntityGroups()
+LoadEntityAlertsConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 
@@ -895,6 +900,7 @@ OnTreeTabChanged(*)
 #Include ahk/PoE2AtlasReader.ahk
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
+#Include ahk/OffsetCompare.ahk
 #Include ahk/UIHelpers.ahk
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.

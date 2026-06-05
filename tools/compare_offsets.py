@@ -2,7 +2,7 @@
 """
 compare_offsets.py
 Vergleicht PoE2Offsets.ahk / StaticOffsetsPatterns.ahk mit dem aktuellen
-C#-Stand von https://gitlab.com/bylafko/gamehelper2.
+C#-Stand von https://gitlab.com/g0rdin/gamehelper2 (Branch arsenic).
 
 Führt eine versionierte Änderungshistorie mit Klassifizierung (fix / game_update).
 Analysiert Delta-Muster zur Vorhersage zukünftiger Änderungen.
@@ -15,7 +15,7 @@ Verwendung:
   python compare_offsets.py --predict    # Delta-Muster für Vorhersagen analysieren
 """
 
-import re, json, sys, subprocess, argparse
+import re, json, sys, subprocess, argparse, shutil
 from pathlib import Path
 from datetime import date
 from collections import defaultdict
@@ -23,13 +23,14 @@ from collections import defaultdict
 # ── Pfade ──────────────────────────────────────────────────────────────────────
 SCRIPT_DIR   = Path(__file__).parent
 ROOT_DIR     = SCRIPT_DIR.parent          # GameHelper/ (tools/ liegt eine Ebene höher)
-AHK_OFFSETS  = ROOT_DIR / "PoE2Offsets.ahk"
-AHK_PATTERNS = ROOT_DIR / "StaticOffsetsPatterns.ahk"
+AHK_OFFSETS  = ROOT_DIR / "ahk/PoE2Offsets.ahk"
+AHK_PATTERNS = ROOT_DIR / "ahk/StaticOffsetsPatterns.ahk"
 PATCH_FILE   = ROOT_DIR / "last_known_patch.txt"
 HISTORY_FILE = ROOT_DIR / "offset_history.json"
 CACHE_DIR    = ROOT_DIR / ".upstream_cache"
 
-GITLAB_URL   = "https://gitlab.com/bylafko/gamehelper2"
+GITLAB_URL    = "https://gitlab.com/g0rdin/gamehelper2.git"
+GITLAB_BRANCH = "arsenic"
 CS_OFFSETS_REL = "GameOffsets"   # Pfad innerhalb des Repos
 
 # ── Hilfsfunktionen ────────────────────────────────────────────────────────────
@@ -74,13 +75,36 @@ def upstream_commit() -> str:
 
 
 # ── Git Fetch ──────────────────────────────────────────────────────────────────
+def _cache_matches_config() -> bool:
+    """True, wenn der vorhandene Klon bereits auf URL + Branch der Konfiguration zeigt."""
+    def _norm(u: str) -> str:
+        return u.strip().rstrip("/").removesuffix(".git")
+    try:
+        url = subprocess.check_output(
+            ["git", "-C", str(CACHE_DIR), "remote", "get-url", "origin"],
+            stderr=subprocess.DEVNULL).decode().strip()
+        branch = subprocess.check_output(
+            ["git", "-C", str(CACHE_DIR), "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return False
+    return _norm(url) == _norm(GITLAB_URL) and branch == GITLAB_BRANCH
+
+
 def fetch_upstream(verbose=True) -> bool:
-    """Klont oder pullt das GitLab-Repo in CACHE_DIR."""
+    """Klont oder pullt den arsenic-Branch des GitLab-Repos in CACHE_DIR."""
+    # Vorhandenen Cache verwerfen, wenn er auf ein anderes Repo/Branch zeigt
+    # (z. B. nach einem Wechsel von Repo oder Branch).
+    if CACHE_DIR.exists() and not _cache_matches_config():
+        print(c("  Cache zeigt auf anderes Repo/Branch — wird neu geklont …", YELLOW))
+        shutil.rmtree(CACHE_DIR, ignore_errors=True)
+
     if not CACHE_DIR.exists():
-        print(f"  Klone {GITLAB_URL} …")
+        print(f"  Klone {GITLAB_URL} (Branch {GITLAB_BRANCH}) …")
         try:
             subprocess.check_call(
-                ["git", "clone", "--depth=1", GITLAB_URL, str(CACHE_DIR)],
+                ["git", "clone", "--depth=1", "--branch", GITLAB_BRANCH,
+                 GITLAB_URL, str(CACHE_DIR)],
                 stdout=subprocess.DEVNULL if not verbose else None,
                 stderr=subprocess.STDOUT if not verbose else None
             )
@@ -92,7 +116,8 @@ def fetch_upstream(verbose=True) -> bool:
     else:
         try:
             result = subprocess.run(
-                ["git", "-C", str(CACHE_DIR), "pull", "--depth=1", "--rebase"],
+                ["git", "-C", str(CACHE_DIR), "pull", "--depth=1", "--rebase",
+                 "origin", GITLAB_BRANCH],
                 capture_output=True, text=True, timeout=30
             )
             if "Already up to date" in result.stdout or "up to date" in result.stdout.lower():

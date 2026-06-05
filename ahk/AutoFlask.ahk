@@ -24,7 +24,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
-        global g_playerHudEnabled, g_playerHud
+        global g_playerHudEnabled, g_playerHud, g_notifyOverlay
         if g_updatesPaused
         {
             if g_radarOverlay
@@ -73,6 +73,11 @@ UpdateRadarFast()
 
         ; ── AutoPilot (state machine: combat → explore, owns shared guards) ──
         TryAutoPilot(radarSnap)
+
+        ; ── Entity alerts + banner — every tick, outside the claim chain, map-independent ──
+        TryEntityAlerts(radarSnap)
+        if g_notifyOverlay
+            g_notifyOverlay.Tick()
 
         currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
 
