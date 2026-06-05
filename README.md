@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logo_poE2gamehelper.png" width="640" alt="PoE2 GameHelper">
+<img src="assets/PoEformance.png" width="640" alt="PoE2 GameHelper">
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
