@@ -240,7 +240,7 @@ _BuildEntitiesJson(snap)
             entityType := _ClassifyEntityType(path)
 
             ; Promote Enemy to Boss if rarity is Unique/Boss
-            rarId := (decoded && decoded.Has("rarityId")) ? decoded["rarityId"] : 0
+            rarId := ReadEntityRarityId(decoded)
             if (entityType = "Enemy" && (rarId >= 3))
                 entityType := "Boss"
 
@@ -292,6 +292,8 @@ _BuildEntitiesJson(snap)
             en := StrReplace(en,          '"', '\"')
             er := StrReplace(rarity,      '"', '\"')
             et := StrReplace(entityType,  '"', '\"')
+            mg := StrReplace(ExtractMetaGroup(path), '"', '\"')
+            gr := StrReplace(ResolveEntityGroupNameByPath(path), '"', '\"')
             sl := isSleep ? "true" : "false"
             addrHex := Format("0x{:X}", entityAddr)
 
@@ -299,7 +301,7 @@ _BuildEntitiesJson(snap)
                 . '{"id":' entityId
                 . ',"addr":"' addrHex '"'
                 . ',"path":"' ep '","name":"' en '","rarity":"' er '","rarityId":' rarId
-                . ',"type":"' et '","state":"' stateStr '"'
+                . ',"type":"' et '","metaGroup":"' mg '","group":"' gr '","state":"' stateStr '"'
                 . ',"life":' lifePct ',"dist":' dist ',"alive":' (isAlive ? "true" : "false")
                 . ',"sleep":' sl
                 . ',"componentCount":' compCount

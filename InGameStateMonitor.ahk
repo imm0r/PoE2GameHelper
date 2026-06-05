@@ -22,8 +22,10 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/PoE2MemoryReader.ahk
 #Include ahk/PatchChecker.ahk
 #Include Lib/TerrainPathfinder.ahk
+#Include ahk/GdiOverlayBase.ahk
 #Include ahk/RadarOverlay.ahk
 #Include ahk/PlayerHUD.ahk
+#Include ahk/NotificationOverlay.ahk
 #Include ahk/UiTreeBrowser.ahk
 #Include ahk/UiBrowserHandler.ahk
 
@@ -94,10 +96,11 @@ g_lastSnapshotForUi := 0
 g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
-g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions"  ; comma-separated open detail sections
+g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
 g_radarOverlay := 0   ; lazy-init beim ersten Render-Aufruf
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
 g_playerHud := 0   ; lazy-init on first render
+g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
 g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
@@ -292,6 +295,8 @@ LoadConfig()
 LoadCombatAutoConfig()
 LoadExplorationConfig()
 LoadLootPickupConfig()
+LoadEntityGroups()
+LoadEntityAlertsConfig()
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 

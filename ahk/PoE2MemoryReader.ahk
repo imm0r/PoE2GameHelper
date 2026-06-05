@@ -3311,6 +3311,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 "w2sMatrix", w2sMatrix,
                 "areaInstance", Map(
                     "address", areaInstanceData,
+                    "currentAreaHash", currentAreaHash,
                     "localPlayerPtr", localPlayerPtr,
                     "playerRenderComponent", playerRenderComponent,
                     "awakeEntities", awakeEntities,

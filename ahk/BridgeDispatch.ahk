@@ -117,6 +117,15 @@ _DispatchBridgeCall(method, args)
             g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
         case "ClearEntityHighlight":
             g_highlightedEntityPath := ""
+        case "SetGroups":
+            _ApplyEntityGroups((args.Length >= 1) ? args[1] : 0)
+            SaveEntityGroups()
+            SetTimer(PushHeaderToWebView, -50)
+        case "SetAlert":
+            if (args.Length >= 2)
+                _ApplyAlertSetting(args[1], args[2])
+            SaveEntityAlertsConfig()
+            SetTimer(PushHeaderToWebView, -50)
         case "DecodeComponent":
             ; Lazy-decode a single component for the Entity Inspector. The
             ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine
