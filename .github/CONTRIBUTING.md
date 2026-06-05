@@ -116,7 +116,6 @@ data/                      TSVs the extractor writes; read at runtime
 external/                  Vendored upstream libs (LibGGPK3, etc.)
 assets/                    Icons, logos
 DEV_README.md              Architecture deep-dive: memory layout, pattern scanning, panel discovery
-PROJECT_STATUS.md          Current feature inventory + known issues
 CLAUDE.md                  Project conventions distilled for AI pair-programming sessions
 ```
 
