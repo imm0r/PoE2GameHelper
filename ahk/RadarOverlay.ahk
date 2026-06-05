@@ -1,10 +1,10 @@
 ; RadarOverlay.ahk
-; Transparentes, click-through Overlay — zeichnet Entity-Dots auf Mini- und Großkarte.
+; Transparent, click-through overlay — draws entity dots on the mini-map and the large map.
 ;
-; ── Koordinatentransformation (portiert von Radar.cs / GameHelper2) ────────────────────
-;   Kamerawinkel: 38.7°
-;   Projektionsformel:
-;     mapScale   = 240 / zoom  (Großkarte: zoom *= LARGE_MAP_ZOOM_FACTOR = 0.1738)
+; ── Coordinate transformation (ported from Radar.cs / GameHelper2) ─────────────────────
+;   Camera angle: 38.7°
+;   Projection formula:
+;     mapScale   = 240 / zoom  (large map: zoom *= LARGE_MAP_ZOOM_FACTOR = 0.1738)
 ;     projCos    = mapDiagonal * cos(38.7°) / mapScale
 ;     projSin    = mapDiagonal * sin(38.7°) / mapScale
 ;     gridDelta  = (worldPosition - playerWorldPosition) / WORLD_TO_GRID_RATIO
@@ -12,44 +12,44 @@
 ;     screenDelta.y = (gridDelta.z - gridDelta.x - gridDelta.y) * projSin
 ;     dotScreenPos  = mapCenter + screenDelta
 ;
-; ── UI-Positionsberechnung (portiert von UiElement.cs / GameHelper2) ──────────────────
-;   GetUnscaledPosition(): Laufe die Parent-Chain hoch, akkumuliere relativePosition.
-;   Finales Ergebnis: unscaledPos * GameWindowScale(scaleIndex, localMultiplier)
-;     Referenzauflösung des Spiels: 2560×1600
+; ── UI position calculation (ported from UiElement.cs / GameHelper2) ──────────────────
+;   GetUnscaledPosition(): walk up the parent chain, accumulating relativePosition.
+;   Final result: unscaledPos * GameWindowScale(scaleIndex, localMultiplier)
+;     Game design reference resolution: 2560×1600
 ;     scaleFactorX = windowWidth  / 2560
 ;     scaleFactorY = windowHeight / 1600
 ;     scaleIndex 1 → uiScaleX = localMult * scaleFactorX, uiScaleY = localMult * scaleFactorX
 ;     scaleIndex 2 → uiScaleX = localMult * scaleFactorY, uiScaleY = localMult * scaleFactorY
-;     scaleIndex 3 → uiScaleX = localMult * scaleFactorX, uiScaleY = localMult * scaleFactorY  (Standard für UI)
+;     scaleIndex 3 → uiScaleX = localMult * scaleFactorX, uiScaleY = localMult * scaleFactorY  (UI default)
 ;
-; ── Kartentypen ───────────────────────────────────────────────────────────────────────
-;   MiniMap:   gespeicherte Position = LINKS OBEN  → Mitte = pos + size/2 + defaultShift + shift
-;   Großkarte: gespeicherte Position = KARTENMITTE → Mitte = pos + defaultShift + shift
-;              mapDiagonal = sqrt(windowWidth² + windowHeight²)  (rawsz=0 → Fenster als Äquivalent)
+; ── Map types ───────────────────────────────────────────────────────────────────────────
+;   MiniMap:   stored position = TOP-LEFT     → center = pos + size/2 + defaultShift + shift
+;   LargeMap:  stored position = MAP CENTER   → center = pos + defaultShift + shift
+;              mapDiagonal = sqrt(windowWidth² + windowHeight²)  (rawsz=0 → window as equivalent)
 
 class RadarOverlay
 {
-    ; Transparenzfarbe: fast Schwarz (0x000000 wird von manchen Systemen ignoriert)
+    ; Transparency color: near black (0x000000 is ignored by some systems)
     static TRANSPARENT_BACKGROUND := 0x010101
 
-    ; Kamerawinkel-Konstanten für 38.7°
-    static CAMERA_COS := 0.78094   ; cos(38.7° in Radiant)
-    static CAMERA_SIN := 0.62470   ; sin(38.7° in Radiant)
+    ; Camera-angle constants for 38.7°
+    static CAMERA_COS := 0.78094   ; cos(38.7° in radians)
+    static CAMERA_SIN := 0.62470   ; sin(38.7° in radians)
 
-    ; Zoom-Korrekturfaktor für die Großkarte (aus RadarSettings.cs, default = 0.1738)
+    ; Zoom correction factor for the large map (from RadarSettings.cs, default = 0.1738)
     static LARGE_MAP_ZOOM_FACTOR := 0.1738
 
-    ; Umrechnungsfaktor WorldPosition → GridPosition (aus Radar.cs: ratio = 10.86957)
+    ; Conversion factor WorldPosition → GridPosition (from Radar.cs: ratio = 10.86957)
     static WORLD_TO_GRID_RATIO := 10.86957
 
-    ; Dot-Farben (GDI erwartet BGR, nicht RGB)
-    static COLOR_ENEMY_NORMAL := 0x0000FF   ; rot   (normale Gegner)
-    static COLOR_ENEMY_RARE   := 0xFF00FF   ; magenta (seltene Gegner)
-    static COLOR_ENEMY_BOSS   := 0x00FFFF   ; gelb  (Unique/Boss)
-    static COLOR_MINION       := 0x0080FF   ; orange (eigene Minions)
-    static COLOR_NPC          := 0x00FF80   ; grün
-    static COLOR_CHEST        := 0xFFFF00   ; cyan  (Chests/Strongboxes)
-    static COLOR_PLAYER       := 0xFFFFFF   ; weiß
+    ; Dot colors (GDI expects BGR, not RGB)
+    static COLOR_ENEMY_NORMAL := 0x0000FF   ; red    (normal enemies)
+    static COLOR_ENEMY_RARE   := 0xFF00FF   ; magenta (rare enemies)
+    static COLOR_ENEMY_BOSS   := 0x00FFFF   ; yellow (Unique/Boss)
+    static COLOR_MINION       := 0x0080FF   ; orange (own minions)
+    static COLOR_NPC          := 0x00FF80   ; green
+    static COLOR_CHEST        := 0xFFFF00   ; cyan   (Chests/Strongboxes)
+    static COLOR_PLAYER       := 0xFFFFFF   ; white
 
     ; Maximum world-unit radius drawn on the radar. Entities beyond this distance are skipped.
     ; 6000 world units ≈ 552 grid units — matches the outer scoring penalty in the entity sampler.
@@ -84,7 +84,7 @@ class RadarOverlay
         this._bgBrush    := 0       ; cached background fill brush
         this._frameRect  := Buffer(16, 0)  ; reused RECT for FillRect
 
-        ; Entity-Gruppen-Filter (alle standardmäßig sichtbar)
+        ; Entity-group filters (all visible by default)
         this.ShowEnemyNormal := true
         this.ShowEnemyRare   := true
         this.ShowEnemyBoss   := true
@@ -154,27 +154,27 @@ class RadarOverlay
         ; work in the per-frame render hot path.
         this._pathTypeCache := Map()
 
-        ; ── Batch-Draw Queues ────────────────────────────────────────────────────────────
-        ; Draw-Calls werden gesammelt und am Ende des Frames in einem einzigen Batch
-        ; ausgeführt — reduziert Kernel-Mode-Switches um 80–95 %.
-        ;   Key-Encoding für _dotBatch / _dotTopBatch:  colorBGR | (radius << 24)
-        ;   Key-Encoding für _lineBatch:                colorBGR | (width  << 24)
-        this._dotBatch    := Map()   ; normale Entity-Dots (alle Farb-Gruppen)
-        this._dotTopBatch := Map()   ; Highlight-Dot — wird nach _dotBatch gerendert (on top)
-        this._lineBatch   := Map()   ; Liniensegmente: je Farb-/Breiten-Gruppe ein Array
-        this._textBatch   := []      ; Text-Einträge: [x, y, text, colorBGR]
+        ; ── Batch-draw queues ────────────────────────────────────────────────────────────
+        ; Draw calls are collected and executed at the end of the frame in a single batch
+        ; — reduces kernel-mode switches by 80–95 %.
+        ;   Key encoding for _dotBatch / _dotTopBatch:  colorBGR | (radius << 24)
+        ;   Key encoding for _lineBatch:                colorBGR | (width  << 24)
+        this._dotBatch    := Map()   ; normal entity dots (all color groups)
+        this._dotTopBatch := Map()   ; highlight dot — rendered after _dotBatch (on top)
+        this._lineBatch   := Map()   ; line segments: one array per color/width group
+        this._textBatch   := []      ; text entries: [x, y, text, colorBGR]
     }
 
     ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
     ; Params: snapshot - full game state snapshot; gameWindow* - screen position and size of the PoE window.
-    ; Hauptmethode — wird bei jedem Snapshot-Update aufgerufen.
-    ; gameWindowX/Y/Width/Height: Position und Größe des PoE-Fensters in Bildschirmkoordinaten.
+    ; Main method — called on every snapshot update.
+    ; gameWindowX/Y/Width/Height: position and size of the PoE window in screen coordinates.
     Render(snapshot, gameWindowX, gameWindowY, gameWindowWidth, gameWindowHeight)
     {
         if (gameWindowWidth < 100 || gameWindowHeight < 100)
             return
 
-        ; Overlay-Fenster auf das Spielfenster ausrichten — nur wenn sich Position/Größe geändert hat
+        ; Align the overlay window to the game window — only when position/size has changed
         if (gameWindowX != this._lastGwX || gameWindowY != this._lastGwY
          || gameWindowWidth != this._lastGwW || gameWindowHeight != this._lastGwH)
         {
@@ -206,7 +206,7 @@ class RadarOverlay
         NumPut("Int", gameWindowHeight, this._frameRect, 12)
         DllCall("FillRect", "Ptr", this.memoryDC, "Ptr", this._frameRect, "Ptr", this._bgBrush)
 
-        ; Daten aus dem Snapshot extrahieren
+        ; Extract data from the snapshot
         inGameState    := (snapshot && snapshot.Has("inGameState"))           ? snapshot["inGameState"]                 : 0
         uiElements     := (inGameState && inGameState.Has("importantUiElements")) ? inGameState["importantUiElements"]  : 0
         areaInstance   := (inGameState && inGameState.Has("areaInstance"))    ? inGameState["areaInstance"]             : 0
@@ -310,7 +310,7 @@ class RadarOverlay
 
         if !hasPlayerPosition
         {
-            this._DrawDot(20, 8, 0x0000FF, 5)   ; blauer Punkt = kein Spieler gefunden
+            this._DrawDot(20, 8, 0x0000FF, 5)   ; blue dot = no player found
             this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
             return
         }
@@ -320,8 +320,8 @@ class RadarOverlay
         playerWorldY        := playerWorldPosition["y"]
         playerTerrainHeight := playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0
 
-        ; Minimap-Diagonale auch dann cachen, wenn die Minimap gerade unsichtbar ist
-        ; (die Großkarte braucht sie, ist aber oft offen wenn Minimap verdeckt ist).
+        ; Cache the minimap diagonal even when the minimap is currently invisible
+        ; (the large map needs it, but is often open while the minimap is hidden).
         if miniMapData
         {
             sfX := gameWindowWidth  / 2560.0
@@ -340,7 +340,7 @@ class RadarOverlay
             try this._RenderMapLayer(miniMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, false)
             catch
-                this._DrawDot(40, 8, 0x00FF00, 4)   ; grüner Punkt = MiniMap-Fehler
+                this._DrawDot(40, 8, 0x00FF00, 4)   ; green dot = MiniMap error
         }
 
         if (largeMapData && largeMapData["isVisible"])
@@ -348,7 +348,7 @@ class RadarOverlay
             try this._RenderMapLayer(largeMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, true)
             catch
-                this._DrawDot(56, 8, 0x00FFFF, 4)   ; cyaner Punkt = Großkarten-Fehler
+                this._DrawDot(56, 8, 0x00FFFF, 4)   ; cyan dot = large-map error
         }
 
         ; ── Path recompute (A*) when highlighted entity changes or player/entity moves ──
@@ -609,13 +609,13 @@ class RadarOverlay
 
     ; Renders entity dots onto one map layer using isometric projection and the game's UI scale math.
     ; Params: isLargeMap - switches between large-map center/window-diagonal vs. mini-map top-left formulas.
-    ; Zeichnet Entities auf eine Kartenschicht (Mini- oder Großkarte).
+    ; Draws entities onto one map layer (mini-map or large map).
     _RenderMapLayer(mapData, playerWorldX, playerWorldY, playerTerrainHeight,
                     areaInstance, gameWindowWidth, gameWindowHeight, isLargeMap)
     {
-        ; ── UI-Skalierung berechnen (nach GameWindowScale.cs) ────────────────────────────
-        ; Das Spiel nutzt 2560×1600 als Design-Referenzauflösung für alle UI-Positionen.
-        ; scaleFactorX/Y rechnen unscaled UI-Koordinaten in echte Pixelkoordinaten um.
+        ; ── Compute UI scaling (per GameWindowScale.cs) ──────────────────────────────────
+        ; The game uses 2560×1600 as the design reference resolution for all UI positions.
+        ; scaleFactorX/Y convert unscaled UI coordinates into real pixel coordinates.
         scaleFactorX    := gameWindowWidth  / 2560.0
         scaleFactorY    := gameWindowHeight / 1600.0
         scaleIndex      := mapData["scaleIdx"]
@@ -630,21 +630,21 @@ class RadarOverlay
         else
             uiScaleX := localMultiplier,                uiScaleY := localMultiplier
 
-        ; ── Kartenposition auf dem Bildschirm ────────────────────────────────────────────
-        ; MiniMap: unscaledPos = LINKS OBEN → mapCenter = pos + size/2 + shifts
-        ; LargeMap: Die Position-Traversal liefert bereits den Kartenmittelpunkt (der Großkarte
-        ;           ist im UI-Baum relativ zum Bildschirmmittelpunkt positioniert → kein +size/2)
+        ; ── Map position on screen ───────────────────────────────────────────────────────
+        ; MiniMap: unscaledPos = TOP-LEFT → mapCenter = pos + size/2 + shifts
+        ; LargeMap: the position traversal already yields the map center (the large map
+        ;           is positioned relative to the screen center in the UI tree → no +size/2)
         mapElementScreenX := mapData["unscaledPosX"] * uiScaleX
         mapElementScreenY := mapData["unscaledPosY"] * uiScaleY
 
-        ; ── Kartengröße und Mittelpunkt auf dem Bildschirm ───────────────────────────────
+        ; ── Map size and center on screen ────────────────────────────────────────────────
         mapScreenWidth  := mapData["sizeW"] * uiScaleX
         mapScreenHeight := mapData["sizeH"] * uiScaleY
 
         if isLargeMap
         {
-            ; Großkarte: Position-Traversal gibt Mittelpunkt → nur Shifts hinzuaddieren.
-            ; Die gespeicherte Elementgröße ist oft 0 → Fenstergröße als Displayfallback.
+            ; Large map: position traversal gives the center → only add the shifts.
+            ; The stored element size is often 0 → use window size as a display fallback.
             mapCenterX := mapElementScreenX + mapData["defaultShiftX"] + mapData["shiftX"]
             mapCenterY := mapElementScreenY + mapData["defaultShiftY"] + mapData["shiftY"]
             if (!(mapScreenWidth > 20) || !(mapScreenHeight > 20)) {
@@ -656,7 +656,7 @@ class RadarOverlay
         {
             if (!(mapScreenWidth > 20) || !(mapScreenHeight > 20))
                 return
-            ; MiniMap: Position ist Links-Oben → Mittelpunkt = pos + size/2 + shifts.
+            ; MiniMap: position is top-left → center = pos + size/2 + shifts.
             mapCenterX := mapElementScreenX + mapScreenWidth  / 2 + mapData["defaultShiftX"] + mapData["shiftX"]
             mapCenterY := mapElementScreenY + mapScreenHeight / 2 + mapData["defaultShiftY"] + mapData["shiftY"]
         }
@@ -665,12 +665,12 @@ class RadarOverlay
          || mapCenterY < -mapScreenHeight || mapCenterY > gameWindowHeight + mapScreenHeight)
             return
 
-        ; ── Diagonale für Projektionsskalierung ──────────────────────────────────────────
-        ; MiniMap: Diagonale des tatsächlichen Kartenelements.
-        ; LargeMap: UnscaledSize=0 im Speicher → Minimap-Diagonale verwenden (gecacht in Render()).
-        ;           Wird ohne LARGE_MAP_ZOOM_FACTOR kombiniert, weil dieser Faktor die
-        ;           Fensterdiagonale auf Minimap-Diagonale herunterskaliert — bei direkter
-        ;           Nutzung der Minimap-Diagonale wird er nicht mehr benötigt.
+        ; ── Diagonal for projection scaling ──────────────────────────────────────────────
+        ; MiniMap: diagonal of the actual map element.
+        ; LargeMap: UnscaledSize=0 in memory → use the minimap diagonal (cached in Render()).
+        ;           Combined without LARGE_MAP_ZOOM_FACTOR, because that factor scales the
+        ;           window diagonal down to the minimap diagonal — when using the minimap
+        ;           diagonal directly it is no longer needed.
         if isLargeMap
             mapDiagonal := (this._lastMiniMapDiagonal > 0)
                 ? this._lastMiniMapDiagonal
@@ -678,9 +678,9 @@ class RadarOverlay
         else
             mapDiagonal := Sqrt(mapScreenWidth * mapScreenWidth + mapScreenHeight * mapScreenHeight)
 
-        ; ── Zoom-Wert für Radar-Projektion ───────────────────────────────────────────────
-        ; LARGE_MAP_ZOOM_FACTOR ist NUR nötig wenn Fensterdiagonale verwendet wird.
-        ; Mit Minimap-Diagonale direkt → rohen Zoom-Wert verwenden (kein Faktor).
+        ; ── Zoom value for radar projection ──────────────────────────────────────────────
+        ; LARGE_MAP_ZOOM_FACTOR is ONLY needed when the window diagonal is used.
+        ; With the minimap diagonal directly → use the raw zoom value (no factor).
         mapZoom := mapData["zoom"]
         if (!(mapZoom > 0) || mapZoom > 20)
             mapZoom := 0.5
@@ -698,7 +698,7 @@ class RadarOverlay
                 . " z=" Round(mapZoom, 3)
         }
 
-        ; ── Projektionsfaktoren für Radar-Koordinatentransformation ──────────────────────
+        ; ── Projection factors for the radar coordinate transformation ───────────────────
         baseMapScale := 240.0 / mapZoom
         projectionCos := mapDiagonal * RadarOverlay.CAMERA_COS / baseMapScale
         projectionSin := mapDiagonal * RadarOverlay.CAMERA_SIN / baseMapScale
@@ -708,7 +708,7 @@ class RadarOverlay
             this._RenderMapHack(mapCenterX, mapCenterY, playerWorldX, playerWorldY,
                 projectionCos, projectionSin)
 
-        ; Spieler-Dot in der Kartenmitte
+        ; Player dot at the map center
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
 
         ; ── Range circles (config toggle + only when entries are set) ──
@@ -728,7 +728,7 @@ class RadarOverlay
         this._RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin,
             gameWindowWidth, gameWindowHeight)
 
-        ; ── Entities zeichnen ────────────────────────────────────────────────────────────
+        ; ── Draw entities ────────────────────────────────────────────────────────────────
         awakeEntities   := (areaInstance && areaInstance.Has("awakeEntities"))    ? areaInstance["awakeEntities"]    : 0
         sleepingEntities := (areaInstance && areaInstance.Has("sleepingEntities")) ? areaInstance["sleepingEntities"] : 0
 
@@ -778,7 +778,7 @@ class RadarOverlay
                     continue
                 }
 
-                ; Path-Filter: nur Monster, Spielercharaktere, NPCs und Chests anzeigen.
+                ; Path filter: only show monsters, player characters, NPCs and chests.
                 ; Resolve via cached classification to avoid repeated StrLower/InStr per frame.
                 entityPath := entity.Has("path") ? entity["path"] : ""
                 pathFlags := this._GetPathTypeFlags(entityPath)
@@ -805,12 +805,12 @@ class RadarOverlay
                     continue
                 }
 
-                ; Welt-Delta → Grid-Delta umrechnen
+                ; Convert world delta → grid delta
                 gridDeltaX := (entityWorldPos["x"] - playerWorldX)        / RadarOverlay.WORLD_TO_GRID_RATIO
                 gridDeltaY := (entityWorldPos["y"] - playerWorldY)        / RadarOverlay.WORLD_TO_GRID_RATIO
                 gridDeltaZ := (entityTerrainHeight - playerTerrainHeight) / RadarOverlay.WORLD_TO_GRID_RATIO
 
-                ; Isometrische Radar-Projektion (Kamerawinkel 38.7°)
+                ; Isometric radar projection (camera angle 38.7°)
                 screenDeltaX := (gridDeltaX - gridDeltaY) * projectionCos
                 screenDeltaY := (gridDeltaZ - gridDeltaX - gridDeltaY) * projectionSin
 
@@ -872,7 +872,7 @@ class RadarOverlay
                     }
                 }
 
-                ; Entity-Typ klassifizieren
+                ; Classify the entity type
                 positionedComponent := decodedComponents.Has("positioned") ? decodedComponents["positioned"] : 0
                 isFriendly := positionedComponent && positionedComponent.Has("isFriendly") && positionedComponent["isFriendly"]
 
@@ -881,13 +881,13 @@ class RadarOverlay
                 isNpc    := isNpcPath || isCharacter || (isFriendly && !isMonster)
                 isEnemy  := !isFriendly && !isChest && !isAreaTransition && !isWaypoint && !isCheckpoint
 
-                ; Rarity aus Mods/ObjectMagicProperties (0=Normal,1=Magic,2=Rare,3=Unique/Boss)
+                ; Rarity from Mods/ObjectMagicProperties (0=Normal,1=Magic,2=Rare,3=Unique/Boss)
                 rarityId := decodedComponents.Has("rarityId") ? decodedComponents["rarityId"] : 0
-                isEnemyBoss   := isEnemy && (rarityId = 3)           ; Unique — Bosse
+                isEnemyBoss   := isEnemy && (rarityId = 3)           ; Unique — bosses
                 isEnemyRare   := isEnemy && (rarityId = 2)           ; Rare
                 isEnemyNormal := isEnemy && !isEnemyBoss && !isEnemyRare
 
-                ; Entity-Gruppen-Filter anwenden
+                ; Apply entity-group filters
                 if (isChest && !this.ShowChests) {
                     statFiltered += 1
                     continue
@@ -913,7 +913,7 @@ class RadarOverlay
                     continue
                 }
 
-                ; Dot-Farbe nach Entity-Typ
+                ; Dot color by entity type
                 dotColor := isAreaTransition ? RadarOverlay.COLOR_AREATRANSITION
                           : isWaypoint       ? RadarOverlay.COLOR_WAYPOINT
                           : isCheckpoint     ? RadarOverlay.COLOR_CHECKPOINT
@@ -948,7 +948,7 @@ class RadarOverlay
             playerGY  := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
 
             ; Use cached A* path segments if available for this entity, else straight line.
-            ; Polyline: baut POINT-Buffer einmalig → 1 Syscall statt 4×n Syscalls.
+            ; Polyline: builds the POINT buffer once → 1 syscall instead of 4×n syscalls.
             pathCoords := this._pathGridCoords
             if (pathCoords.Length >= 2 && this._pathHlEntity = this.highlightedEntityPath)
             {
@@ -1016,7 +1016,7 @@ class RadarOverlay
         }
 
         ; ── Navigation path: A* path to nearest AreaTransition ──
-        ; Polyline: 1 Syscall für den gesamten Pfad statt 4×n Syscalls.
+        ; Polyline: 1 syscall for the entire path instead of 4×n syscalls.
         navCoords := this._navPathCoords
         if (this._navEnabled && navCoords.Length >= 2)
         {
@@ -1125,7 +1125,7 @@ class RadarOverlay
         return flags
     }
 
-    ; ── GDI Zeichen-Helfer ───────────────────────────────────────────────────────────────
+    ; ── GDI drawing helpers ──────────────────────────────────────────────────────────────
 
     ; Returns a cached HPEN for (colorBGR, width). Creates on first use, never deleted until __Delete.
     _GetPen(colorBGR, width := 1)
@@ -1144,9 +1144,9 @@ class RadarOverlay
         return this._brushCache[colorBGR]
     }
 
-    ; ── Batch-Collector-Methoden ─────────────────────────────────────────────────────────
-    ; Diese Methoden zeichnen NICHT sofort — sie sammeln Draw-Operationen im RAM.
-    ; _FlushBatch() führt alle gesammelten Ops in einem Batch aus (einmal pro Frame).
+    ; ── Batch collector methods ──────────────────────────────────────────────────────────
+    ; These methods do NOT draw immediately — they collect draw operations in RAM.
+    ; _FlushBatch() executes all collected ops in one batch (once per frame).
 
     ; Queues a filled circle into the normal dot batch (drawn before the highlight dot).
     _DrawDot(centerX, centerY, colorBGR, radius := 3)
@@ -1182,26 +1182,26 @@ class RadarOverlay
         this._textBatch.Push([screenX, screenY, text, colorBGR])
     }
 
-    ; ── Batch-Flush ──────────────────────────────────────────────────────────────────────
+    ; ── Batch flush ──────────────────────────────────────────────────────────────────────
     ; Renders all queued draw operations in one pass — called once per frame before _Blit().
     ;
-    ; Flush-Reihenfolge (korrekte Layering):
-    ;   1. Linien      — liegen unter Dots
-    ;   2. Normale Dots (entity-Dots, Player-Dot, Zone-Scan-Dots)
-    ;   3. Top-Dot     — Highlight-Entity immer on top
-    ;   4. Text        — Labels immer ganz oben
+    ; Flush order (correct layering):
+    ;   1. Lines       — sit below the dots
+    ;   2. Normal dots (entity dots, player dot, zone-scan dots)
+    ;   3. Top dot     — highlighted entity always on top
+    ;   4. Text        — labels always at the very top
     ;
-    ; Dot-Batch-Technik: BeginPath → n×Ellipse → EndPath → StrokeAndFillPath
+    ; Dot-batch technique: BeginPath → n×Ellipse → EndPath → StrokeAndFillPath
     ;   → 2 SelectObject + 1 BeginPath + n×Ellipse + 1 EndPath + 1 StrokeAndFillPath
-    ;   statt 5 DllCalls × n pro Farb-Gruppe.
+    ;   instead of 5 DllCalls × n per color group.
     ;
-    ; Linien-Technik: PolyPolyline mit n×2-Punkt-Segmenten
-    ;   → 1 SelectObject + 1 PolyPolyline statt 4 DllCalls × n.
+    ; Line technique: PolyPolyline with n×2-point segments
+    ;   → 1 SelectObject + 1 PolyPolyline instead of 4 DllCalls × n.
     _FlushBatch()
     {
         dc := this.memoryDC
 
-        ; ── 1. Linien ────────────────────────────────────────────────────────────────────
+        ; ── 1. Lines ─────────────────────────────────────────────────────────────────────
         for key, segs in this._lineBatch
         {
             n := segs.Length
@@ -1212,9 +1212,9 @@ class RadarOverlay
             pen    := this._GetPen(color, width)
             oldPen := DllCall("SelectObject", "Ptr", dc, "Ptr", pen, "Ptr")
 
-            ; PolyPolyline: alle Segmente als 2-Punkt-Polylines in einem Syscall
-            pts    := Buffer(n * 16, 0)    ; n Segmente × 2 POINTs × 8 Byte
-            counts := Buffer(n * 4,  0)    ; n DWORD-Counts à 2
+            ; PolyPolyline: all segments as 2-point polylines in one syscall
+            pts    := Buffer(n * 16, 0)    ; n segments × 2 POINTs × 8 bytes
+            counts := Buffer(n * 4,  0)    ; n DWORD counts of 2 each
             i := 0
             for seg in segs
             {
@@ -1230,14 +1230,14 @@ class RadarOverlay
         }
         this._lineBatch.Clear()
 
-        ; ── 2. + 3. Dots (normal, dann top) ─────────────────────────────────────────────
+        ; ── 2. + 3. Dots (normal, then top) ──────────────────────────────────────────────
         this._FlushDotLayer(this._dotBatch)
         this._dotBatch.Clear()
         this._FlushDotLayer(this._dotTopBatch)
         this._dotTopBatch.Clear()
 
         ; ── 4. Text ──────────────────────────────────────────────────────────────────────
-        ; SetBkMode einmal pro Frame — alle TextOut-Calls profitieren davon
+        ; SetBkMode once per frame — all TextOut calls benefit from it
         DllCall("SetBkMode", "Ptr", dc, "Int", 1)   ; TRANSPARENT
         for t in this._textBatch
         {
@@ -1273,7 +1273,7 @@ class RadarOverlay
     }
 
     ; Draws a hollow rectangle outline on the back-buffer; uses NULL_BRUSH to avoid filling the interior.
-    ; Not batched — called at most once per frame (UI-Browser highlight).
+    ; Not batched — called at most once per frame (UI Browser highlight).
     _DrawRect(screenX, screenY, width, height, colorBGR, penWidth := 1)
     {
         pen       := this._GetPen(colorBGR, penWidth)
@@ -1512,7 +1512,7 @@ class RadarOverlay
         DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
     }
 
-    ; ── Interne Buffer-Verwaltung ────────────────────────────────────────────────────────
+    ; ── Internal buffer management ───────────────────────────────────────────────────────
 
     ; Creates (or re-creates) the compatible memory DC and DIB bitmap used for off-screen rendering.
     _InitBuffers(width, height)

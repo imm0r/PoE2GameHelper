@@ -789,13 +789,13 @@ SendFlaskKeyToGame(sendKey, gameHwnd)
     if (!vk)
         return false
 
-    ; KeyDown sofort
+    ; KeyDown immediately
     DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0, "uptr", 0)
 
-    ; KeyUp nach 20ms — nicht-blockierend über SetTimer
-    ; Closure capturt vk als Kopie (AHK v2: Variablen in Closures sind by-value captures)
+    ; KeyUp after 20ms — non-blocking via SetTimer
+    ; Closure captures vk as a copy (AHK v2: variables in closures are by-value captures)
     keyUpFn := () => DllCall("keybd_event", "uchar", vk, "uchar", 0, "uint", 0x0002, "uptr", 0)
-    SetTimer(keyUpFn, -KEY_UP_DELAY_MS)   ; negativ = einmaliger Fire
+    SetTimer(keyUpFn, -KEY_UP_DELAY_MS)   ; negative = one-shot fire
 
     return true
 }
@@ -827,7 +827,7 @@ SendChatSlashCommand(cmd)
 
     if isChatActive
     {
-        ; Chat schon offen: Ctrl+A + End, dann 30ms warten, dann Command senden
+        ; Chat already open: Ctrl+A + End, wait 30ms, then send the command
         ControlSend("^a", , gameWin)
         ControlSend("{End}", , gameWin)
         sendFn := () => ControlSend(cmd "{Enter}", , gameWin)
@@ -835,7 +835,7 @@ SendChatSlashCommand(cmd)
     }
     else
     {
-        ; Chat öffnen, 100ms warten, dann Command senden
+        ; Open chat, wait 100ms, then send the command
         ControlSend("{Enter}", , gameWin)
         sendFn := () => ControlSend(cmd "{Enter}", , gameWin)
         SetTimer(sendFn, -100)

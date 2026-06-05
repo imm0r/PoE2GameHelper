@@ -1063,7 +1063,7 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             }
             else if !out.Has("rarityId") && this.ComponentNameMatches(compName, "Mods")
             {
-                ; Nur den Rarity-Int lesen — kein vollständiger Mods-Decode (zu teuer für 100ms-Tick)
+                ; Read only the rarity int — no full Mods decode (too expensive for the 100ms tick)
                 rarityId := this.Mem.ReadInt(compAddr + PoE2Offsets.Mods["Rarity"])
                 if (rarityId >= 0 && rarityId <= 5)
                     out["rarityId"] := rarityId

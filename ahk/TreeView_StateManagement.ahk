@@ -170,7 +170,7 @@ TV_GetItemState(hwnd, itemId, mask)
 }
 
 
-; --- Panel-Steuerung ---
+; --- Panel control ---
 
 ; Toggles the tree pane visibility, updates the overlay layout, and triggers a refresh.
 ToggleTreePaneVisibility()
@@ -243,7 +243,7 @@ SyncNpcWatchEntries(snapshot, npcLookup)
     if !g_npcWatchAutoSync
         return
 
-    ; Entferne verwaiste @npc:-Eintraege (tot, Gebietswechsel, ausser Range)
+    ; Remove orphaned @npc: entries (dead, area change, out of range)
     i := 1
     while (i <= g_pinnedNodePaths.Length)
     {
@@ -267,7 +267,7 @@ SyncNpcWatchEntries(snapshot, npcLookup)
     for _, staleKey in staleIgnored
         g_npcWatchIgnoredKeys.Delete(staleKey)
 
-    ; Fuege neue NPCs innerhalb der Range hinzu
+    ; Add new NPCs within range
     for key, _ in npcLookup
     {
         if g_npcWatchIgnoredKeys.Has(key)

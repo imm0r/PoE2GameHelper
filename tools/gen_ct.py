@@ -12,9 +12,9 @@ BUTTONS = [
     (13, "[Toggle] Live Refresh (2s)",
          "_liveTimer=createTimer(nil,false)\n_liveTimer.Interval=2000\n"
          "_liveTimer.OnTimer=function() poe2_refresh() end\n_liveTimer.Enabled=true\n"
-         'print("[PoE2] Live-Refresh aktiv")',
+         'print("[PoE2] Live refresh active")',
          'if _liveTimer then _liveTimer.Enabled=false _liveTimer.destroy() '
-         '_liveTimer=nil print("[PoE2] Live-Refresh gestoppt") end'),
+         '_liveTimer=nil print("[PoE2] Live refresh stopped") end'),
 ]
 
 def btn_xml(btn):
@@ -36,7 +36,7 @@ ct = f"""<?xml version="1.0" encoding="utf-8"?>
     <CheatEntry><ID>1</ID><Description>"=== PoE2 Inspector ==="</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries>
       <CheatEntry><ID>2</ID><Description>"[INFO] Lua Engine -&gt; View -&gt; Output"</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries/></CheatEntry>
 {btn_xml_all}
-      <CheatEntry><ID>20</ID><Description>"--- Dynamische Adressen ---"</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries/></CheatEntry>
+      <CheatEntry><ID>20</ID><Description>"--- Dynamic addresses ---"</Description><GroupHeader>1</GroupHeader><Options moHideChildren="0"/><Entries/></CheatEntry>
     </Entries></CheatEntry>
   </CheatEntries>
   <LuaScript><![CDATA[

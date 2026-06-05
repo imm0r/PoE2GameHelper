@@ -73,7 +73,7 @@ print(f'Remaining bytes: {len(idx_data) - pos:,}')
 for fe in files[:3]:
     print(f'  hash={fe["hash"]:016x} bundle={fe["bundle_idx"]} offset={fe["file_offset"]} size={fe["file_size"]}')
 
-# --- Suche Stats.dat64 im Pfad-Abschnitt ---
+# --- Search for Stats.dat64 in the path section ---
 path_section = idx_data[pos:]
 needle = b'Stats.dat64'
 found_at = path_section.find(needle)
@@ -84,6 +84,6 @@ if found_at >= 0:
     print(f'  context: {txt}')
     print(f'  hex:     {ctx.hex()}')
 
-# Ersten 200 Bytes des Pfad-Abschnitts
+# First 200 bytes of the path section
 print(f'\nFirst 200 bytes of path section (hex): {path_section[:200].hex()}')
 print(f'First 200 bytes (text): {bytes([c if 32<=c<127 else 46 for c in path_section[:200]])}')

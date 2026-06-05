@@ -2714,9 +2714,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
         t2 := A_TickCount  ; after player read
 
-        ; ── UI pointer resolution (einmalig pro Tick) ──────────────────────────────
-        ; uiRootStructPtr und activeGameUiPtr werden EINMAL gelesen und von beiden
-        ; Cache-Blöcken (UI-Cache 400ms + Panel-Visibility 200ms) geteilt.
+        ; ── UI pointer resolution (once per tick) ──────────────────────────────────
+        ; uiRootStructPtr and activeGameUiPtr are read ONCE and shared by both
+        ; cache blocks (UI cache 400ms + panel visibility 200ms).
         uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
         activeGameUiPtr := 0
         isControllerMode := false
@@ -2790,7 +2790,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                                 this._panelCleanSince := 0
                         }
                     }
-                    ; Discovery für Struct Diff Diagnostic (läuft nur einmalig)
+                    ; Discovery for the Struct Diff diagnostic (runs only once)
                     if (!this._radarPanelDiscoveryDone)
                     {
                         this._radarPanelDiscoveryResult := this.DiscoverPanelOffsets(activeGameUiPtr)
