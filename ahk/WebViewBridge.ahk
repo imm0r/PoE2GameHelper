@@ -78,7 +78,7 @@ PushHeaderToWebView()
         . '"afReason":' _JsStr(g_autoFlaskLastReason) ","
         . '"afSlot1Key":' _JsStr(slot1Key) ","
         . '"afSlot2Key":' _JsStr(slot2Key) ","
-        . '"ghVersion":' _JsStr(POEFORMANCE_VERSION) ","
+        . '"appVersion":' _JsStr(POEFORMANCE_VERSION) ","
         . '"gameVersion":' _JsStr(gameVer) ","
         . '"radarEnabled":' (g_radarEnabled ? "true" : "false") ","
         . '"playerHud":' (g_playerHudEnabled ? "true" : "false") ","

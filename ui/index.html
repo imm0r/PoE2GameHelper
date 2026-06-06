@@ -335,10 +335,6 @@
     #logo-cell { cursor: pointer; }
 
     .logo-poe { color: var(--codex-text) }
-    .logo-gh  {
-      color: var(--codex-gold-hi);
-      text-shadow: 0 0 6px rgba(240,214,138,0.4), 0 1px 0 rgba(0,0,0,0.6)
-    }
 
     /* ─── STATUS PILLS — codex cartouches ──────────────────────────────
        Each pill is an inscribed brass tag rather than a rounded chip:
@@ -3823,7 +3819,7 @@
           <div class="logo-pop-name"><span class="logo-poe">PoEformance</span></div>
           <div class="logo-pop-vers">
             <span>Game <span id="ver-game">v—</span></span>
-            <span>App <span id="ver-gh">v—</span></span>
+            <span>App <span id="ver-app">v—</span></span>
           </div>
           <div class="logo-pop-hint">Click to visit</div>
         </div>
@@ -7031,9 +7027,9 @@
       if (d.alerts !== undefined) applyAlertsFromHeader(d.alerts);
 
       // Version tags
-      const verGh = document.getElementById('ver-gh');
+      const verApp = document.getElementById('ver-app');
       const verGame = document.getElementById('ver-game');
-      if (verGh && d.ghVersion) verGh.textContent = 'v' + d.ghVersion;
+      if (verApp && d.appVersion) verApp.textContent = 'v' + d.appVersion;
       if (verGame && d.gameVersion) verGame.textContent = 'v' + d.gameVersion;
 
       // Pills
