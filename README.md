@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/PoEformance.png" width="640" alt="PoE2 GameHelper">
+<img src="assets/PoEformance.png" width="640" alt="PoEformance">
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
@@ -15,7 +15,7 @@
 ---
 
 <div align="center">
-  <img src="assets/inventory.png" width="900" alt="PoE2 GameHelper — Arcane Codex UI">
+  <img src="assets/inventory.png" width="900" alt="PoEformance — Arcane Codex UI">
   <p><em>Inventory tab — the "Arcane Codex" theme: vellum pages, illuminated chapter headings, sigil-card items with rarity ink-bleed glows.</em></p>
 </div>
 
@@ -285,8 +285,8 @@ Two compact-mode tiers kick in as the window narrows: pills shrink at ≤ 1300 p
 
 ```bash
 # Clone (with the LibGGPK3 submodule that ggpk-tools depends on)
-git clone --recurse-submodules https://github.com/imm0r/PoE2GameHelper.git
-cd PoE2GameHelper
+git clone --recurse-submodules https://github.com/imm0r/PoEformance.git
+cd PoEformance
 
 # Run (path may vary; AHK v2 install location)
 "C:\Program Files\AutoHotkey\v2\AutoHotkey.exe" InGameStateMonitor.ahk

@@ -1,6 +1,6 @@
 ; PoE2AtlasReader.ahk
 ; Reverse-engineering scaffold for porting the C# "Atlas" GameHelper plugin
-; (github.com/danthespal/Atlas) to PoE2GameHelper.
+; (github.com/danthespal/Atlas) to PoEformance.
 ;
 ; The offsets in g_atlasOff are taken verbatim from the reference plugin's
 ; GameStructures.cs and are HYPOTHESES for our PoE2 build. AtlasDumpDebug()

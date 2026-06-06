@@ -30,7 +30,7 @@ global g_alertSoundFile         := ""
 global g_alertBannerMs          := 2500
 global g_alertHighlight         := false     ; set g_highlightedEntityPath to the trigger
 global g_alertFlash             := false     ; flash the tool window in the taskbar
-global g_alertLog               := false     ; append to logs\gamehelper_alerts.log
+global g_alertLog               := false     ; append to logs\poeformance_alerts.log
 
 ; INI file owned by this module (self-persist pattern, like LootPickup).
 global g_alertsConfigFile := A_ScriptDir "\alerts.ini"
@@ -283,7 +283,7 @@ _AlertFlashWindow(hwnd)
     try DllCall("FlashWindowEx", "Ptr", fi)
 }
 
-; Appends a timestamped alert line to logs\gamehelper_alerts.log (created on demand).
+; Appends a timestamped alert line to logs\poeformance_alerts.log (created on demand).
 _AlertLogLine(text, path)
 {
     try
@@ -291,7 +291,7 @@ _AlertLogLine(text, path)
         dir := A_ScriptDir "\logs"
         if !DirExist(dir)
             DirCreate(dir)
-        FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") " | " text " | " path "`n", dir "\gamehelper_alerts.log", "UTF-8")
+        FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") " | " text " | " path "`n", dir "\poeformance_alerts.log", "UTF-8")
     }
 }
 

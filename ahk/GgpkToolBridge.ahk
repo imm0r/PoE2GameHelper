@@ -4,7 +4,7 @@
 ; ggpk-tools/). All comms go via process args + filesystem — the AHK
 ; host never links any binary from ggpk-tools/, which keeps the AGPL
 ; scope contained inside that directory and lets the rest of the
-; PoE2GameHelper stay MIT.
+; PoEformance stay MIT.
 ;
 ; Workflow:
 ;   - Locate the running PoE2 process to derive its install path

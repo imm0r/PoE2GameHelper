@@ -30,7 +30,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/UiBrowserHandler.ahk
 
 /*
-The project and all the files I develop in are located locally at "E:\PoE2GameHelper\"
+The project and all the files I develop in are located locally at "E:\PoEformance\"
 For maximum readability, keep all .ahk files as small as possible. If you notice that you have developed a substantial amount of new code for a particular area, move it into a new .ahk file and include it via #include.
 Break large tasks into smaller steps and ask clarifying questions when needed.
 In your feedback, explain your reasoning and point out problems and opportunities.
@@ -41,7 +41,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-GAMEHELPER_VERSION := "0.4.12.2"
+POEFORMANCE_VERSION := "0.4.12.2"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -73,6 +73,14 @@ if A_IsCompiled
 
 ; Tray icon
 try TraySetIcon(A_ScriptDir "\ui\tray.ico")
+
+; ── One-time settings migration (PoE2GameHelper → PoEformance rebrand) ──
+; The settings file was renamed gamehelper_config.ini → poeformance_config.ini.
+; Carry an existing file over so users keep their settings after updating.
+_oldCfg := A_ScriptDir "\gamehelper_config.ini"
+_newCfg := A_ScriptDir "\poeformance_config.ini"
+if (FileExist(_oldCfg) && !FileExist(_newCfg))
+    try FileMove(_oldCfg, _newCfg, false)
 
 g_reader := PoE2GameStateReader()
 ; Connection state — flipped by EnsureConnected(). When false, the
@@ -328,7 +336,7 @@ HotkeysRegisterAll()
 SetTimer(HotkeysEvaluateTick, g_hkEvalInterval)
 
 ; ── WebViewGui ────────────────────────────────────────────────────────────────
-g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoE2 GameHelper", , { DefaultWidth: g_winW, DefaultHeight: g_winH })
+g_webGui := WebViewGui("+AlwaysOnTop +Resize -Caption +Border", "PoEformance", , { DefaultWidth: g_winW, DefaultHeight: g_winH })
 
 ; Override WebViewToo's compiled-mode behaviour.
 ; The library auto-calls BrowseExe() when A_IsCompiled is true, which sets
@@ -529,12 +537,12 @@ EnsureConnected()
 UpdateStatusBar()
 {
     global g_radarReadMs, g_radarRenderMs, g_radarFps, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs, g_reader
-    global GAMEHELPER_VERSION
+    global POEFORMANCE_VERSION
 
     patch := GetLastKnownPoeVersion()
     now := FormatTime(A_Now, "HH:mm:ss")
 
-    leftText := "GameHelper v" GAMEHELPER_VERSION " for PoE2 v" (patch != "" ? patch : "—")
+    leftText := "PoEformance v" POEFORMANCE_VERSION " for PoE2 v" (patch != "" ? patch : "—")
     rightText := "Last Updated: " now
 
     ; Performance details for the FPS pill: total iteration ms + radar fps

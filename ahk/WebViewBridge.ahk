@@ -41,7 +41,7 @@ PushHeaderToWebView()
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_autoFlaskLastReason, g_flaskKeyBySlot, g_reader, g_radarEnabled, g_webGui
     global g_playerHudEnabled
-    global GAMEHELPER_VERSION
+    global POEFORMANCE_VERSION
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_zoneNavEnabled
@@ -78,7 +78,7 @@ PushHeaderToWebView()
         . '"afReason":' _JsStr(g_autoFlaskLastReason) ","
         . '"afSlot1Key":' _JsStr(slot1Key) ","
         . '"afSlot2Key":' _JsStr(slot2Key) ","
-        . '"ghVersion":' _JsStr(GAMEHELPER_VERSION) ","
+        . '"ghVersion":' _JsStr(POEFORMANCE_VERSION) ","
         . '"gameVersion":' _JsStr(gameVer) ","
         . '"radarEnabled":' (g_radarEnabled ? "true" : "false") ","
         . '"playerHud":' (g_playerHudEnabled ? "true" : "false") ","

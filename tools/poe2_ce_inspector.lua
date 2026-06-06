@@ -768,7 +768,7 @@ end
 -- Banner + immediate start if already attached
 -- ─────────────────────────────────────────────────────────────────────────────
 print("==========================================================")
-print("  PoE2 Memory Inspector  (GameHelper CE bridge)")
+print("  PoE2 Memory Inspector  (PoEformance CE bridge)")
 print("----------------------------------------------------------")
 print("  poe2_scan()                scan byte patterns")
 print("  poe2_refresh()             chain + address list")

@@ -13,14 +13,14 @@ Only the **latest release** receives security fixes. Older builds are not back-p
 
 **Please do not open a public GitHub issue for security reports.** Use one of the private channels below so we can ship a fix before details are widely known.
 
-- **Preferred:** GitHub's [private vulnerability reporting](https://github.com/imm0r/PoE2GameHelper/security/advisories/new) form (Security tab → "Report a vulnerability"). End-to-end on GitHub, no email round-trip.
+- **Preferred:** GitHub's [private vulnerability reporting](https://github.com/imm0r/PoEformance/security/advisories/new) form (Security tab → "Report a vulnerability"). End-to-end on GitHub, no email round-trip.
 - **Email fallback:** `gdthsupp0rt@gmail.com` with `[security]` in the subject line.
 
 A report is more actionable when it includes:
 
 - **What the vulnerability is** in one or two sentences (the impact, not just the symptom).
 - **A minimal reproduction** — input file, config snippet, exact steps. The smaller the repro, the faster the fix.
-- **Affected version** (in-app header shows the GameHelper version, e.g. `v4.4.0.14`) and **game patch version** if relevant.
+- **Affected version** (in-app header shows the PoEformance version, e.g. `v4.4.0.14`) and **game patch version** if relevant.
 - **What you've already tried**, if anything.
 - A **suggested fix** if one is obvious to you (very welcome but not required).
 

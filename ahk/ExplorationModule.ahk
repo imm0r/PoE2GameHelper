@@ -1088,7 +1088,7 @@ LoadExplorationConfig()
 {
     global g_exploreEnabled, g_exploreTargetPercent
 
-    iniFile := A_ScriptDir "\gamehelper_config.ini"
+    iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "Exploration"
 
     g_exploreEnabled       := IniRead(iniFile, section, "Enabled", "0") = "1"
@@ -1100,7 +1100,7 @@ SaveExplorationConfig()
 {
     global g_exploreEnabled, g_exploreTargetPercent
 
-    iniFile := A_ScriptDir "\gamehelper_config.ini"
+    iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "Exploration"
 
     IniWrite(g_exploreEnabled ? "1" : "0", iniFile, section, "Enabled")

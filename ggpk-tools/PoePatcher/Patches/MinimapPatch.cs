@@ -76,7 +76,7 @@ internal sealed class MinimapPatch : IPatch
             index, backups,
             "shaders/minimap_visibility_pixel.hlsl",
             "float ratio = saturate((1.0f - dist / visibility_radius) * 2.0f);",
-            "float ratio = 1.0f; // PoE2GameHelper: forced-reveal");
+            "float ratio = 1.0f; // PoEformance: forced-reveal");
 
         // 2) Blending shader — color swaps only. We deliberately do NOT
         //    force `visibility = 1.0f` here even though it looks like
@@ -110,10 +110,10 @@ internal sealed class MinimapPatch : IPatch
 
         text = ReplaceOnce(text, blendPath,
             OutlineMarker,
-            FormatColor(OutlineColor) + " /* PoE2GameHelper: outline */");
+            FormatColor(OutlineColor) + " /* PoEformance: outline */");
         text = ReplaceOnce(text, blendPath,
             BackgroundMarker,
-            FormatColor(BackgroundColor) + " /* PoE2GameHelper: background */");
+            FormatColor(BackgroundColor) + " /* PoEformance: background */");
 
         blendFile.Record.Write(Encoding.UTF8.GetBytes(text));
     }

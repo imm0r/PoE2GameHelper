@@ -926,7 +926,7 @@ LoadLootPickupConfig()
     global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
     global g_lootRarityUnique, g_lootRarityCurrency
 
-    iniFile := A_ScriptDir "\gamehelper_config.ini"
+    iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "LootPickup"
 
     ; Sensible defaults: all enabled except Normal (Normal items are usually
@@ -943,7 +943,7 @@ SaveLootPickupConfig()
     global g_lootRarityNormal, g_lootRarityMagic, g_lootRarityRare
     global g_lootRarityUnique, g_lootRarityCurrency
 
-    iniFile := A_ScriptDir "\gamehelper_config.ini"
+    iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "LootPickup"
 
     IniWrite(g_lootRarityNormal   ? "1" : "0", iniFile, section, "Normal")
