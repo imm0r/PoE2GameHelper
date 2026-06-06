@@ -223,7 +223,10 @@
        than the three rows of pills + cat-bar + sub-tabs combined. */
     #topbar-logo {
       position: relative;
-      width: 110px;
+      /* No fixed width: the rail stretches to the full topbar height (down to
+         the sub-tab bar) and derives its width from the logo's aspect ratio,
+         so the wordmark scales with the header instead of leaving empty bands. */
+      aspect-ratio: 1215 / 746;
       flex-shrink: 0;
       border-right: 1px solid rgba(90,62,34,0.5);
       /* Bottom rule matches the codex border closing the cat-bar /
@@ -253,11 +256,9 @@
        with the bottom of the sub-tab bar (last row of the stack). */
     #logo-cell {
       position: absolute;
-      /* Tight inset so the artwork fills the rail — the original 6/12 px
-         padding left visible empty bands above and below. Right side
-         needs a little more breathing room because of the gold-rule
-         divider sitting on the rail's right edge. */
-      inset: 2px 8px 2px 4px;
+      /* Fill the rail completely; the rail's aspect-ratio already matches the
+         trimmed logo, so the artwork fills both height and width with no bands. */
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
