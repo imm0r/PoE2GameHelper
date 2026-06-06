@@ -358,7 +358,7 @@ _DispatchBridgeCall(method, args)
         case "ToggleTreePane":
             SetTimer(ToggleTreePaneVisibility, -1)
         case "StartGame":
-            try Run("steam://rungameid/2694490")
+            SetTimer(LaunchPoE2, -1)
         case "OpenUrl":
             ; Open an http(s) URL in the user's default browser via the
             ; shell. Whitelisted scheme so a malformed call can't shell
@@ -699,6 +699,41 @@ GgpkInstallPathUi_Save(rawPath)
         . ',"msg":' _BridgeJsonEscape(result["msg"]) '}'
     try WebViewExec("updateGgpkMaphackStatus(" _JsStr(json) ")")
     SetTimer(PushHeaderToWebView, -50)
+}
+
+; Launches the installed PoE2 client, picking the method from the detected
+; install (GgpkTools lastIndexPath). A Steam install (path under \steamapps\)
+; goes through the Steam protocol so Steam handles updates/overlay; a standalone
+; install runs its client exe directly from the game folder. Falls back to the
+; Steam protocol when nothing is detected. No parameters; no return value.
+LaunchPoE2()
+{
+    idx := ""
+    try idx := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+    if (idx = "" || !FileExist(idx))
+    {
+        ; Cache miss — let the GGPK bridge derive it from Steam's bookkeeping.
+        try {
+            if GgpkToolBridge.HasCachedIndexPath()
+                idx := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+        }
+    }
+    if (idx != "" && !InStr(idx, "\steamapps\"))
+    {
+        ; Standalone (non-Steam) install — run the client exe from the game folder.
+        installDir := RegExReplace(idx, "i)\\(Bundles2\\_\.index\.bin|Content\.ggpk)$", "")
+        for _, exe in ["PathOfExile.exe", "PathOfExile_x64.exe", "PathOfExileSteam.exe", "PathOfExile_x64Steam.exe"]
+        {
+            full := installDir "\" exe
+            if FileExist(full)
+            {
+                try Run('"' full '"', installDir)
+                return
+            }
+        }
+    }
+    ; Steam install or undetected — let Steam launch PoE2 (app id 2694490).
+    try Run("steam://rungameid/2694490")
 }
 
 ; UI-side wrappers for the GGPK maphack patch/revert. Both shell out

@@ -7135,9 +7135,10 @@
       const btnSnap = document.getElementById('btn-snap-or-start');
       if (btnSnap) {
         const running = d.poeRunning === true || d.poeRunning === 'true';
+        const gv = (d.gameVersion && d.gameVersion !== '') ? ' v' + d.gameVersion : '';
         btnSnap.dataset.mode = running ? 'snap' : 'start';
         btnSnap.textContent  = running ? '↺ Snap' : '▶ PoE2';
-        btnSnap.setAttribute('data-tip', running ? 'Refresh tree from live game' : 'Launch PoE2 via Steam');
+        btnSnap.setAttribute('data-tip', running ? 'Refresh tree from live game' : ('Launch PoE2' + gv));
       }
 
       // Watchlist badge
