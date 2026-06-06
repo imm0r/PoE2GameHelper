@@ -703,9 +703,13 @@ GgpkInstallPathUi_Save(rawPath)
 
 ; Launches the installed PoE2 client, picking the method from the detected
 ; install (GgpkTools lastIndexPath). A Steam install (path under \steamapps\)
-; goes through the Steam protocol so Steam handles updates/overlay; a standalone
-; install runs its client exe directly from the game folder. Falls back to the
-; Steam protocol when nothing is detected. No parameters; no return value.
+; goes through the Steam protocol so Steam handles updates/overlay; any other
+; install (standalone / Epic / Garena-TW) runs its detected client exe directly
+; from the game folder, which is distribution-agnostic. Falls back to the Steam
+; protocol when nothing is detected. No parameters; no return value.
+; NOTE: auto-detection of the path is Steam-only (it parses Steam's bookkeeping);
+; for non-Steam clients the path is known only once it has been cached from a
+; running game or set manually in the GGPK tab.
 LaunchPoE2()
 {
     idx := ""
@@ -720,7 +724,7 @@ LaunchPoE2()
     }
     if (idx != "" && !InStr(idx, "\steamapps\"))
     {
-        ; Standalone (non-Steam) install — run the client exe from the game folder.
+        ; Non-Steam install (standalone / Epic / TW) — run the detected client exe.
         installDir := RegExReplace(idx, "i)\\(Bundles2\\_\.index\.bin|Content\.ggpk)$", "")
         for _, exe in ["PathOfExile.exe", "PathOfExile_x64.exe", "PathOfExileSteam.exe", "PathOfExile_x64Steam.exe"]
         {
