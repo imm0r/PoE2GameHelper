@@ -26,6 +26,8 @@ logs/
 offset_history.json
 # legacy — PatchChecker now stores this in the config INI
 last_known_patch.txt
+poeformance_config.ini
+# legacy name (pre-PoEformance rebrand; auto-migrated on startup)
 gamehelper_config.ini
 # EntityAlerts self-persist (user-specific)
 alerts.ini

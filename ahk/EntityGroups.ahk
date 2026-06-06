@@ -2,7 +2,7 @@
 ; User-defined, path-based entity grouping. Each group has a name, comma-separated match
 ; terms (matched against the entity path and its metaGroup), a color and an enabled flag.
 ; The web entity table, the radar coloring and the alert engine consume the resolved group.
-; Managed from the Groups tab in the web UI; self-persisting to gamehelper_config.ini [Groups]
+; Managed from the Groups tab in the web UI; self-persisting to poeformance_config.ini [Groups]
 ; (same pattern as LootPickup). Depends on ExtractMetaGroup (EntityFacts.ahk) and _JsStr
 ; (WebViewBridge.ahk). Included via TreeViewWatchlistPanel.ahk.
 
@@ -117,7 +117,7 @@ SaveEntityGroups()
             s .= RS
         s .= g["name"] FS g["terms"] FS g["color"] FS (g["enabled"] ? "1" : "0")
     }
-    IniWrite((s = "" ? " " : s), A_ScriptDir "\gamehelper_config.ini", "Groups", "list")
+    IniWrite((s = "" ? " " : s), A_ScriptDir "\poeformance_config.ini", "Groups", "list")
 }
 
 ; Loads the group list from the INI back into g_entityGroups (inverse of SaveEntityGroups).
@@ -126,7 +126,7 @@ LoadEntityGroups()
     global g_entityGroups
     g_entityGroups := []
     FS := Chr(31), RS := Chr(30)
-    raw := IniRead(A_ScriptDir "\gamehelper_config.ini", "Groups", "list", "")
+    raw := IniRead(A_ScriptDir "\poeformance_config.ini", "Groups", "list", "")
     if (raw = "" || raw = " ")
         return
 

@@ -876,7 +876,7 @@ LoadCombatAutoConfig()
     global g_combatGlobalCooldownMs, g_combatSkillSlots, g_combatToggleHotkey
     global g_combatW2SScale
 
-    cfgPath := A_ScriptDir "\gamehelper_config.ini"
+    cfgPath := A_ScriptDir "\poeformance_config.ini"
 
     g_combatAutoEnabled := false
     g_combatRange := 1500
@@ -937,7 +937,7 @@ SaveCombatAutoConfig()
     global g_combatGlobalCooldownMs, g_combatSkillSlots, g_combatToggleHotkey
     global g_combatW2SScale
 
-    cfgPath := A_ScriptDir "\gamehelper_config.ini"
+    cfgPath := A_ScriptDir "\poeformance_config.ini"
 
     try IniWrite(g_combatAutoEnabled ? "1" : "0", cfgPath, "CombatAutomation", "enabled")
     try IniWrite(String(g_combatRange), cfgPath, "CombatAutomation", "combatRange")

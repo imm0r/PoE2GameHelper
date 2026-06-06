@@ -1,5 +1,5 @@
-# PoE2 GameHelper — Developer Documentation
-<img src="assets/logo2_poE2gamehelper.png">
+# PoEformance — Developer Documentation
+<img src="assets/PoEformance.png" width="520">
 
 ## Architecture Overview
 ### Core Systems
@@ -139,7 +139,7 @@ resolved := Memory.ResolveRIP(address)
 
 | Module        | Version    | PoE2 Compatibility |
 |---------------|------------|--------------------|
-| GameHelper    | v0.4.21.7  | PoE2 v4.2.0.12     |
+| PoEformance   | v0.4.21.7  | PoE2 v4.2.0.12     |
 | AutoFlask     | v0.4.11.2  | PoE2 v4.4.0.12     |
 | RadarOverlay  | v0.4.12f   | PoE2 v4.0.12f      |
 

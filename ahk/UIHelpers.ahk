@@ -186,10 +186,10 @@ SwitchTreeTab(key)
     ForceRefreshActiveTree()
 }
 
-; GameHelperBridge is no longer used — JS→AHK is handled via postMessage / OnWebMessage.
+; PoEformanceBridge is no longer used — JS→AHK is handled via postMessage / OnWebMessage.
 ; Kept as empty stub for any legacy references.
 /*
-class GameHelperBridge
+class PoEformanceBridge
 {
 }
 */

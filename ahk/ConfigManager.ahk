@@ -1,10 +1,10 @@
 ; ConfigManager.ahk
-; Persists all user-configurable settings to/from gamehelper_config.ini.
+; Persists all user-configurable settings to/from poeformance_config.ini.
 ;
 ; Included by InGameStateMonitor.ahk
 
 ; Returns the full path to the configuration INI file.
-_ConfigPath() => A_ScriptDir "\gamehelper_config.ini"
+_ConfigPath() => A_ScriptDir "\poeformance_config.ini"
 
 ; Normalises a stored maphack color hex string into a clean 8-char
 ; RRGGBBAA form. Strips an optional leading '#', upper-cases, and

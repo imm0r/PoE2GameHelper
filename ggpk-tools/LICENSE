@@ -6,7 +6,7 @@
  links against LibGGPK3 (https://github.com/aianlinb/LibGGPK3), which
  is itself AGPL-3.0.
 
- The rest of the PoE2GameHelper project (everything OUTSIDE `ggpk-tools/`)
+ The rest of the PoEformance project (everything OUTSIDE `ggpk-tools/`)
  remains under the MIT License. The two licensing regimes are kept
  separate by a strict file-IO boundary — the AHK host never links
  against any binary built from this directory; it only invokes the
@@ -30,4 +30,4 @@
    * You may not impose further restrictions on recipients beyond
      what AGPL-3.0 allows.
 
- Copyright (C) PoE2GameHelper contributors. See git history for authors.
+ Copyright (C) PoEformance contributors. See git history for authors.

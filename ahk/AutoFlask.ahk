@@ -288,7 +288,7 @@ UpdateRadarFast()
 
         if !WinActive("ahk_id " gameHwnd)
         {
-            ; Keep rendering when our own tool window is focused (user clicks in GameHelper)
+            ; Keep rendering when our own tool window is focused (user clicks in PoEformance)
             ; or when range circles are set (config preview mode).
             ; Any other window in focus → hide.
             global g_webGui

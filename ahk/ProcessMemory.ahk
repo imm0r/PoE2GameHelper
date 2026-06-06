@@ -52,7 +52,7 @@ ResolvePoeExeNameFromCachedInstall()
     ; PatternScanDemo.ahk, GgpkMemoryMonitorApp.ahk) that don't include
     ; ConfigManager.ahk, where _ConfigPath() lives — and a call to an undefined
     ; function is a load-time error in v2. This mirrors _ConfigPath() exactly.
-    configPath := A_ScriptDir "\gamehelper_config.ini"
+    configPath := A_ScriptDir "\poeformance_config.ini"
 
     indexPath := IniRead(configPath, "GgpkTools", "lastIndexPath", "")
     if (!FileExist(indexPath))

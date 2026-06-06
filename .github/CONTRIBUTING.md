@@ -1,4 +1,4 @@
-# Contributing to PoE2 GameHelper
+# Contributing to PoEformance
 
 Thanks for taking the time to look at this. Patches, bug reports, ideas — all welcome. The notes below are the conventions the project has settled into; following them keeps reviews short and the history readable.
 
@@ -10,7 +10,7 @@ A useful bug report includes:
 
 - **What happened** vs. **what you expected** — one sentence each is fine.
 - **Game patch version** the bug shows up on (PoE2's UI footer, e.g. `0.9.1a.2026.33.13`). Memory layouts and shader markers shift between patches, so this is the single most important field.
-- **GameHelper version** (top-left of the in-app header, e.g. `v4.4.0.14`).
+- **PoEformance version** (top-left of the in-app header, e.g. `v4.4.0.14`).
 - **Reproduction steps** — even three lines is enough most of the time.
 - **Logs / screenshots** if they're handy. `InGameStateMonitor.error.log` next to the exe captures most crash details automatically.
 

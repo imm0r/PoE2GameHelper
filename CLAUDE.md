@@ -61,7 +61,7 @@ symptom of getting this wrong is the runtime error *"This global variable has no
 assigned a value."*
 
 ### Persistence (self-persist pattern, like LootPickup)
-Each module owns its INI section: Groups → `gamehelper_config.ini [Groups]`;
+Each module owns its INI section: Groups → `poeformance_config.ini [Groups]`;
 Alerts → `alerts.ini [Alerts]`.
 
 ### AHK ↔ WebView bridge

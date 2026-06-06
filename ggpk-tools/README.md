@@ -1,13 +1,13 @@
 # ggpk-tools — PoE2 game-data extraction & patching
 
 Standalone CLI utilities that read and modify PoE2's `Bundles2/_.index.bin`
-(and `Content.ggpk` on legacy installs). Used by the main PoE2GameHelper
+(and `Content.ggpk` on legacy installs). Used by the main PoEformance
 (AHK) project but deliberately built as **separate executables** invoked
 via shell-out so the AGPL-3.0 license of the underlying LibGGPK3 library
 stays scoped to this directory.
 
 ⚠️  **All code in this directory is AGPL-3.0** — see [LICENSE](LICENSE).
-    The rest of PoE2GameHelper stays MIT.
+    The rest of PoEformance stays MIT.
 
 ## What's here
 
@@ -164,7 +164,7 @@ head-start.
   - `@0x1C`  int32             → InventoryHeight
   - `@0x20`  int64 string-ref → display Name
 
-## Usage from PoE2GameHelper
+## Usage from PoEformance
 
 The AHK host invokes these tools via `Run` / `RunWait`. Communication
 is **file-based only** — args in, files out, exit code for success /

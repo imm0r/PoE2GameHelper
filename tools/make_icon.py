@@ -1,15 +1,15 @@
-"""Generate ui/gamehelper.ico from the GameHelper shield logo PNG."""
+"""Generate ui/poeformance.ico from the PoEformance shield logo PNG."""
 from PIL import Image
 import os
 
-# Source: the GameHelper logo PNG (shield with book, sword, magnifier, potion)
-SRC_PNG = os.path.join(os.path.dirname(__file__), "gamehelper_logo.png")
-OUT_ICO = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "ui", "gamehelper.ico"))
+# Source: the PoEformance logo PNG (shield with book, sword, magnifier, potion)
+SRC_PNG = os.path.join(os.path.dirname(__file__), "poeformance_logo.png")
+OUT_ICO = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "ui", "poeformance.ico"))
 
 def main():
     if not os.path.exists(SRC_PNG):
         print(f"Source PNG not found: {SRC_PNG}")
-        print("Place the GameHelper logo PNG at that path and re-run.")
+        print("Place the PoEformance logo PNG at that path and re-run.")
         return
     img = Image.open(SRC_PNG).convert("RGBA")
     sizes = [256, 128, 64, 48, 32, 24, 16]

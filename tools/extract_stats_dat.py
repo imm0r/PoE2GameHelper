@@ -272,7 +272,7 @@ def ensure_schema(schema_path: str) -> dict:
     if needs_download:
         print(f'Downloading latest schema from GitHub ...')
         try:
-            req = urllib.request.Request(SCHEMA_URL, headers={'User-Agent': 'poe2-gamehelper/1.0'})
+            req = urllib.request.Request(SCHEMA_URL, headers={'User-Agent': 'poeformance/1.0'})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = resp.read()
             with open(schema_path, 'wb') as f:
