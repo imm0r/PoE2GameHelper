@@ -8,7 +8,7 @@
 ;   1. data    — GgpkToolBridge.RefreshAllTsvs() (GGPK extraction) then the
 ;                tools/ Python regeneration pipeline (skipped if no Python).
 ;                If the install path is unknown the user is prompted for it.
-;   2. offsets — _OC_RunCompareData() (clone/pull arsenic + diff), summarised in
+;   2. offsets — _OC_RunCompareData() (clone/pull main + diff), summarised in
 ;                the modal and pushed to the Config → Debug dev panel.
 ;
 ; Globals (declared in InGameStateMonitor.ahk):
@@ -45,7 +45,7 @@ RunPatchMaintenance()
         "current", g_patchMaint["cur"],
         "steps", [
             Map("id", "data",    "label", "Regenerate data files (data/)"),
-            Map("id", "offsets", "label", "Check offsets vs upstream (arsenic)")
+            Map("id", "offsets", "label", "Check offsets vs upstream (main)")
         ])
     try WebViewExec("patchMaintStart(" _JsStr(JsonFull_Stringify(payload, false)) ")")
     PatchMaint_StageData()
@@ -152,11 +152,11 @@ _PM_FindPython()
     return ""
 }
 
-; Stage 2 — clone/pull arsenic, diff offsets, summarise in the modal and push
+; Stage 2 — clone/pull main, diff offsets, summarise in the modal and push
 ; the full result to the Config → Debug → Offset Comparison dev panel.
 PatchMaint_StageOffsets()
 {
-    _PM_Step("offsets", "running", "Fetching arsenic & diffing offsets…")
+    _PM_Step("offsets", "running", "Fetching upstream (main) & diffing offsets…")
     res := ""
     try {
         res := _OC_RunCompareData()

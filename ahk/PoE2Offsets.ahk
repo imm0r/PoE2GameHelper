@@ -44,11 +44,11 @@ class PoE2Offsets
         "Entities", 0x6C0,
         "AwakeEntities", 0x6C0,
         "SleepingEntities", 0x6D0,
-        "TerrainMetadata", 0x8A0   ; g0rdin/gamehelper2 (arsenic) reference: TerrainStruct at AreaInstance+0x8A0
+        "TerrainMetadata", 0x8A0   ; Gordin/GameHelper2 reference: TerrainStruct at AreaInstance+0x8A0
     )
 
     ; Offsets within TerrainStruct (base = AreaInstance + 0x8A0).
-    ; Source: https://gitlab.com/g0rdin/gamehelper2 (arsenic) -- AreaInstanceOffsets.cs
+    ; Source: https://github.com/Gordin/GameHelper2 -- AreaInstanceOffsets.cs
     ; Each byte encodes 2 grid cells: even-x -> lower nibble, odd-x -> upper nibble.
     ; A nibble value != 0 means the cell is walkable.
     static TerrainMetadata := Map(
@@ -101,7 +101,7 @@ class PoE2Offsets
         "ComponentsVec", 0x10,
         "ComponentsVecLast", 0x18,
         "Id", 0x88,
-        ; IsValid byte per g0rdin@arsenic EntityOffsets.cs (was 0x84).
+        ; IsValid byte per Gordin/GameHelper2 EntityOffsets.cs (was 0x84).
         ; Semantics unchanged: bit 0 clear => entity valid. NEEDS IN-GAME VERIFY —
         ; the v0.5 client may still use 0x84; revert this commit if validity regresses.
         "Flags", 0x8C
@@ -193,7 +193,7 @@ class PoE2Offsets
         "ActiveSkillsLast", 0xB10,
         "Cooldowns", 0xB20,           ; CooldownsPtr StdVector start
         "CooldownsLast", 0xB28,
-        "DeployedEntities", 0xC18,    ; DeployedEntityArray StdVector start (g0rdin@arsenic Actor.cs)
+        "DeployedEntities", 0xC18,    ; DeployedEntityArray StdVector start (Gordin/GameHelper2 Actor.cs)
         "DeployedEntitiesLast", 0xC20
     )
 
@@ -208,8 +208,8 @@ class PoE2Offsets
         "UnknownIdAndEquipmentInfo", 0x40,
         "GrantedEffectsPerLevelDatRow", 0x48,
         "GrantedEffectStatSetsPerLevelDatRow", 0x50,
-        "TotalUses", 0xE4,            ; g0rdin@arsenic Actor.cs (was 0x98)
-        "TotalCooldownTimeInMs", 0xE8 ; g0rdin@arsenic Actor.cs (was 0xA8)
+        "TotalUses", 0xE4,            ; Gordin/GameHelper2 Actor.cs (was 0x98)
+        "TotalCooldownTimeInMs", 0xE8 ; Gordin/GameHelper2 Actor.cs (was 0xA8)
     )
 
     ; GrantedEffectsPerLevel DAT row — first field is a pointer to the GrantedEffects DAT row
@@ -360,7 +360,7 @@ class PoE2Offsets
     )
 
     static Inventory := Map(
-        "TotalBoxes", 0x150,          ; g0rdin@arsenic InventoryOffset.cs (was 0x14C)
+        "TotalBoxes", 0x150,          ; Gordin/GameHelper2 InventoryOffset.cs (was 0x14C)
         "TotalBoxesY", 0x154,         ; StdTuple2D<int>.Y of TotalBoxes (was 0x150)
         "ItemList", 0x170,
         "ItemListLast", 0x178,
