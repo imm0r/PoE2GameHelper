@@ -1,7 +1,7 @@
 """Generate animation_names.js from the C# Animation enum."""
 import re, json, urllib.request
 
-url = 'https://gitlab.com/g0rdin/gamehelper2/-/raw/arsenic/GameHelper/RemoteEnums/Animation.cs'
+url = 'https://raw.githubusercontent.com/Gordin/GameHelper2/main/GameHelper/RemoteEnums/Animation.cs'
 with urllib.request.urlopen(url) as resp:
     content = resp.read().decode('utf-8')
 

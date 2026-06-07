@@ -588,7 +588,7 @@ class PoE2EntityReader extends PoE2ComponentDecoders
         compVecFirst     := NumGet(hdrBuf.Ptr, 0x08, "Int64")  ; entity 0x10
         compVecLast      := NumGet(hdrBuf.Ptr, 0x10, "Int64")  ; entity 0x18
         entityId         := NumGet(hdrBuf.Ptr, 0x78, "UInt")   ; entity 0x80
-        flags            := NumGet(hdrBuf.Ptr, 0x84, "UChar")  ; entity 0x8C (IsValid, g0rdin@arsenic)
+        flags            := NumGet(hdrBuf.Ptr, 0x84, "UChar")  ; entity 0x8C (IsValid, Gordin/GameHelper2)
 
         ; ── Inline validation (replaces separate IsEntityLikePointer pre-check) ──
         ; Same rules as IsEntityLikePointer — but operates on the buffer we already read,

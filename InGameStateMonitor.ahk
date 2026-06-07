@@ -36,7 +36,7 @@ Break large tasks into smaller steps and ask clarifying questions when needed.
 In your feedback, explain your reasoning and point out problems and opportunities.
 Think step by step and lay out your reasoning for complex problems.
 Use concrete examples.
-In general, at the start of a new task, always check the original C# project ("https://gitlab.com/g0rdin/gamehelper2" — branch arsenic) to see whether a solution or approach for the current task already exists there.
+In general, at the start of a new task, always check the original C# project ("https://github.com/Gordin/GameHelper2" — branch main) to see whether a solution or approach for the current task already exists there.
 When you create new functions, always add a 2-3 line comment beforehand: what the function is for, which parameters it uses, and whether it returns values.
 When you create new variables, always name them meaningfully and follow the existing general style.
 */

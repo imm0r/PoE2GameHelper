@@ -134,5 +134,5 @@ Alerts → `alerts.ini [Alerts]`.
 ## Reference
 
 - Original C# reference project (authority when unclear):
-  `https://gitlab.com/g0rdin/gamehelper2` (branch `arsenic`).
+  `https://github.com/Gordin/GameHelper2` (branch `main`).
   Check it when starting a new feature — solutions / approaches may already exist there.

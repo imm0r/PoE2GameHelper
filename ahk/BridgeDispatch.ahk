@@ -648,7 +648,7 @@ _DispatchBridgeCall(method, args)
             if (pathArg != "")
                 SetTimer(() => GgpkInstallPathUi_Save(pathArg), -1)
         case "OffsetCompareRun":
-            ; Fetch upstream (arsenic) + diff local offsets/patterns on a timer;
+            ; Fetch upstream (main) + diff local offsets/patterns on a timer;
             ; the result is pushed back via updateOffsetComparison().
             SetTimer(() => OffsetCompareRun(), -1)
         case "OffsetCompareRecord":

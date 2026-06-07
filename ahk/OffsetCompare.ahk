@@ -3,7 +3,7 @@
 ;
 ; Compares the offset tables in ahk/PoE2Offsets.ahk and the byte patterns in
 ; ahk/StaticOffsetsPatterns.ahk against the current C# reference
-; (https://gitlab.com/g0rdin/gamehelper2, branch arsenic) and keeps a versioned
+; (https://github.com/Gordin/GameHelper2, branch main) and keeps a versioned
 ; change history (offset_history.json) with fix/game_update classification plus
 ; a delta-pattern prediction. Results are surfaced in the WebView dev panel.
 ;
@@ -12,8 +12,8 @@
 
 ; ── Configuration ───────────────────────────────────────────────────────────
 ; All paths are relative to the app root (A_ScriptDir == repo root).
-_OC_GitUrl()      => "https://gitlab.com/g0rdin/gamehelper2.git"
-_OC_GitBranch()   => "arsenic"
+_OC_GitUrl()      => "https://github.com/Gordin/GameHelper2.git"
+_OC_GitBranch()   => "main"
 _OC_CsRel()       => "GameOffsets"                       ; path inside the repo
 _OC_AhkOffsets()  => A_ScriptDir "\ahk\PoE2Offsets.ahk"
 _OC_AhkPatterns() => A_ScriptDir "\ahk\StaticOffsetsPatterns.ahk"
@@ -108,7 +108,7 @@ _OC_UpstreamCommit()
     return StrSplit(out, "`n")[1]
 }
 
-; ── Upstream fetch (git clone/pull of arsenic into the cache) ──────────────────
+; ── Upstream fetch (git clone/pull of the main branch into the cache) ─────────
 
 ; True if the cached clone already points at the configured URL + branch.
 _OC_CacheMatches()
@@ -121,7 +121,7 @@ _OC_CacheMatches()
     return (_OC_NormUrl(url) = _OC_NormUrl(_OC_GitUrl())) && (branch = _OC_GitBranch())
 }
 
-; Clones or pulls the arsenic branch into the cache. Discards a cache that
+; Clones or pulls the main branch into the cache. Discards a cache that
 ; points at a different repo/branch first. Returns Map("ok", bool, "msg", str).
 _OC_FetchUpstream()
 {
