@@ -659,6 +659,9 @@ _DispatchBridgeCall(method, args)
             SetTimer(() => OffsetCompareShowHistory(), -1)
         case "OffsetComparePredict":
             SetTimer(() => OffsetComparePredict(), -1)
+        case "AreaInstanceProbeRun":
+            ; TEMP post-patch diagnostic: scan for shifted AreaInstance offsets.
+            SetTimer(() => AreaInstanceProbeRun(), -1)
         case "PatchMaintSetPath":
             ; args[1] = user-entered path to Bundles2\_.index.bin / Content.ggpk.
             pmPathArg := (args.Length >= 1) ? String(args[1]) : ""
