@@ -254,3 +254,148 @@ AreaInstanceProbeRun()
         . "Full report (please send me this file):" nl . path
     try MsgBox(summary, "AreaInstance Probe", "Iconi")
 }
+
+; Component-level probe (v2): confirms WHERE the breakage is downstream of the
+; (verified-correct) AreaInstance offsets. Dumps the player's component lookup,
+; decodes Life at our vs upstream offsets (plus a scan), enumerates entities via
+; the real reader, and tests the entity validity byte at 0x84 vs 0x8C. No params,
+; no return; writes a log + summary MsgBox. Trigger: ahkCall 'ComponentProbeRun'.
+ComponentProbeRun()
+{
+    global g_reader
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Component probe: not connected or not in-game.", "Component Probe", "Iconx")
+        return
+    }
+    piOff := PoE2Offsets.AreaInstance["PlayerInfo"]
+    lpRaw := g_reader.Mem.ReadPtr(base + piOff + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
+    localPlayer := g_reader.ResolveEntityPointer(lpRaw)
+    nl := "`r`n"
+
+    rpt := "=== Component Probe ===" nl
+    rpt .= "areaInstanceData=0x" Format("{:X}", base) "  localPlayer=0x" Format("{:X}", localPlayer)
+        . "  plausible=" (g_reader.IsPlausibleEntityPointer(localPlayer) ? "YES" : "NO") nl nl
+
+    ; ── 1. Player component lookup (name -> address). Proves the lookup works. ──
+    rpt .= "-- Player components (name : address) --" nl
+    comps := ""
+    try comps := g_reader.ReadEntityComponentLookupBasic(localPlayer, 96)
+    lifeAddr := 0
+    if (comps && Type(comps) = "Array")
+    {
+        for _, c in comps
+        {
+            if !(c && Type(c) = "Map" && c.Has("name") && c.Has("address"))
+                continue
+            rpt .= "  " c["name"] " : 0x" Format("{:X}", c["address"]) nl
+            if (c["name"] = "Life")
+                lifeAddr := c["address"]
+        }
+    }
+    else
+        rpt .= "  (component lookup returned nothing!)" nl
+    rpt .= nl
+
+    ; ── 2. Life: decode HP/Mana/ES at our vs upstream offsets, plus a window scan. ──
+    if !lifeAddr
+        try lifeAddr := g_reader.FindEntityComponentAddress(localPlayer, "Life")
+    rpt .= "-- Life @0x" Format("{:X}", lifeAddr) " : Vital(current/max) per Health-offset --" nl
+    lifeVerdict := "unknown"
+    if lifeAddr
+    {
+        oursH := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x1A8)
+        oursM := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x1F8)
+        oursE := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x230)
+        upH   := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x1B0)
+        upM   := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x208)
+        upE   := g_reader.ReadVitalStructSnapshot(lifeAddr, 0x248)
+        rpt .= "  ours(0x1A8/0x1F8/0x230):  HP " oursH["current"] "/" oursH["max"]
+            . "   Mana " oursM["current"] "/" oursM["max"] "   ES " oursE["current"] "/" oursE["max"] nl
+        rpt .= "  upstream(0x1B0/0x208/0x248):  HP " upH["current"] "/" upH["max"]
+            . "   Mana " upM["current"] "/" upM["max"] "   ES " upE["current"] "/" upE["max"] nl
+        oursOK := (oursH["max"] > 0 && oursH["max"] < 500000 && oursH["current"] <= oursH["max"] + 50000)
+        upOK   := (upH["max"] > 0 && upH["max"] < 500000 && upH["current"] <= upH["max"] + 50000)
+        lifeVerdict := oursOK ? "OURS 0x1A8" : (upOK ? "UPSTREAM 0x1B0" : "neither (see scan)")
+        rpt .= "  [scan Health-offset 0x180..0x268 for plausible max>0]:" nl
+        ho := 0x180
+        while (ho <= 0x268)
+        {
+            v := g_reader.ReadVitalStructSnapshot(lifeAddr, ho)
+            if (v["max"] > 0 && v["max"] < 500000 && v["current"] >= 0 && v["current"] <= v["max"] + 50000)
+                rpt .= "    0x" Format("{:X}", ho) " -> " v["current"] "/" v["max"] nl
+            ho += 0x08
+        }
+    }
+    else
+        rpt .= "  (Life component NOT in lookup — lookup or name match is the problem)" nl
+    rpt .= nl
+
+    ; ── 3. Entity enumeration via the REAL reader (same path the radar uses). ──
+    awakeAddr := base + PoE2Offsets.AreaInstance["AwakeEntities"]
+    rpt .= "-- ReadAreaEntityMapSummary(0x" Format("{:X}", awakeAddr) ") --" nl
+    summary := ""
+    try summary := g_reader.ReadAreaEntityMapSummary(awakeAddr, 16, 0)
+    entSampleCount := -1
+    if (summary && Type(summary) = "Map")
+    {
+        entSampleCount := summary.Has("sampleCount") ? summary["sampleCount"] : 0
+        rpt .= "  size=" (summary.Has("size") ? summary["size"] : "?")
+            . "  sampleCount=" entSampleCount
+            . "  npc=" (summary.Has("npcCount") ? summary["npcCount"] : "?")
+            . "  chest=" (summary.Has("chestCount") ? summary["chestCount"] : "?") nl
+        if (summary.Has("sample") && Type(summary["sample"]) = "Array")
+        {
+            n := 0
+            for _, en in summary["sample"]
+            {
+                if (n >= 8)
+                    break
+                if !(en && Type(en) = "Map")
+                    continue
+                ePtr := en.Has("entityPtr") ? en["entityPtr"] : (en.Has("entityRawPtr") ? en["entityRawPtr"] : 0)
+                ent  := en.Has("entity") ? en["entity"] : 0
+                path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : "?"
+                valid := (IsObject(ent) && ent.Has("isValid")) ? (ent["isValid"] ? "y" : "n") : "?"
+                rpt .= "    ptr=0x" Format("{:X}", ePtr) " valid=" valid " path=" path nl
+                n += 1
+            }
+        }
+    }
+    else
+        rpt .= "  (reader returned nothing)" nl
+    rpt .= nl
+
+    ; ── 4. Validity byte: which of 0x84 / 0x8C is the IsValid flag? (valid = bit0 clear) ──
+    b84 := g_reader.Mem.ReadUChar(localPlayer + 0x84)
+    b8C := g_reader.Mem.ReadUChar(localPlayer + 0x8C)
+    rpt .= "-- localPlayer validity byte: @0x84=0x" Format("{:X}", b84) " (bit0=" (b84 & 1) ")"
+        . "   @0x8C=0x" Format("{:X}", b8C) " (bit0=" (b8C & 1) ")   [valid = bit0 clear] --" nl
+
+    path := A_ScriptDir "\logs\InGameStateMonitor.component_probe.log"
+    writeMsg := ""
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+            writeMsg := "wrote " StrLen(rpt) " chars"
+        }
+        else
+            writeMsg := "FileOpen failed"
+    }
+    catch as ex
+        writeMsg := "exception: " (ex.HasOwnProp("Message") ? ex.Message : "?")
+    try LogError("ComponentProbe " writeMsg " -> " path)
+
+    summaryBox := "Component Probe done." nl nl
+        . "Life offset verdict: " lifeVerdict nl
+        . "Entity sampleCount (real reader): " entSampleCount nl
+        . "Validity bit0 — @0x84=" (b84 & 1) "  @0x8C=" (b8C & 1) " (valid=0)" nl nl
+        . "Full report (please send me this file):" nl . path
+    try MsgBox(summaryBox, "Component Probe", "Iconi")
+}
