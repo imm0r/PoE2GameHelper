@@ -6735,6 +6735,25 @@
       return !(id === 1 || id === 12 || (id >= 2 && id <= 11));
     }
 
+    // Turn an internal inventory type Id into a readable name. Inventories.datc64
+    // has no official display-name column, so this is heuristic: drop a trailing
+    // index ("Relics1" → "Relics"), drop a trailing "Id", and split camelCase
+    // ("LakeTabletInventory" → "Lake Tablet Inventory"). A few well-known player
+    // inventories get friendlier overrides.
+    const INV_TYPE_OVERRIDES = {
+      MainInventory: 'Backpack',
+      Flask: 'Flasks'
+    };
+    function _prettyInvType(t) {
+      if (!t) return '';
+      let s = String(t).replace(/\d+$/, '');                 // trailing index
+      if (INV_TYPE_OVERRIDES[s]) return INV_TYPE_OVERRIDES[s];
+      s = s.replace(/Id$/, '');                              // trailing "Id"
+      s = s.replace(/([a-z0-9])([A-Z])/g, '$1 $2')           // camelCase split
+           .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');       // ACRONYM boundary
+      return s.trim();
+    }
+
     let _invPollTimer = null;
 
     function _invTabActivated() {
@@ -6869,16 +6888,16 @@
       const by = Math.max(1, inv.by || 5);
       const items = Array.isArray(inv.items) ? inv.items : [];
 
-      // Stash tabs prefer the user-given name (from ServerStashTab.Name) over
-      // the numeric "Stash Tab #N" label. Player inventories ignore tn.
-      const labelBase = (_isStashTabId(id) && inv.tn)
-        ? `Stash · ${inv.tn}`
-        : _inventoryLabel(id);
-      // The inventory type (Id from Inventories.datc64, e.g. "MainInventory1",
-      // "Relics1") comes from the AHK side; show it next to the numeric id when
-      // available so the raw inventory identity is visible alongside the label.
-      const typeTag = inv.type ? ` · ${escHtml(inv.type)}` : '';
-      const meta = `id=${id}${typeTag} · ${bx}×${by} · ${items.length} items` + (inv.src ? ' · ' + escHtml(inv.src) : '');
+      // Top row: "#<id> <name>". Prefer the translated inventory type (from
+      // Inventories.datc64 via the AHK bridge); fall back to the user-given stash
+      // tab name, then the heuristic id-range label.
+      const rawType  = inv.type || '';
+      const namePart = _prettyInvType(rawType)
+        || (_isStashTabId(id) ? (inv.tn || 'Stash Tab') : _inventoryLabel(id));
+      const labelBase = `#${id} ${namePart}`;
+      // Keep the raw internal type (e.g. "LakeTabletInventory1") in the meta line.
+      const metaType = rawType ? `${escHtml(rawType)} · ` : '';
+      const meta = `${metaType}${bx}×${by} · ${items.length} items` + (inv.src ? ' · ' + escHtml(inv.src) : '');
 
       // Background empty cells for the full grid
       let cells = '';
