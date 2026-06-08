@@ -169,6 +169,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this.ModNameMap := Map()
         this.BaseItemNameMap := Map()
         this.UniqueItemNameMap := Map()
+        this.InventoryTypeMap := Map()
         this.LoadModNameMap(A_ScriptDir "\\data\\mod_name_map.tsv")
         ; base_item_sizes.tsv has 4 cols (id, name, width, height); the
         ; LoadBaseItemNameMap reader only consumes the first two, so one
@@ -177,6 +178,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; base_item_sizes.tsv) and is no longer generated.
         this.LoadBaseItemNameMap(A_ScriptDir "\\data\\base_item_sizes.tsv")
         this.LoadUniqueItemNameMap(A_ScriptDir "\\data\\unique_item_name_map.tsv")
+        this.LoadInventoryTypeMap(A_ScriptDir "\\data\\inventory_type_map.tsv")
     }
 
     ; Opens the process and resolves the GameStates address via pattern scan, falling back to heuristic scan.
