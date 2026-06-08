@@ -37,6 +37,22 @@ inline when authoring commit messages, PR bodies, etc.
 - The user often cannot runtime-test (the game is ~140 GB). When a change can only be
   verified in-game, say so and list exactly what to check.
 
+### Completion-summary format (lean, GitHub-ready)
+When wrapping up a task, output the summary as ONE copyable raw GitHub-flavored
+markdown block (a fenced ```` ```markdown ```` code block), so it can be pasted
+straight into a PR/issue/commit. Because it is destined for GitHub, write it in
+**English** (per the Language rules above). Use this fixed, lean structure and
+show only the sections that have content — never pad with empty headings:
+
+- **Summary** — one sentence on what was achieved.
+- **Changes** — bullet list, `path/file.ext:line — what & why`.
+- **Verify in-game** — concrete click/hotkey steps + expected result (the user
+  usually cannot runtime-test). Write "None needed" when nothing applies.
+
+Add **Verification** (static checks: brace balance, `node --check`, minimal diff)
+or **Open / Next steps** only when actually relevant. Any prose outside the block
+(chat commentary) may stay German.
+
 ## Project structure & conventions
 
 - **Entry point:** `InGameStateMonitor.ahk` (repo root). Run with **AutoHotkey v2**.

@@ -931,6 +931,7 @@ OnTreeTabChanged(*)
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
 #Include ahk/AreaInstanceProbe.ahk
+#Include ahk/HoverPathfindingProbe.ahk
 #Include ahk/OffsetCompare.ahk
 #Include ahk/PatchMaintenance.ahk
 #Include ahk/UIHelpers.ahk
