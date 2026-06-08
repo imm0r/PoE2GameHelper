@@ -692,6 +692,12 @@ _DispatchBridgeCall(method, args)
         case "SkillProbeRun":
             ; TEMP post-patch diagnostic: trace the skill-name DAT chain.
             SetTimer(() => SkillProbeRun(), -1)
+        case "PathfindingProbeRun":
+            ; TEMP diagnostic: verify Pathfinding Flying/BaseSpeed offsets.
+            SetTimer(() => PathfindingProbeRun(), -1)
+        case "HoverTrackerProbeRun":
+            ; TEMP diagnostic: verify the HoverTracker resolve chain (Ctrl+Alt+H).
+            SetTimer(() => HoverTrackerProbeRun(), -1)
         case "ComponentDumpProbeRun":
             ; TEMP diagnostic: dump all components + raw fields of the highlighted entity.
             SetTimer(() => ComponentDumpProbeRun(), -1)
