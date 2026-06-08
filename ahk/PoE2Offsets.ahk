@@ -290,9 +290,12 @@ class PoE2Offsets
     )
 
     static Life := Map(
-        "Health", 0x1A8,
-        "Mana", 0x1F8,
-        "EnergyShield", 0x230
+        ; PoE2 v4.5.x: vital bases shifted; confirmed in-game via the component
+        ; probe (Mana 5771/5771 @0x208 matched the client). Matches Gordin/GameHelper2
+        ; Life.cs (Health 0x1B0, Mana 0x208, EnergyShield 0x248).
+        "Health", 0x1B0,        ; was 0x1A8
+        "Mana", 0x208,          ; was 0x1F8
+        "EnergyShield", 0x248   ; was 0x230
     )
 
     static Vital := Map(

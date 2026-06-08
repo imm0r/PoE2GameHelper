@@ -918,6 +918,7 @@ OnTreeTabChanged(*)
 #Include ahk/PoE2AtlasReader.ahk
 #Include ahk/MemoryDiff.ahk
 #Include ahk/MemoryDissect.ahk
+#Include ahk/AreaInstanceProbe.ahk
 #Include ahk/OffsetCompare.ahk
 #Include ahk/PatchMaintenance.ahk
 #Include ahk/UIHelpers.ahk
