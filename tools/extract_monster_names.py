@@ -149,7 +149,7 @@ def build_monster_name_map(dat_bytes, id_offset, name_offset):
 
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir    = os.path.join(os.path.dirname(script_dir), 'data')
+    data_dir    = os.path.join(os.path.dirname(script_dir), 'data')
     game_dir = sys.argv[1] if len(sys.argv) > 1 else r'H:\SteamLibrary\steamapps\common\Path of Exile 2'
     output_tsv = sys.argv[2] if len(sys.argv) > 2 else os.path.join(data_dir, 'monster_name_map.tsv')
 
