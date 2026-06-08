@@ -19,18 +19,36 @@ stays scoped to this directory.
 ## Prerequisites
 
 - **.NET 8 SDK** — https://dotnet.microsoft.com/download/dotnet/8.0
-- **LibGGPK3 source** — clone or git-submodule
-  https://github.com/aianlinb/LibGGPK3 alongside this folder (default
-  path: `../external/LibGGPK3`). The `.csproj` files reference its
-  sub-projects via the `$(LibGGPK3Root)` MSBuild property defined in
-  `Directory.Build.props`.
+- **C++ build tools** (for the AOT publish only) — Visual Studio 2022 with
+  the *"Desktop development with C++"* workload, or the standalone
+  *Build Tools for Visual Studio*. Native AOT invokes the MSVC linker
+  (`link.exe`) as its last step; without the C++ toolchain the
+  `-p:PublishAot=true` publish fails at link time even though the .NET SDK
+  itself is installed. A plain `dotnet build` (framework-dependent) does
+  **not** need this.
+- **LibGGPK3 source** — already wired up as a git submodule at
+  `external/LibGGPK3` (see `.gitmodules`). After a fresh clone the folder
+  is empty until you check it out:
+
+  ```bash
+  git submodule update --init --recursive
+  ```
+
+  The `.csproj` files reference its sub-projects via the `$(LibGGPK3Root)`
+  MSBuild property defined in `Directory.Build.props`.
 - **Oodle decompression DLL** — placed next to the compiled
   executables (or anywhere on `PATH` / the working directory).
   LibBundle3 imports it via `DllImport("oo2core")`, so on Windows the
   file must be named **`oo2core.dll`** (no version suffix). If you
   pulled a copy named `oo2core_9_win64.dll` from a game install, just
   rename it. PoE2 statically links Oodle so the DLL is **not** in the
-  PoE2 install folder. Legitimate sources:
+  PoE2 install folder. **`PoeDataExtract` now auto-provisions this on
+  first run** — if `oo2core.dll` isn't already loadable it scans your
+  local Steam game installs (anchored off the ggpk/index path you pass)
+  for an `oo2core*.dll`, copies it next to the exe, and (in an interactive
+  terminal) offers a file picker as a fallback. It never downloads or
+  bundles the DLL — the copy comes from a game you already own. Legitimate
+  manual sources:
   - a Path of Exile **1** install root (free Steam download — but check
     the `Redist/` subfolder if the root looks empty)
   - aianlinb's [VisualGGPK3 release ZIPs](https://github.com/aianlinb/LibGGPK3/releases)
@@ -45,8 +63,9 @@ stays scoped to this directory.
 From this directory:
 
 ```bash
-# One-time: clone LibGGPK3 next to this folder
-git submodule add https://github.com/aianlinb/LibGGPK3.git ../external/LibGGPK3
+# One-time after a fresh clone: check out the LibGGPK3 submodule
+# (already registered in .gitmodules — this populates external/LibGGPK3)
+git submodule update --init --recursive
 
 # Restore + build both tools
 dotnet build -c Release
@@ -67,6 +86,28 @@ Both tools accept either the legacy `Content.ggpk` (PoE1, older PoE2
 beta installs) or the bare `Bundles2/_.index.bin` (current PoE2 Steam)
 — passed via `--ggpk`. The opener auto-detects which it's looking at
 based on the file extension.
+
+### Refresh ALL data files in one go (the common case)
+
+Just hand `PoeDataExtract` the path to your game data file — no verb,
+no flags — and it extracts every TSV the helper consumes straight into
+the repo's `data/` folder:
+
+```bash
+poe-data-extract.exe "C:\path\to\Bundles2\_.index.bin"
+```
+
+This runs all six extractors and writes `base_item_sizes.tsv`,
+`monster_name_map.tsv`, `stat_name_map.tsv`, `mod_name_map.tsv`,
+`unique_item_name_map.tsv` and `map_mod_list.tsv`. The `data/` folder is
+auto-located by walking up from the exe to the repo root; override it
+with `--output-dir <dir>` if needed. `map_mod_list.tsv` is best-effort
+(it's the most schema-fragile table and a failure there won't fail the
+batch). Equivalent explicit form:
+
+```bash
+poe-data-extract.exe extract-all --ggpk "C:\path\to\Bundles2\_.index.bin"
+```
 
 ### Listing files inside the GGPK / bundle index
 
