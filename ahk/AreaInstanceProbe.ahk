@@ -992,6 +992,124 @@ _AIP_WriteSkillLog(rpt)
     try MsgBox("Skill chain probe done." "`r`n`r`nSend me:`r`n" path, "Skill Probe", "Iconi")
 }
 
+; Generic component dump for the currently highlighted entity: finds it in the
+; awake-entity sample by path, enumerates ALL its components and dumps each
+; component's raw bytes (0x00..0x80) plus 8-aligned pointer candidates. The basis
+; for a systematic component-offset pass — highlight any entity (monster, shrine,
+; monolith, chest, ...) in the tree, then run this.
+ComponentDumpProbeRun()
+{
+    global g_reader, g_highlightedEntityPath
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Component dump: not in-game.", "Component Dump", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    target := (IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : "")
+    rpt := "=== Component Dump Probe ===" nl
+    rpt .= "highlighted path: '" target "'" nl nl
+    if (target = "")
+    {
+        rpt .= "(no entity highlighted — click an entity in the tree first, then run this)" nl
+        _AIP_WriteProbeLog("component_dump", rpt)
+        return
+    }
+
+    summary := 0
+    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 256, 0)
+    entPtr := 0
+    matchedPath := ""
+    matches := 0
+    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    {
+        for _, en in summary["sample"]
+        {
+            if !(en && Type(en) = "Map")
+                continue
+            ent := en.Has("entity") ? en["entity"] : 0
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+            if (path = "")
+                continue
+            if (path = target || InStr(path, target) || InStr(target, path))
+            {
+                matches += 1
+                if !entPtr
+                {
+                    entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
+                    matchedPath := path
+                }
+            }
+        }
+    }
+    if !g_reader.IsProbablyValidPointer(entPtr)
+    {
+        rpt .= "(no awake entity matched the highlighted path — stand closer / re-highlight)" nl
+        _AIP_WriteProbeLog("component_dump", rpt)
+        return
+    }
+    rpt .= "matched entity: 0x" Format("{:X}", entPtr) "  (" matches " match(es))" nl
+    rpt .= "path: " matchedPath nl nl
+
+    comps := g_reader.ReadEntityComponentLookupBasic(entPtr, 96)
+    rpt .= "components: " comps.Length nl nl
+    for _, comp in comps
+    {
+        name := comp["name"]
+        addr := comp["address"]
+        rpt .= "-- " name " @0x" Format("{:X}", addr) " --" nl
+        buf := g_reader.Mem.ReadBytes(addr, 0x80, true)
+        if !buf
+        {
+            rpt .= "  (unreadable)" nl nl
+            continue
+        }
+        i := 0
+        while (i < buf.Size)
+        {
+            rowOff := "  0x" Format("{:02X}", i) ": "
+            j := 0
+            while (j < 16 && i + j < buf.Size)
+            {
+                rowOff .= Format("{:02X} ", NumGet(buf.Ptr, i + j, "UChar"))
+                j += 1
+            }
+            rpt .= RTrim(rowOff) nl
+            i += 16
+        }
+        pc := ""
+        k := 0
+        while (k + 8 <= buf.Size)
+        {
+            p := NumGet(buf.Ptr, k, "Int64")
+            if g_reader.IsProbablyValidPointer(p)
+                pc .= "0x" Format("{:X}", k) "=0x" Format("{:X}", p) " "
+            k += 8
+        }
+        rpt .= "  ptrs: " (pc = "" ? "(none)" : pc) nl nl
+    }
+    _AIP_WriteProbeLog("component_dump", rpt)
+}
+
+; Writes a probe report to logs\InGameStateMonitor.<tag>.log and shows the path.
+_AIP_WriteProbeLog(tag, rpt)
+{
+    path := A_ScriptDir "\logs\InGameStateMonitor." tag ".log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("Probe[" tag "] -> " path)
+    try MsgBox("Probe done." "`r`n`r`nSend me:`r`n" path, "Probe", "Iconi")
+}
+
 ; Registers the temporary in-game probe hotkeys (Ctrl+Alt+Shift+T = chest CLOSED/
 ; OPENED diff, Ctrl+B = IsTargetedByPlayer hover diff) so they fire in-game
 ; without the UI button dropping the hover/target. Called once at startup.
@@ -999,4 +1117,5 @@ _AIP_RegisterProbeHotkeys()
 {
     try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
     try Hotkey("^b", (*) => TargetedByPlayerProbeRun(), "On")
+    try Hotkey("^!+d", (*) => ComponentDumpProbeRun(), "On")
 }
