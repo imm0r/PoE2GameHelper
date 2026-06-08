@@ -276,7 +276,7 @@ _BuildEntitiesJson(snap)
                 isAlive := life.Has("isAlive") ? life["isAlive"] : true
                 lifePct := life.Has("lifeCurrentPercentMax") ? Round(life["lifeCurrentPercentMax"], 0) : -1
             }
-            if decoded && decoded.Has("targetable")
+            if decoded && decoded.Has("targetable") && (entityType = "Enemy" || entityType = "Boss")
                 isAlive := decoded["targetable"]
 
             entityId  := entity.Has("entityId") ? entity["entityId"] : 0

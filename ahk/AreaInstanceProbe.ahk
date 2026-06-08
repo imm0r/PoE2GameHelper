@@ -399,3 +399,133 @@ ComponentProbeRun()
         . "Full report (please send me this file):" nl . path
     try MsgBox(summaryBox, "Component Probe", "Iconi")
 }
+
+; Resolves the live InGameState address (snapshot first, index-4 chain fallback).
+_AIP_ResolveInGameState()
+{
+    global g_reader, g_radarLastSnap
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+        return 0
+    if IsObject(g_radarLastSnap)
+    {
+        inGs := g_radarLastSnap.Has("inGameState") ? g_radarLastSnap["inGameState"] : 0
+        addr := (IsObject(inGs) && inGs.Has("address")) ? inGs["address"] : 0
+        if (addr && g_reader.IsProbablyValidPointer(addr))
+            return addr
+    }
+    try
+    {
+        if !g_reader.IsProbablyValidPointer(g_reader.GameStatesAddress)
+            return 0
+        staticPtr := g_reader.Mem.ReadPtr(g_reader.GameStatesAddress)
+        igs := g_reader.Mem.ReadPtr(staticPtr + PoE2Offsets.GameState["States"]
+            + (PoE2Offsets.GameState["InGameStateIndex"] * PoE2Offsets.GameState["StateEntrySize"]))
+        return g_reader.IsProbablyValidPointer(igs) ? igs : 0
+    }
+    catch
+        return 0
+}
+
+; Dumps a candidate map-UiElement: validity, ReadMapUiElementData (visible/size),
+; raw Flags, and StringId read at BOTH 0xF8 (ours) and 0x140 (reference) so we can
+; tell which StringId offset is correct. Returns a report line.
+_AIP_MapElemLine(label, ptr)
+{
+    global g_reader
+    if !g_reader.IsProbablyValidPointer(ptr)
+        return "  " label " 0x" Format("{:X}", ptr) "  (invalid)`r`n"
+    flags := g_reader.Mem.ReadUInt(ptr + PoE2Offsets.UiElementBase["Flags"])
+    sid_F8 := "", sid_140 := ""
+    try sid_F8  := g_reader.ReadStdWStringAt(ptr + 0xF8, 48)
+    try sid_140 := g_reader.ReadStdWStringAt(ptr + 0x140, 48)
+    vis := "?", sw := "?", sh := "?"
+    try {
+        d := g_reader.ReadMapUiElementData(ptr)
+        if (d && IsObject(d))
+        {
+            vis := (d.Has("isVisible") && d["isVisible"]) ? "Y" : "N"
+            sw := d.Has("sizeW") ? Round(d["sizeW"]) : "?"
+            sh := d.Has("sizeH") ? Round(d["sizeH"]) : "?"
+        }
+    }
+    return "  " label " 0x" Format("{:X}", ptr) "  flags=0x" Format("{:X}", flags)
+        . " vis=" vis " size=" sw "x" sh
+        . "  strId@0xF8='" sid_F8 "'  @0x140='" sid_140 "'`r`n"
+}
+
+; UI/Map chain probe: walks InGameState -> UiRoot -> GameUi -> MapParent -> Large/
+; MiniMap (cache + child-walk) so we can see exactly where LargeMap detection fails.
+; Run with the in-game large map OPEN. No params; writes a log + summary MsgBox.
+UiMapProbeRun()
+{
+    global g_reader
+    inGs := _AIP_ResolveInGameState()
+    if !inGs
+    {
+        try MsgBox("UI/Map probe: not in-game.", "UI/Map Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    M := PoE2Offsets
+    uiRootStruct := g_reader.Mem.ReadPtr(inGs + M.InGameState["UiRootStructPtr"])
+    uiRoot       := g_reader.Mem.ReadPtr(uiRootStruct + M.UiRootStruct["UiRootPtr"])
+    gameUi       := g_reader.Mem.ReadPtr(uiRootStruct + M.UiRootStruct["GameUiPtr"])
+    gameUiCtrl   := g_reader.Mem.ReadPtr(uiRootStruct + M.UiRootStruct["GameUiControllerPtr"])
+
+    rpt := "=== UI/Map Probe (open the large map before running!) ===" nl
+    rpt .= "inGameState=0x" Format("{:X}", inGs) nl
+    rpt .= "uiRootStruct(@0x" Format("{:X}", M.InGameState["UiRootStructPtr"]) ")=0x" Format("{:X}", uiRootStruct)
+        . " valid=" (g_reader.IsProbablyValidPointer(uiRootStruct) ? "y" : "N") nl
+    rpt .= "uiRoot=0x" Format("{:X}", uiRoot) "  gameUi(@0xBE0)=0x" Format("{:X}", gameUi)
+        . " valid=" (g_reader.IsProbablyValidPointer(gameUi) ? "y" : "N")
+        . "  gameUiCtrl=0x" Format("{:X}", gameUiCtrl) nl nl
+
+    activeUi := g_reader.IsProbablyValidPointer(gameUi) ? gameUi : gameUiCtrl
+    mapParent := g_reader.Mem.ReadPtr(activeUi + M.ImportantUiElements["MapParentPtr"])
+    ctrlMapParent := g_reader.Mem.ReadPtr(activeUi + M.ImportantUiElements["ControllerModeMapParentPtr"])
+    rpt .= "mapParentPtr(@0x" Format("{:X}", M.ImportantUiElements["MapParentPtr"]) ")=0x" Format("{:X}", mapParent)
+        . " valid=" (g_reader.IsProbablyValidPointer(mapParent) ? "y" : "N")
+        . "  ctrlMapParent(@0xAA8)=0x" Format("{:X}", ctrlMapParent) nl
+
+    largeMapPtr := g_reader.Mem.ReadPtr(mapParent + M.MapParentStruct["LargeMapPtr"])
+    miniMapPtr  := g_reader.Mem.ReadPtr(mapParent + M.MapParentStruct["MiniMapPtr"])
+    childrenFirst := g_reader.Mem.ReadPtr(mapParent + M.UiElementBase["ChildrenFirst"])
+    child0 := g_reader.Mem.ReadPtr(childrenFirst)
+    child1 := g_reader.Mem.ReadPtr(childrenFirst + 0x08)
+    rpt .= "  cache: largeMapPtr(@+0x28)=0x" Format("{:X}", largeMapPtr)
+        . "  miniMapPtr(@+0x30)=0x" Format("{:X}", miniMapPtr) nl
+    rpt .= "  childrenFirst(@+0x10)=0x" Format("{:X}", childrenFirst)
+        . "  child0=0x" Format("{:X}", child0) "  child1=0x" Format("{:X}", child1) nl nl
+
+    rpt .= "-- LargeMap candidates (flags / visible / size / StringId@0xF8 vs 0x140) --" nl
+    rpt .= _AIP_MapElemLine("cache(0x28) ", largeMapPtr)
+    rpt .= _AIP_MapElemLine("child0      ", child0)
+    rpt .= nl "-- MiniMap candidates --" nl
+    rpt .= _AIP_MapElemLine("cache(0x30) ", miniMapPtr)
+    rpt .= _AIP_MapElemLine("child1      ", child1)
+
+    path := A_ScriptDir "\logs\InGameStateMonitor.uimap_probe.log"
+    wrote := ""
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+            wrote := "ok"
+        }
+    }
+    catch as ex
+        wrote := "err:" (ex.HasOwnProp("Message") ? ex.Message : "?")
+    try LogError("UiMapProbe " wrote " -> " path)
+
+    box := "UI/Map Probe done (run with the large map OPEN)." nl nl
+        . "gameUi valid: " (g_reader.IsProbablyValidPointer(gameUi) ? "y" : "N") nl
+        . "mapParent valid: " (g_reader.IsProbablyValidPointer(mapParent) ? "y" : "N") nl
+        . "largeMapPtr(cache 0x28) valid: " (g_reader.IsProbablyValidPointer(largeMapPtr) ? "y" : "N") nl
+        . "child0 valid: " (g_reader.IsProbablyValidPointer(child0) ? "y" : "N") nl nl
+        . "Send me:" nl . path
+    try MsgBox(box, "UI/Map Probe", "Iconi")
+}
