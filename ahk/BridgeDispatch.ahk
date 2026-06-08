@@ -698,6 +698,9 @@ _DispatchBridgeCall(method, args)
         case "HoverTrackerProbeRun":
             ; TEMP diagnostic: verify the HoverTracker resolve chain (Ctrl+Alt+H).
             SetTimer(() => HoverTrackerProbeRun(), -1)
+        case "ToggleFocusOverlay":
+            ; Toggle the focused-entity test overlay (targeted monster + hovered object).
+            SetTimer(() => ToggleFocusOverlay(), -1)
         case "ComponentDumpProbeRun":
             ; TEMP diagnostic: dump all components + raw fields of the highlighted entity.
             SetTimer(() => ComponentDumpProbeRun(), -1)

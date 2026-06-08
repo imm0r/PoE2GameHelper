@@ -24,7 +24,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
-        global g_playerHudEnabled, g_playerHud, g_notifyOverlay
+        global g_playerHudEnabled, g_playerHud, g_notifyOverlay, g_focusOverlay, g_focusOverlayEnabled
         if g_updatesPaused
         {
             if g_radarOverlay
@@ -78,6 +78,12 @@ UpdateRadarFast()
         TryEntityAlerts(radarSnap)
         if g_notifyOverlay
             g_notifyOverlay.Tick()
+
+        ; ── Focused-entity test overlay (targeted monster + hovered world object) ──
+        if (IsSet(g_focusOverlayEnabled) && g_focusOverlayEnabled)
+            TickFocusOverlay(g_reader, radarSnap)
+        else if IsObject(g_focusOverlay)
+            g_focusOverlay.Hide()
 
         currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
 
