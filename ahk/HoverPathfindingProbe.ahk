@@ -5,13 +5,12 @@
 ; Sikaka/POE2Radar (Poe2Offsets.cs) and added to PoE2Offsets.ahk:
 ;
 ;   * Pathfinding component  — PoE2Offsets.Pathfinding (Flying 0xE5, BaseSpeed 0xEC)
-;   * HoverTracker chain     — PoE2Offsets.HoverTracker (FromUiRoot 0x7D8,
-;                              WorldTracker 0x630, HoveredEntity 0x18)
+;   * HoverTracker           — resolve the entity currently under the cursor
 ;
-; Both dump a PARSED interpretation (using our offsets) AND raw hex of the key
-; regions, so the real offsets can be confirmed / corrected against the live
-; game. Remove this module once the offsets are verified and wired into the
-; readers (or discarded).
+; Both dump a PARSED interpretation (using our offsets) AND raw hex / scan data,
+; so the real offsets can be confirmed / corrected against the live game. Remove
+; this module once the offsets are verified and wired into the readers (or
+; discarded).
 ;
 ; Reuses helpers from AreaInstanceProbe.ahk: _AIP_ResolveAreaInstance(),
 ; _AIP_ResolveInGameState(), _AIP_WriteProbeLog().
@@ -116,14 +115,72 @@ PathfindingProbeRun()
     _AIP_WriteProbeLog("pathfinding_probe", rpt)
 }
 
-; HoverTracker probe: walk the hypothesised chain UiRoot -> FromUiRoot(0x7D8) ->
-; WorldTracker(0x630) -> HoveredEntity(0x18) and report the resolved entity, plus
-; raw hex of each struct region so a wrong link can be spotted/corrected. Because
-; clicking a UI button drops the hover, this is best run via its hotkey
-; (Ctrl+Alt+H) WHILE hovering a monster/chest. Writes a probe log.
+; Scans base from startOff up to endOff in qword steps for entity-like pointers, adds
+; each hit to <out>, keyed "<tag>+0xNNN". A slot counts when it IS a plausible
+; Entity* (mode "direct") or points to one (mode "indirect"). Reads id + path per
+; hit. IsPlausibleEntityPointer checks the component vector, details ptr and id
+; range, so false positives are rare. Params: reader, base, offsets, tag, out Map.
+_HPP_ScanEntityPtrs(reader, base, startOff, endOff, tag, out)
+{
+    off := startOff
+    while (off + 8 <= endOff)
+    {
+        q := reader.Mem.ReadPtr(base + off)
+        entPtr := 0
+        mode := ""
+        if (reader.IsProbablyValidPointer(q) && reader.IsPlausibleEntityPointer(q))
+        {
+            entPtr := q
+            mode := "direct"
+        }
+        else if reader.IsProbablyValidPointer(q)
+        {
+            d := reader.Mem.ReadPtr(q)
+            if (reader.IsProbablyValidPointer(d) && reader.IsPlausibleEntityPointer(d))
+            {
+                entPtr := d
+                mode := "indirect"
+            }
+        }
+        if (entPtr)
+        {
+            id := _HPP_ReadEntityId(reader, entPtr)
+            path := "?"
+            try {
+                e := reader.ReadEntityBasic(entPtr)
+                if (IsObject(e) && e.Has("path"))
+                    path := e["path"]
+            }
+            out[tag "+0x" Format("{:X}", off)] := Map("ptr", q, "entPtr", entPtr,
+                "id", id, "path", path, "mode", mode)
+        }
+        off += 8
+    }
+}
+
+; Small helper: reads an entity's id (Entity.Id offset). Kept separate so the
+; scan loop stays readable. Returns the uint id (or 0 on failure).
+_HPP_ReadEntityId(reader, entPtr)
+{
+    try return reader.Mem.ReadUInt(entPtr + PoE2Offsets.Entity["Id"])
+    return 0
+}
+
+; HoverTracker probe (entity-ptr scan + DIFF). The fixed Sikaka chain does not fit
+; our build (tracker+0x630 hit a vtable, not a heap struct), so instead of trusting
+; offsets we SCAN the hover-tracker / UI-root structs for slots that hold a
+; plausible Entity* (direct) or point to one (indirect), and DIFF two runs to
+; isolate the slot that only carries a valid entity while hovering.
+;
+; Usage (best via the Ctrl+Alt+H hotkey so the click does not drop the hover):
+;   1. Hover NOTHING (cursor over empty ground), press Ctrl+Alt+H.
+;   2. Hover a monster/chest, press Ctrl+Alt+H again.
+; The slot listed under "NEW/CHANGED" is the hovered-entity pointer. Writes a log.
 HoverTrackerProbeRun()
 {
-    global g_reader
+    global g_reader, g_hoverScanPrev
+    if !IsSet(g_hoverScanPrev)
+        g_hoverScanPrev := Map()
     inGs := _AIP_ResolveInGameState()
     if !inGs
     {
@@ -131,66 +188,64 @@ HoverTrackerProbeRun()
         return
     }
     nl := "`r`n"
-    H := PoE2Offsets.HoverTracker
-    rpt := "=== HoverTracker Probe (resolve hovered entity) ===" nl
-    rpt .= "HYPOTHESIS chain from Sikaka/POE2Radar — hover a monster/chest, then run." nl
-    rpt .= "inGameState: 0x" Format("{:X}", inGs) nl
-
     uiRoot := g_reader.Mem.ReadPtr(inGs + PoE2Offsets.InGameState["UiRootStructPtr"])
-    rpt .= "uiRoot (ReadPtr(inGs+0x" Format("{:X}", PoE2Offsets.InGameState["UiRootStructPtr"]) "))"
-        . " = 0x" Format("{:X}", uiRoot) (g_reader.IsProbablyValidPointer(uiRoot) ? "" : "  (invalid)") nl
-    if !g_reader.IsProbablyValidPointer(uiRoot)
-    {
-        _AIP_WriteProbeLog("hovertracker_probe", rpt)
-        return
-    }
+    tracker := g_reader.IsProbablyValidPointer(uiRoot)
+        ? g_reader.Mem.ReadPtr(uiRoot + PoE2Offsets.HoverTracker["FromUiRoot"]) : 0
 
-    tracker := g_reader.Mem.ReadPtr(uiRoot + H["FromUiRoot"])
-    rpt .= "tracker (ReadPtr(uiRoot+0x" Format("{:X}", H["FromUiRoot"]) "))"
-        . " = 0x" Format("{:X}", tracker) (g_reader.IsProbablyValidPointer(tracker) ? "" : "  (invalid)") nl
+    rpt := "=== HoverTracker Probe (entity-ptr scan + diff) ===" nl
+    rpt .= "Run 1: hover NOTHING.  Run 2: hover a monster/chest, then Ctrl+Alt+H again." nl
+    rpt .= "inGameState=0x" Format("{:X}", inGs) "  uiRoot=0x" Format("{:X}", uiRoot)
+        . "  tracker(uiRoot+0x" Format("{:X}", PoE2Offsets.HoverTracker["FromUiRoot"]) ")=0x"
+        . Format("{:X}", tracker) nl nl
 
-    worldTracker := g_reader.IsProbablyValidPointer(tracker)
-        ? g_reader.Mem.ReadPtr(tracker + H["WorldTracker"]) : 0
-    rpt .= "worldTracker (ReadPtr(tracker+0x" Format("{:X}", H["WorldTracker"]) "))"
-        . " = 0x" Format("{:X}", worldTracker) (g_reader.IsProbablyValidPointer(worldTracker) ? "" : "  (invalid)") nl
+    ; Scan two candidate regions for entity-like pointers. Keys are "<tag>+0xNNN":
+    ; T = the hover-tracker struct (uiRoot+FromUiRoot), U = the UI-root struct.
+    cur := Map()
+    if g_reader.IsProbablyValidPointer(tracker)
+        _HPP_ScanEntityPtrs(g_reader, tracker, 0x000, 0x740, "T", cur)
+    if g_reader.IsProbablyValidPointer(uiRoot)
+        _HPP_ScanEntityPtrs(g_reader, uiRoot, 0x600, 0xA00, "U", cur)
 
-    hovered := g_reader.IsProbablyValidPointer(worldTracker)
-        ? g_reader.Mem.ReadPtr(worldTracker + H["HoveredEntity"]) : 0
-    rpt .= "hoveredEntity (ReadPtr(worldTracker+0x" Format("{:X}", H["HoveredEntity"]) "))"
-        . " = 0x" Format("{:X}", hovered) nl nl
+    rpt .= "entity-like slots found this run: " cur.Count nl
+    for key, h in cur
+        rpt .= Format("  {} {} ptr=0x{:X}  ent=0x{:X}  id={}  {}",
+            key, h["mode"], h["ptr"], h["entPtr"], h["id"], h["path"]) nl
 
-    ; Try to interpret the resolved pointer as an entity and read its path.
-    if (hovered && g_reader.IsPlausibleEntityPointer(hovered))
-    {
-        path := "?"
-        try {
-            ent := g_reader.ReadEntityBasic(hovered)
-            if (IsObject(ent) && ent.Has("path"))
-                path := ent["path"]
-        }
-        eid := g_reader.Mem.ReadUInt(hovered + PoE2Offsets.Entity["Id"])
-        rpt .= ">> hovered entity LOOKS VALID: id=" eid "  path=" path nl
-        rpt .= "   (compare with what you were hovering — match = chain confirmed)" nl nl
-    }
+    ; Diff vs the previous run — the slot whose entity id appeared or changed
+    ; between "no hover" and "hover" is the hovered-entity pointer.
+    prevCount := g_hoverScanPrev.Count
+    rpt .= nl . "previous run slots: " prevCount nl
+    if (prevCount = 0 && cur.Count = 0)
+        rpt .= "(nothing found — make sure you are in-game; run 1 stored)" nl
+    else if (prevCount = 0)
+        rpt .= "(run 1 stored — now hover a monster/chest and run again)" nl
     else
     {
-        rpt .= ">> resolved pointer is NOT a plausible entity — the chain/offsets need fixing." nl
-        rpt .= "   Use the raw hex below to find the real links (look for an entity-like ptr:" nl
-        rpt .= "   one whose +0x" Format("{:X}", PoE2Offsets.Entity["Id"]) " reads a small id < 0x40000000)." nl nl
+        rpt .= "-- NEW/CHANGED vs previous run (hovered-entity candidates) --" nl
+        changes := 0
+        for key, h in cur
+        {
+            prevId := g_hoverScanPrev.Has(key) ? g_hoverScanPrev[key]["id"] : 0
+            if (prevId != h["id"])
+            {
+                rpt .= Format("  >> {} id {} -> {}  ent=0x{:X}  {}",
+                    key, prevId, h["id"], h["entPtr"], h["path"]) nl
+                changes += 1
+            }
+        }
+        for key, h in g_hoverScanPrev
+        {
+            if !cur.Has(key)
+            {
+                rpt .= Format("  << {} lost id {} (was {})", key, h["id"], h["path"]) nl
+                changes += 1
+            }
+        }
+        if (changes = 0)
+            rpt .= "  (no slot changed — re-run while the cursor is actually over a monster"
+                . " when you press Ctrl+Alt+H)" nl
     }
 
-    ; Raw hex of each region so a mis-stepped link can be corrected.
-    rpt .= "-- RAW uiRoot +0x7C0..+0x800 (locate FromUiRoot link) --" nl
-    rpt .= _HPP_HexDump(g_reader, uiRoot + 0x7C0, 0x40, 0x7C0)
-    if g_reader.IsProbablyValidPointer(tracker)
-    {
-        rpt .= nl . "-- RAW tracker +0x620..+0x660 (locate WorldTracker link) --" nl
-        rpt .= _HPP_HexDump(g_reader, tracker + 0x620, 0x40, 0x620)
-    }
-    if g_reader.IsProbablyValidPointer(worldTracker)
-    {
-        rpt .= nl . "-- RAW worldTracker +0x00..+0x40 (locate HoveredEntity link) --" nl
-        rpt .= _HPP_HexDump(g_reader, worldTracker, 0x40, 0x00)
-    }
+    g_hoverScanPrev := cur
     _AIP_WriteProbeLog("hovertracker_probe", rpt)
 }
