@@ -37,6 +37,19 @@ inline when authoring commit messages, PR bodies, etc.
 - The user often cannot runtime-test (the game is ~140 GB). When a change can only be
   verified in-game, say so and list exactly what to check.
 
+### Completion-summary format (lean)
+When wrapping up a task, summarize with this fixed, lean structure. Show only the
+sections that have content — never pad with empty headings:
+
+- **Zusammenfassung** — one sentence on what was achieved.
+- **Änderungen** — bullet list, `path/file.ext:line — what & why`.
+- **In-game zu prüfen** — concrete click/hotkey steps + expected result (the
+  user usually cannot runtime-test). Write "nichts nötig" when nothing applies.
+
+Add **Verifikation** (static checks: brace balance, `node --check`, minimal diff)
+or **Offen / Nächste Schritte** only when actually relevant. Chat summaries may be
+in German; anything committed/posted stays English per the Language rules above.
+
 ## Project structure & conventions
 
 - **Entry point:** `InGameStateMonitor.ahk` (repo root). Run with **AutoHotkey v2**.
