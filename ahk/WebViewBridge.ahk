@@ -47,7 +47,7 @@ PushHeaderToWebView()
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled, g_maphackSource, g_isConnected, g_rangeCirclesEnabled, g_panelDetectionEnabled
     global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
-    global g_inventoryChainDumpEnabled, g_overlayStatusTextEnabled, g_alwaysOnTop
+    global g_inventoryChainDumpEnabled, g_overlayStatusTextEnabled, g_alwaysOnTop, g_localApiEnabled, g_localApiPort
     global g_cfgOpenSections
     global g_combatAutoEnabled, g_combatState, g_combatLastReason, g_combatToggleHotkey
     global g_combatRange, g_combatDisengageRange, g_combatGlobalCooldownMs, g_combatSkillSlots
@@ -118,7 +118,7 @@ PushHeaderToWebView()
         . '"autoPilotState":' _JsStr(g_autoPilotState) ","
         . '"autoPilotReason":' _JsStr(g_autoPilotReason) ","
         . '"invChainDump":' (g_inventoryChainDumpEnabled ? "true" : "false") ","
-        . '"overlayStatusText":' (g_overlayStatusTextEnabled ? "true" : "false") ","
+        . '"overlayStatusText":' (g_overlayStatusTextEnabled ? "true" : "false") "," . '"localApi":' (g_localApiEnabled ? "true" : "false") "," . '"localApiPort":' g_localApiPort ","
         . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
         . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
         . '"combatState":' _JsStr(g_combatState) ","

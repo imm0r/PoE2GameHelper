@@ -243,6 +243,18 @@ _DispatchBridgeCall(method, args)
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
 
+        case "ToggleLocalApi":
+            ; Start/stop the local HTTP API (MCP backend). Bound to
+            ; 127.0.0.1; off by default. State persists to [LocalApi].
+            global g_localApiEnabled
+            g_localApiEnabled := !g_localApiEnabled
+            if (g_localApiEnabled)
+                StartLocalApiServer()
+            else
+                StopLocalApiServer()
+            SaveLocalApiConfig()
+            SetTimer(PushHeaderToWebView, -50)
+
             ; ── Memory-Diff RE tab ────────────────────────────────────────
             ; Configure target: args = [symbol, customHex, sizeBytes]
         case "MemDiffConfigure":

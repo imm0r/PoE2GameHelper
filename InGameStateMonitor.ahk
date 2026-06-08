@@ -109,6 +109,8 @@ g_radarOverlay := 0   ; lazy-init on first render call
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
 g_playerHud := 0   ; lazy-init on first render
 g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
+g_localApiEnabled := false   ; local HTTP API (MCP backend) — opt-in; seeded by LoadLocalApiConfig()
+g_localApiPort := 7777       ; loopback port for the local HTTP API
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
 g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
@@ -305,6 +307,7 @@ LoadExplorationConfig()
 LoadLootPickupConfig()
 LoadEntityGroups()
 LoadEntityAlertsConfig()
+LoadLocalApiConfig()      ; local HTTP API (MCP backend) settings + Winsock constants
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 
@@ -384,6 +387,13 @@ try WinSetAlwaysOnTop(g_alwaysOnTop ? 1 : 0, "ahk_id " g_webGui.Hwnd)
 ; Save window geometry on exit and after move/resize
 OnExit((*) => (_CaptureWindowGeometry(), SaveConfig(), SaveCombatAutoConfig()))
 OnMessage(0x0232, _OnExitSizeMove)  ; WM_EXITSIZEMOVE
+
+; Local HTTP API (MCP backend) — opt-in, bound to 127.0.0.1, off by default.
+; Start it here so the hidden message-receiver Gui and OnMessage hook are live
+; once the main window exists; tear it down cleanly on exit.
+if (g_localApiEnabled)
+    StartLocalApiServer()
+OnExit((*) => StopLocalApiServer())
 
 ; Set window icon (title bar + taskbar) using LoadImage for reliable HICON
 try
@@ -903,6 +913,7 @@ OnTreeTabChanged(*)
 #Include ahk/DebugDump.ahk
 #Include ahk/ToggleHandlers.ahk
 #Include ahk/BridgeDispatch.ahk
+#Include ahk/LocalApiServer.ahk
 #Include ahk/GgpkToolBridge.ahk
 
 #Include ahk/AutoFlask.ahk

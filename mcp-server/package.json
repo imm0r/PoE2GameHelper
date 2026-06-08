@@ -1,0 +1,20 @@
+{
+  "name": "poeformance-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing PoEformance live game data to an AI assistant",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "poeformance-mcp": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  }
+}
