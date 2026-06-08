@@ -49,6 +49,11 @@ internal static class OodleResolver
         }
         catch { /* fall through to provisioning */ }
 
+        // 1b. A versioned oo2core_*.dll already dropped next to the exe (or in
+        //     the working dir)? Rename it to oo2core.dll — the name the loader
+        //     actually wants — so the user doesn't have to do it by hand.
+        if (TryAdoptLocalVersioned()) return true;
+
         string target = Path.Combine(AppContext.BaseDirectory, TargetFileName);
 
         // 2. Auto-scan local game installs.
@@ -75,6 +80,68 @@ internal static class OodleResolver
             "  Copy 'oo2core_9_win64.dll' from a game you own (e.g. a Path of Exile 1\n" +
             "  install root, or any other Oodle game) next to this executable and\n" +
             "  rename the copy to 'oo2core.dll'.");
+        return false;
+    }
+
+    /// <summary>
+    /// If a versioned Oodle DLL (e.g. <c>oo2core_9_win64.dll</c>) is sitting
+    /// next to the executable or in the working directory but the canonical
+    /// <c>oo2core.dll</c> isn't loadable, rename it in place to
+    /// <c>oo2core.dll</c>. The loader imports <c>DllImport("oo2core")</c> →
+    /// <c>oo2core.dll</c>, so the versioned filename alone is never picked up.
+    /// Falls back to a copy if the move is blocked. Returns true on success.
+    /// </summary>
+    private static bool TryAdoptLocalVersioned()
+    {
+        // Search the exe dir and the working dir (both on the loader's path),
+        // de-duplicated so the same folder isn't processed twice.
+        var dirs = new List<string>();
+        foreach (var d in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
+        {
+            if (string.IsNullOrEmpty(d)) continue;
+            string full = Path.GetFullPath(d).TrimEnd('\\', '/');
+            if (!dirs.Any(x => string.Equals(x, full, StringComparison.OrdinalIgnoreCase)))
+                dirs.Add(full);
+        }
+
+        foreach (var dir in dirs)
+        {
+            string[] hits;
+            try { hits = Directory.GetFiles(dir, "oo2core*.dll"); }
+            catch { continue; }
+            foreach (var src in hits)
+            {
+                // Skip the canonical name itself — it either already works
+                // (then we wouldn't be here) or is a broken file we shouldn't
+                // move onto itself.
+                if (string.Equals(Path.GetFileName(src), TargetFileName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string dst = Path.Combine(dir, TargetFileName);
+                try
+                {
+                    File.Move(src, dst, overwrite: true);
+                    Console.Out.WriteLine($"Renamed {Path.GetFileName(src)} → {TargetFileName}");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    // Move can fail (locked / cross-volume) — copy so we still
+                    // end up with a usable oo2core.dll.
+                    try
+                    {
+                        File.Copy(src, dst, overwrite: true);
+                        Console.Out.WriteLine($"Copied {Path.GetFileName(src)} → {TargetFileName}");
+                        return true;
+                    }
+                    catch
+                    {
+                        Console.Error.WriteLine(
+                            $"Found {src} but couldn't rename it to {TargetFileName}: {ex.Message}");
+                    }
+                }
+            }
+        }
         return false;
     }
 

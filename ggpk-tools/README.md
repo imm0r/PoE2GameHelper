@@ -43,10 +43,12 @@ stays scoped to this directory.
   pulled a copy named `oo2core_9_win64.dll` from a game install, just
   rename it. PoE2 statically links Oodle so the DLL is **not** in the
   PoE2 install folder. **`PoeDataExtract` now auto-provisions this on
-  first run** — if `oo2core.dll` isn't already loadable it scans your
-  local Steam game installs (anchored off the ggpk/index path you pass)
-  for an `oo2core*.dll`, copies it next to the exe, and (in an interactive
-  terminal) offers a file picker as a fallback. It never downloads or
+  first run** — if `oo2core.dll` isn't already loadable it will, in order:
+  (1) rename a versioned `oo2core_*win64.dll` you've dropped next to the
+  exe (or in the working dir) to `oo2core.dll`; (2) scan your local Steam
+  game installs (anchored off the ggpk/index path you pass) for an
+  `oo2core*.dll` and copy it next to the exe; (3) in an interactive
+  terminal, offer a file picker as a fallback. It never downloads or
   bundles the DLL — the copy comes from a game you already own. Legitimate
   manual sources:
   - a Path of Exile **1** install root (free Steam download — but check
