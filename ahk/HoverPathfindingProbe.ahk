@@ -196,7 +196,25 @@ HoverTrackerProbeRun()
     rpt .= "Run 1: hover NOTHING.  Run 2: hover a monster/chest, then Ctrl+Alt+H again." nl
     rpt .= "inGameState=0x" Format("{:X}", inGs) "  uiRoot=0x" Format("{:X}", uiRoot)
         . "  tracker(uiRoot+0x" Format("{:X}", PoE2Offsets.HoverTracker["FromUiRoot"]) ")=0x"
-        . Format("{:X}", tracker) nl nl
+        . Format("{:X}", tracker) nl
+
+    ; Confirmed resolve: WorldTracker is embedded, so the hovered entity sits at
+    ; tracker + 0x648 (= WorldTracker 0x630 + HoveredEntity 0x18).
+    hov := g_reader.IsProbablyValidPointer(tracker)
+        ? g_reader.Mem.ReadPtr(tracker + PoE2Offsets.HoverTracker["HoveredEntityFromTracker"]) : 0
+    if (hov && g_reader.IsPlausibleEntityPointer(hov))
+    {
+        hp := "?"
+        try {
+            he := g_reader.ReadEntityBasic(hov)
+            if (IsObject(he) && he.Has("path"))
+                hp := he["path"]
+        }
+        rpt .= "HOVERED (tracker+0x648) = 0x" Format("{:X}", hov)
+            . "  id=" _HPP_ReadEntityId(g_reader, hov) "  " hp nl nl
+    }
+    else
+        rpt .= "HOVERED (tracker+0x648) = none (hover a monster/chest and re-run)" nl nl
 
     ; Scan two candidate regions for entity-like pointers. Keys are "<tag>+0xNNN":
     ; T = the hover-tracker struct (uiRoot+FromUiRoot), U = the UI-root struct.
