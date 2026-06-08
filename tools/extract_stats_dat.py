@@ -296,7 +296,7 @@ def ensure_schema(schema_path: str) -> dict:
 # -----------------------------------------------------------------------
 def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-data_dir    = os.path.join(os.path.dirname(script_dir), 'data')
+    data_dir    = os.path.join(os.path.dirname(script_dir), 'data')
 
     # Detect defaults
     game_dir    = sys.argv[1] if len(sys.argv) > 1 else r'H:\SteamLibrary\steamapps\common\Path of Exile 2'

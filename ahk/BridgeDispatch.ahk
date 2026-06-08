@@ -668,6 +668,9 @@ _DispatchBridgeCall(method, args)
         case "UiMapProbeRun":
             ; TEMP post-patch diagnostic: UI->Map chain (LargeMap detection).
             SetTimer(() => UiMapProbeRun(), -1)
+        case "ChestProbeRun":
+            ; TEMP post-patch diagnostic: dump Chest component bytes (IsOpened).
+            SetTimer(() => ChestProbeRun(), -1)
         case "PatchMaintSetPath":
             ; args[1] = user-entered path to Bundles2\_.index.bin / Content.ggpk.
             pmPathArg := (args.Length >= 1) ? String(args[1]) : ""
