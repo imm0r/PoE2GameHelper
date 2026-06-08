@@ -659,27 +659,43 @@ TargetableProbeRun()
             if !tgtAddr
                 continue
             rpt .= "#" id "  " path nl
-            buf := g_reader.Mem.ReadBytes(tgtAddr + 0x40, 0x28, true)
+            ; Verify this really is the Targetable component: header EntityPtr (0x08)
+            ; should equal the entity pointer.
+            hdrEnt := g_reader.Mem.ReadPtr(tgtAddr + PoE2Offsets.ComponentHeader["EntityPtr"])
+            rpt .= "  tgt@0x" Format("{:X}", tgtAddr) "  hdr.EntityPtr=0x" Format("{:X}", hdrEnt)
+                . (hdrEnt = entPtr ? " (OK)" : " (MISMATCH ent=0x" Format("{:X}", entPtr) ")") nl
+            buf := g_reader.Mem.ReadBytes(tgtAddr, 0xC0, true)
             if buf
             {
-                line := "  0x40: "
                 i := 0
+                line := ""
                 while (i < buf.Size)
                 {
+                    if (Mod(i, 16) = 0)
+                        line := "  0x" Format("{:02X}", i) ": "
                     line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
                     i += 1
                     if (Mod(i, 16) = 0)
-                    {
                         rpt .= RTrim(line) nl
-                        line := "  0x" Format("{:X}", 0x40 + i) ": "
-                    }
                 }
-                if (Trim(line) != "0x" Format("{:X}", 0x40 + i) ":")
+                if (Mod(i, 16) != 0)
                     rpt .= RTrim(line) nl
             }
-            rpt .= "  -> @0x51=" g_reader.Mem.ReadUChar(tgtAddr + 0x51)
-                . " @0x52=" g_reader.Mem.ReadUChar(tgtAddr + 0x52)
-                . " @0x53=" g_reader.Mem.ReadUChar(tgtAddr + 0x53) nl
+            ; Scan a wider window for bool flags (byte == 1) — the targeted monster
+            ; should light up wherever IsTargetable/Highlightable/TargetedByPlayer moved.
+            ones := ""
+            scanBuf := g_reader.Mem.ReadBytes(tgtAddr, 0x200, true)
+            if scanBuf
+            {
+                j := 0
+                while (j < scanBuf.Size)
+                {
+                    if (NumGet(scanBuf.Ptr, j, "UChar") = 1)
+                        ones .= "0x" Format("{:X}", j) " "
+                    j += 1
+                }
+            }
+            rpt .= "  bytes==1 at: " (ones = "" ? "(none)" : ones) nl
             rpt .= nl
             n += 1
             if (n >= 12)
