@@ -288,9 +288,11 @@ _BuildEntitiesJson(snap)
                 isAlive := life.Has("isAlive") ? life["isAlive"] : true
                 lifePct := life.Has("lifeCurrentPercentMax") ? Round(life["lifeCurrentPercentMax"], 0) : -1
             }
-            ; (Targetable-based corpse override temporarily disabled: the v4.5.1.1.4
-            ; hotfix moved the Targetable struct, so decoded["targetable"] is
-            ; unreliable. isAlive stays life-based until the offset is re-derived.)
+            ; Hostile monsters with stale HP (HP still reads >0 shortly after death)
+            ; are caught by IsTargetable (0x69) going to 0. Gate on Enemy/Boss only —
+            ; players/NPCs/chests read it differently.
+            if decoded && decoded.Has("targetable") && (entityType = "Enemy" || entityType = "Boss")
+                isAlive := decoded["targetable"]
 
             entityId  := entity.Has("entityId") ? entity["entityId"] : 0
             entityAddr := entity.Has("address") ? entity["address"] : 0
