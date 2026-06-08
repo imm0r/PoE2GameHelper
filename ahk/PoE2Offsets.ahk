@@ -357,6 +357,17 @@ class PoE2Offsets
         "Count", 0x18
     )
 
+    ; Item "Base" component. For unique items, +0x30 points to the item's
+    ; ItemVisualIdentity dat row (0 for non-uniques). That row's first field
+    ; (+0x00) is a pointer to the IVI Id wide string (e.g. "FourUniquePinnacle1"),
+    ; which uniquely identifies the unique even when several share a base item.
+    static ItemBaseComponent := Map(
+        "UniqueIviRow", 0x30
+    )
+    static ItemVisualIdentityRow := Map(
+        "IdPtr", 0x00
+    )
+
     static ChargesInternal := Map(
         "PerUseCharges", 0x18
     )
