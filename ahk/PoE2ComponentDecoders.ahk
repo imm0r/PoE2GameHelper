@@ -969,27 +969,22 @@ class PoE2ComponentDecoders
             grantedEffectDatPtr := this.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
             if this.IsProbablyValidPointer(grantedEffectDatPtr)
             {
-                ; Internal name from GrantedEffects row offset 0x00
-                nameStringPtr := this.Mem.ReadPtr(grantedEffectDatPtr)
-                if this.IsProbablyValidPointer(nameStringPtr)
-                    internalName := this.Mem.ReadUnicodeString(nameStringPtr, 256)
+                ; PoE2 v4.5.1.1.4: the GrantedEffects Id string is stored INLINE at
+                ; +0x00 (was a pointer-to-string). Read it directly — dereferencing
+                ; once more read the string's first bytes as a pointer and fell back
+                ; to "Skill_<hex>".
+                internalName := this.Mem.ReadUnicodeString(grantedEffectDatPtr, 256)
 
-                ; Display name + icon via ActiveSkills.dat row
-                if (this._activeSkillOffset > 0)
+                ; Pretty display name from the skill-gem name map (base_item_name_map):
+                ; "Metadata/Items/Gems/SkillGem<Id>" -> e.g. "Bind Spectre". The in-memory
+                ; ActiveSkills DisplayedName chain was restructured in v4.5; the gem TSV is
+                ; version-robust. Non-gem/utility skills keep their internal id.
+                if (internalName != "")
                 {
-                    asInfo := this._TryReadActiveSkillRow(grantedEffectDatPtr, this._activeSkillOffset)
-                    displayName := asInfo["displayName"]
-                    iconPath := asInfo["iconPath"]
-                }
-                else
-                {
-                    this._activeSkillOffset := this._FindActiveSkillOffset(grantedEffectDatPtr)
-                    if (this._activeSkillOffset > 0)
-                    {
-                        asInfo := this._TryReadActiveSkillRow(grantedEffectDatPtr, this._activeSkillOffset)
-                        displayName := asInfo["displayName"]
-                        iconPath := asInfo["iconPath"]
-                    }
+                    gemKey := "Metadata/Items/Gems/SkillGem" . internalName
+                    mapped := this.GetBaseItemName(gemKey)
+                    if (mapped != "" && mapped != gemKey && mapped != internalName)
+                        displayName := mapped
                 }
             }
         }
@@ -1491,8 +1486,11 @@ class PoE2ComponentDecoders
     }
 
 
-    ; Reads the MinimapIcon component's owner entity and staticPtr for minimap icon lookup.
-    ; Returns: Map with ownerEntityPtr, owner identity, staticPtr, and hasMinimapIcon, or 0 on invalid owner
+    ; Reads the MinimapIcon component's owner entity, staticPtr and icon name.
+    ; Icon name chain: componentPtr + IconDatPtr(0x20) -> MinimapIcons.dat row -> name.
+    ; In v4.5 the row stores the name INLINE (UTF-16) at +0x00; older builds stored a
+    ; pointer-to-string there, so try the pointer first, then fall back to inline.
+    ; Returns: Map with ownerEntityPtr, owner identity, staticPtr, iconName, hasMinimapIcon, or 0 on invalid owner
     DecodeMinimapIconComponentBasic(componentPtr)
     {
         staticPtr := this.Mem.ReadPtr(componentPtr + PoE2Offsets.ComponentHeader["StaticPtr"])
@@ -1501,11 +1499,27 @@ class PoE2ComponentDecoders
             return 0
         owner := this.ReadEntityIdentityBasic(ownerEntityPtr, 120)
 
+        iconName := ""
+        datRowPtr := this.Mem.ReadPtr(componentPtr + PoE2Offsets.MinimapIcon["IconDatPtr"])
+        if this.IsProbablyValidPointer(datRowPtr)
+        {
+            namePtr := this.Mem.ReadPtr(datRowPtr)
+            if this.IsProbablyValidPointer(namePtr)
+                iconName := this.Mem.ReadUnicodeString(namePtr, 256)
+            if (iconName = "")
+                iconName := this.Mem.ReadUnicodeString(datRowPtr, 256)
+            ; MinimapIcons.dat ids are identifiers (e.g. "RewardChestExpedition");
+            ; reject binary garbage from a stale offset by requiring a leading letter.
+            if (iconName != "" && !RegExMatch(iconName, "^[A-Za-z_]"))
+                iconName := ""
+        }
+
         return Map(
             "address", componentPtr,
             "ownerEntityPtr", ownerEntityPtr,
             "owner", owner,
             "staticPtr", staticPtr,
+            "iconName", iconName,
             "hasMinimapIcon", true
         )
     }

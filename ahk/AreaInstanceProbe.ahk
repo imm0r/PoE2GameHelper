@@ -771,51 +771,62 @@ _AIP_HexDump(buf, len)
 ; a monster and run again.
 TargetedByPlayerProbeRun()
 {
-    global g_reader, g_aipTgtPrev
+    global g_reader, g_radarLastSnap, g_aipTgtPrev
     if !IsSet(g_aipTgtPrev)
         g_aipTgtPrev := Map()
-    base := _AIP_ResolveAreaInstance()
-    if !base
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
     {
-        try MsgBox("IsTargetedByPlayer probe: not in-game.", "TgtByPlayer Probe", "Iconx")
+        try MsgBox("IsTargetedByPlayer probe: not connected.", "TgtByPlayer Probe", "Iconx")
         return
     }
     nl := "`r`n"
-    summary := ""
-    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
-    OFF := 0x60
-    LEN := 0x20
-    cur := Map()
-    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    ; Use the persistent radar cache (stable across frames) so the SAME monsters are
+    ; present in both runs — a fresh BFS re-samples a different subset each call.
+    sample := 0
+    try
     {
-        for _, en in summary["sample"]
-        {
-            if !(en && Type(en) = "Map")
-                continue
-            ent := en.Has("entity") ? en["entity"] : 0
-            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
-            if !InStr(StrLower(path), "monster")
-                continue
-            entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
-            id := en.Has("id") ? en["id"] : 0
-            tgt := 0
-            try tgt := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
-            if !tgt
-                continue
-            buf := g_reader.Mem.ReadBytes(tgt + OFF, LEN, true)
-            if buf
-                cur[id] := Map("path", path, "buf", buf)
-        }
+        inGs := (IsObject(g_radarLastSnap) && g_radarLastSnap.Has("inGameState")) ? g_radarLastSnap["inGameState"] : 0
+        area := (IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        awake := (IsObject(area) && area.Has("awakeEntities")) ? area["awakeEntities"] : 0
+        sample := (IsObject(awake) && awake.Has("sample")) ? awake["sample"] : 0
+    }
+    if !IsObject(sample)
+    {
+        try MsgBox("No radar snapshot yet — let the radar run a moment, then retry.", "TgtByPlayer Probe", "Iconx")
+        return
+    }
+
+    LEN := 0x100
+    cur := Map()
+    for _, en in sample
+    {
+        if !(IsObject(en) && en.Has("entity"))
+            continue
+        ent := en["entity"]
+        path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+        if !InStr(StrLower(path), "monster")
+            continue
+        entPtr := en.Has("entityPtr") ? en["entityPtr"] : (en.Has("entityRawPtr") ? en["entityRawPtr"] : 0)
+        id := en.Has("id") ? en["id"] : 0
+        if (!entPtr || !id)
+            continue
+        tgt := 0
+        try tgt := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
+        if !tgt
+            continue
+        buf := g_reader.Mem.ReadBytes(tgt, LEN, true)
+        if buf
+            cur[id] := Map("path", path, "buf", buf)
     }
 
     curCount := cur.Count
     prevCount := g_aipTgtPrev.Count
-    rpt := "=== IsTargetedByPlayer hover-diff (NO hover, then hover one monster and run again) ===" nl
+    rpt := "=== IsTargetedByPlayer diff (run 1 = no target, run 2 = while ATTACKING one monster) ===" nl
     rpt .= "captured monsters: " curCount "   previous: " prevCount nl nl
 
     if (prevCount > 0)
     {
-        rpt .= "-- byte changes vs previous run (component-relative offsets) --" nl
+        rpt .= "-- byte changes vs previous run (full Targetable component 0x00..0x100) --" nl
         changes := 0
         for id, c in cur
         {
@@ -830,7 +841,7 @@ TargetedByPlayerProbeRun()
                 pv := NumGet(pb.Ptr, k, "UChar")
                 cv := NumGet(cb.Ptr, k, "UChar")
                 if (pv != cv)
-                    line .= "0x" Format("{:X}", OFF + k) ":" pv "->" cv "  "
+                    line .= "0x" Format("{:X}", k) ":" pv "->" cv "  "
                 k += 1
             }
             if (line != "")
@@ -840,10 +851,10 @@ TargetedByPlayerProbeRun()
             }
         }
         if (changes = 0)
-            rpt .= "  (no byte changed for any monster present in both runs)" nl
+            rpt .= "  (no byte changed in any monster's Targetable component between the two runs)" nl
     }
     else
-        rpt .= "(first run stored — now hover/target ONE monster and run again)" nl
+        rpt .= "(first run stored — now ATTACK/target ONE monster and run again)" nl
 
     g_aipTgtPrev := cur
 
@@ -859,10 +870,244 @@ TargetedByPlayerProbeRun()
         }
     }
     try LogError("TgtByPlayerProbe cur=" curCount " prev=" prevCount " -> " path)
-    try MsgBox("IsTargetedByPlayer hover-diff." nl nl
-        . "Run 1: NO hover. Then HOVER/target one monster and press Ctrl+B again." nl
+    try MsgBox("IsTargetedByPlayer diff." nl nl
+        . "Run 1: do NOT target anything. Then ATTACK/target ONE monster and press Ctrl+B again." nl
         . "captured=" curCount "  previous=" prevCount nl nl
         . "Send me the log after the 2nd run:" nl . path, "TgtByPlayer Probe", "Iconi")
+}
+
+; Skill-name chain probe: traces Actor -> ActiveSkills[i] -> details ->
+; GrantedEffectsPerLevelDatRow(0x48) -> grantedEffectDatPtr(geplRow+0x00) ->
+; nameStr(GED+0x00) -> string, dumping each step so we can see where the
+; "Skill_<hex>" fallback comes from (a moved 0x48 or a changed DAT-row layout).
+SkillProbeRun()
+{
+    global g_reader
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Skill probe: not in-game.", "Skill Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    piOff := PoE2Offsets.AreaInstance["PlayerInfo"]
+    lpRaw := g_reader.Mem.ReadPtr(base + piOff + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
+    localPlayer := g_reader.ResolveEntityPointer(lpRaw)
+    actor := 0
+    try actor := g_reader.FindEntityComponentAddress(localPlayer, "Actor")
+
+    rpt := "=== Skill Chain Probe ===" nl
+    rpt .= "localPlayer=0x" Format("{:X}", localPlayer) "  Actor=0x" Format("{:X}", actor) nl
+    rpt .= "offsets: ActiveSkills=0x" Format("{:X}", PoE2Offsets.Actor["ActiveSkills"])
+        . " GEPLRow=0x" Format("{:X}", PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+        . " GEDatPtr=0x" Format("{:X}", PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"]) nl nl
+    if !actor
+    {
+        rpt .= "(no Actor component)" nl
+        _AIP_WriteSkillLog(rpt)
+        return
+    }
+    asFirst := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["ActiveSkills"])
+    asLast  := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["ActiveSkillsLast"])
+    cnt := (asFirst > 0 && asLast >= asFirst) ? Floor((asLast - asFirst) / 0x10) : 0
+    rpt .= "ActiveSkills vec: first=0x" Format("{:X}", asFirst) " last=0x" Format("{:X}", asLast) " count=" cnt nl nl
+
+    n := 0
+    idx := 0
+    while (idx < cnt && n < 5)
+    {
+        entry := asFirst + idx * 0x10
+        detailsPtr := g_reader.Mem.ReadPtr(entry + PoE2Offsets.ActiveSkillStructure["ActiveSkillPtr"])
+        idx += 1
+        if !g_reader.IsProbablyValidPointer(detailsPtr)
+            continue
+        geplRow := g_reader.Mem.ReadPtr(detailsPtr + PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+        rpt .= "-- skill #" n " --" nl
+        rpt .= "  details=0x" Format("{:X}", detailsPtr) "  geplRow(@0x48)=0x" Format("{:X}", geplRow)
+            . " valid=" (g_reader.IsProbablyValidPointer(geplRow) ? "y" : "N") nl
+        db := g_reader.Mem.ReadBytes(detailsPtr + 0x40, 0x30, true)
+        if db
+        {
+            cand := ""
+            j := 0
+            while (j + 8 <= db.Size)
+            {
+                p := NumGet(db.Ptr, j, "Int64")
+                if g_reader.IsProbablyValidPointer(p)
+                    cand .= "0x" Format("{:X}", 0x40 + j) "=0x" Format("{:X}", p) " "
+                j += 8
+            }
+            rpt .= "  details ptr-candidates 0x40..0x70: " (cand = "" ? "(none)" : cand) nl
+        }
+        if g_reader.IsProbablyValidPointer(geplRow)
+        {
+            gedp := g_reader.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
+            rpt .= "  geplRow q0..q3:"
+            q := 0
+            while (q < 4)
+            {
+                rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(geplRow + q * 8) & 0xFFFFFFFFFFFFFFFF)
+                q += 1
+            }
+            rpt .= nl
+            rpt .= "  grantedEffectDatPtr(@geplRow+0x00)=0x" Format("{:X}", gedp)
+                . " valid=" (g_reader.IsProbablyValidPointer(gedp) ? "y" : "N") nl
+            if g_reader.IsProbablyValidPointer(gedp)
+            {
+                rpt .= "  GED q0..q3:"
+                q := 0
+                while (q < 4)
+                {
+                    rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(gedp + q * 8) & 0xFFFFFFFFFFFFFFFF)
+                    q += 1
+                }
+                rpt .= nl
+                nameStr := g_reader.Mem.ReadPtr(gedp + 0x00)
+                s := ""
+                try s := g_reader.Mem.ReadUnicodeString(nameStr, 128)
+                rpt .= "  name@GED+0x00: strPtr=0x" Format("{:X}", nameStr) "  str='" s "'" nl
+            }
+        }
+        rpt .= nl
+        n += 1
+    }
+    _AIP_WriteSkillLog(rpt)
+}
+
+; Writes the skill-probe report to the log and shows the path.
+_AIP_WriteSkillLog(rpt)
+{
+    path := A_ScriptDir "\logs\InGameStateMonitor.skill_probe.log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("SkillProbe -> " path)
+    try MsgBox("Skill chain probe done." "`r`n`r`nSend me:`r`n" path, "Skill Probe", "Iconi")
+}
+
+; Generic component dump for the currently highlighted entity: finds it in the
+; awake-entity sample by path, enumerates ALL its components and dumps each
+; component's raw bytes (0x00..0x80) plus 8-aligned pointer candidates. The basis
+; for a systematic component-offset pass — highlight any entity (monster, shrine,
+; monolith, chest, ...) in the tree, then run this.
+ComponentDumpProbeRun()
+{
+    global g_reader, g_highlightedEntityPath
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Component dump: not in-game.", "Component Dump", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    target := (IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : "")
+    rpt := "=== Component Dump Probe ===" nl
+    rpt .= "highlighted path: '" target "'" nl nl
+    if (target = "")
+    {
+        rpt .= "(no entity highlighted — click an entity in the tree first, then run this)" nl
+        _AIP_WriteProbeLog("component_dump", rpt)
+        return
+    }
+
+    summary := 0
+    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 256, 0)
+    entPtr := 0
+    matchedPath := ""
+    matches := 0
+    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    {
+        for _, en in summary["sample"]
+        {
+            if !(en && Type(en) = "Map")
+                continue
+            ent := en.Has("entity") ? en["entity"] : 0
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+            if (path = "")
+                continue
+            if (path = target || InStr(path, target) || InStr(target, path))
+            {
+                matches += 1
+                if !entPtr
+                {
+                    entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
+                    matchedPath := path
+                }
+            }
+        }
+    }
+    if !g_reader.IsProbablyValidPointer(entPtr)
+    {
+        rpt .= "(no awake entity matched the highlighted path — stand closer / re-highlight)" nl
+        _AIP_WriteProbeLog("component_dump", rpt)
+        return
+    }
+    rpt .= "matched entity: 0x" Format("{:X}", entPtr) "  (" matches " match(es))" nl
+    rpt .= "path: " matchedPath nl nl
+
+    comps := g_reader.ReadEntityComponentLookupBasic(entPtr, 96)
+    rpt .= "components: " comps.Length nl nl
+    for _, comp in comps
+    {
+        name := comp["name"]
+        addr := comp["address"]
+        rpt .= "-- " name " @0x" Format("{:X}", addr) " --" nl
+        buf := g_reader.Mem.ReadBytes(addr, 0x80, true)
+        if !buf
+        {
+            rpt .= "  (unreadable)" nl nl
+            continue
+        }
+        i := 0
+        while (i < buf.Size)
+        {
+            rowOff := "  0x" Format("{:02X}", i) ": "
+            j := 0
+            while (j < 16 && i + j < buf.Size)
+            {
+                rowOff .= Format("{:02X} ", NumGet(buf.Ptr, i + j, "UChar"))
+                j += 1
+            }
+            rpt .= RTrim(rowOff) nl
+            i += 16
+        }
+        pc := ""
+        k := 0
+        while (k + 8 <= buf.Size)
+        {
+            p := NumGet(buf.Ptr, k, "Int64")
+            if g_reader.IsProbablyValidPointer(p)
+                pc .= "0x" Format("{:X}", k) "=0x" Format("{:X}", p) " "
+            k += 8
+        }
+        rpt .= "  ptrs: " (pc = "" ? "(none)" : pc) nl nl
+    }
+    _AIP_WriteProbeLog("component_dump", rpt)
+}
+
+; Writes a probe report to logs\InGameStateMonitor.<tag>.log and shows the path.
+_AIP_WriteProbeLog(tag, rpt)
+{
+    path := A_ScriptDir "\logs\InGameStateMonitor." tag ".log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("Probe[" tag "] -> " path)
+    try MsgBox("Probe done." "`r`n`r`nSend me:`r`n" path, "Probe", "Iconi")
 }
 
 ; Registers the temporary in-game probe hotkeys (Ctrl+Alt+Shift+T = chest CLOSED/
@@ -872,4 +1117,5 @@ _AIP_RegisterProbeHotkeys()
 {
     try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
     try Hotkey("^b", (*) => TargetedByPlayerProbeRun(), "On")
+    try Hotkey("^!+d", (*) => ComponentDumpProbeRun(), "On")
 }
