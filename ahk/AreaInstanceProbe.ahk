@@ -914,7 +914,7 @@ SkillProbeRun()
 
     n := 0
     idx := 0
-    while (idx < cnt && n < 5)
+    while (idx < cnt && n < 64)
     {
         entry := asFirst + idx * 0x10
         detailsPtr := g_reader.Mem.ReadPtr(entry + PoE2Offsets.ActiveSkillStructure["ActiveSkillPtr"])
@@ -922,89 +922,76 @@ SkillProbeRun()
         if !g_reader.IsProbablyValidPointer(detailsPtr)
             continue
         geplRow := g_reader.Mem.ReadPtr(detailsPtr + PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
-        rpt .= "-- skill #" n " --" nl
-        rpt .= "  details=0x" Format("{:X}", detailsPtr) "  geplRow(@0x48)=0x" Format("{:X}", geplRow)
-            . " valid=" (g_reader.IsProbablyValidPointer(geplRow) ? "y" : "N") nl
-        db := g_reader.Mem.ReadBytes(detailsPtr + 0x40, 0x30, true)
-        if db
+        nm := ""
+        try
         {
-            cand := ""
-            j := 0
-            while (j + 8 <= db.Size)
-            {
-                p := NumGet(db.Ptr, j, "Int64")
-                if g_reader.IsProbablyValidPointer(p)
-                    cand .= "0x" Format("{:X}", 0x40 + j) "=0x" Format("{:X}", p) " "
-                j += 8
-            }
-            rpt .= "  details ptr-candidates 0x40..0x70: " (cand = "" ? "(none)" : cand) nl
+            sn := g_reader._ResolveSkillName(geplRow)
+            nm := sn["displayName"] " (" sn["internalName"] ")"
         }
-        if g_reader.IsProbablyValidPointer(geplRow)
+        equipId := g_reader.Mem.ReadUInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["UnknownIdAndEquipmentInfo"])
+        rpt .= "-- #" n " " nm "  details=0x" Format("{:X}", detailsPtr) " equipId=0x" Format("{:X}", equipId) nl
+        ; Int fields in the TotalUses / cooldown region. The cast counter (was 0xE4)
+        ; should increment by 1 each time you use the skill — find which field == your
+        ; cast count after casting it a few times.
+        rpt .= "  ints 0x90..0x120 (non-zero):"
+        o := 0x90
+        while (o <= 0x120)
         {
-            gedp := g_reader.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
-            rpt .= "  geplRow q0..q3:"
-            q := 0
-            while (q < 4)
-            {
-                rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(geplRow + q * 8) & 0xFFFFFFFFFFFFFFFF)
-                q += 1
-            }
-            rpt .= nl
-            rpt .= "  grantedEffectDatPtr(@geplRow+0x00)=0x" Format("{:X}", gedp)
-                . " valid=" (g_reader.IsProbablyValidPointer(gedp) ? "y" : "N") nl
-            if g_reader.IsProbablyValidPointer(gedp)
-            {
-                rpt .= "  GED q0..q3:"
-                q := 0
-                while (q < 4)
-                {
-                    rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(gedp + q * 8) & 0xFFFFFFFFFFFFFFFF)
-                    q += 1
-                }
-                rpt .= nl
-                nameStr := g_reader.Mem.ReadPtr(gedp + 0x00)
-                s := ""
-                try s := g_reader.Mem.ReadUnicodeString(nameStr, 128)
-                rpt .= "  name@GED+0x00: strPtr=0x" Format("{:X}", nameStr) "  str='" s "'" nl
-
-                ; Scan the GrantedEffects row (byte-by-byte, offsets can be unaligned)
-                ; for the ActiveSkills-row pointer. The ActiveSkills row should expose
-                ; +0x00 Id, +0x08 DisplayedName, +0x28 Icon_DDSFile. Follow each pointer
-                ; and show those strings so we can pin the (post-patch) offsets that drive
-                ; skill display names + icons.
-                rpt .= "  GED ptr-scan 0x40..0x98 (-> candidate ActiveSkills rows):" nl
-                gscan := 0x40
-                while (gscan <= 0x98)
-                {
-                    cp := g_reader.Mem.ReadPtr(gedp + gscan)
-                    if g_reader.IsProbablyValidPointer(cp)
-                    {
-                        s0 := "", s8 := "", s28 := ""
-                        try {
-                            p0 := g_reader.Mem.ReadPtr(cp + 0x00)
-                            if g_reader.IsProbablyValidPointer(p0)
-                                s0 := g_reader.Mem.ReadUnicodeString(p0, 64)
-                        }
-                        try {
-                            p8 := g_reader.Mem.ReadPtr(cp + 0x08)
-                            if g_reader.IsProbablyValidPointer(p8)
-                                s8 := g_reader.Mem.ReadUnicodeString(p8, 64)
-                        }
-                        try {
-                            p28 := g_reader.Mem.ReadPtr(cp + 0x28)
-                            if g_reader.IsProbablyValidPointer(p28)
-                                s28 := g_reader.Mem.ReadUnicodeString(p28, 96)
-                        }
-                        if (s0 != "" || s8 != "" || s28 != "")
-                            rpt .= "    +0x" Format("{:02X}", gscan) " ->0x" Format("{:X}", cp)
-                                . "  [+0]='" s0 "' [+8]='" s8 "' [+28]='" s28 "'" nl
-                    }
-                    gscan += 1
-                }
-            }
+            v := g_reader.Mem.ReadInt(detailsPtr + o)
+            if (v != 0)
+                rpt .= " +0x" Format("{:X}", o) "=" v
+            o += 4
         }
         rpt .= nl
         n += 1
+    }
+
+    ; ── Cooldowns vector (Actor.Cooldowns @ 0xB20) ──────────────────────────
+    ; ActiveSkillCooldown: 0x08 DatId, 0x10 CooldownsList(vec), 0x30 MaxUses,
+    ; 0x34 TotalCooldownTimeInMs, 0x3C eqInfo. The per-cooldown REMAINING time should
+    ; live in a CooldownsList element (0x10 bytes) — a value < totMs that counts down.
+    ; Run this once while a skill is on cooldown (ideally twice, a second apart).
+    cdF := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["Cooldowns"])
+    cdL := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["CooldownsLast"])
+    cdCnt := (cdF > 0 && cdL >= cdF) ? Floor((cdL - cdF) / 0x40) : 0
+    rpt .= nl "=== Cooldowns vec: first=0x" Format("{:X}", cdF) " last=0x" Format("{:X}", cdL) " (0x40 stride -> " cdCnt ") ===" nl
+    ci := 0
+    while (ci < cdCnt && ci < 16)
+    {
+        ce := cdF + ci * 0x40
+        datId := g_reader.Mem.ReadInt(ce + 0x08)
+        maxUses := g_reader.Mem.ReadInt(ce + 0x30)
+        totMs := g_reader.Mem.ReadInt(ce + 0x34)
+        eqInf := g_reader.Mem.ReadUInt(ce + 0x3C)
+        lF := g_reader.Mem.ReadInt64(ce + 0x10)
+        lL := g_reader.Mem.ReadInt64(ce + 0x18)
+        lCnt := (lF > 0 && lL >= lF) ? Floor((lL - lF) / 0x10) : 0
+        rpt .= "  CD#" ci " @0x" Format("{:X}", ce) " datId=" datId " maxUses=" maxUses " totMs=" totMs " eqInf=0x" Format("{:X}", eqInf) " listCnt=" lCnt nl
+        rpt .= "    entry ints 0x00..0x40:"
+        o := 0
+        while (o < 0x40)
+        {
+            v := g_reader.Mem.ReadInt(ce + o)
+            if (v != 0)
+                rpt .= " +0x" Format("{:X}", o) "=" v
+            o += 4
+        }
+        rpt .= nl
+        ei := 0
+        while (ei < lCnt && ei < 4)
+        {
+            el := lF + ei * 0x10
+            rpt .= "    list[" ei "] @0x" Format("{:X}", el) ":"
+            o := 0
+            while (o < 0x10)
+            {
+                rpt .= " +0x" Format("{:X}", o) "=" g_reader.Mem.ReadInt(el + o)
+                o += 4
+            }
+            rpt .= nl
+            ei += 1
+        }
+        ci += 1
     }
     _AIP_WriteSkillLog(rpt)
 }
