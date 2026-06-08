@@ -27,7 +27,11 @@ _ClassifyEntityType(path)
             return "Boss"
         return "Enemy"
     }
-    if InStr(p, "metadata/chests/") || InStr(p, "strongbox") || InStr(p, "detonator")
+    if InStr(p, "strongbox")
+        return "Strongbox"
+    if InStr(p, "monolith")
+        return "Monolith"
+    if InStr(p, "metadata/chests/") || InStr(p, "detonator")
         return "Chest"
     if InStr(p, "worlditem") || InStr(p, "metadata/items/")
         return "WorldItem"
@@ -254,6 +258,8 @@ _BuildEntitiesJson(snap)
                 case "Boss":           showIt := g_entityShowEnemy
                 case "NPC":            showIt := g_entityShowNPC
                 case "Chest":          showIt := g_entityShowChest
+                case "Strongbox":      showIt := g_entityShowChest
+                case "Monolith":       showIt := g_entityShowOther
                 case "WorldItem":      showIt := g_entityShowWorldItem
                 case "AreaTransition": showIt := g_entityShowOther
                 case "Waypoint":       showIt := g_entityShowOther

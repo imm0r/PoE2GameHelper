@@ -671,6 +671,9 @@ _DispatchBridgeCall(method, args)
         case "ChestProbeRun":
             ; TEMP post-patch diagnostic: dump Chest component bytes (IsOpened).
             SetTimer(() => ChestProbeRun(), -1)
+        case "TargetableProbeRun":
+            ; TEMP post-patch diagnostic: dump Targetable component bytes.
+            SetTimer(() => TargetableProbeRun(), -1)
         case "PatchMaintSetPath":
             ; args[1] = user-entered path to Bundles2\_.index.bin / Content.ggpk.
             pmPathArg := (args.Length >= 1) ? String(args[1]) : ""
