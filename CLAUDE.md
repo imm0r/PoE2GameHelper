@@ -125,6 +125,41 @@ Alerts → `alerts.ini [Alerts]`.
   unconditionally before reading the INI — fixes "global not assigned" on a fresh install
   (see the AHK v2 init gotcha).
 
+## Local HTTP API + MCP server (AI assistant integration)
+
+Opt-in feature that lets an external Model-Context-Protocol server (and thus an AI
+assistant) read live game data and change settings. Inspired by
+NattKh/POE2Radar's `mcp-server` — but PoEformance had no HTTP server, so this adds
+both halves.
+
+- **`ahk/LocalApiServer.ahk`** — a tiny HTTP server on `127.0.0.1` (default port
+  7777). Winsock + `WSAAsyncSelect`; socket events arrive as window messages on a
+  hidden Gui and are dispatched via `OnMessage` on the main thread, so the radar
+  hot path is never blocked and reads of `g_radarLastSnap` stay consistent.
+  Off by default. `LoadLocalApiConfig()` seeds all globals **and** the `LOCALAPI_*`
+  Winsock constants unconditionally (init gotcha). Self-persists `[LocalApi]`
+  (`enabled`, `port`) in `poeformance_config.ini`. Endpoints: `GET /state`,
+  `GET /entities`, `GET|POST /api/groups`, `GET|POST /api/alerts`,
+  `GET|POST /api/config`, `GET|POST|DELETE /api/watchlist`, `GET /api/names`.
+  Reads pull from the snapshot / existing `_Build*Json`; writes route through the
+  existing bridge commands (`_DispatchBridgeCall`) so side effects + persistence
+  match the UI exactly.
+- **`mcp-server/`** — Node MCP server (`index.js`, `package.json`, `README.md`)
+  that proxies the HTTP API. Tools: `game_state`, `get_entities`, `get_groups`/
+  `set_groups`/`add_group`/`remove_group`, `get_alerts`/`set_alert`,
+  `get_config`/`update_config`, watchlist tools, `search_names`. Run `npm install`
+  in `mcp-server/`; `node_modules` is gitignored.
+- **Wiring:** `InGameStateMonitor.ahk` includes the module, seeds
+  `g_localApiEnabled`/`g_localApiPort`, calls `LoadLocalApiConfig()`, and
+  `StartLocalApiServer()`/`StopLocalApiServer()` (OnExit). `BridgeDispatch.ahk` has
+  a `ToggleLocalApi` case; `WebViewBridge.ahk` pushes `localApi`/`localApiPort` in
+  the header; `ui/index.html` has the toggle in **Config → General → Integrations**
+  (section id `integrations`).
+- **Pending (needs the game/Windows):** verify the Winsock listener binds, that
+  `OnMessage` fires for the hidden Gui, request/response round-trips, and that the
+  config toggle starts/stops the server. The listener only starts at app launch,
+  so toggling on requires a restart.
+
 ## Open / pending (needs the game running)
 
 - Verify real alert matches; banner position/size; WAV playback; `FlashWindowEx` struct; the

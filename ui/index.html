@@ -4268,6 +4268,21 @@
           </details>
         </div>
 
+        <div class="cfg-section">
+          <details id="det-integrations" ontoggle="syncCfgSections()">
+            <summary>
+              <div class="cfg-header">Integrations</div>
+            </summary>
+            <div class="cfg-subsection">
+              <div class="cfg-row"><span class="cfg-label">Local API (MCP backend)</span>
+                <label class="toggle"><input type="checkbox" id="tog-localapi" onchange="ahkCall('ToggleLocalApi')"><span
+                    class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-help">Exposes a small HTTP API on <code>127.0.0.1:<span id="localapi-port">7777</span></code> so the bundled MCP server (<code>mcp-server/</code>) can let an AI assistant read live game state and change settings. Loopback only; off by default — restart the app after enabling.</div>
+            </div>
+          </details>
+        </div>
+
         <!-- Actions section — moved from the bottom of the old Config
              tab to live inside General so the panel order matches the
              sub-tab order. -->
@@ -7160,6 +7175,8 @@
       setChk('tog-radar', d.radarEnabled !== undefined ? d.radarEnabled : true);
       setChk('tog-player-hud', d.playerHud !== undefined ? d.playerHud : true);
       setChk('tog-overlay-status', d.overlayStatusText !== undefined ? d.overlayStatusText : true);
+      setChk('tog-localapi', d.localApi !== undefined ? d.localApi : false);
+      if (d.localApiPort !== undefined) { const lp = document.getElementById('localapi-port'); if (lp) lp.textContent = d.localApiPort; }
 
       const radarFilters = document.getElementById('radar-filters');
       if (radarFilters) radarFilters.style.opacity = (d.radarEnabled === false || d.radarEnabled === 'false') ? '0.4' : '1';
@@ -8918,7 +8935,7 @@
     // ═══════════════════════════════════════════════════════════════════
     //  CONFIG HELPERS
     // ═══════════════════════════════════════════════════════════════════
-    const _cfgSectionIds = ['status', 'overview', 'toggles', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output'];
+    const _cfgSectionIds = ['status', 'overview', 'toggles', 'integrations', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output'];
     let _cfgSectionsGuard = 0;
     let _cfgSectionsLoaded = false;
 
