@@ -1221,7 +1221,32 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
                     {
                         out .= "`n          Components:"
                         for _, c in comps
+                        {
                             out .= "`n            " c["name"] " @ " _FmtChainHex(c["address"])
+                            ; For equipped/player items (id ≤ 12) hex-dump the
+                            ; components most likely to carry the unique identity
+                            ; (RenderItem → ItemVisualIdentity, Base, Mods) as
+                            ; 8-byte qwords, so the IVI / unique-name pointer can be
+                            ; located. Two uniques on the same base (e.g. Morior
+                            ; Invictus vs Tabula Rasa) only differ here, not in path.
+                            cn := c["name"]
+                            if (invId <= 12 && (cn = "RenderItem" || cn = "Base" || cn = "Mods"))
+                            {
+                                try
+                                {
+                                    hb := g_reader.Mem.ReadBytes(c["address"], 0x60)
+                                    if (hb && hb.Size >= 0x60)
+                                    {
+                                        ho := 0
+                                        while (ho < 0x60)
+                                        {
+                                            out .= "`n              +0x" Format("{:02X}", ho) ": 0x" Format("{:016X}", NumGet(hb.Ptr, ho, "Int64"))
+                                            ho += 8
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
