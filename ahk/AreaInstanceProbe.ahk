@@ -637,13 +637,11 @@ TargetableProbeRun()
     summary := ""
     try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
 
-    rpt := "=== Targetable Probe (hover/target a live monster first) ===" nl
-    entSampleCount := (summary && Type(summary) = "Map" && summary.Has("sampleCount")) ? summary["sampleCount"] : 0
-    rpt .= "awake sampleCount=" entSampleCount nl
-    rpt .= "current offsets: IsTargetable=0x51 IsHighlightable=0x52 IsTargetedByPlayer=0x53" nl
-    rpt .= "(byte index in the dump = offset - 0x40)" nl nl
-
-    n := 0
+    DUMP := 0xC0
+    openedBufs := []
+    closedBufs := []
+    openedInfo := []
+    closedInfo := []
     if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
     {
         for _, en in summary["sample"]
@@ -652,58 +650,58 @@ TargetableProbeRun()
                 continue
             ent := en.Has("entity") ? en["entity"] : 0
             path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : "?"
+            pl := StrLower(path)
+            if !((InStr(pl, "/chests/") || InStr(pl, "strongbox")) && !InStr(pl, "interactionobject"))
+                continue
             entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
             id := en.Has("id") ? en["id"] : 0
             tgtAddr := 0
+            chestAddr := 0
             try tgtAddr := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
-            if !tgtAddr
+            try chestAddr := g_reader.FindEntityComponentAddress(entPtr, "Chest")
+            if (!tgtAddr || !chestAddr)
                 continue
-            rpt .= "#" id "  " path nl
-            ; Verify this really is the Targetable component: header EntityPtr (0x08)
-            ; should equal the entity pointer.
-            hdrEnt := g_reader.Mem.ReadPtr(tgtAddr + PoE2Offsets.ComponentHeader["EntityPtr"])
-            rpt .= "  tgt@0x" Format("{:X}", tgtAddr) "  hdr.EntityPtr=0x" Format("{:X}", hdrEnt)
-                . (hdrEnt = entPtr ? " (OK)" : " (MISMATCH ent=0x" Format("{:X}", entPtr) ")") nl
-            buf := g_reader.Mem.ReadBytes(tgtAddr, 0xC0, true)
-            if buf
+            isOpened := g_reader.Mem.ReadUChar(chestAddr + PoE2Offsets.Chest["IsOpened"])
+            buf := g_reader.Mem.ReadBytes(tgtAddr, DUMP, true)
+            if !buf
+                continue
+            if (isOpened = 1)
             {
-                i := 0
-                line := ""
-                while (i < buf.Size)
-                {
-                    if (Mod(i, 16) = 0)
-                        line := "  0x" Format("{:02X}", i) ": "
-                    line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
-                    i += 1
-                    if (Mod(i, 16) = 0)
-                        rpt .= RTrim(line) nl
-                }
-                if (Mod(i, 16) != 0)
-                    rpt .= RTrim(line) nl
+                openedBufs.Push(buf)
+                openedInfo.Push("#" id " " path)
             }
-            ; Scan a wider window for bool flags (byte == 1) — the targeted monster
-            ; should light up wherever IsTargetable/Highlightable/TargetedByPlayer moved.
-            ones := ""
-            scanBuf := g_reader.Mem.ReadBytes(tgtAddr, 0x200, true)
-            if scanBuf
+            else if (isOpened = 0)
             {
-                j := 0
-                while (j < scanBuf.Size)
-                {
-                    if (NumGet(scanBuf.Ptr, j, "UChar") = 1)
-                        ones .= "0x" Format("{:X}", j) " "
-                    j += 1
-                }
+                closedBufs.Push(buf)
+                closedInfo.Push("#" id " " path)
             }
-            rpt .= "  bytes==1 at: " (ones = "" ? "(none)" : ones) nl
-            rpt .= nl
-            n += 1
-            if (n >= 12)
-                break
         }
     }
-    if (n = 0)
-        rpt .= "(no targetable entities in the awake sample)" nl
+
+    rpt := "=== Targetable Diff Probe (chest CLOSED vs OPENED) ===" nl
+    rpt .= "closed chests: " closedBufs.Length "   opened chests: " openedBufs.Length nl nl
+
+    if (closedBufs.Length >= 1 && openedBufs.Length >= 1)
+    {
+        rpt .= "-- offsets where CLOSED != OPENED (IsTargetable/IsHighlightable candidates) --" nl
+        off := 0
+        while (off < DUMP)
+        {
+            cVal := _AIP_ConsistentByte(closedBufs, off)
+            oVal := _AIP_ConsistentByte(openedBufs, off)
+            if (cVal >= 0 && oVal >= 0 && cVal != oVal)
+                rpt .= "  0x" Format("{:X}", off) ":  closed=" cVal "  opened=" oVal nl
+            off += 1
+        }
+        rpt .= nl
+    }
+    else
+        rpt .= "(need >=1 CLOSED and >=1 OPENED chest nearby — stand near a mix)" nl nl
+
+    if (closedBufs.Length >= 1)
+        rpt .= "-- sample CLOSED " closedInfo[1] " --" nl . _AIP_HexDump(closedBufs[1], DUMP)
+    if (openedBufs.Length >= 1)
+        rpt .= "-- sample OPENED " openedInfo[1] " --" nl . _AIP_HexDump(openedBufs[1], DUMP)
 
     path := A_ScriptDir "\logs\InGameStateMonitor.targetable_probe.log"
     try
@@ -716,10 +714,54 @@ TargetableProbeRun()
             f.Close()
         }
     }
-    try LogError("TargetableProbe " n " -> " path)
-    try MsgBox("Targetable probe done (" n " entities)." nl nl
-        . "Hover/target a LIVE monster (IsTargetable should be 1)." nl
+    try LogError("TargetableDiffProbe closed=" closedBufs.Length " opened=" openedBufs.Length " -> " path)
+    try MsgBox("Targetable diff probe done." nl nl
+        . "closed chests: " closedBufs.Length "   opened chests: " openedBufs.Length nl
+        . "(need >=1 of each — stand near a mix of opened & unopened chests)" nl nl
         . "Send me:" nl . path, "Targetable Probe", "Iconi")
+}
+
+; Returns the byte at `off` if identical across every buffer in `bufs`, else -1.
+_AIP_ConsistentByte(bufs, off)
+{
+    if (bufs.Length = 0)
+        return -1
+    val := -1
+    for _, b in bufs
+    {
+        if (off >= b.Size)
+            return -1
+        v := NumGet(b.Ptr, off, "UChar")
+        if (val = -1)
+            val := v
+        else if (v != val)
+            return -1
+    }
+    return val
+}
+
+; Hex-dumps a Buffer (16 bytes/line with offset labels); returns the text.
+_AIP_HexDump(buf, len)
+{
+    out := ""
+    line := ""
+    i := 0
+    cap := Min(len, buf.Size)
+    while (i < cap)
+    {
+        if (Mod(i, 16) = 0)
+            line := "  0x" Format("{:02X}", i) ": "
+        line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
+        i += 1
+        if (Mod(i, 16) = 0)
+        {
+            out .= RTrim(line) "`r`n"
+            line := ""
+        }
+    }
+    if (line != "")
+        out .= RTrim(line) "`r`n"
+    return out
 }
 
 ; Registers the temporary in-game hotkey for the Targetable probe

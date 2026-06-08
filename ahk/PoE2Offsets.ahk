@@ -138,16 +138,17 @@ class PoE2Offsets
     )
 
     static Targetable := Map(
-        ; PoE2 v4.5.x: the whole Targetable struct shifted +0x17 (the reference's
-        ; 0x51 is stale). Confirmed in-game via the byte probe — IsTargetable reads 1
-        ; at 0x68 for every living monster (component verified via header EntityPtr).
-        "IsTargetable", 0x68,        ; was 0x51
-        "IsHighlightable", 0x69,     ; was 0x52
-        "IsTargetedByPlayer", 0x6A,  ; was 0x53 — NOTE: read 1 for all sampled monsters; verify vs combat cursor
-        "MeetsQuestState", 0x6D,     ; was 0x56
-        "NeedsTrue", 0x6F,           ; was 0x58
-        "HiddenFromPlayer", 0x70,    ; was 0x59
-        "NeedsFalse", 0x71           ; was 0x5A
+        ; NOTE: pre-hotfix (v4.5.1.1.3) values. The v4.5.1.1.4 hotfix moved the
+        ; Targetable struct again; the +0x17 guess (0x68) was wrong (those bytes
+        ; read 1 for everything). Real offsets pending the chest opened/closed diff
+        ; probe. Kept here as a neutral baseline (do not trust these on the hotfix).
+        "IsTargetable", 0x51,
+        "IsHighlightable", 0x52,
+        "IsTargetedByPlayer", 0x53,
+        "MeetsQuestState", 0x56,
+        "NeedsTrue", 0x58,
+        "HiddenFromPlayer", 0x59,
+        "NeedsFalse", 0x5A
     )
 
     static Render := Map(
