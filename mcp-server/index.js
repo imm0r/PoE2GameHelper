@@ -9,8 +9,22 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+const HOST = "127.0.0.1";
 const PORT = process.env.POEFORMANCE_API_PORT || "7777";
-const API = `http://127.0.0.1:${PORT}`;
+
+// Build the request URL from a constant loopback origin. Only the path and
+// query string come from the caller; the scheme/host/port are fixed literals,
+// so the request destination can never be redirected away from the local app
+// (avoids the server-side request forgery class CodeQL flags on tainted URLs).
+function buildUrl(path) {
+  const q = path.indexOf("?");
+  const url = new URL("http://localhost");
+  url.hostname = HOST;
+  url.port = String(PORT);
+  url.pathname = q === -1 ? path : path.slice(0, q);
+  url.search = q === -1 ? "" : path.slice(q);
+  return url;
+}
 
 // Thin fetch wrapper. Returns parsed JSON, or a small error object when the
 // app/API is unreachable (so tool calls degrade gracefully instead of throwing).
@@ -21,7 +35,7 @@ async function api(path, method = "GET", body = null) {
     opts.body = JSON.stringify(body);
   }
   try {
-    const r = await fetch(`${API}${path}`, opts);
+    const r = await fetch(buildUrl(path), opts);
     const text = await r.text();
     try {
       return JSON.parse(text);
@@ -29,7 +43,7 @@ async function api(path, method = "GET", body = null) {
       return text;
     }
   } catch (e) {
-    return { error: `Cannot reach PoEformance at ${API}. Is the app running with the Local API enabled? (${e.message})` };
+    return { error: `Cannot reach PoEformance at http://${HOST}:${PORT}. Is the app running with the Local API enabled? (${e.message})` };
   }
 }
 
