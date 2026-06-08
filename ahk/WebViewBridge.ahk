@@ -1276,6 +1276,7 @@ _BuildInventoryArrayJson(invs)
         boxY := inv.Has("totalBoxesY") ? Integer(inv["totalBoxesY"]) : 0
         source := inv.Has("source") ? String(inv["source"]) : ""
         tabName := inv.Has("tabName") ? String(inv["tabName"]) : ""
+        invName := inv.Has("inventoryName") ? String(inv["inventoryName"]) : ""
         items := inv.Has("items") ? inv["items"] : []
 
         ; PoE2's inventory ItemList is cell-based: a 2×3 body armor produces
@@ -1333,6 +1334,7 @@ _BuildInventoryArrayJson(invs)
             . '"by":' boxY ","
             . '"src":' _JsStr(source) ","
             . '"tn":' _JsStr(tabName) ","
+            . '"name":' _JsStr(invName) ","
             . '"items":' itemsJson
             . "}"
     }
