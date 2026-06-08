@@ -232,36 +232,26 @@ def extract_unique_gold_prices(csv_dir, words):
 
 # ---------------------------------------------------------------------------
 # 5b. Unique item names (metadata_path → unique_name)
-#     Join: UniqueStashLayout + ItemVisualIdentity + BaseItemTypes
+#     EXACT join: a base item maps to a unique ONLY when the base item's
+#     ItemVisualIdentity row equals the unique's ItemVisualIdentityKey row.
+#
+#     The previous fuzzy IVI-Id match (dropping "Four"/"Unique"/digits) bridged
+#     a generic base's IVI to a unique's IVI, so a generic base whose IVI fuzzily
+#     resembled a unique was mislabelled — e.g. the str/dex/int body armour base
+#     "FourBodyStrDexInt1" mapped to "Tabula Rasa", which then leaked onto any
+#     item on that base read as unique. Exact row matching only keeps a mapping
+#     when the base really is the unique's dedicated visual base.
 # ---------------------------------------------------------------------------
-def ivi_match_key(ivi_id_str):
-    """Generate a fuzzy match key from an ItemVisualIdentity Id string."""
-    parts = re.findall(r"[A-Z][a-z0-9]*|[0-9]+", ivi_id_str)
-    num = next((p for p in parts if p.isdigit()), "")
-    rest = tuple(sorted(p for p in parts if p not in ("Four", "Unique") and not p.isdigit()))
-    return (rest, num)
-
-
 def extract_unique_item_names(csv_dir, words):
     """Returns list of (metadata_path, unique_name)."""
-    print("\n--- Unique item name map (USL + IVI + BIT) ---")
+    print("\n--- Unique item name map (USL + BIT, exact IVI row) ---")
 
-    # Load ItemVisualIdentity → build row→match_key
-    ivi_rows = read_csv(csv_dir, "ItemVisualIdentity", ["Id"])
-    if not ivi_rows:
-        return []
-    ivi_row_to_key = {}
-    for i, row in enumerate(ivi_rows):
-        ivi_id = row.get("Id", "").strip()
-        if ivi_id:
-            ivi_row_to_key[i] = ivi_match_key(ivi_id)
-
-    # Load UniqueStashLayout → build match_key → unique_name
+    # UniqueStashLayout → exact ItemVisualIdentity row → unique name.
     usl_rows = read_csv(csv_dir, "UniqueStashLayout", ["WordsKey", "ItemVisualIdentityKey"])
     if not usl_rows:
         return []
 
-    key_to_unique = {}
+    ivi_to_unique = {}  # ivi_row -> (name, is_alt); prefer non-alternate art
     for row in usl_rows:
         words_row = safe_int(row.get("WordsKey", ""), -1)
         ivi_row = safe_int(row.get("ItemVisualIdentityKey", ""), -1)
@@ -269,17 +259,16 @@ def extract_unique_item_names(csv_dir, words):
 
         entry = words.get(words_row, {})
         name = entry.get("text", "") if isinstance(entry, dict) else ""
-        if not name or ivi_row not in ivi_row_to_key:
+        if not name or ivi_row < 0:
             continue
 
-        key = ivi_row_to_key[ivi_row]
-        existing = key_to_unique.get(key)
+        existing = ivi_to_unique.get(ivi_row)
         if existing is None or (not is_alt and existing[1]):
-            key_to_unique[key] = (name, is_alt)
+            ivi_to_unique[ivi_row] = (name, is_alt)
 
-    print(f"  {len(key_to_unique)} unique match keys")
+    print(f"  {len(ivi_to_unique)} unique IVI rows")
 
-    # Load BaseItemTypes → join via IVI match_key
+    # BaseItemTypes → emit (metadata_path → unique_name) on exact IVI-row match.
     bit_rows = read_csv(csv_dir, "BaseItemTypes", ["Id", "ItemVisualIdentity"])
     if not bit_rows:
         return []
@@ -290,14 +279,11 @@ def extract_unique_item_names(csv_dir, words):
         if not item_id:
             continue
         ivi_row = safe_int(row.get("ItemVisualIdentity", ""), -1)
-        if ivi_row not in ivi_row_to_key:
-            continue
-        key = ivi_row_to_key[ivi_row]
-        match = key_to_unique.get(key)
+        match = ivi_to_unique.get(ivi_row)
         if match:
             results.append((item_id, match[0]))
 
-    print(f"  Mapped {len(results)} base item paths to unique names")
+    print(f"  Mapped {len(results)} base item paths to unique names (exact IVI)")
     return results
 
 

@@ -439,34 +439,16 @@ def extract_unique_gold_prices(file_table, bundles, words: dict) -> list:
 # ---------------------------------------------------------------------------
 
 def extract_unique_item_names(schema, file_table, bundles, words: dict) -> list:
-    import re
+    print("\n--- Unique item name map (UniqueStashLayout + BaseItemTypes, exact IVI row) ---")
 
-    print("\n--- Unique item name map (UniqueStashLayout + IVI + BaseItemTypes) ---")
+    # EXACT join: a base item maps to a unique ONLY when the base item's
+    # ItemVisualIdentity row equals the unique's ItemVisualIdentityKey row. The
+    # previous fuzzy IVI-Id match bridged generic base IVIs to unique IVIs, so
+    # generic bases (e.g. "FourBodyStrDexInt1") were mislabelled as the unique
+    # (e.g. "Tabula Rasa"). See build_item_names_csv.py for the full rationale.
 
-    def ivi_match_key(ivi_id_str):
-        parts = re.findall('[A-Z][a-z0-9]*|[0-9]+', ivi_id_str)
-        num = next((p for p in parts if p.isdigit()), '')
-        rest = tuple(sorted(p for p in parts if p not in ('Four', 'Unique') and not p.isdigit()))
-        return (rest, num)
-
-    # Load ItemVisualIdentity — build ivi_row → match_key
-    ivi_dat = (load_bundle_file(file_table, bundles, 'Data/Balance/ItemVisualIdentity.datc64') or
-               load_bundle_file(file_table, bundles, 'Data/ItemVisualIdentity.datc64'))
-    if not ivi_dat:
-        print("  ItemVisualIdentity.datc64 NOT FOUND")
-        return []
-    ivi_nr, ivi_rs, ivi_vb = find_boundary(ivi_dat)
-    print(f"  IVI: {ivi_nr} rows, row_size={ivi_rs}")
-
-    ivi_row_to_key = {}
-    for i in range(ivi_nr):
-        base = 4 + i * ivi_rs
-        str_off = struct.unpack_from('<I', ivi_dat, base)[0]   # Id is first field (string, offset 0)
-        ivi_id_str = read_utf16(ivi_dat, ivi_vb, str_off)
-        if ivi_id_str:
-            ivi_row_to_key[i] = ivi_match_key(ivi_id_str)
-
-    # Load UniqueStashLayout — build match_key → unique_name (prefer non-alternate-art)
+    # UniqueStashLayout — exact ItemVisualIdentity row → unique name.
+    # USL schema: +0 WordsKey (foreignrow,16), +16 ItemVisualIdentityKey (foreignrow,16), +82 IsAlternateArt (bool,1)
     usl_dat = (load_bundle_file(file_table, bundles, 'Data/Balance/UniqueStashLayout.datc64') or
                load_bundle_file(file_table, bundles, 'Data/UniqueStashLayout.datc64'))
     if not usl_dat:
@@ -475,8 +457,7 @@ def extract_unique_item_names(schema, file_table, bundles, words: dict) -> list:
     usl_nr, usl_rs, usl_vb = find_boundary(usl_dat)
     print(f"  USL: {usl_nr} rows, row_size={usl_rs}")
 
-    # USL schema: +0 WordsKey (foreignrow,16), +16 ItemVisualIdentityKey (foreignrow,16), +82 IsAlternateArt (bool,1)
-    key_to_unique: dict = {}   # match_key → (name, is_alt)
+    ivi_to_unique: dict = {}   # ivi_row → (name, is_alt); prefer non-alternate art
     for i in range(usl_nr):
         base = 4 + i * usl_rs
         words_row = int(struct.unpack_from('<Q', usl_dat, base + 0)[0])
@@ -485,21 +466,17 @@ def extract_unique_item_names(schema, file_table, bundles, words: dict) -> list:
 
         entry = words.get(words_row, {})
         name = entry.get('text', '') if isinstance(entry, dict) else ''
-        if not name or ivi_row >= ivi_nr:
+        if not name:
             continue
 
-        key = ivi_row_to_key.get(ivi_row)
-        if key is None:
-            continue
-
-        existing = key_to_unique.get(key)
+        existing = ivi_to_unique.get(ivi_row)
         # Prefer non-alternate-art; if both same alt-status, keep first (already stored)
         if existing is None or (not is_alt and existing[1]):
-            key_to_unique[key] = (name, is_alt)
+            ivi_to_unique[ivi_row] = (name, is_alt)
 
-    print(f"  USL: {len(key_to_unique)} unique match keys built")
+    print(f"  USL: {len(ivi_to_unique)} unique IVI rows")
 
-    # Load BaseItemTypes — join via IVI match_key
+    # Load BaseItemTypes — emit (metadata_path → unique_name) on exact IVI-row match.
     bit_dat = (load_bundle_file(file_table, bundles, 'Data/Balance/BaseItemTypes.datc64') or
                load_bundle_file(file_table, bundles, 'Data/BaseItemTypes.datc64'))
     if not bit_dat:
@@ -520,12 +497,7 @@ def extract_unique_item_names(schema, file_table, bundles, words: dict) -> list:
         if not item_id:
             continue
         ivi_row = int(struct.unpack_from('<Q', bit_dat, base + ivi_off)[0])
-        if ivi_row >= ivi_nr:
-            continue
-        key = ivi_row_to_key.get(ivi_row)
-        if key is None:
-            continue
-        match = key_to_unique.get(key)
+        match = ivi_to_unique.get(ivi_row)
         if match:
             results.append((item_id, match[0]))
 
