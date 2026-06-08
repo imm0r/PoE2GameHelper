@@ -26,6 +26,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/RadarOverlay.ahk
 #Include ahk/PlayerHUD.ahk
 #Include ahk/NotificationOverlay.ahk
+#Include ahk/FocusOverlay.ahk
 #Include ahk/UiTreeBrowser.ahk
 #Include ahk/UiBrowserHandler.ahk
 
@@ -109,6 +110,8 @@ g_radarOverlay := 0   ; lazy-init on first render call
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
 g_playerHud := 0   ; lazy-init on first render
 g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
+g_focusOverlay := 0   ; lazy-init (FocusOverlay) — focused-entity test readout
+g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active
 g_localApiEnabled := false   ; local HTTP API (MCP backend) — opt-in; seeded by LoadLocalApiConfig()
 g_localApiPort := 7777       ; loopback port for the local HTTP API
 g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entities button
@@ -904,6 +907,7 @@ OnTreeTabChanged(*)
 #Include ahk/TreeViewWatchlistPanel.ahk
 
 ; ── Extracted single-responsibility modules ──────────────────────────────────
+#Include ahk/EntityFocus.ahk
 #Include ahk/JsonParser.ahk
 #Include ahk/JsonFull.ahk
 #Include ahk/ErrorLogger.ahk

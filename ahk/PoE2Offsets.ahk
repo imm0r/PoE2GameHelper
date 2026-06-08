@@ -523,14 +523,19 @@ class PoE2Offsets
         "Zoom", 0x3A8   ; float — current zoom level (default ~0.5) (was 0x3E0)
     )
 
-    ; Hover tracker — resolves the entity currently under the cursor. CONFIRMED
-    ; in-game via a chest hover (tracker+0x648 -> id 170 Metadata/Chests/MossyChest26).
+    ; Hover tracker — resolves the WORLD OBJECT / interactable currently under the
+    ; cursor (chests, ground items, shrines, ...). CONFIRMED in-game: chest hover
+    ; -> id 170 Metadata/Chests/MossyChest26; ground-item hover -> Metadata/
+    ; MiscellaneousObjects/WorldItem. NOTE: this does NOT track MONSTERS — a
+    ; monster hover leaves tracker+0x648 at 0 (monster targeting is a different
+    ; mechanism). For the hovered/targeted monster use Targetable.IsTargetedByPlayer
+    ; (0x6B) on the entity list instead.
     ; Sikaka/POE2Radar's offsets are correct, but WorldTracker is an EMBEDDED
     ; sub-struct (vtable at tracker+0x630), NOT a pointer to dereference. Chain:
     ;   uiRoot  = ReadPtr(InGameState + UiRootStructPtr 0x2F0)
     ;   tracker = ReadPtr(uiRoot + FromUiRoot 0x7D8)
     ;   hovered = ReadPtr(tracker + WorldTracker 0x630 + HoveredEntity 0x18)
-    ;           = ReadPtr(tracker + 0x648)   ; 0 when nothing is hovered
+    ;           = ReadPtr(tracker + 0x648)   ; 0 when no world object is hovered
     static HoverTracker := Map(
         "FromUiRoot", 0x7D8,
         "WorldTracker", 0x630,                ; embedded sub-struct offset — do NOT deref
