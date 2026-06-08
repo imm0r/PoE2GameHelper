@@ -1486,8 +1486,11 @@ class PoE2ComponentDecoders
     }
 
 
-    ; Reads the MinimapIcon component's owner entity and staticPtr for minimap icon lookup.
-    ; Returns: Map with ownerEntityPtr, owner identity, staticPtr, and hasMinimapIcon, or 0 on invalid owner
+    ; Reads the MinimapIcon component's owner entity, staticPtr and icon name.
+    ; Icon name chain: componentPtr + IconDatPtr(0x20) -> MinimapIcons.dat row -> name.
+    ; In v4.5 the row stores the name INLINE (UTF-16) at +0x00; older builds stored a
+    ; pointer-to-string there, so try the pointer first, then fall back to inline.
+    ; Returns: Map with ownerEntityPtr, owner identity, staticPtr, iconName, hasMinimapIcon, or 0 on invalid owner
     DecodeMinimapIconComponentBasic(componentPtr)
     {
         staticPtr := this.Mem.ReadPtr(componentPtr + PoE2Offsets.ComponentHeader["StaticPtr"])
@@ -1496,11 +1499,27 @@ class PoE2ComponentDecoders
             return 0
         owner := this.ReadEntityIdentityBasic(ownerEntityPtr, 120)
 
+        iconName := ""
+        datRowPtr := this.Mem.ReadPtr(componentPtr + PoE2Offsets.MinimapIcon["IconDatPtr"])
+        if this.IsProbablyValidPointer(datRowPtr)
+        {
+            namePtr := this.Mem.ReadPtr(datRowPtr)
+            if this.IsProbablyValidPointer(namePtr)
+                iconName := this.Mem.ReadUnicodeString(namePtr, 256)
+            if (iconName = "")
+                iconName := this.Mem.ReadUnicodeString(datRowPtr, 256)
+            ; MinimapIcons.dat ids are identifiers (e.g. "RewardChestExpedition");
+            ; reject binary garbage from a stale offset by requiring a leading letter.
+            if (iconName != "" && !RegExMatch(iconName, "^[A-Za-z_]"))
+                iconName := ""
+        }
+
         return Map(
             "address", componentPtr,
             "ownerEntityPtr", ownerEntityPtr,
             "owner", owner,
             "staticPtr", staticPtr,
+            "iconName", iconName,
             "hasMinimapIcon", true
         )
     }

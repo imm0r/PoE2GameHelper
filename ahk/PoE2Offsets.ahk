@@ -117,6 +117,13 @@ class PoE2Offsets
         "EntityPtr", 0x08
     )
 
+    ; MinimapIcon component: IconDatPtr -> MinimapIcons.dat row; the icon name is
+    ; read from that row (inline UTF-16 string in v4.5, pointer-to-string in older
+    ; builds). Mirrors GameHelper2's MinimapIcon.cs (Address + 0x20).
+    static MinimapIcon := Map(
+        "IconDatPtr", 0x20
+    )
+
     static ComponentLookup := Map(
         "Bucket", 0x28
     )
