@@ -45,12 +45,13 @@ stays scoped to this directory.
   PoE2 install folder. **`PoeDataExtract` now auto-provisions this on
   first run** — if `oo2core.dll` isn't already loadable it will, in order:
   (1) rename a versioned `oo2core_*win64.dll` you've dropped next to the
-  exe (or in the working dir) to `oo2core.dll`; (2) scan your local Steam
-  game installs (anchored off the ggpk/index path you pass) for an
-  `oo2core*.dll` and copy it next to the exe; (3) in an interactive
-  terminal, offer a file picker as a fallback. It never downloads or
-  bundles the DLL — the copy comes from a game you already own. Legitimate
-  manual sources:
+  exe (or in the working dir) to `oo2core.dll`; (2) scan your local game
+  installs — Steam, Epic, and generic game folders across every fixed
+  drive (covers Battle.net / GOG / standalone) — preferring the Oodle 2.9
+  `oo2core_9_win64.dll` (the version LibBundle3 is built for), and copy it
+  next to the exe; (3) in an interactive terminal, offer a file picker as a
+  fallback. It never downloads or bundles the DLL — the copy comes from a
+  game you already own. Legitimate manual sources:
   - a Path of Exile **1** install root (free Steam download — but check
     the `Redist/` subfolder if the root looks empty)
   - aianlinb's [VisualGGPK3 release ZIPs](https://github.com/aianlinb/LibGGPK3/releases)

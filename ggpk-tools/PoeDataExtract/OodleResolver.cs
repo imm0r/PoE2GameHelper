@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace PoeDataExtract;
 
@@ -14,8 +15,13 @@ namespace PoeDataExtract;
 ///   1. Probe via the real OS loader (NativeLibrary.TryLoad) — covers the
 ///      exe dir, working dir, System32 and PATH. If already resolvable,
 ///      do nothing.
-///   2. Auto-scan local Steam game installs for an <c>oo2core*.dll</c> and
-///      copy it next to the exe as <c>oo2core.dll</c> (the name
+///   1b. Rename a versioned <c>oo2core_*win64.dll</c> dropped next to the
+///      exe to the canonical <c>oo2core.dll</c>.
+///   2. Auto-scan local game installs — Steam, Epic, plus generic game
+///      containers across every fixed drive (covers Battle.net / GOG /
+///      standalone) — for an <c>oo2core*.dll</c>, preferring the Oodle 2.9
+///      <c>oo2core_9_win64.dll</c> (the version LibBundle3 is built for),
+///      and copy it next to the exe as <c>oo2core.dll</c> (the name
 ///      <c>DllImport("oo2core")</c> in LibBundle3 resolves to).
 ///   3. Interactive file picker — only when stdio isn't redirected and the
 ///      caller allows it, so the AHK shell-out flow never pops a dialog.
@@ -109,7 +115,8 @@ internal static class OodleResolver
             string[] hits;
             try { hits = Directory.GetFiles(dir, "oo2core*.dll"); }
             catch { continue; }
-            foreach (var src in hits)
+            // Prefer the Oodle 2.9 oo2core_9_win64.dll if several are present.
+            foreach (var src in hits.OrderByDescending(IsPreferredOodle))
             {
                 // Skip the canonical name itself — it either already works
                 // (then we wouldn't be here) or is a broken file we shouldn't
@@ -150,17 +157,197 @@ internal static class OodleResolver
     // ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns the first <c>oo2core*.dll</c> found across the user's Steam
-    /// libraries, or null. The scan is bounded (one directory level per
-    /// game plus a handful of well-known subdirs) so it stays fast even on
-    /// libraries with hundreds of GB of games.
+    /// Returns an <c>oo2core*.dll</c> found in a local game install, or null.
+    /// Searches Steam libraries, Epic install locations and generic game
+    /// containers across every fixed drive. Returns the first
+    /// <c>oo2core_9_win64.dll</c> (Oodle 2.9 — what LibBundle3 targets) as
+    /// soon as one is seen; only if none exists does it fall back to any
+    /// other <c>oo2core*.dll</c>. The scan is bounded (one directory level
+    /// per game plus a handful of well-known subdirs) so it stays fast.
     /// </summary>
     private static string? FindLocalOodle(string? ggpkHint)
     {
+        string? fallback = null;
+        foreach (var game in GameDirectories(ggpkHint))
+        {
+            foreach (var dll in ScanGameDir(game))
+            {
+                if (IsPreferredOodle(dll)) return dll; // Oodle 2.9 — take it
+                fallback ??= dll;                      // remember a non-2.9 hit
+            }
+        }
+        return fallback;
+    }
+
+    // oo2core_9_win64.dll == Oodle 2.9, the line PoE/PoE2 use and LibBundle3
+    // is built against. Prefer it over any other oo2core variant.
+    private static bool IsPreferredOodle(string path) =>
+        Path.GetFileName(path).StartsWith("oo2core_9", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Enumerates candidate game directories from every source: Steam
+    /// (library\steamapps\common\*), Epic (exact install locations from the
+    /// launcher manifests), and a generic sweep of common game containers on
+    /// each fixed drive — drive root, Program Files, Program Files (x86)
+    /// (Battle.net's default), Games, Epic Games, GOG Games, Riot Games,
+    /// XboxGames. De-duplicated; obvious system folders are skipped.
+    /// </summary>
+    private static IEnumerable<string> GameDirectories(string? ggpkHint)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool IsNew(string dir, out string full)
+        {
+            full = "";
+            if (string.IsNullOrEmpty(dir)) return false;
+            try { full = Path.GetFullPath(dir).TrimEnd('\\', '/'); } catch { return false; }
+            return seen.Add(full);
+        }
+
+        // 1. Steam: every game under each library's common\ folder.
         foreach (var lib in SteamLibraries(ggpkHint))
-            foreach (var dll in ScanLibrary(lib))
-                return dll;
-        return null;
+            foreach (var game in SafeEnumDirs(Path.Combine(lib, "steamapps", "common")))
+                if (IsNew(game, out var f)) yield return f;
+
+        // 2. Epic: exact install locations parsed from the launcher manifests.
+        foreach (var loc in EpicInstallLocations())
+            if (IsNew(loc, out var f)) yield return f;
+
+        // 3. Generic containers across all fixed drives.
+        foreach (var drive in FixedDriveRoots())
+        {
+            string[] containers =
+            {
+                drive,                                       // H:\  → H:\Diablo IV
+                Path.Combine(drive, "Program Files"),
+                Path.Combine(drive, "Program Files (x86)"),  // Battle.net default
+                Path.Combine(drive, "Games"),
+                Path.Combine(drive, "Epic Games"),
+                Path.Combine(drive, "GOG Games"),
+                Path.Combine(drive, "Riot Games"),
+                Path.Combine(drive, "XboxGames"),
+            };
+            foreach (var container in containers)
+                foreach (var game in SafeEnumDirs(container))
+                    if (!IsSystemDir(game) && IsNew(game, out var f)) yield return f;
+        }
+    }
+
+    /// <summary>
+    /// Yields every <c>oo2core*.dll</c> directly inside a game's root or one
+    /// of a fixed set of common native-library subdirectories. Non-recursive
+    /// per directory to keep the scan cheap.
+    /// </summary>
+    private static IEnumerable<string> ScanGameDir(string game)
+    {
+        // Common spots where Oodle-using games keep oo2core_*.dll. The empty
+        // string is the game root (where Path of Exile 1 keeps it).
+        string[] subs =
+        {
+            "", "bin", @"bin\x64", "x64", "Win64", "Tools",
+            @"Binaries\Win64", @"Engine\Binaries\Win64",
+            @"Engine\Binaries\ThirdParty\Oodle\Win64",
+            "Redist", "redist",
+        };
+
+        foreach (var sub in subs)
+        {
+            string dir = sub.Length == 0 ? game : Path.Combine(game, sub);
+            string[] hits;
+            try { hits = Directory.Exists(dir) ? Directory.GetFiles(dir, "oo2core*.dll") : Array.Empty<string>(); }
+            catch { continue; }
+            foreach (var h in hits) yield return h;
+        }
+    }
+
+    // Fixed (non-removable, ready) drive roots, e.g. "C:\", "H:\".
+    private static IEnumerable<string> FixedDriveRoots()
+    {
+        DriveInfo[] drives;
+        try { drives = DriveInfo.GetDrives(); }
+        catch { yield break; }
+        foreach (var d in drives)
+        {
+            bool ok;
+            try { ok = d.DriveType == DriveType.Fixed && d.IsReady; }
+            catch { ok = false; }
+            if (ok) yield return d.RootDirectory.FullName;
+        }
+    }
+
+    private static readonly HashSet<string> _systemDirs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Windows", "Windows.old", "$Recycle.Bin", "System Volume Information",
+        "Recovery", "PerfLogs", "ProgramData", "Users", "MSOCache",
+        "Intel", "AMD", "NVIDIA", "$WinREAgent",
+    };
+
+    // Skip obvious non-game top-level folders so the drive-root sweep doesn't
+    // wander into the system tree.
+    private static bool IsSystemDir(string dir)
+    {
+        string name = Path.GetFileName(dir);
+        return name.Length == 0 || _systemDirs.Contains(name);
+    }
+
+    /// <summary>
+    /// Reads each Epic Games Launcher manifest (<c>*.item</c> under
+    /// ProgramData) and yields the <c>InstallLocation</c> of every installed
+    /// title — gives exact paths regardless of which drive they live on.
+    /// </summary>
+    private static IEnumerable<string> EpicInstallLocations()
+    {
+        string manifests = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "Epic", "EpicGamesLauncher", "Data", "Manifests");
+        foreach (var item in SafeEnumFiles(manifests, "*.item"))
+        {
+            string? loc = ReadJsonStringField(item, "InstallLocation");
+            if (!string.IsNullOrEmpty(loc)) yield return loc;
+        }
+    }
+
+    // Pulls a single JSON string value out of a small manifest file without a
+    // full JSON parser (keeps the AOT binary dependency-free). Honours \\ and
+    // \" escapes in the value; returns null if the key isn't present.
+    private static string? ReadJsonStringField(string file, string key)
+    {
+        string text;
+        try { text = File.ReadAllText(file); } catch { return null; }
+
+        int k = text.IndexOf("\"" + key + "\"", StringComparison.Ordinal);
+        if (k < 0) return null;
+        int colon = text.IndexOf(':', k);
+        if (colon < 0) return null;
+        int q = text.IndexOf('"', colon + 1);
+        if (q < 0) return null;
+
+        var sb = new StringBuilder();
+        for (int j = q + 1; j < text.Length; j++)
+        {
+            char c = text[j];
+            if (c == '\\' && j + 1 < text.Length) { sb.Append(text[++j]); continue; }
+            if (c == '"') break;
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    private static List<string> SafeEnumDirs(string path)
+    {
+        var list = new List<string>();
+        if (!Directory.Exists(path)) return list;
+        try { foreach (var d in Directory.EnumerateDirectories(path)) list.Add(d); }
+        catch { /* partial result is fine */ }
+        return list;
+    }
+
+    private static List<string> SafeEnumFiles(string path, string pattern)
+    {
+        var list = new List<string>();
+        if (!Directory.Exists(path)) return list;
+        try { foreach (var f in Directory.EnumerateFiles(path, pattern)) list.Add(f); }
+        catch { /* partial result is fine */ }
+        return list;
     }
 
     /// <summary>
@@ -206,44 +393,6 @@ internal static class OodleResolver
         }
 
         return roots;
-    }
-
-    /// <summary>
-    /// Yields every <c>oo2core*.dll</c> directly inside a game's root or one
-    /// of a fixed set of common native-library subdirectories. Non-recursive
-    /// per directory to keep the scan cheap.
-    /// </summary>
-    private static IEnumerable<string> ScanLibrary(string lib)
-    {
-        string common = Path.Combine(lib, "steamapps", "common");
-        if (!Directory.Exists(common)) yield break;
-
-        // Common spots where Oodle-using games keep oo2core_*.dll. The empty
-        // string is the game root (where Path of Exile 1 keeps it).
-        string[] subs =
-        {
-            "", "bin", @"bin\x64", "x64", "Win64", "Tools",
-            @"Binaries\Win64", @"Engine\Binaries\Win64",
-            @"Engine\Binaries\ThirdParty\Oodle\Win64",
-            "Redist", "redist",
-        };
-
-        IEnumerable<string> games;
-        try { games = Directory.EnumerateDirectories(common); }
-        catch { yield break; }
-
-        foreach (var game in games)
-        {
-            foreach (var sub in subs)
-            {
-                string dir = sub.Length == 0 ? game : Path.Combine(game, sub);
-                if (!Directory.Exists(dir)) continue;
-                string[] hits;
-                try { hits = Directory.GetFiles(dir, "oo2core*.dll"); }
-                catch { continue; }
-                foreach (var h in hits) yield return h;
-            }
-        }
     }
 
     /// <summary>
