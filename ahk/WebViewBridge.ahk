@@ -1752,7 +1752,9 @@ _RunTsvGenerationPipeline()
         . '"Data/Balance/BaseItemTypes.datc64" '
         . '"Data/Balance/UniqueGoldPrices.datc64" '
         . '"Data/Balance/UniqueStashLayout.datc64" '
-        . '"Data/Balance/ItemVisualIdentity.datc64"'
+        . '"Data/Balance/ItemVisualIdentity.datc64" '
+        . '"Data/Balance/GrantedEffects.datc64" '
+        . '"Data/Balance/ActiveSkills.datc64"'
 
     result := _RunCmdCapture(dumpCmd, toolsDir)
     if (result.exitCode != 0)
