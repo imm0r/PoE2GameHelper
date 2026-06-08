@@ -677,6 +677,9 @@ _DispatchBridgeCall(method, args)
         case "TargetedByPlayerProbeRun":
             ; TEMP post-patch diagnostic: IsTargetedByPlayer hover diff.
             SetTimer(() => TargetedByPlayerProbeRun(), -1)
+        case "SkillProbeRun":
+            ; TEMP post-patch diagnostic: trace the skill-name DAT chain.
+            SetTimer(() => SkillProbeRun(), -1)
         case "PatchMaintSetPath":
             ; args[1] = user-entered path to Bundles2\_.index.bin / Content.ggpk.
             pmPathArg := (args.Length >= 1) ? String(args[1]) : ""

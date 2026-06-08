@@ -876,6 +876,122 @@ TargetedByPlayerProbeRun()
         . "Send me the log after the 2nd run:" nl . path, "TgtByPlayer Probe", "Iconi")
 }
 
+; Skill-name chain probe: traces Actor -> ActiveSkills[i] -> details ->
+; GrantedEffectsPerLevelDatRow(0x48) -> grantedEffectDatPtr(geplRow+0x00) ->
+; nameStr(GED+0x00) -> string, dumping each step so we can see where the
+; "Skill_<hex>" fallback comes from (a moved 0x48 or a changed DAT-row layout).
+SkillProbeRun()
+{
+    global g_reader
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Skill probe: not in-game.", "Skill Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    piOff := PoE2Offsets.AreaInstance["PlayerInfo"]
+    lpRaw := g_reader.Mem.ReadPtr(base + piOff + PoE2Offsets.LocalPlayerStruct["LocalPlayerPtr"])
+    localPlayer := g_reader.ResolveEntityPointer(lpRaw)
+    actor := 0
+    try actor := g_reader.FindEntityComponentAddress(localPlayer, "Actor")
+
+    rpt := "=== Skill Chain Probe ===" nl
+    rpt .= "localPlayer=0x" Format("{:X}", localPlayer) "  Actor=0x" Format("{:X}", actor) nl
+    rpt .= "offsets: ActiveSkills=0x" Format("{:X}", PoE2Offsets.Actor["ActiveSkills"])
+        . " GEPLRow=0x" Format("{:X}", PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+        . " GEDatPtr=0x" Format("{:X}", PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"]) nl nl
+    if !actor
+    {
+        rpt .= "(no Actor component)" nl
+        _AIP_WriteSkillLog(rpt)
+        return
+    }
+    asFirst := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["ActiveSkills"])
+    asLast  := g_reader.Mem.ReadInt64(actor + PoE2Offsets.Actor["ActiveSkillsLast"])
+    cnt := (asFirst > 0 && asLast >= asFirst) ? Floor((asLast - asFirst) / 0x10) : 0
+    rpt .= "ActiveSkills vec: first=0x" Format("{:X}", asFirst) " last=0x" Format("{:X}", asLast) " count=" cnt nl nl
+
+    n := 0
+    idx := 0
+    while (idx < cnt && n < 5)
+    {
+        entry := asFirst + idx * 0x10
+        detailsPtr := g_reader.Mem.ReadPtr(entry + PoE2Offsets.ActiveSkillStructure["ActiveSkillPtr"])
+        idx += 1
+        if !g_reader.IsProbablyValidPointer(detailsPtr)
+            continue
+        geplRow := g_reader.Mem.ReadPtr(detailsPtr + PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+        rpt .= "-- skill #" n " --" nl
+        rpt .= "  details=0x" Format("{:X}", detailsPtr) "  geplRow(@0x48)=0x" Format("{:X}", geplRow)
+            . " valid=" (g_reader.IsProbablyValidPointer(geplRow) ? "y" : "N") nl
+        db := g_reader.Mem.ReadBytes(detailsPtr + 0x40, 0x30, true)
+        if db
+        {
+            cand := ""
+            j := 0
+            while (j + 8 <= db.Size)
+            {
+                p := NumGet(db.Ptr, j, "Int64")
+                if g_reader.IsProbablyValidPointer(p)
+                    cand .= "0x" Format("{:X}", 0x40 + j) "=0x" Format("{:X}", p) " "
+                j += 8
+            }
+            rpt .= "  details ptr-candidates 0x40..0x70: " (cand = "" ? "(none)" : cand) nl
+        }
+        if g_reader.IsProbablyValidPointer(geplRow)
+        {
+            gedp := g_reader.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
+            rpt .= "  geplRow q0..q3:"
+            q := 0
+            while (q < 4)
+            {
+                rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(geplRow + q * 8) & 0xFFFFFFFFFFFFFFFF)
+                q += 1
+            }
+            rpt .= nl
+            rpt .= "  grantedEffectDatPtr(@geplRow+0x00)=0x" Format("{:X}", gedp)
+                . " valid=" (g_reader.IsProbablyValidPointer(gedp) ? "y" : "N") nl
+            if g_reader.IsProbablyValidPointer(gedp)
+            {
+                rpt .= "  GED q0..q3:"
+                q := 0
+                while (q < 4)
+                {
+                    rpt .= " 0x" Format("{:X}", g_reader.Mem.ReadInt64(gedp + q * 8) & 0xFFFFFFFFFFFFFFFF)
+                    q += 1
+                }
+                rpt .= nl
+                nameStr := g_reader.Mem.ReadPtr(gedp + 0x00)
+                s := ""
+                try s := g_reader.Mem.ReadUnicodeString(nameStr, 128)
+                rpt .= "  name@GED+0x00: strPtr=0x" Format("{:X}", nameStr) "  str='" s "'" nl
+            }
+        }
+        rpt .= nl
+        n += 1
+    }
+    _AIP_WriteSkillLog(rpt)
+}
+
+; Writes the skill-probe report to the log and shows the path.
+_AIP_WriteSkillLog(rpt)
+{
+    path := A_ScriptDir "\logs\InGameStateMonitor.skill_probe.log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("SkillProbe -> " path)
+    try MsgBox("Skill chain probe done." "`r`n`r`nSend me:`r`n" path, "Skill Probe", "Iconi")
+}
+
 ; Registers the temporary in-game probe hotkeys (Ctrl+Alt+Shift+T = chest CLOSED/
 ; OPENED diff, Ctrl+B = IsTargetedByPlayer hover diff) so they fire in-game
 ; without the UI button dropping the hover/target. Called once at startup.
