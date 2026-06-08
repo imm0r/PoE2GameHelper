@@ -1156,23 +1156,23 @@ class PoE2GameStateReader extends PoE2InventoryReader
         uiRootPtr := 0
         gameUiPtr := 0
         gameUiControllerPtr := 0
-        activeGameUiPtr := 0
-        isControllerMode := false
+
+        ; The ImportantUiElements manager IS the UiRoot struct pointer itself, not the
+        ; deref'd GameUiPtr(0xBE0). Matches the reference (InGameState.cs: GameUi.Address
+        ; = uiManagerPtr = UiRootStructPtr for KB/M, GamepadUiRootStructPtr for
+        ; controller). The PoE2 v4.5 UI patch dropped the old GameUiPtr indirection,
+        ; which left every panel/map/chat read off-base (radar gate: no-largemap).
+        isControllerMode := !this.IsProbablyValidPointer(uiRootStructPtr)
+        if isControllerMode
+            activeGameUiPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
+        else
+            activeGameUiPtr := uiRootStructPtr
 
         if this.IsProbablyValidPointer(uiRootStructPtr)
         {
             uiRootPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["UiRootPtr"])
             gameUiPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
             gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
-            if (!gameUiPtr && gameUiControllerPtr)
-            {
-                isControllerMode := true
-                activeGameUiPtr := gameUiControllerPtr
-            }
-            else
-            {
-                activeGameUiPtr := gameUiPtr
-            }
         }
 
         importantUiElements := this.ReadImportantUiElements(activeGameUiPtr, isControllerMode)

@@ -480,7 +480,9 @@ UiMapProbeRun()
         . " valid=" (g_reader.IsProbablyValidPointer(gameUi) ? "y" : "N")
         . "  gameUiCtrl=0x" Format("{:X}", gameUiCtrl) nl nl
 
-    activeUi := g_reader.IsProbablyValidPointer(gameUi) ? gameUi : gameUiCtrl
+    ; Manager base = the UiRoot struct pointer itself (reference: GameUi.Address =
+    ; uiManagerPtr = UiRootStructPtr), NOT the deref'd GameUiPtr.
+    activeUi := g_reader.IsProbablyValidPointer(uiRootStruct) ? uiRootStruct : gameUiCtrl
     mapParent := g_reader.Mem.ReadPtr(activeUi + M.ImportantUiElements["MapParentPtr"])
     ctrlMapParent := g_reader.Mem.ReadPtr(activeUi + M.ImportantUiElements["ControllerModeMapParentPtr"])
     rpt .= "mapParentPtr(@0x" Format("{:X}", M.ImportantUiElements["MapParentPtr"]) ")=0x" Format("{:X}", mapParent)
