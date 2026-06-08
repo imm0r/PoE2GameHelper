@@ -531,3 +531,91 @@ UiMapProbeRun()
         . "Send me:" nl . path
     try MsgBox(box, "UI/Map Probe", "Iconi")
 }
+
+; Chest open-flag probe: dumps the Chest component bytes (0x150..0x197) for nearby
+; chest entities so the IsOpened offset can be pinned. Run once with a chest CLOSED,
+; then OPEN that chest and run again; the byte that flips 0->1 for the same entity
+; id is the real IsOpened flag. No params; writes a log + summary MsgBox.
+ChestProbeRun()
+{
+    global g_reader
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Chest probe: not in-game.", "Chest Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    summary := ""
+    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
+
+    rpt := "=== Chest Probe (run CLOSED, then open the chest and run again) ===" nl
+    rpt .= "current IsOpened offset = 0x" Format("{:X}", PoE2Offsets.Chest["IsOpened"])
+        . " (= byte index 0x18 of the 0x150 dump)" nl nl
+
+    n := 0
+    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    {
+        for _, en in summary["sample"]
+        {
+            if !(en && Type(en) = "Map")
+                continue
+            ent := en.Has("entity") ? en["entity"] : 0
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+            if !(InStr(path, "Chest") || InStr(path, "Boulder") || InStr(path, "Strongbox"))
+                continue
+            entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
+            id := en.Has("id") ? en["id"] : 0
+            chestAddr := 0
+            try chestAddr := g_reader.FindEntityComponentAddress(entPtr, "Chest")
+            rpt .= "#" id "  " path nl
+            if chestAddr
+            {
+                rpt .= "  Chest@0x" Format("{:X}", chestAddr)
+                    . "  isOpened@0x168=" g_reader.Mem.ReadUChar(chestAddr + 0x168) nl
+                buf := g_reader.Mem.ReadBytes(chestAddr + 0x150, 0x48, true)
+                if buf
+                {
+                    line := "  0x150: "
+                    i := 0
+                    while (i < buf.Size)
+                    {
+                        line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
+                        i += 1
+                        if (Mod(i, 16) = 0)
+                        {
+                            rpt .= RTrim(line) nl
+                            line := "  0x" Format("{:X}", 0x150 + i) ": "
+                        }
+                    }
+                    if (Trim(line) != "0x" Format("{:X}", 0x150 + i) ":")
+                        rpt .= RTrim(line) nl
+                }
+            }
+            else
+                rpt .= "  (no Chest component)" nl
+            rpt .= nl
+            n += 1
+            if (n >= 10)
+                break
+        }
+    }
+    if (n = 0)
+        rpt .= "(no chest entities in the awake sample — stand closer to chests)" nl
+
+    path := A_ScriptDir "\logs\InGameStateMonitor.chest_probe.log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("ChestProbe " n " chests -> " path)
+    try MsgBox("Chest probe done (" n " chest(s) dumped)." nl nl
+        . "Run once with a chest CLOSED, then OPEN that chest and run again." nl
+        . "Send me both logs:" nl . path, "Chest Probe", "Iconi")
+}
