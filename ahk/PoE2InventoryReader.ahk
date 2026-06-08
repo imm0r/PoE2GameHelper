@@ -690,7 +690,7 @@ class PoE2InventoryReader extends PoE2PlayerReader
 
         modsInfo := this.ReadItemModsAndMagicProperties(itemEntityPtr)
         rarityId := (modsInfo && modsInfo.Has("rarityId")) ? modsInfo["rarityId"] : -1
-        displayName := this.ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId)
+        displayName := this.ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId, itemEntityPtr)
 
         ; Stack count (for stackable items like scrolls, currency, gold).
         ; Reads the Stack component's Count field when present; non-stackable
@@ -726,11 +726,21 @@ class PoE2InventoryReader extends PoE2PlayerReader
     ; (doing so produced names like "Blessed IncreasedLife Cuffs of the …").
     ; The real tier adjective lives in stat-description data we don't extract
     ; yet; until that lands the composed name simply drops the tier slot.
-    ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId := -1)
+    ComposeItemDisplayName(metadataPath, baseType, modsInfo, rarityId := -1, itemEntityPtr := 0)
     {
-        ; Unique items: look up by metadata path → unique name
+        ; Unique items: resolve the name via the item's ItemVisualIdentity Id
+        ; (robust — distinguishes uniques that share a base, e.g. Morior Invictus
+        ; vs Tabula Rasa on FourBodyStrDexInt1). Fall back to the metadata-path map
+        ; only when the IVI read / lookup fails.
         if (rarityId = 3)
         {
+            iviId := this.ReadUniqueIviId(itemEntityPtr)
+            if (iviId != "")
+            {
+                uniqueByIvi := this.GetUniqueNameByIvi(iviId)
+                if (uniqueByIvi != "")
+                    return uniqueByIvi
+            }
             uniqueName := this.GetUniqueItemName(metadataPath)
             if (uniqueName != "")
                 return uniqueName
@@ -1485,6 +1495,63 @@ class PoE2InventoryReader extends PoE2PlayerReader
     {
         if this.UniqueItemNameMap.Has(metadataPath)
             return this.UniqueItemNameMap[metadataPath]
+        return ""
+    }
+
+    ; Reads the item's ItemVisualIdentity Id (e.g. "FourUniquePinnacle1") for unique
+    ; items via the Base component: Base+0x30 → IVI dat row → +0x00 → Id wide string.
+    ; Returns "" for non-uniques or on any invalid pointer in the chain.
+    ReadUniqueIviId(itemEntityPtr)
+    {
+        if !this.IsProbablyValidPointer(itemEntityPtr)
+            return ""
+        baseComp := this.FindEntityComponentAddress(itemEntityPtr, "Base")
+        if !this.IsProbablyValidPointer(baseComp)
+            return ""
+        iviRowPtr := this.Mem.ReadPtr(baseComp + PoE2Offsets.ItemBaseComponent["UniqueIviRow"])
+        if !this.IsProbablyValidPointer(iviRowPtr)
+            return ""
+        idStrPtr := this.Mem.ReadPtr(iviRowPtr + PoE2Offsets.ItemVisualIdentityRow["IdPtr"])
+        if !this.IsProbablyValidPointer(idStrPtr)
+            return ""
+        iviId := this.Mem.ReadUnicodeString(idStrPtr)
+        if (StrLen(iviId) <= 0 || StrLen(iviId) > 128)
+            return ""
+        return iviId
+    }
+
+    ; Loads the IVI-id → unique-name lookup table (data/unique_ivi_name_map.tsv)
+    ; into this.UniqueIviNameMap. Columns: ivi_id, unique_name.
+    LoadUniqueIviNameMap(tsvPath)
+    {
+        if !FileExist(tsvPath)
+            return
+        try {
+            f := FileOpen(tsvPath, "r", "UTF-8")
+            if !f
+                return
+            while !f.AtEOF
+            {
+                line := f.ReadLine()
+                line := RTrim(line, "`r`n")
+                if (SubStr(line, 1, 1) = "#" || line = "")
+                    continue
+                parts := StrSplit(line, "`t")
+                if (parts.Length < 2)
+                    continue
+                this.UniqueIviNameMap[parts[1]] := parts[2]
+            }
+            f.Close()
+        }
+        catch as err {
+        }
+    }
+
+    ; Returns the unique name for an ItemVisualIdentity Id, or "" if not mapped.
+    GetUniqueNameByIvi(iviId)
+    {
+        if this.UniqueIviNameMap.Has(iviId)
+            return this.UniqueIviNameMap[iviId]
         return ""
     }
 
