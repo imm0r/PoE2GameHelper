@@ -146,7 +146,7 @@ class PoE2Offsets
         ; entity we can verify, so both map to 0x69.
         "IsTargetable", 0x69,
         "IsHighlightable", 0x69,
-        "IsTargetedByPlayer", 0x53,  ; PENDING hover-diff: hover-dependent flag; old offset reads 0 (safe — combat won't false-fire)
+        "IsTargetedByPlayer", 0x6B,  ; v4.5.1.1.4: hover-diff confirmed — only the attacked monster's 0x6B flipped 0->1
         "MeetsQuestState", 0x56,
         "NeedsTrue", 0x58,
         "HiddenFromPlayer", 0x59,
