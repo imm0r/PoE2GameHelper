@@ -51,6 +51,27 @@ Example `claude_desktop_config.json` / MCP client config entry:
 
 `POEFORMANCE_API_PORT` is optional (defaults to `7777`).
 
+### Local Claude Code (same machine as the game)
+
+The repo ships a project-scoped [`.mcp.json`](../.mcp.json) at its root:
+
+```json
+{
+  "mcpServers": {
+    "poeformance": { "command": "node", "args": ["mcp-server/index.js"] }
+  }
+}
+```
+
+When you run Claude Code **locally on the machine that runs PoEformance**, it
+picks this up automatically (it prompts once to approve the project MCP server).
+The relative path works because Claude Code launches MCP servers with the
+project root as the working directory — so the same coding session can edit the
+code *and* call the live tools. This only works locally: a remote/cloud Claude
+Code session has no network path to your PC's `127.0.0.1:7777`, and the API is
+loopback-only by design (it can write settings), so don't expose it to reach it
+from the cloud.
+
 ## Tools
 
 | Tool | What it does |
