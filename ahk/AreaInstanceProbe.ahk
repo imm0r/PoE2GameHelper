@@ -771,51 +771,62 @@ _AIP_HexDump(buf, len)
 ; a monster and run again.
 TargetedByPlayerProbeRun()
 {
-    global g_reader, g_aipTgtPrev
+    global g_reader, g_radarLastSnap, g_aipTgtPrev
     if !IsSet(g_aipTgtPrev)
         g_aipTgtPrev := Map()
-    base := _AIP_ResolveAreaInstance()
-    if !base
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
     {
-        try MsgBox("IsTargetedByPlayer probe: not in-game.", "TgtByPlayer Probe", "Iconx")
+        try MsgBox("IsTargetedByPlayer probe: not connected.", "TgtByPlayer Probe", "Iconx")
         return
     }
     nl := "`r`n"
-    summary := ""
-    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
-    OFF := 0x60
-    LEN := 0x20
-    cur := Map()
-    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    ; Use the persistent radar cache (stable across frames) so the SAME monsters are
+    ; present in both runs — a fresh BFS re-samples a different subset each call.
+    sample := 0
+    try
     {
-        for _, en in summary["sample"]
-        {
-            if !(en && Type(en) = "Map")
-                continue
-            ent := en.Has("entity") ? en["entity"] : 0
-            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
-            if !InStr(StrLower(path), "monster")
-                continue
-            entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
-            id := en.Has("id") ? en["id"] : 0
-            tgt := 0
-            try tgt := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
-            if !tgt
-                continue
-            buf := g_reader.Mem.ReadBytes(tgt + OFF, LEN, true)
-            if buf
-                cur[id] := Map("path", path, "buf", buf)
-        }
+        inGs := (IsObject(g_radarLastSnap) && g_radarLastSnap.Has("inGameState")) ? g_radarLastSnap["inGameState"] : 0
+        area := (IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        awake := (IsObject(area) && area.Has("awakeEntities")) ? area["awakeEntities"] : 0
+        sample := (IsObject(awake) && awake.Has("sample")) ? awake["sample"] : 0
+    }
+    if !IsObject(sample)
+    {
+        try MsgBox("No radar snapshot yet — let the radar run a moment, then retry.", "TgtByPlayer Probe", "Iconx")
+        return
+    }
+
+    LEN := 0x100
+    cur := Map()
+    for _, en in sample
+    {
+        if !(IsObject(en) && en.Has("entity"))
+            continue
+        ent := en["entity"]
+        path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+        if !InStr(StrLower(path), "monster")
+            continue
+        entPtr := en.Has("entityPtr") ? en["entityPtr"] : (en.Has("entityRawPtr") ? en["entityRawPtr"] : 0)
+        id := en.Has("id") ? en["id"] : 0
+        if (!entPtr || !id)
+            continue
+        tgt := 0
+        try tgt := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
+        if !tgt
+            continue
+        buf := g_reader.Mem.ReadBytes(tgt, LEN, true)
+        if buf
+            cur[id] := Map("path", path, "buf", buf)
     }
 
     curCount := cur.Count
     prevCount := g_aipTgtPrev.Count
-    rpt := "=== IsTargetedByPlayer hover-diff (NO hover, then hover one monster and run again) ===" nl
+    rpt := "=== IsTargetedByPlayer diff (run 1 = no target, run 2 = while ATTACKING one monster) ===" nl
     rpt .= "captured monsters: " curCount "   previous: " prevCount nl nl
 
     if (prevCount > 0)
     {
-        rpt .= "-- byte changes vs previous run (component-relative offsets) --" nl
+        rpt .= "-- byte changes vs previous run (full Targetable component 0x00..0x100) --" nl
         changes := 0
         for id, c in cur
         {
@@ -830,7 +841,7 @@ TargetedByPlayerProbeRun()
                 pv := NumGet(pb.Ptr, k, "UChar")
                 cv := NumGet(cb.Ptr, k, "UChar")
                 if (pv != cv)
-                    line .= "0x" Format("{:X}", OFF + k) ":" pv "->" cv "  "
+                    line .= "0x" Format("{:X}", k) ":" pv "->" cv "  "
                 k += 1
             }
             if (line != "")
@@ -840,10 +851,10 @@ TargetedByPlayerProbeRun()
             }
         }
         if (changes = 0)
-            rpt .= "  (no byte changed for any monster present in both runs)" nl
+            rpt .= "  (no byte changed in any monster's Targetable component between the two runs)" nl
     }
     else
-        rpt .= "(first run stored — now hover/target ONE monster and run again)" nl
+        rpt .= "(first run stored — now ATTACK/target ONE monster and run again)" nl
 
     g_aipTgtPrev := cur
 
@@ -859,8 +870,8 @@ TargetedByPlayerProbeRun()
         }
     }
     try LogError("TgtByPlayerProbe cur=" curCount " prev=" prevCount " -> " path)
-    try MsgBox("IsTargetedByPlayer hover-diff." nl nl
-        . "Run 1: NO hover. Then HOVER/target one monster and press Ctrl+B again." nl
+    try MsgBox("IsTargetedByPlayer diff." nl nl
+        . "Run 1: do NOT target anything. Then ATTACK/target ONE monster and press Ctrl+B again." nl
         . "captured=" curCount "  previous=" prevCount nl nl
         . "Send me the log after the 2nd run:" nl . path, "TgtByPlayer Probe", "Iconi")
 }
