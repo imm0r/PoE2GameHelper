@@ -975,22 +975,16 @@ class PoE2ComponentDecoders
                 ; to "Skill_<hex>".
                 internalName := this.Mem.ReadUnicodeString(grantedEffectDatPtr, 256)
 
-                ; Display name + icon via ActiveSkills.dat row
-                if (this._activeSkillOffset > 0)
+                ; Pretty display name from the skill-gem name map (base_item_name_map):
+                ; "Metadata/Items/Gems/SkillGem<Id>" -> e.g. "Bind Spectre". The in-memory
+                ; ActiveSkills DisplayedName chain was restructured in v4.5; the gem TSV is
+                ; version-robust. Non-gem/utility skills keep their internal id.
+                if (internalName != "")
                 {
-                    asInfo := this._TryReadActiveSkillRow(grantedEffectDatPtr, this._activeSkillOffset)
-                    displayName := asInfo["displayName"]
-                    iconPath := asInfo["iconPath"]
-                }
-                else
-                {
-                    this._activeSkillOffset := this._FindActiveSkillOffset(grantedEffectDatPtr)
-                    if (this._activeSkillOffset > 0)
-                    {
-                        asInfo := this._TryReadActiveSkillRow(grantedEffectDatPtr, this._activeSkillOffset)
-                        displayName := asInfo["displayName"]
-                        iconPath := asInfo["iconPath"]
-                    }
+                    gemKey := "Metadata/Items/Gems/SkillGem" . internalName
+                    mapped := this.GetBaseItemName(gemKey)
+                    if (mapped != "" && mapped != gemKey && mapped != internalName)
+                        displayName := mapped
                 }
             }
         }
