@@ -665,6 +665,9 @@ _DispatchBridgeCall(method, args)
         case "ComponentProbeRun":
             ; TEMP post-patch diagnostic: Life/entity/validity component probe.
             SetTimer(() => ComponentProbeRun(), -1)
+        case "UiMapProbeRun":
+            ; TEMP post-patch diagnostic: UI->Map chain (LargeMap detection).
+            SetTimer(() => UiMapProbeRun(), -1)
         case "PatchMaintSetPath":
             ; args[1] = user-entered path to Bundles2\_.index.bin / Content.ggpk.
             pmPathArg := (args.Length >= 1) ? String(args[1]) : ""
