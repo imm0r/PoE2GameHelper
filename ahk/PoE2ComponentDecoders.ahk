@@ -873,6 +873,15 @@ class PoE2ComponentDecoders
             internalName := skillNames["internalName"]
             displayName := skillNames["displayName"]
 
+            ; Skip internal/innate action skills that have no real DisplayedName
+            ; (Move, Ascend, DismountMinion, EpilogueKnockdown, …) — they only
+            ; cluttered the list. Only skills resolvable to a real name are shown.
+            if !skillNames["hasRealName"]
+            {
+                idx += 1
+                continue
+            }
+
             useStage := this.Mem.ReadInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["UseStage"])
             castType := this.Mem.ReadInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["CastType"])
             equipId := this.Mem.ReadUInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["UnknownIdAndEquipmentInfo"])
@@ -964,6 +973,7 @@ class PoE2ComponentDecoders
         internalName := ""
         displayName := ""
         iconPath := ""
+        hasRealName := false
         try
         {
             grantedEffectDatPtr := this.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
@@ -975,16 +985,32 @@ class PoE2ComponentDecoders
                 ; to "Skill_<hex>".
                 internalName := this.Mem.ReadUnicodeString(grantedEffectDatPtr, 256)
 
-                ; Pretty display name from the skill-gem name map (base_item_name_map):
-                ; "Metadata/Items/Gems/SkillGem<Id>" -> e.g. "Bind Spectre". The in-memory
-                ; ActiveSkills DisplayedName chain was restructured in v4.5; the gem TSV is
-                ; version-robust. Non-gem/utility skills keep their internal id.
                 if (internalName != "")
                 {
-                    gemKey := "Metadata/Items/Gems/SkillGem" . internalName
-                    mapped := this.GetBaseItemName(gemKey)
-                    if (mapped != "" && mapped != gemKey && mapped != internalName)
-                        displayName := mapped
+                    ; Primary: skill_name_map.tsv (GrantedEffects.Id -> ActiveSkills
+                    ; DisplayedName, built from the dat files). Authoritative for every
+                    ; skill — gem or innate — and version-robust vs the in-memory
+                    ; DisplayedName chain, which the patch keeps moving.
+                    if (this.HasOwnProp("SkillNameMap") && this.SkillNameMap.Has(internalName))
+                    {
+                        rec := this.SkillNameMap[internalName]
+                        displayName := rec["name"]
+                        iconPath := rec.Has("icon") ? rec["icon"] : ""
+                        if (displayName != "")
+                            hasRealName := true
+                    }
+                    ; Fallback: skill-gem name map (base_item_name_map):
+                    ; "Metadata/Items/Gems/SkillGem<Id>" -> e.g. "Bind Spectre".
+                    if (displayName = "")
+                    {
+                        gemKey := "Metadata/Items/Gems/SkillGem" . internalName
+                        mapped := this.GetBaseItemName(gemKey)
+                        if (mapped != "" && mapped != gemKey && mapped != internalName)
+                        {
+                            displayName := mapped
+                            hasRealName := true
+                        }
+                    }
                 }
             }
         }
@@ -997,7 +1023,7 @@ class PoE2ComponentDecoders
         if (displayName = "")
             displayName := internalName
 
-        result := Map("internalName", internalName, "displayName", displayName, "iconPath", iconPath)
+        result := Map("internalName", internalName, "displayName", displayName, "iconPath", iconPath, "hasRealName", hasRealName)
         this._skillNameCache[cacheKey] := result
         return result
     }
