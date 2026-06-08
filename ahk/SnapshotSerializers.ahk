@@ -28,7 +28,13 @@ _ClassifyEntityType(path)
         return "Enemy"
     }
     if InStr(p, "strongbox")
+    {
+        ; Sub-interaction objects (e.g. …/Unique/UniqueVaalStrongboxInteractionObject)
+        ; are children of the real strongbox, not standalone boxes — keep them out.
+        if InStr(p, "interactionobject")
+            return "Object"
         return "Strongbox"
+    }
     if InStr(p, "monolith")
         return "Monolith"
     if InStr(p, "metadata/chests/") || InStr(p, "detonator")

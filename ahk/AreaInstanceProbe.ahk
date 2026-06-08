@@ -638,6 +638,8 @@ TargetableProbeRun()
     try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
 
     rpt := "=== Targetable Probe (hover/target a live monster first) ===" nl
+    entSampleCount := (summary && Type(summary) = "Map" && summary.Has("sampleCount")) ? summary["sampleCount"] : 0
+    rpt .= "awake sampleCount=" entSampleCount nl
     rpt .= "current offsets: IsTargetable=0x51 IsHighlightable=0x52 IsTargetedByPlayer=0x53" nl
     rpt .= "(byte index in the dump = offset - 0x40)" nl nl
 
@@ -649,17 +651,14 @@ TargetableProbeRun()
             if !(en && Type(en) = "Map")
                 continue
             ent := en.Has("entity") ? en["entity"] : 0
-            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
-            pl := StrLower(path)
-            if !(InStr(pl, "monster") || InStr(pl, "strongbox") || InStr(pl, "chest") || InStr(pl, "monolith"))
-                continue
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : "?"
             entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
             id := en.Has("id") ? en["id"] : 0
             tgtAddr := 0
             try tgtAddr := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
+            if !tgtAddr
+                continue
             rpt .= "#" id "  " path nl
-            if tgtAddr
-            {
                 buf := g_reader.Mem.ReadBytes(tgtAddr + 0x40, 0x28, true)
                 if buf
                 {
