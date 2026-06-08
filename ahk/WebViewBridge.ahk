@@ -1243,6 +1243,45 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
                                             out .= "`n              +0x" Format("{:02X}", ho) ": 0x" Format("{:016X}", NumGet(hb.Ptr, ho, "Int64"))
                                             ho += 8
                                         }
+                                        ; Uniques carry a per-unique dat-row pointer at Base+0x30
+                                        ; (zero for non-uniques). Follow it and try to read a wide
+                                        ; string at each field to locate the unique-name offset.
+                                        if (cn = "Base")
+                                        {
+                                            uniqRowPtr := NumGet(hb.Ptr, 0x30, "Int64")
+                                            if g_reader.IsProbablyValidPointer(uniqRowPtr)
+                                            {
+                                                out .= "`n              → [Base+0x30] uniqueRow @ 0x" Format("{:016X}", uniqRowPtr)
+                                                rb := g_reader.Mem.ReadBytes(uniqRowPtr, 0x60)
+                                                if (rb && rb.Size >= 0x60)
+                                                {
+                                                    ro := 0
+                                                    while (ro < 0x60)
+                                                    {
+                                                        qv := NumGet(rb.Ptr, ro, "Int64")
+                                                        out .= "`n                +0x" Format("{:02X}", ro) ": 0x" Format("{:016X}", qv)
+                                                        ; (a) qword is a pointer to a wide buffer
+                                                        if g_reader.IsProbablyValidPointer(qv)
+                                                        {
+                                                            try
+                                                            {
+                                                                sv := g_reader.Mem.ReadUnicodeString(qv)
+                                                                if (sv != "" && StrLen(sv) <= 48)
+                                                                    out .= "  str='" sv "'"
+                                                            }
+                                                        }
+                                                        ; (b) field is an inline std::wstring at row+ro
+                                                        try
+                                                        {
+                                                            sw := g_reader.ReadStdWStringAt(uniqRowPtr + ro, 48)
+                                                            if (sw != "" && StrLen(sw) <= 48)
+                                                                out .= "  sw='" sw "'"
+                                                        }
+                                                        ro += 8
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
