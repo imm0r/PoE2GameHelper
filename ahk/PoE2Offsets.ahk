@@ -475,9 +475,12 @@ class PoE2Offsets
     ; Extra offsets for Map-type UiElements (MapUiElementOffset.cs)
     ; Base = MapUiElementOffset (UiElementBase @ 0x000, then own fields)
     static MapUiElement := Map(
-        "Shift", 0x3A0,  ; StdTuple2D<float> — user/game shift of map center
-        "DefaultShift", 0x3A8,  ; StdTuple2D<float> — default offset (PoE2: 0, -20)
-        "Zoom", 0x3E0   ; float — current zoom level (default ~0.5)
+        ; PoE2 v4.5.x: all three shifted -0x38 (UiElementBase shrank); confirmed
+        ; in-game (old Zoom@0x3E0 read 0.000). Matches Gordin/GameHelper2
+        ; MapUiElement.cs (Shift 0x368, DefaultShift 0x370, Zoom 0x3A8).
+        "Shift", 0x368,  ; StdTuple2D<float> — user/game shift of map center (was 0x3A0)
+        "DefaultShift", 0x370,  ; StdTuple2D<float> — default offset PoE2 (0, -20) (was 0x3A8)
+        "Zoom", 0x3A8   ; float — current zoom level (default ~0.5) (was 0x3E0)
     )
 
 }
