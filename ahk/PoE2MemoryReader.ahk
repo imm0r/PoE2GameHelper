@@ -2719,14 +2719,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; cache blocks (UI cache 400ms + panel visibility 200ms).
         uiRootStructPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["UiRootStructPtr"])
         activeGameUiPtr := 0
-        isControllerMode := false
-        if this.IsProbablyValidPointer(uiRootStructPtr)
-        {
-            gameUiPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
-            gameUiControllerPtr := this.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
-            isControllerMode := (!gameUiPtr && gameUiControllerPtr)
-            activeGameUiPtr := isControllerMode ? gameUiControllerPtr : gameUiPtr
-        }
+        ; Manager base = the UiRoot struct pointer itself (KB/M) or the Gamepad UiRoot
+        ; struct (controller) — matches the reference / ReadInGameState. The PoE2 v4.5
+        ; UI patch dropped the old deref'd-GameUiPtr(0xBE0) indirection, which left this
+        ; radar/AutoFlask path reading the map/panel pointers off-base (gate: no-largemap).
+        isControllerMode := !this.IsProbablyValidPointer(uiRootStructPtr)
+        if isControllerMode
+            activeGameUiPtr := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
+        else
+            activeGameUiPtr := uiRootStructPtr
 
         ; Map UI element data — re-read only every 400ms to avoid expensive UI tree walk at 100ms.
         ; Map positions/zoom rarely change mid-frame; re-reading less often has no visible impact.
