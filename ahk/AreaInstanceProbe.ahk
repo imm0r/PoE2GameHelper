@@ -860,16 +860,16 @@ TargetedByPlayerProbeRun()
     }
     try LogError("TgtByPlayerProbe cur=" curCount " prev=" prevCount " -> " path)
     try MsgBox("IsTargetedByPlayer hover-diff." nl nl
-        . "Run 1: NO hover. Then HOVER/target one monster and press Ctrl+Alt+Shift+Y again." nl
+        . "Run 1: NO hover. Then HOVER/target one monster and press Ctrl+B again." nl
         . "captured=" curCount "  previous=" prevCount nl nl
         . "Send me the log after the 2nd run:" nl . path, "TgtByPlayer Probe", "Iconi")
 }
 
 ; Registers the temporary in-game probe hotkeys (Ctrl+Alt+Shift+T = chest CLOSED/
-; OPENED diff, Ctrl+Alt+Shift+Y = IsTargetedByPlayer hover diff) so they fire
-; in-game without the UI button dropping the hover/target. Called once at startup.
+; OPENED diff, Ctrl+B = IsTargetedByPlayer hover diff) so they fire in-game
+; without the UI button dropping the hover/target. Called once at startup.
 _AIP_RegisterProbeHotkeys()
 {
     try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
-    try Hotkey("^!+y", (*) => TargetedByPlayerProbeRun(), "On")
+    try Hotkey("^b", (*) => TargetedByPlayerProbeRun(), "On")
 }
