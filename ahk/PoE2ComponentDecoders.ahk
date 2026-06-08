@@ -969,10 +969,11 @@ class PoE2ComponentDecoders
             grantedEffectDatPtr := this.Mem.ReadPtr(geplRow + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
             if this.IsProbablyValidPointer(grantedEffectDatPtr)
             {
-                ; Internal name from GrantedEffects row offset 0x00
-                nameStringPtr := this.Mem.ReadPtr(grantedEffectDatPtr)
-                if this.IsProbablyValidPointer(nameStringPtr)
-                    internalName := this.Mem.ReadUnicodeString(nameStringPtr, 256)
+                ; PoE2 v4.5.1.1.4: the GrantedEffects Id string is stored INLINE at
+                ; +0x00 (was a pointer-to-string). Read it directly — dereferencing
+                ; once more read the string's first bytes as a pointer and fell back
+                ; to "Skill_<hex>".
+                internalName := this.Mem.ReadUnicodeString(grantedEffectDatPtr, 256)
 
                 ; Display name + icon via ActiveSkills.dat row
                 if (this._activeSkillOffset > 0)
