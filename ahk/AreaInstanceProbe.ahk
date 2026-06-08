@@ -659,30 +659,27 @@ TargetableProbeRun()
             if !tgtAddr
                 continue
             rpt .= "#" id "  " path nl
-                buf := g_reader.Mem.ReadBytes(tgtAddr + 0x40, 0x28, true)
-                if buf
+            buf := g_reader.Mem.ReadBytes(tgtAddr + 0x40, 0x28, true)
+            if buf
+            {
+                line := "  0x40: "
+                i := 0
+                while (i < buf.Size)
                 {
-                    line := "  0x40: "
-                    i := 0
-                    while (i < buf.Size)
+                    line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
+                    i += 1
+                    if (Mod(i, 16) = 0)
                     {
-                        line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
-                        i += 1
-                        if (Mod(i, 16) = 0)
-                        {
-                            rpt .= RTrim(line) nl
-                            line := "  0x" Format("{:X}", 0x40 + i) ": "
-                        }
-                    }
-                    if (Trim(line) != "0x" Format("{:X}", 0x40 + i) ":")
                         rpt .= RTrim(line) nl
+                        line := "  0x" Format("{:X}", 0x40 + i) ": "
+                    }
                 }
-                rpt .= "  -> @0x51=" g_reader.Mem.ReadUChar(tgtAddr + 0x51)
-                    . " @0x52=" g_reader.Mem.ReadUChar(tgtAddr + 0x52)
-                    . " @0x53=" g_reader.Mem.ReadUChar(tgtAddr + 0x53) nl
+                if (Trim(line) != "0x" Format("{:X}", 0x40 + i) ":")
+                    rpt .= RTrim(line) nl
             }
-            else
-                rpt .= "  (no Targetable component)" nl
+            rpt .= "  -> @0x51=" g_reader.Mem.ReadUChar(tgtAddr + 0x51)
+                . " @0x52=" g_reader.Mem.ReadUChar(tgtAddr + 0x52)
+                . " @0x53=" g_reader.Mem.ReadUChar(tgtAddr + 0x53) nl
             rpt .= nl
             n += 1
             if (n >= 12)
