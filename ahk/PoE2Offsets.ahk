@@ -185,7 +185,34 @@ class PoE2Offsets
     )
 
     static Positioned := Map(
-        "Reaction", 0x1E0
+        "Reaction", 0x1E0,
+        ; Presence/aura AoE scale of the entity (monster presence radius).
+        ; HYPOTHESIS from Sikaka/POE2Radar (Poe2Offsets.cs, Positioned). VERIFY
+        ; in-game against a known aura/presence monster before relying on it.
+        "PresenceAoeScale", 0x2A0
+    )
+
+    ; Monster component. HYPOTHESIS from Sikaka/POE2Radar (Poe2Offsets.cs,
+    ; MonsterComponent). IsBoss is a direct boss flag — currently we only infer
+    ; rarity via the mods/objectmagicproperties path. VERIFY in-game: read this
+    ; byte on a confirmed boss vs. a normal monster.
+    static Monster := Map(
+        "IsBoss", 0x27
+    )
+
+    ; Pathfinding component (movement). HYPOTHESIS from Sikaka/POE2Radar
+    ; (Poe2Offsets.cs, PathfindingComponent). VERIFY in-game: BaseSpeed should
+    ; read a plausible movement speed; Flying should be 1 only on flying mobs.
+    static Pathfinding := Map(
+        "Flying", 0xE5,        ; byte — non-zero on flying entities
+        "BaseSpeed", 0xEC      ; movement speed
+    )
+
+    ; AreaTransition component (portals / zone transitions). HYPOTHESIS from
+    ; Sikaka/POE2Radar (Poe2Offsets.cs, AreaTransitionComponent). VERIFY in-game.
+    static AreaTransition := Map(
+        "GracePeriod", 0x18,
+        "TeleportDelay", 0x1C
     )
 
     static Transitionable := Map(
@@ -494,6 +521,17 @@ class PoE2Offsets
         "Shift", 0x368,  ; StdTuple2D<float> — user/game shift of map center (was 0x3A0)
         "DefaultShift", 0x370,  ; StdTuple2D<float> — default offset PoE2 (0, -20) (was 0x3A8)
         "Zoom", 0x3A8   ; float — current zoom level (default ~0.5) (was 0x3E0)
+    )
+
+    ; Hover tracker — resolves the entity the player is currently hovering.
+    ; HYPOTHESIS from Sikaka/POE2Radar (Poe2Offsets.cs, HoverTracker). Chain
+    ; (per the reference): UiRoot + FromUiRoot -> tracker; + WorldTracker ->
+    ; world-hover sub-struct; + HoveredEntity -> Entity ptr. VERIFY in-game by
+    ; hovering a known monster/chest and confirming the resolved entity path.
+    static HoverTracker := Map(
+        "FromUiRoot", 0x7D8,
+        "WorldTracker", 0x630,
+        "HoveredEntity", 0x18
     )
 
 }
