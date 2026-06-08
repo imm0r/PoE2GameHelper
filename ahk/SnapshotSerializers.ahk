@@ -288,8 +288,9 @@ _BuildEntitiesJson(snap)
                 isAlive := life.Has("isAlive") ? life["isAlive"] : true
                 lifePct := life.Has("lifeCurrentPercentMax") ? Round(life["lifeCurrentPercentMax"], 0) : -1
             }
-            if decoded && decoded.Has("targetable") && (entityType = "Enemy" || entityType = "Boss")
-                isAlive := decoded["targetable"]
+            ; (Targetable-based corpse override temporarily disabled: the v4.5.1.1.4
+            ; hotfix moved the Targetable struct, so decoded["targetable"] is
+            ; unreliable. isAlive stays life-based until the offset is re-derived.)
 
             entityId  := entity.Has("entityId") ? entity["entityId"] : 0
             entityAddr := entity.Has("address") ? entity["address"] : 0

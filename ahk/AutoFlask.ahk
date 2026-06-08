@@ -328,6 +328,14 @@ UpdateRadarFast()
             g_radarOverlay._navEnabled := g_zoneNavEnabled
             g_radarOverlay._mapHackEnabled := g_mapHackEnabled
             g_radarOverlay._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
+            ; Auto-expire entity tracking once the target is finished (opened
+            ; chest/strongbox or dead monster) so the tracking line/label stop
+            ; pinning a completed objective. Only clears when a matching entity
+            ; exists and none are still active — avoids dropping tracking when the
+            ; target briefly leaves the radar sample.
+            if (IsSet(g_highlightedEntityPath) && g_highlightedEntityPath != ""
+                && _TrackedEntityExpired(radarSnap, g_highlightedEntityPath))
+                g_highlightedEntityPath := ""
             g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
 
             radarRenderStart := A_TickCount
@@ -1037,4 +1045,51 @@ _ConfigVkToSendKey(code)
     if (code >= 112 && code <= 135)      ; F1-F24
         return "F" (code - 111)
     return ""
+}
+
+; Returns true when every radar-sample entity matching trackPath is "finished"
+; (opened chest/strongbox or dead) and at least one such entity exists — used to
+; auto-expire entity tracking. Fully defensive: any read/shape error returns false
+; so tracking is never dropped by accident.
+_TrackedEntityExpired(snap, trackPath)
+{
+    if !(IsObject(snap) && trackPath != "")
+        return false
+    try
+    {
+        inGame := snap.Has("inGameState") ? snap["inGameState"] : 0
+        area   := (IsObject(inGame) && inGame.Has("areaInstance")) ? inGame["areaInstance"] : 0
+        awake  := (IsObject(area) && area.Has("awakeEntities")) ? area["awakeEntities"] : 0
+        sample := (IsObject(awake) && awake.Has("sample")) ? awake["sample"] : 0
+        if !IsObject(sample)
+            return false
+        foundActive := false
+        foundExpired := false
+        for _, entry in sample
+        {
+            if !(IsObject(entry) && entry.Has("entity"))
+                continue
+            ent := entry["entity"]
+            if !(IsObject(ent) && ent.Has("path") && ent["path"] = trackPath)
+                continue
+            dc := ent.Has("decodedComponents") ? ent["decodedComponents"] : 0
+            isExpired := false
+            if IsObject(dc)
+            {
+                ch := dc.Has("chest") ? dc["chest"] : 0
+                if (IsObject(ch) && ch.Has("isOpened") && ch["isOpened"])
+                    isExpired := true
+                lf := dc.Has("life") ? dc["life"] : 0
+                if (IsObject(lf) && lf.Has("isAlive") && !lf["isAlive"])
+                    isExpired := true
+            }
+            if isExpired
+                foundExpired := true
+            else
+                foundActive := true
+        }
+        return (foundExpired && !foundActive)
+    }
+    catch
+        return false
 }

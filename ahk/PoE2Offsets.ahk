@@ -138,6 +138,10 @@ class PoE2Offsets
     )
 
     static Targetable := Map(
+        ; NOTE: pre-hotfix (v4.5.1.1.3) values. The v4.5.1.1.4 hotfix moved the
+        ; Targetable struct again; the +0x17 guess (0x68) was wrong (those bytes
+        ; read 1 for everything). Real offsets pending the chest opened/closed diff
+        ; probe. Kept here as a neutral baseline (do not trust these on the hotfix).
         "IsTargetable", 0x51,
         "IsHighlightable", 0x52,
         "IsTargetedByPlayer", 0x53,
