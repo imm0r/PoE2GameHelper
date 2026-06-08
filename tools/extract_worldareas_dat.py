@@ -25,22 +25,29 @@ import sys, os, struct, json, urllib.request, time
 
 
 # -----------------------------------------------------------------------
-# OOZ decompressor path (installed via 'pip install pyooz')
+# OOZ decompressor (PoE bundles are Oodle-compressed).
+# Install with:  pip install pyooz
+# Optionally point OOZ_PATH at a directory containing the ooz module if it is
+# installed somewhere not on sys.path.
 # -----------------------------------------------------------------------
-_OOZ_CANDIDATES = [
-    r'C:\Users\m0nsu\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages',
-]
 def _ensure_ooz():
     try:
         import ooz
         return ooz
     except ImportError:
         pass
-    for p in _OOZ_CANDIDATES:
-        if os.path.isdir(p) and p not in sys.path:
-            sys.path.insert(0, p)
-    import ooz
-    return ooz
+    env_path = os.environ.get('OOZ_PATH')
+    if env_path and os.path.isdir(env_path) and env_path not in sys.path:
+        sys.path.insert(0, env_path)
+        try:
+            import ooz
+            return ooz
+        except ImportError:
+            pass
+    print('ERROR: the "ooz" module is required to decompress PoE bundles.')
+    print('  Install it with:  pip install pyooz')
+    print('  (or set OOZ_PATH to the directory containing the ooz module)')
+    sys.exit(1)
 
 ooz_mod = _ensure_ooz()
 
