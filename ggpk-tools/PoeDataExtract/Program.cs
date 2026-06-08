@@ -25,15 +25,39 @@ namespace PoeDataExtract;
 /// </summary>
 internal static class Program
 {
+    [STAThread] // required for the comdlg32 file picker the Oodle resolver may show
     private static int Main(string[] args)
     {
         if (args.Length == 0) { PrintUsage(); return 1; }
 
+        // The interactive Oodle file-picker is only offered for genuine
+        // manual CLI use: suppressed when --no-prompt is passed or when any
+        // standard stream is redirected (the AHK shell-out redirects stderr,
+        // so its automated calls never pop a dialog).
+        bool allowPrompt = !HasFlag(args, "--no-prompt")
+            && !Console.IsErrorRedirected && !Console.IsInputRedirected;
+
         string verb = args[0].ToLowerInvariant();
-        var rest = args.AsSpan(1);
 
         try
         {
+            // Convenience form: `poe-data-extract <path-to-_.index.bin|Content.ggpk>`
+            // with no verb runs a full extract-all into the repo data/ folder.
+            if (!IsKnownVerb(verb))
+            {
+                if (LooksLikePath(args[0]))
+                {
+                    OodleResolver.EnsureAvailable(args[0], allowPrompt);
+                    return RunExtractAll(args.AsSpan());
+                }
+                return Fail($"Unknown verb: {verb}", 1);
+            }
+
+            // Known verb: make the Oodle native DLL available before we open
+            // any bundle. Best-effort — never aborts here.
+            OodleResolver.EnsureAvailable(FindGgpkHint(args), allowPrompt);
+
+            var rest = args.AsSpan(1);
             return verb switch
             {
                 "extract"     => RunExtract(rest),
@@ -41,7 +65,7 @@ internal static class Program
                 "inspect"     => RunInspect(rest),
                 "ls"          => RunLs(rest),
                 "cat"         => RunCat(rest),
-                _ => Fail($"Unknown verb: {verb}", 1),
+                _ => Fail($"Unknown verb: {verb}", 1), // unreachable (IsKnownVerb)
             };
         }
         catch (ArgumentException ex)
@@ -99,17 +123,25 @@ internal static class Program
     /// <summary>
     /// Refreshes every TSV the helper consumes in one shell-out. Opens
     /// the GGPK once and runs each extractor against it — saves the
-    /// ~300 ms .NET-startup cost of invoking the tool 5x.
+    /// ~300 ms .NET-startup cost of invoking the tool per table.
     ///
-    /// Usage: poe-data-extract extract-all --ggpk &lt;path&gt; --output-dir &lt;dir&gt;
+    /// Usage: poe-data-extract extract-all [--ggpk] &lt;path&gt; [--output-dir &lt;dir&gt;]
+    ///        poe-data-extract &lt;path&gt;     (bare path → same thing)
+    ///
+    /// The ggpk/index path may be passed positionally or via --ggpk. When
+    /// --output-dir is omitted it defaults to the repo's data/ folder
+    /// (see <see cref="RepoDataDir"/>), so a plain
+    /// `poe-data-extract <path>` refreshes the whole data pack in place.
     ///
     /// Each extractor writes a fixed filename inside output-dir:
-    ///     base_item_sizes.tsv          (BaseItemSizes)
-    ///     base_item_name_map.tsv       (BaseItemNames)
+    ///     base_item_sizes.tsv          (BaseItemSizes — Id+Name+W+H)
     ///     monster_name_map.tsv         (MonsterNames)
     ///     stat_name_map.tsv            (StatNames)
     ///     mod_name_map.tsv             (Mods)
-    /// UniqueNames is NOT in the all-set (placeholder — throws if invoked).
+    ///     unique_item_name_map.tsv     (UniqueNames)
+    ///     map_mod_list.tsv             (MapMods — optional; failure doesn't
+    ///                                   fail the batch as it's the most
+    ///                                   schema-fragile and not yet consumed)
     /// </summary>
     private static int RunExtractAll(ReadOnlySpan<string> args)
     {
@@ -120,26 +152,42 @@ internal static class Program
             {
                 case "--ggpk":       if (++i < args.Length) ggpkPath = args[i]; break;
                 case "--output-dir": if (++i < args.Length) outDir   = args[i]; break;
+                default:
+                    // Accept the first non-flag token as the ggpk/index path
+                    // so a bare `poe-data-extract <path>` just works.
+                    if (ggpkPath is null && !args[i].StartsWith("--")) ggpkPath = args[i];
+                    break;
             }
         }
-        if (ggpkPath is null || outDir is null) { PrintUsage(); return 1; }
+        if (ggpkPath is null) { PrintUsage(); return 1; }
         if (!File.Exists(ggpkPath)) { Console.Error.WriteLine($"GGPK not found: {ggpkPath}"); return 2; }
 
+        // Default the output straight into the repo's data/ folder.
+        outDir ??= RepoDataDir.Resolve();
         Directory.CreateDirectory(outDir);
+        Console.Out.WriteLine($"extract-all → {outDir}");
         using var ggpk = GgpkOpener.Open(ggpkPath);
 
-        // (extractor, output-filename) pairs — ordered cheapest-first
-        // so a failure on a later one still leaves something useful.
-        var tasks = new (IExtractor extractor, string filename, string label)[]
+        // MapMods renders nicer tooltips when the existing stat-description
+        // map sits in the same data/ folder — wire it up automatically.
+        var mapMods = new MapMods();
+        string statDescMap = Path.Combine(outDir, "stat_desc_map.tsv");
+        if (File.Exists(statDescMap)) mapMods.StatDescMapPath = statDescMap;
+
+        // (extractor, output-filename, label, optional) — ordered
+        // cheapest-first so a failure on a later one still leaves something
+        // useful. `optional` tasks log on failure but don't fail the batch.
+        var tasks = new (IExtractor extractor, string filename, string label, bool optional)[]
         {
             // BaseItemSizes carries Id + Name + Width + Height in one
             // TSV — base_item_name_map.tsv would be a strict subset, so
             // the helper just reads names from base_item_sizes.tsv too.
-            (new StatNames(),     "stat_name_map.tsv",    "stat names"),
-            (new BaseItemSizes(), "base_item_sizes.tsv",  "base item sizes + names"),
-            (new MonsterNames(),  "monster_name_map.tsv", "monster names"),
-            (new Mods(),          "mod_name_map.tsv",          "mod names"),
-            (new UniqueNames(),   "unique_item_name_map.tsv",  "unique item names"),
+            (new StatNames(),     "stat_name_map.tsv",         "stat names",              false),
+            (new BaseItemSizes(), "base_item_sizes.tsv",       "base item sizes + names", false),
+            (new MonsterNames(),  "monster_name_map.tsv",      "monster names",           false),
+            (new Mods(),          "mod_name_map.tsv",          "mod names",               false),
+            (new UniqueNames(),   "unique_item_name_map.tsv",  "unique item names",       false),
+            (mapMods,             "map_mod_list.tsv",          "map mods",                true),
         };
 
         int ok = 0, fail = 0;
@@ -153,8 +201,8 @@ internal static class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"FAIL {t.label}: {ex.Message}");
-                fail++;
+                Console.Error.WriteLine($"{(t.optional ? "WARN" : "FAIL")} {t.label}: {ex.Message}");
+                if (!t.optional) fail++;
             }
         }
         Console.Out.WriteLine($"extract-all: {ok} ok, {fail} failed");
@@ -310,17 +358,53 @@ internal static class Program
 
     private static int Fail(string msg, int code) { Console.Error.WriteLine(msg); return code; }
 
+    // The verbs the dispatcher recognises. Anything else that looks like a
+    // path is treated as the bare-path extract-all convenience form.
+    private static bool IsKnownVerb(string verb) => verb is
+        "extract" or "extract-all" or "inspect" or "ls" or "cat";
+
+    // True when the token looks like a ggpk/index path rather than a verb —
+    // it exists on disk, or carries the expected extension.
+    private static bool LooksLikePath(string s) =>
+        File.Exists(s)
+        || s.EndsWith(".ggpk", StringComparison.OrdinalIgnoreCase)
+        || s.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasFlag(string[] args, string flag)
+    {
+        foreach (var a in args)
+            if (a.Equals(flag, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    // Best-effort ggpk/index path for anchoring the Oodle scan on the right
+    // drive: the --ggpk value if present, else the first path-shaped token.
+    private static string? FindGgpkHint(string[] args)
+    {
+        for (int i = 0; i + 1 < args.Length; i++)
+            if (args[i].Equals("--ggpk", StringComparison.OrdinalIgnoreCase)) return args[i + 1];
+        foreach (var a in args)
+            if (!a.StartsWith("--") && LooksLikePath(a)) return a;
+        return null;
+    }
+
     private static void PrintUsage()
     {
-        Console.Error.WriteLine("usage: poe-data-extract extract --ggpk <path> --table <Name> --output <out.tsv>");
+        Console.Error.WriteLine("usage: poe-data-extract <path>          (bare path → extract-all into the repo data/ folder)");
+        Console.Error.WriteLine("       poe-data-extract extract-all [--ggpk] <path> [--output-dir <dir>]");
+        Console.Error.WriteLine("       poe-data-extract extract --ggpk <path> --table <Name> --output <out.tsv>");
         Console.Error.WriteLine("                                [--mod-domain <N>] [--stat-desc-map <path>]");
         Console.Error.WriteLine("       poe-data-extract inspect --ggpk <path> --table <Name> [--output <dump.txt>]");
         Console.Error.WriteLine("       poe-data-extract ls      --ggpk <path> --match <substr> [--output <list.txt>]");
         Console.Error.WriteLine("       poe-data-extract cat     --ggpk <path> --path <internal/path> [--output <file>]");
+        Console.Error.WriteLine("       extract-all writes: base_item_sizes, monster_name_map, stat_name_map,");
+        Console.Error.WriteLine("                           mod_name_map, unique_item_name_map, map_mod_list (.tsv)");
         Console.Error.WriteLine("       known tables (extract): BaseItemTypes, MonsterNames, StatNames, Mods, MapMods, UniqueNames");
         Console.Error.WriteLine("       --mod-domain      only applies to MapMods (default 5 = AREA / map mods)");
         Console.Error.WriteLine("       --stat-desc-map   only applies to MapMods; path to data/stat_desc_map.tsv");
         Console.Error.WriteLine("                         enables in-game-style tooltip rendering per mod row");
+        Console.Error.WriteLine("       --no-prompt       never show the interactive oo2core.dll file picker");
         Console.Error.WriteLine("       <path> = either Content.ggpk or Bundles2/_.index.bin");
+        Console.Error.WriteLine("       Missing oo2core.dll is auto-copied from a local Steam game (e.g. PoE 1).");
     }
 }

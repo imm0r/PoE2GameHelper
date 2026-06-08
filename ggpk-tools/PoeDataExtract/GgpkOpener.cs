@@ -51,8 +51,11 @@ internal sealed class GgpkOpener : IDisposable
             // PoE2 statically links Oodle, so the DLL isn't shipped in
             // the install folder. Tell the user where to find one.
             throw new DllNotFoundException(
-                "oo2core (Oodle) DLL not found. PoE2 doesn't ship it externally.\n" +
-                "  Copy 'oo2core_9_win64.dll' next to the .exe (or into the working directory).\n" +
+                "oo2core (Oodle) DLL not found. PoE2 doesn't ship it externally, and the\n" +
+                "  auto-locate pass couldn't find a copy in a local Steam game install.\n" +
+                "  Copy 'oo2core_9_win64.dll' next to the .exe (or into the working\n" +
+                "  directory) and rename it to 'oo2core.dll' — LibBundle3 imports it as\n" +
+                "  DllImport(\"oo2core\"), so the filename must be exactly oo2core.dll.\n" +
                 "  Sources: a PoE1 install root, VisualGGPK3 release zips, or any other\n" +
                 "  Oodle-using game (Cyberpunk, Apex Legends, Warframe, Manor Lords, ...).",
                 ex);
