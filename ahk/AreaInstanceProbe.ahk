@@ -764,10 +764,112 @@ _AIP_HexDump(buf, len)
     return out
 }
 
-; Registers the temporary in-game hotkey for the Targetable probe
-; (Ctrl+Alt+Shift+T) so it fires while a monster is still targeted/hovered —
-; clicking the UI button would drop the target first. Called once at startup.
+; IsTargetedByPlayer hover-diff: captures each sampled monster's Targetable flag
+; bytes (component +0x60..+0x80) and diffs against the previous run (stored in
+; g_aipTgtPrev). Hovering/targeting one monster between two runs reveals which byte
+; flips 0->1 — that byte is IsTargetedByPlayer. Run once with NO hover, then hover
+; a monster and run again.
+TargetedByPlayerProbeRun()
+{
+    global g_reader, g_aipTgtPrev
+    if !IsSet(g_aipTgtPrev)
+        g_aipTgtPrev := Map()
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("IsTargetedByPlayer probe: not in-game.", "TgtByPlayer Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    summary := ""
+    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
+    OFF := 0x60
+    LEN := 0x20
+    cur := Map()
+    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    {
+        for _, en in summary["sample"]
+        {
+            if !(en && Type(en) = "Map")
+                continue
+            ent := en.Has("entity") ? en["entity"] : 0
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : ""
+            if !InStr(StrLower(path), "monster")
+                continue
+            entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
+            id := en.Has("id") ? en["id"] : 0
+            tgt := 0
+            try tgt := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
+            if !tgt
+                continue
+            buf := g_reader.Mem.ReadBytes(tgt + OFF, LEN, true)
+            if buf
+                cur[id] := Map("path", path, "buf", buf)
+        }
+    }
+
+    curCount := cur.Count
+    prevCount := g_aipTgtPrev.Count
+    rpt := "=== IsTargetedByPlayer hover-diff (NO hover, then hover one monster and run again) ===" nl
+    rpt .= "captured monsters: " curCount "   previous: " prevCount nl nl
+
+    if (prevCount > 0)
+    {
+        rpt .= "-- byte changes vs previous run (component-relative offsets) --" nl
+        changes := 0
+        for id, c in cur
+        {
+            if !g_aipTgtPrev.Has(id)
+                continue
+            pb := g_aipTgtPrev[id]["buf"]
+            cb := c["buf"]
+            line := ""
+            k := 0
+            while (k < LEN && k < pb.Size && k < cb.Size)
+            {
+                pv := NumGet(pb.Ptr, k, "UChar")
+                cv := NumGet(cb.Ptr, k, "UChar")
+                if (pv != cv)
+                    line .= "0x" Format("{:X}", OFF + k) ":" pv "->" cv "  "
+                k += 1
+            }
+            if (line != "")
+            {
+                rpt .= "  #" id " " c["path"] ":  " line nl
+                changes += 1
+            }
+        }
+        if (changes = 0)
+            rpt .= "  (no byte changed for any monster present in both runs)" nl
+    }
+    else
+        rpt .= "(first run stored — now hover/target ONE monster and run again)" nl
+
+    g_aipTgtPrev := cur
+
+    path := A_ScriptDir "\logs\InGameStateMonitor.targetedbyplayer_probe.log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("TgtByPlayerProbe cur=" curCount " prev=" prevCount " -> " path)
+    try MsgBox("IsTargetedByPlayer hover-diff." nl nl
+        . "Run 1: NO hover. Then HOVER/target one monster and press Ctrl+B again." nl
+        . "captured=" curCount "  previous=" prevCount nl nl
+        . "Send me the log after the 2nd run:" nl . path, "TgtByPlayer Probe", "Iconi")
+}
+
+; Registers the temporary in-game probe hotkeys (Ctrl+Alt+Shift+T = chest CLOSED/
+; OPENED diff, Ctrl+B = IsTargetedByPlayer hover diff) so they fire in-game
+; without the UI button dropping the hover/target. Called once at startup.
 _AIP_RegisterProbeHotkeys()
 {
     try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
+    try Hotkey("^b", (*) => TargetedByPlayerProbeRun(), "On")
 }
