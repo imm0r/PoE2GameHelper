@@ -619,3 +619,97 @@ ChestProbeRun()
         . "Run once with a chest CLOSED, then OPEN that chest and run again." nl
         . "Send me both logs:" nl . path, "Chest Probe", "Iconi")
 }
+
+; Targetable byte probe: dumps the Targetable component bytes (0x40..0x67) for
+; nearby targetable entities (monsters/strongboxes/monoliths). A live monster's
+; IsTargetable should read 1 somewhere; if it's not at 0x51, the offset shifted in
+; the patch. Hover/target an entity before running. Writes a log + summary MsgBox.
+TargetableProbeRun()
+{
+    global g_reader
+    base := _AIP_ResolveAreaInstance()
+    if !base
+    {
+        try MsgBox("Targetable probe: not in-game.", "Targetable Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    summary := ""
+    try summary := g_reader.ReadAreaEntityMapSummary(base + PoE2Offsets.AreaInstance["AwakeEntities"], 96, 0)
+
+    rpt := "=== Targetable Probe (hover/target a live monster first) ===" nl
+    entSampleCount := (summary && Type(summary) = "Map" && summary.Has("sampleCount")) ? summary["sampleCount"] : 0
+    rpt .= "awake sampleCount=" entSampleCount nl
+    rpt .= "current offsets: IsTargetable=0x51 IsHighlightable=0x52 IsTargetedByPlayer=0x53" nl
+    rpt .= "(byte index in the dump = offset - 0x40)" nl nl
+
+    n := 0
+    if (summary && Type(summary) = "Map" && summary.Has("sample") && Type(summary["sample"]) = "Array")
+    {
+        for _, en in summary["sample"]
+        {
+            if !(en && Type(en) = "Map")
+                continue
+            ent := en.Has("entity") ? en["entity"] : 0
+            path := (IsObject(ent) && ent.Has("path")) ? ent["path"] : "?"
+            entPtr := en.Has("entityPtr") ? en["entityPtr"] : 0
+            id := en.Has("id") ? en["id"] : 0
+            tgtAddr := 0
+            try tgtAddr := g_reader.FindEntityComponentAddress(entPtr, "Targetable")
+            if !tgtAddr
+                continue
+            rpt .= "#" id "  " path nl
+            buf := g_reader.Mem.ReadBytes(tgtAddr + 0x40, 0x28, true)
+            if buf
+            {
+                line := "  0x40: "
+                i := 0
+                while (i < buf.Size)
+                {
+                    line .= Format("{:02X} ", NumGet(buf.Ptr, i, "UChar"))
+                    i += 1
+                    if (Mod(i, 16) = 0)
+                    {
+                        rpt .= RTrim(line) nl
+                        line := "  0x" Format("{:X}", 0x40 + i) ": "
+                    }
+                }
+                if (Trim(line) != "0x" Format("{:X}", 0x40 + i) ":")
+                    rpt .= RTrim(line) nl
+            }
+            rpt .= "  -> @0x51=" g_reader.Mem.ReadUChar(tgtAddr + 0x51)
+                . " @0x52=" g_reader.Mem.ReadUChar(tgtAddr + 0x52)
+                . " @0x53=" g_reader.Mem.ReadUChar(tgtAddr + 0x53) nl
+            rpt .= nl
+            n += 1
+            if (n >= 12)
+                break
+        }
+    }
+    if (n = 0)
+        rpt .= "(no targetable entities in the awake sample)" nl
+
+    path := A_ScriptDir "\logs\InGameStateMonitor.targetable_probe.log"
+    try
+    {
+        try DirCreate(A_ScriptDir "\logs")
+        f := FileOpen(path, "w", "UTF-8")
+        if f
+        {
+            f.Write(rpt)
+            f.Close()
+        }
+    }
+    try LogError("TargetableProbe " n " -> " path)
+    try MsgBox("Targetable probe done (" n " entities)." nl nl
+        . "Hover/target a LIVE monster (IsTargetable should be 1)." nl
+        . "Send me:" nl . path, "Targetable Probe", "Iconi")
+}
+
+; Registers the temporary in-game hotkey for the Targetable probe
+; (Ctrl+Alt+Shift+T) so it fires while a monster is still targeted/hovered —
+; clicking the UI button would drop the target first. Called once at startup.
+_AIP_RegisterProbeHotkeys()
+{
+    try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
+}

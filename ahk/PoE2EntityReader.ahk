@@ -1786,6 +1786,21 @@ class PoE2EntityReader extends PoE2ComponentDecoders
             }
         }
 
+        ; Update chest open-flag — chests don't move, only IsOpened toggles. The
+        ; cache never refreshed it before, so opened chests lingered on the overlay
+        ; until a restart (the IsOpened offset 0x168 itself reads correctly).
+        chestComp := dc.Has("chest") ? dc["chest"] : 0
+        if (chestComp && Type(chestComp) = "Map" && chestComp.Has("address"))
+        {
+            chestAddr := chestComp["address"]
+            if this.IsProbablyValidPointer(chestAddr)
+            {
+                rawOpen := this.Mem.ReadUChar(chestAddr + PoE2Offsets.Chest["IsOpened"])
+                if (rawOpen <= 1)
+                    chestComp["isOpened"] := (rawOpen != 0)
+            }
+        }
+
         ; Update distance from player
         entityPos := this.ExtractEntityWorldPositionFromEntityBasic(entity, playerOrigin)
         if entityPos
