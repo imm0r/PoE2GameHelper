@@ -709,3 +709,11 @@ TargetableProbeRun()
         . "Hover/target a LIVE monster (IsTargetable should be 1)." nl
         . "Send me:" nl . path, "Targetable Probe", "Iconi")
 }
+
+; Registers the temporary in-game hotkey for the Targetable probe
+; (Ctrl+Alt+Shift+T) so it fires while a monster is still targeted/hovered —
+; clicking the UI button would drop the target first. Called once at startup.
+_AIP_RegisterProbeHotkeys()
+{
+    try Hotkey("^!+t", (*) => TargetableProbeRun(), "On")
+}

@@ -330,6 +330,7 @@ SetTimer(() => GgpkToolBridge.MaybeAutoRefresh(), -8000)
 g_combatAutoEnabled := g_autoPilotEnabled
 g_exploreEnabled := g_autoPilotEnabled
 RegisterCombatHotkey()
+_AIP_RegisterProbeHotkeys()   ; TEMP: Ctrl+Alt+Shift+T triggers the Targetable probe in-game
 
 ; Custom hotkeys: bind user-defined hotkeys and start the condition evaluator.
 HotkeysRegisterAll()
