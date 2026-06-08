@@ -6860,17 +6860,15 @@
       for (const inv of ordered) {
         const slotName = _inventoryLabel(inv.id);
         const items = Array.isArray(inv.items) ? inv.items : [];
-        // Surface the inventory type (e.g. "BodyArmour1") on hover of the slot card.
-        const typeTitle = inv.type ? ` title="${escHtml(inv.type)}"` : '';
         if (items.length === 0) {
-          cards += `<div class="eq-card eq-empty"${typeTitle}><div class="eq-slot-id">${escHtml(slotName)}</div><div class="eq-empty-msg">empty</div></div>`;
+          cards += `<div class="eq-card eq-empty"><div class="eq-slot-id">${escHtml(slotName)}</div><div class="eq-empty-msg">empty</div></div>`;
           continue;
         }
         const it = items[0];
         const rarity = (typeof it.r === 'number' && it.r >= 0 && it.r <= 3) ? it.r : 0;
         const name = it.n || it.b || '?';
         const tip = _buildItemTooltipPayload(it);
-        cards += `<div class="eq-card rarity-${rarity}"${typeTitle} `
+        cards += `<div class="eq-card rarity-${rarity}" `
               + `onmouseenter="_invShowTip(event,'${tip}')" onmouseleave="_invHideTip()" onmousemove="_invMoveTip(event)">`
               + `<div class="eq-slot-id">${escHtml(slotName)}</div>`
               + `<div class="eq-card-name">${escHtml(name)}</div>`
