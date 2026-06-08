@@ -966,6 +966,41 @@ SkillProbeRun()
                 s := ""
                 try s := g_reader.Mem.ReadUnicodeString(nameStr, 128)
                 rpt .= "  name@GED+0x00: strPtr=0x" Format("{:X}", nameStr) "  str='" s "'" nl
+
+                ; Scan the GrantedEffects row (byte-by-byte, offsets can be unaligned)
+                ; for the ActiveSkills-row pointer. The ActiveSkills row should expose
+                ; +0x00 Id, +0x08 DisplayedName, +0x28 Icon_DDSFile. Follow each pointer
+                ; and show those strings so we can pin the (post-patch) offsets that drive
+                ; skill display names + icons.
+                rpt .= "  GED ptr-scan 0x40..0x98 (-> candidate ActiveSkills rows):" nl
+                gscan := 0x40
+                while (gscan <= 0x98)
+                {
+                    cp := g_reader.Mem.ReadPtr(gedp + gscan)
+                    if g_reader.IsProbablyValidPointer(cp)
+                    {
+                        s0 := "", s8 := "", s28 := ""
+                        try {
+                            p0 := g_reader.Mem.ReadPtr(cp + 0x00)
+                            if g_reader.IsProbablyValidPointer(p0)
+                                s0 := g_reader.Mem.ReadUnicodeString(p0, 64)
+                        }
+                        try {
+                            p8 := g_reader.Mem.ReadPtr(cp + 0x08)
+                            if g_reader.IsProbablyValidPointer(p8)
+                                s8 := g_reader.Mem.ReadUnicodeString(p8, 64)
+                        }
+                        try {
+                            p28 := g_reader.Mem.ReadPtr(cp + 0x28)
+                            if g_reader.IsProbablyValidPointer(p28)
+                                s28 := g_reader.Mem.ReadUnicodeString(p28, 96)
+                        }
+                        if (s0 != "" || s8 != "" || s28 != "")
+                            rpt .= "    +0x" Format("{:02X}", gscan) " ->0x" Format("{:X}", cp)
+                                . "  [+0]='" s0 "' [+8]='" s8 "' [+28]='" s28 "'" nl
+                    }
+                    gscan += 1
+                }
             }
         }
         rpt .= nl
