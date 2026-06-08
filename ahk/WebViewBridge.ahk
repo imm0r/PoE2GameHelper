@@ -1209,6 +1209,21 @@ _DumpInventoryPointerChain(sdPtr, areaAddr, inGsAddr, gameUiPtr)
                             out .= "`n          path: " path
                     }
                 }
+
+                ; Component inventory (name @ address). The entity metadata path is
+                ; only the BASE item path, so it can't tell uniques apart; this list
+                ; helps locate the component that carries the item's
+                ; ItemVisualIdentity / unique name for the reader-side fix.
+                try
+                {
+                    comps := g_reader.ReadEntityComponentLookupBasic(itemEntityPtr, 32)
+                    if (comps.Length > 0)
+                    {
+                        out .= "`n          Components:"
+                        for _, c in comps
+                            out .= "`n            " c["name"] " @ " _FmtChainHex(c["address"])
+                    }
+                }
             }
             itemIdx += 1
         }
