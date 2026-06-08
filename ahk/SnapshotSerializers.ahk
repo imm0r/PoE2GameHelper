@@ -650,6 +650,9 @@ _BuildSkillsJson(snapshot)
             maxUses     := s.Has("maxUses")     ? Integer(s["maxUses"])     : 0
             equipId     := s.Has("equipId")     ? s["equipId"]             : 0
             equipHex    := Format("0x{:X}", equipId & 0xFFFFFFFF)
+            ; Player/equipped skill (true) vs internal action skill (false). The UI
+            ; shows only player skills by default and a pill reveals the rest.
+            isPlayer    := (s.Has("hasRealName") && s["hasRealName"]) ? "true" : "false"
 
             rows .= (first ? "" : ",")
                 . '{"n":"' nm '"'
@@ -662,6 +665,7 @@ _BuildSkillsJson(snapshot)
                 . ',"ok":' canUse
                 . ',"ac":' activeCds
                 . ',"mu":' maxUses
+                . ',"pl":' isPlayer
                 . ',"eq":"' equipHex '"}'
             first := false
         }

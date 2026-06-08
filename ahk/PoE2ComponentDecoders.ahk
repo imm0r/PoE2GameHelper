@@ -872,15 +872,11 @@ class PoE2ComponentDecoders
             skillNames := this._ResolveSkillName(geplRow)
             internalName := skillNames["internalName"]
             displayName := skillNames["displayName"]
-
-            ; Skip internal/innate action skills that have no real DisplayedName
-            ; (Move, Ascend, DismountMinion, EpilogueKnockdown, …) — they only
-            ; cluttered the list. Only skills resolvable to a real name are shown.
-            if !skillNames["hasRealName"]
-            {
-                idx += 1
-                continue
-            }
+            ; hasRealName distinguishes player/equipped skills (resolved to a real
+            ; DisplayedName) from internal action skills (Move, Ascend, …). The list
+            ; is no longer filtered here — the flag is passed to the UI so a toggle
+            ; pill can optionally show the internal skills too.
+            hasRealName := skillNames["hasRealName"]
 
             useStage := this.Mem.ReadInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["UseStage"])
             castType := this.Mem.ReadInt(detailsPtr + PoE2Offsets.ActiveSkillDetails["CastType"])
@@ -904,6 +900,7 @@ class PoE2ComponentDecoders
             skillsByName[internalName] := Map(
                 "name", internalName,
                 "displayName", displayName,
+                "hasRealName", hasRealName,
                 "iconPath", iconPath,
                 "useStage", useStage,
                 "castType", castType,
@@ -991,13 +988,26 @@ class PoE2ComponentDecoders
                     ; DisplayedName, built from the dat files). Authoritative for every
                     ; skill — gem or innate — and version-robust vs the in-memory
                     ; DisplayedName chain, which the patch keeps moving.
-                    if (this.HasOwnProp("SkillNameMap") && this.SkillNameMap.Has(internalName))
+                    ;
+                    ; The Actor reports the base GrantedEffect Id (e.g. "OrbOfStorms",
+                    ; "Spark"), but a player-cast skill's row is the "<Id>Player" variant
+                    ; (OrbOfStormsPlayer -> "Orb of Storms"). Try the exact id, then the
+                    ; "Player" variant. Internal action skills (Move, Ascend, …) have
+                    ; neither, so they stay unnamed and get filtered out.
+                    if (this.HasOwnProp("SkillNameMap"))
                     {
-                        rec := this.SkillNameMap[internalName]
-                        displayName := rec["name"]
-                        iconPath := rec.Has("icon") ? rec["icon"] : ""
-                        if (displayName != "")
-                            hasRealName := true
+                        rec := 0
+                        if this.SkillNameMap.Has(internalName)
+                            rec := this.SkillNameMap[internalName]
+                        else if this.SkillNameMap.Has(internalName . "Player")
+                            rec := this.SkillNameMap[internalName . "Player"]
+                        if (rec)
+                        {
+                            displayName := rec["name"]
+                            iconPath := rec.Has("icon") ? rec["icon"] : ""
+                            if (displayName != "")
+                                hasRealName := true
+                        }
                     }
                     ; Fallback: skill-gem name map (base_item_name_map):
                     ; "Metadata/Items/Gems/SkillGem<Id>" -> e.g. "Bind Spectre".
