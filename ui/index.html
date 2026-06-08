@@ -6753,7 +6753,7 @@
 
     // Pushed from AHK PushInventoryToWebView. Payload shape:
     //   { player: [<inv>...], stash: [<inv>...], hasStash: bool, error?: "..." }
-    //   <inv> = { id, bx, by, src, items: [{sx,sy,ex,ey,n,b,r,m:[...]}, ...] }
+    //   <inv> = { id, type, bx, by, src, tn?, items: [{sx,sy,ex,ey,n,b,r,m:[...]}, ...] }
     function updateInventory(jsonStr) {
       const el = document.getElementById('inv-content');
       const status = document.getElementById('inv-status');
@@ -6843,15 +6843,17 @@
       for (const inv of ordered) {
         const slotName = _inventoryLabel(inv.id);
         const items = Array.isArray(inv.items) ? inv.items : [];
+        // Surface the inventory type (e.g. "BodyArmour1") on hover of the slot card.
+        const typeTitle = inv.type ? ` title="${escHtml(inv.type)}"` : '';
         if (items.length === 0) {
-          cards += `<div class="eq-card eq-empty"><div class="eq-slot-id">${escHtml(slotName)}</div><div class="eq-empty-msg">empty</div></div>`;
+          cards += `<div class="eq-card eq-empty"${typeTitle}><div class="eq-slot-id">${escHtml(slotName)}</div><div class="eq-empty-msg">empty</div></div>`;
           continue;
         }
         const it = items[0];
         const rarity = (typeof it.r === 'number' && it.r >= 0 && it.r <= 3) ? it.r : 0;
         const name = it.n || it.b || '?';
         const tip = _buildItemTooltipPayload(it);
-        cards += `<div class="eq-card rarity-${rarity}" `
+        cards += `<div class="eq-card rarity-${rarity}"${typeTitle} `
               + `onmouseenter="_invShowTip(event,'${tip}')" onmouseleave="_invHideTip()" onmousemove="_invMoveTip(event)">`
               + `<div class="eq-slot-id">${escHtml(slotName)}</div>`
               + `<div class="eq-card-name">${escHtml(name)}</div>`
@@ -6874,7 +6876,11 @@
       const labelBase = (_isStashTabId(id) && inv.tn)
         ? `Stash · ${inv.tn}`
         : _inventoryLabel(id);
-      const meta = `id=${id} · ${bx}×${by} · ${items.length} items` + (inv.src ? ' · ' + escHtml(inv.src) : '');
+      // The inventory type (Id from Inventories.datc64, e.g. "MainInventory1",
+      // "Relics1") comes from the AHK side; show it next to the numeric id when
+      // available so the raw inventory identity is visible alongside the label.
+      const typeTag = inv.type ? ` · ${escHtml(inv.type)}` : '';
+      const meta = `id=${id}${typeTag} · ${bx}×${by} · ${items.length} items` + (inv.src ? ' · ' + escHtml(inv.src) : '');
 
       // Background empty cells for the full grid
       let cells = '';
