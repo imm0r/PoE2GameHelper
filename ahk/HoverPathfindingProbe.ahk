@@ -210,11 +210,14 @@ HoverTrackerProbeRun()
             if (IsObject(he) && he.Has("path"))
                 hp := he["path"]
         }
-        rpt .= "HOVERED (tracker+0x648) = 0x" Format("{:X}", hov)
-            . "  id=" _HPP_ReadEntityId(g_reader, hov) "  " hp nl nl
+        rpt .= "HOVERED world-object (tracker+0x648) = 0x" Format("{:X}", hov)
+            . "  id=" _HPP_ReadEntityId(g_reader, hov) "  " hp nl
+        rpt .= "(world objects only: chests/ground-items/shrines. Monsters are NOT"
+            . " tracked here — use Targetable.IsTargetedByPlayer 0x6B for those.)" nl nl
     }
     else
-        rpt .= "HOVERED (tracker+0x648) = none (hover a monster/chest and re-run)" nl nl
+        rpt .= "HOVERED world-object (tracker+0x648) = none"
+            . " (hover a chest/ground item; monsters do not populate this slot)" nl nl
 
     ; Scan two candidate regions for entity-like pointers. Keys are "<tag>+0xNNN":
     ; T = the hover-tracker struct (uiRoot+FromUiRoot), U = the UI-root struct.
