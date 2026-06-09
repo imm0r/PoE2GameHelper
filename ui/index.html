@@ -227,6 +227,14 @@
       .subtab-row .tab:has(svg) > .nav-label { display: none; }
       .subtab-row .tab { padding: 6px 9px; }
       .subtab-row[data-cat="config"] .tab { font-size: 9px; padding: 6px 8px; }
+      /* Config's sub-tabs have no icon to shrink to and the row is normally
+         right-aligned (flex-end) under the Config category. At narrow widths
+         flex-end packs any overflow off the LEFT edge — i.e. the first tabs
+         slide under the logo rail and become unreachable. Left-align here so
+         overflow runs off the right (window) edge instead, keeping General…
+         visible. (#tab-bar prefix needed to outrank the later base
+         flex-end rule, which has equal specificity otherwise.) */
+      #tab-bar .subtab-row[data-cat="config"] { justify-content: flex-start; }
       /* Group headers (Live / Tools) collapse; the divider still separates
          the two groups so the grouping still reads without labels. */
       .subtab-group-label { display: none; }
@@ -247,6 +255,9 @@
         overflow-x: auto;
         overflow-y: hidden;
       }
+      /* Only override the height — the thumb/track keep the shared brass
+         ::-webkit-scrollbar style. 5px is slim enough for the short row. */
+      #header-pills::-webkit-scrollbar { height: 5px; }
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
        toolbar's signature so the whole top of the app reads as one frame. */
@@ -9212,6 +9223,13 @@
     function headerDragStart(e) {
       if (e.button !== 0) return;
       if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+      // Don't start a window drag when the press lands on a scrollbar (e.g.
+      // the narrow pill row's horizontal scrollbar). clientWidth/Height
+      // exclude the scrollbar gutter, so an offset past them means the
+      // cursor is over the bar itself — let it scroll instead of dragging.
+      const t = e.target;
+      if (t instanceof Element &&
+          (e.offsetX > t.clientWidth || e.offsetY > t.clientHeight)) return;
       ahkCall('StartDrag');
     }
 
