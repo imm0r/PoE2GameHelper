@@ -115,23 +115,21 @@
     }
 
     /* Right-of-logo container: every pill + the Snap/PoE2 buttons live
-       in here. Wraps to a second (or more) row when the window is
-       narrow, but always stays in the column right of the logo block.
-       align-content keeps the wrapped rows top-aligned with the logo.
+       in here, always in the column right of the logo block.
 
-       container-type: inline-size lets us write @container queries
-       below that compact the pills based on THIS container's width,
-       not the viewport. Means the breakpoints behave correctly even
-       if the logo width changes or padding-right is re-tuned. */
+       flex-wrap: nowrap — the row must NOT wrap. A wrapped second row
+       grew the header and pushed the cat-bar / sub-tabs / content down
+       (exactly the jump we're avoiding here). Instead the pills shrink
+       (≤1300px) then collapse to icon-only (≤1080px) so they always stay
+       on a single row; at extreme widths the rightmost items clip at the
+       window edge rather than reflowing downward. */
     #header-pills {
       flex: 1 1 auto;
       min-width: 0;
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
-      align-content: flex-start;
       gap: 8px;
-      row-gap: 6px;
       padding-top: 2px;
     }
 
@@ -186,12 +184,15 @@
       }
     }
 
-    /* ── Compact stage 2: ≤ 850px viewport ─────────────────────────────
-       Falls beyond what stage 1 can handle (very narrow window): drop
-       the text labels entirely, render pills as colored status dots
-       only. The existing data-tip attributes on each pill still surface
-       the label on hover, so info is one tooltip away — not lost. */
-    @media (max-width: 850px) {
+    /* ── Compact stage 2a: ≤ 1080px — iconify the PILLS early ──────────
+       Because #header-pills is now flex: nowrap, it can no longer relieve
+       overflow by wrapping into a second row (which used to grow the
+       header and shove the cat-bar + content down). So it must drop the
+       text labels and go icon-only *before* the labels would overflow.
+       The trigger sits well above the real wrap point (the gilded Cinzel
+       labels are wider than they look) for margin. data-tip still surfaces
+       each label on hover, so nothing is lost. */
+    @media (max-width: 1080px) {
       #header-pills .pill > span {
         display: none;
       }
@@ -213,10 +214,14 @@
         line-height: 1;
         letter-spacing: 0;
       }
-      /* Iconify the nav bars exactly like the pills: drop the text label,
-         keep only the SVG glyph. Config's sub-tabs have no icon, so the
-         :has(svg) guard leaves their (now smaller) text intact instead of
-         collapsing them to empty buttons. */
+    }
+
+    /* ── Compact stage 2b: ≤ 850px — iconify the cat-bar + sub-tab bars ─
+       Same idea as the pills above, one step further down: drop the text
+       label, keep only the SVG glyph. Config's sub-tabs have no icon, so
+       the :has(svg) guard leaves their (smaller) text intact instead of
+       collapsing them to empty buttons. */
+    @media (max-width: 850px) {
       #cat-bar .cat > .nav-label { display: none; }
       #cat-bar .cat { padding: 7px 11px; }
       .subtab-row .tab:has(svg) > .nav-label { display: none; }
