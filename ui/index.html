@@ -294,6 +294,13 @@
          so the wordmark scales with the header instead of leaving empty bands. */
       aspect-ratio: 1215 / 746;
       flex-shrink: 0;
+      /* Force the rail to take its HEIGHT from the row (the stack) and let
+         aspect-ratio derive the width from that — some WebView2 builds
+         otherwise pin the height off the width, so the logo stops growing
+         when bar 1 gains a scrollbar and the logo bottom no longer meets the
+         sub-tab bar bottom. Explicit stretch + min-height:0 nudges it. */
+      align-self: stretch;
+      min-height: 0;
       border-right: 1px solid rgba(90,62,34,0.5);
       /* Bottom rule matches the codex border closing the cat-bar /
          tab-bar to the right, so the logo rail tucks under the same
