@@ -1801,6 +1801,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 "flags", flags,
                 "sizeX", sizeX, "sizeY", sizeY,
                 "childCount", childCount,
+                ; Effective (hierarchical) visibility — walk parents only when the
+                ; local bit is set (otherwise it's trivially false, no reads).
+                "effVis", (((flags >> 11) & 1) && UiTree_HierarchicallyVisible(this, ptr)) ? true : false,
                 "ptr", ptr
             )
         }
@@ -1882,6 +1885,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 changes.Push("size:" Round(old["sizeX"], 0) "×" Round(old["sizeY"], 0) "→" Round(sizeX, 0) "×" Round(sizeY, 0))
             if (childCount != old["childCount"])
                 changes.Push("children:" old["childCount"] "→" childCount)
+            ; Effective (hierarchical) visibility change — the reliable "panel
+            ; actually became shown" signal (the local flag may already be set).
+            curEffVis := (((flags >> 11) & 1) && UiTree_HierarchicallyVisible(this, ptr)) ? true : false
+            oldEffVis := old.Has("effVis") ? old["effVis"] : false
+            if (curEffVis != oldEffVis)
+                changes.Push("effVis:" (oldEffVis ? "Y" : "N") "→" (curEffVis ? "Y" : "N"))
 
             if (changes.Length > 0)
             {
