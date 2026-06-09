@@ -156,11 +156,6 @@
         gap: 4px;
         row-gap: 3px;
       }
-      #header-pills .hbtn {
-        padding: 0 7px;
-        font-size: 9px;
-        letter-spacing: 0.06em;
-      }
       /* Category + sub-tab bars track the same compaction as the pills, so a
          narrow window shrinks all three rows in lockstep. */
       #cat-bar .cat {
@@ -588,47 +583,6 @@
       50%      { box-shadow: inset 0 0 0 1px rgba(197,72,72,0.55), 0 0 18px -2px rgba(197,72,72,0.85) }
     }
 
-    #header-right {
-      margin-left: auto;
-      display: flex;
-      gap: 4px;
-      /* Stretch to the pill-row height and pass that down to the Snap/PoE2
-         button so it ends up exactly as tall as the pills (which define the
-         row height) across every compact stage. */
-      align-self: stretch;
-      align-items: stretch
-    }
-
-    /* Header utility buttons (Snap, etc.) — Cinzel small-caps in codex tones. */
-    .hbtn {
-      background: linear-gradient(180deg, rgba(28,18,10,0.85), rgba(20,12,6,0.95));
-      border: 1px solid var(--codex-rule);
-      color: var(--codex-text-dim);
-      /* No vertical padding — the button stretches to the pill-row height
-         (see #header-right) and centers its label, so its box matches the
-         pills exactly instead of being a few px taller. */
-      padding: 0 12px;
-      display: inline-flex;
-      align-items: center;
-      font-family: var(--codex-display);
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      white-space: nowrap;
-      flex-shrink: 0;
-      cursor: pointer;
-      transition: color .15s, border-color .15s, box-shadow .15s
-    }
-    .hbtn:hover {
-      color: var(--codex-text);
-      border-color: var(--codex-gold)
-    }
-    .hbtn.active {
-      color: var(--codex-gold-hi);
-      border-color: var(--codex-gold-hi);
-      box-shadow: 0 0 10px -3px rgba(240,214,138,0.45)
-    }
 
     #wm-btns {
       /* Pinned to the top-right corner of the header so window-resize
@@ -3929,6 +3883,12 @@
       style="cursor:pointer" data-icon="❚❚">
       <div class="dot"></div><span id="pill-updates-text">Live</span>
     </div>
+    <!-- Snap-or-Start dual pill — refreshes the tree when PoE2 is up, or
+         launches PoE2 when it isn't. Text / icon / state set from the header
+         push (d.poeRunning); click routed by snapOrStartPoe() via dataset.mode. -->
+    <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
+      <div class="dot"></div><span id="snap-text">Snap</span>
+    </div>
     <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
@@ -3950,13 +3910,6 @@
     </div>
     <div class="pill inactive" id="pill-fps" data-icon="⏱">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
-    </div>
-    <div id="header-right">
-      <!-- Same slot does double duty: when PoE2 is running it acts as
-           "Snap" (refresh the tree from the live game). When PoE2 is not
-           running it morphs into "Start PoE2" via Steam. UI sets text +
-           handler from header push (d.poeRunning). -->
-      <button class="hbtn" id="btn-snap-or-start" onclick="snapOrStartPoe()">↺ Snap</button>
     </div>
     </div><!-- /header-pills -->
     <div id="wm-btns">
@@ -7352,7 +7305,13 @@
         const running = d.poeRunning === true || d.poeRunning === 'true';
         const gv = (d.gameVersion && d.gameVersion !== '') ? ' v' + d.gameVersion : '';
         btnSnap.dataset.mode = running ? 'snap' : 'start';
-        btnSnap.textContent  = running ? '↺ Snap' : '▶ PoE2';
+        // It's a pill now (dot + label span), so set the span's text rather
+        // than the element's textContent (which would wipe the dot).
+        const snapTxt = document.getElementById('snap-text');
+        if (snapTxt) snapTxt.textContent = running ? 'Snap' : 'PoE2';
+        btnSnap.setAttribute('data-icon', running ? '↺' : '▶');   // icon-only mode glyph
+        btnSnap.classList.toggle('active', !running);   // gild it when it means "launch PoE2"
+        btnSnap.classList.toggle('inactive', running);
         btnSnap.setAttribute('data-tip', running ? 'Refresh tree from live game' : ('Launch PoE2' + gv));
       }
 
