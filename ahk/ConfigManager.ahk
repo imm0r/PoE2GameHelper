@@ -176,7 +176,7 @@ LoadConfig()
     ; INI value (typo, leftover from older builds) doesn't break the UI.
     rawSubTab := _Ini("ConfigUI", "activeSubTab", "general")
     if (rawSubTab = "general" || rawSubTab = "automation" || rawSubTab = "overlay"
-        || rawSubTab = "ggpk" || rawSubTab = "filters" || rawSubTab = "debug")
+        || rawSubTab = "vitals" || rawSubTab = "ggpk" || rawSubTab = "filters" || rawSubTab = "debug")
         g_configSubTab := rawSubTab
     else
         g_configSubTab := "general"

@@ -188,7 +188,7 @@ _DispatchBridgeCall(method, args)
                 }
             }
         case "SetConfigSubTab":
-            ; args[1] = one of general / automation / overlay / ggpk /
+            ; args[1] = one of general / automation / overlay / vitals / ggpk /
             ; filters / debug. Anything else is silently ignored so a
             ; bad WebView call can't corrupt the persisted value.
             global g_configSubTab
@@ -196,7 +196,7 @@ _DispatchBridgeCall(method, args)
             {
                 v := args[1]
                 if (v = "general" || v = "automation" || v = "overlay"
-                    || v = "ggpk" || v = "filters" || v = "debug")
+                    || v = "vitals" || v = "ggpk" || v = "filters" || v = "debug")
                 {
                     g_configSubTab := v
                     SetTimer(SaveConfig, -100)
