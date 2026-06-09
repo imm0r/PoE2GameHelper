@@ -281,10 +281,12 @@ _RunExploration(radarSnap, gameHwnd)
                 Sleep(15)
                 DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LEFTUP
 
-                ; Restore mouse and re-press LMB to resume movement
+                ; Restore mouse. Movement resumes via the next regular
+                ; click-to-move tick (≤400 ms away) — deliberately NO held
+                ; LEFTDOWN here: leaving the button pressed turned every
+                ; subsequent SetCursorPos into a drag and could stall the
+                ; character mid-walk with the cursor parked on the door.
                 DllCall("SetCursorPos", "int", prevX, "int", prevY)
-                Sleep(10)
-                DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LEFTDOWN
 
                 ; Track click count
                 addr := doorResult["addr"]
@@ -299,12 +301,18 @@ _RunExploration(radarSnap, gameHwnd)
 
     ; Stuck detection: if player hasn't moved in 3 s, the current waypoint
     ; is probably unreachable from here — rebuild the plan from the new
-    ; position. The greedy-nearest-from-start ordering will skip the dead
-    ; corner naturally on the next attempt.
+    ; position. Crucially, the stuck target's coarse cell is marked visited
+    ; FIRST: without that, the rebuilt greedy-nearest plan immediately
+    ; re-picks the exact same waypoint (the player hasn't moved, so it is
+    ; still the nearest unvisited sample) and the bot loops clicking the
+    ; same unreachable spot forever. Marking also covers the zone-exit case
+    ; where every click near an AreaTransition lands in its avoid box.
     if (_stuckCheckTick = 0 || (now - _stuckCheckTick) > 3000)
     {
         if (Abs(pGX - _stuckPGX) < 5 && Abs(pGY - _stuckPGY) < 5 && _targetCX >= 0)
         {
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
             _targetCX := -1
             _pathCoords := []
             _planBuilt := false   ; rebuild plan from current position
@@ -360,6 +368,20 @@ _RunExploration(radarSnap, gameHwnd)
         _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
         _pathIdx := 1
         _lastTargetTick := now
+        if (_pathCoords.Length = 0)
+        {
+            ; A* failed — the waypoint is unreachable from here (walkable
+            ; "island" disconnected from the player's region, or behind a
+            ; closed blockage). Mark its cell visited and skip it instead of
+            ; falling through to the blind "click directly toward target"
+            ; branch, which would click into a wall every 400 ms forever.
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+            _targetCX := -1
+            _planIdx++
+            g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% wp=" _planIdx "/" _plan.Length ")"
+            return
+        }
     }
     else if (_planIdx > _plan.Length && (_targetCX < 0 || (now - _lastTargetTick) > 2000))
     {
@@ -374,6 +396,18 @@ _RunExploration(radarSnap, gameHwnd)
             tGY := _targetCY * _STEP
             _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
             _pathIdx := 1
+            if (_pathCoords.Length = 0)
+            {
+                ; Unreachable frontier (same island problem as plan waypoints).
+                ; Mark it visited so the spiral search returns the next-nearest
+                ; frontier on the following tick instead of this one again.
+                _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                    , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+                _targetCX := -1
+                _lastTargetTick := now
+                g_exploreLastReason := "frontier-unreachable(" g_exploreCurrentPercent "%)"
+                return
+            }
         }
         else
         {
@@ -487,6 +521,33 @@ _RunExploration(radarSnap, gameHwnd)
     laTag := (chosenLA > 0 && chosenLA != Min(_pathIdx + 3, _pathCoords.Length))
         ? " la=" chosenLA : ""
     g_exploreLastReason := "click(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length laTag ")"
+}
+
+; ── Mark a coarse visited-grid cell as handled ────────────────────────────
+; Used for unreachable targets (A* failure / stuck detection) so the plan
+; skip-loop, the frontier search AND the completion percentage all stop
+; considering the cell. Returns 1 when a walkable cell was newly marked
+; (caller adds it to its visited-walkable counter), else 0.
+_ExploreMarkCoarseVisited(visited, cx, cy, coarseW, coarseH, STEP, buf, dsz, bpr, gridW, rows)
+{
+    if (cx < 0 || cy < 0 || cx >= coarseW || cy >= coarseH)
+        return 0
+    cellIdx := cy * coarseW + cx
+    if (NumGet(visited.Ptr, cellIdx, "UChar") != 0)
+        return 0
+    NumPut("UChar", 1, visited.Ptr, cellIdx)
+    ; Same corner-walkability test the vision sweep uses — only walkable
+    ; cells were counted into totalWalkable, so only those may increment
+    ; the visited counter (keeps the percentage consistent).
+    gx := cx * STEP
+    gy := cy * STEP
+    if (gx < gridW && gy < rows)
+    {
+        tIdx := gy * bpr + (gx >> 1)
+        if (tIdx < dsz && ((NumGet(buf.Ptr, tIdx, "UChar") >> ((gx & 1) * 4)) & 0xF) != 0)
+            return 1
+    }
+    return 0
 }
 
 ; ── Find nearest unvisited walkable cell (frontier) ──────────────────────

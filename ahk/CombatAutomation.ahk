@@ -37,6 +37,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
         global g_lastSkillUseTime, g_combatRange, g_combatDisengageRange
         global g_combatSkillCooldowns
         global g_radarOverlay
+        global g_combatNoPathBlacklist
 
         ; Default: no combat path on the overlay. Each tick clears the carrier
         ; first; the LoS-blocked branch later in the function overrides it back
@@ -45,6 +46,12 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; instead of stranding the previous tick's polyline.
         if (g_radarOverlay)
             g_radarOverlay._combatPathCoords := []
+
+        ; Tracks how long the aim has been continuously "no-path" — used to
+        ; give up on unreachable enemies instead of claiming the tick forever.
+        ; Declared up here so the reset below the no-path branch can run on
+        ; every tick that reaches it.
+        static _noPathSince := 0
 
         ; ── Combat detection from entity cache ────────────────────────────
         combatInfo := _DetectCombat(radarSnap)
@@ -203,14 +210,30 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; ── No-path branch ───────────────────────────────────────────────
         ; Enemy detected but no traversable route exists. Don't move the
         ; cursor (would just spam an unreachable corner) and don't fire
-        ; skills (no LoS = wasted cooldown). Stay in "combat" state so
-        ; AutoPilot doesn't fall through to exploration this tick — let the
-        ; enemy come to us or a future tick re-find the path.
+        ; skills (no LoS = wasted cooldown). Stay in "combat" state briefly —
+        ; the enemy may come to us or a future tick may re-find the path.
+        ; BUT: a genuinely unreachable enemy (across a chasm, behind sealed
+        ; geometry) used to freeze the whole AutoPilot here forever. After
+        ; 4 s of continuous no-path we blacklist that entity for 15 s and
+        ; disengage so loot/exploration can continue.
         if (aimMode = "no-path")
         {
+            if (_noPathSince = 0)
+                _noPathSince := A_TickCount
+            else if ((A_TickCount - _noPathSince) > 4000)
+            {
+                blAddr := combatInfo["nearestEntityAddr"]
+                if (blAddr && IsSet(g_combatNoPathBlacklist))
+                    g_combatNoPathBlacklist[blAddr] := A_TickCount + 15000
+                g_combatState := "idle"
+                _noPathSince := 0
+                g_combatLastReason := "no-path-giveup(d=" Round(terrainDist) " n=" hostileCount ")"
+                return false
+            }
             g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount ")"
             return true
         }
+        _noPathSince := 0   ; any reachable aim resets the give-up timer
 
         ; ── Move mouse toward aim point ────────────────────────────────────
         ; Build a thin info Map carrying just the projection-relevant fields so
@@ -369,6 +392,37 @@ TryCombatAutomation(radarSnap, gameHwnd)
         }
         else if (selResult["outOfRange"])
         {
+            ; Direct LoS but every ready skill is out of range. Previously
+            ; this branch only set a status ("approaching") without ever
+            ; moving — the bot parked the cursor on the enemy and stood
+            ; still until the mob happened to walk over. Now we issue a
+            ; throttled move-click at a point ~60% toward the enemy so the
+            ; character actually closes the gap; skills fire on a later
+            ; tick once the distance drops below the slot range.
+            static _approachClickTick := 0
+            if ((now - _approachClickTick) > 300)
+            {
+                apX := combatInfo["playerWorldX"] + (combatInfo["nearestWorldX"] - combatInfo["playerWorldX"]) * 0.6
+                apY := combatInfo["playerWorldY"] + (combatInfo["nearestWorldY"] - combatInfo["playerWorldY"]) * 0.6
+                apInfo := Map(
+                    "nearestWorldX", apX,
+                    "nearestWorldY", apY,
+                    "nearestWorldZ", combatInfo["nearestWorldZ"],
+                    "w2sMatrix",     combatInfo["w2sMatrix"],
+                    "playerWorldX",  combatInfo["playerWorldX"],
+                    "playerWorldY",  combatInfo["playerWorldY"]
+                )
+                apPos := _WorldToScreen(apInfo, gameHwnd)
+                if (apPos && !IsPointInAvoidZone(apPos["x"], apPos["y"], avoidRects))
+                {
+                    DllCall("SetCursorPos", "int", apPos["x"], "int", apPos["y"])
+                    Sleep(20)
+                    DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LDOWN
+                    Sleep(20)
+                    DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LUP
+                    _approachClickTick := now
+                }
+            }
             g_combatLastReason := "approaching(d=" Round(nearestDist) ")"
         }
         else
@@ -418,12 +472,16 @@ UpdateCombatPresence(radarSnap)
 
 _DetectCombat(radarSnap)
 {
-    global g_combatRange, g_reader
+    global g_combatRange, g_reader, g_combatNoPathBlacklist
 
     result := Map("hostileCount", 0, "nearestDist", 999999, "nearestPath", ""
         , "nearestWorldX", 0, "nearestWorldY", 0, "nearestWorldZ", 0
         , "playerWorldX", 0, "playerWorldY", 0, "playerWorldZ", 0
-        , "nearestTargetableAddr", 0, "w2sMatrix", [])
+        , "nearestTargetableAddr", 0, "nearestEntityAddr", 0, "w2sMatrix", [])
+
+    ; Unreachable-enemy blacklist (filled by the no-path give-up in
+    ; TryCombatAutomation). Expired entries are pruned lazily on lookup.
+    blacklist := IsSet(g_combatNoPathBlacklist) ? g_combatNoPathBlacklist : 0
 
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
     area := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
@@ -464,6 +522,16 @@ _DetectCombat(radarSnap)
         ; Only monsters/characters (not player, not attachments)
         if !g_reader.IsNpcLikeEntityPath(path)
             continue
+
+        ; Skip enemies we recently gave up on (no traversable path) so the
+        ; idle→combat state machine doesn't immediately re-engage them.
+        entityAddr := entity.Has("address") ? entity["address"] : 0
+        if (blacklist && entityAddr && blacklist.Has(entityAddr))
+        {
+            if (A_TickCount < blacklist[entityAddr])
+                continue
+            blacklist.Delete(entityAddr)
+        }
 
         ; Check decoded components for alive + targetable + hostile
         decoded := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
@@ -525,6 +593,7 @@ _DetectCombat(radarSnap)
         {
             nearestDist := dist
             result["nearestPath"] := path
+            result["nearestEntityAddr"] := entityAddr
 
             ; Store Targetable component address for live isTargetedByPlayer check
             if (comps && Type(comps) = "Array")
@@ -594,20 +663,26 @@ _SelectNextSkill(skills, combatInfo)
         if (skillName != "")
         {
             skillReady := false
+            nameMatched := false
             for _, skill in skills
             {
                 sName := skill.Has("name") ? skill["name"] : ""
                 sDisplay := skill.Has("displayName") ? skill["displayName"] : ""
                 if (sName = skillName || sDisplay = skillName)
                 {
+                    nameMatched := true
                     canUse := skill.Has("canUse") ? skill["canUse"] : true
                     if canUse
                         skillReady := true
                     break
                 }
             }
-            ; If we have a skill name match and it's on cooldown, skip
-            if (skillName != "" && !skillReady)
+            ; Skip only when the name actually matched a skill AND that skill
+            ; is on cooldown. A configured name that matches nothing in
+            ; memory (typo, display-name vs internal-name mismatch, renamed
+            ; gem) used to silently disable the slot forever — fire it by
+            ; key instead and let the per-slot cooldown throttle it.
+            if (nameMatched && !skillReady)
                 continue
         }
 
@@ -897,7 +972,7 @@ LoadCombatAutoConfig()
 {
     global g_combatAutoEnabled, g_combatRange, g_combatDisengageRange
     global g_combatGlobalCooldownMs, g_combatSkillSlots, g_combatToggleHotkey
-    global g_combatW2SScale
+    global g_combatW2SScale, g_combatNoPathBlacklist
 
     cfgPath := A_ScriptDir "\poeformance_config.ini"
 
@@ -907,6 +982,9 @@ LoadCombatAutoConfig()
     g_combatGlobalCooldownMs := 120
     g_combatToggleHotkey := "F10"
     g_combatW2SScale := 0.20
+    ; entityAddr → expiry tick for enemies the no-path give-up disengaged
+    ; from (seeded here unconditionally — module-init gotcha, see CLAUDE.md)
+    g_combatNoPathBlacklist := Map()
 
     try g_combatAutoEnabled := IniRead(cfgPath, "CombatAutomation", "enabled", "0") = "1"
     try g_combatRange := Integer(IniRead(cfgPath, "CombatAutomation", "combatRange", "1500"))
