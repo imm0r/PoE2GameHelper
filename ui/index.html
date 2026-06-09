@@ -3887,7 +3887,7 @@
          launches PoE2 when it isn't. Text / icon / state set from the header
          push (d.poeRunning); click routed by snapOrStartPoe() via dataset.mode. -->
     <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
-      <div class="dot"></div><span id="snap-text">Snap</span>
+      <div class="dot"></div><span id="snap-text">Refresh</span>
     </div>
     <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
@@ -7308,7 +7308,7 @@
         // It's a pill now (dot + label span), so set the span's text rather
         // than the element's textContent (which would wipe the dot).
         const snapTxt = document.getElementById('snap-text');
-        if (snapTxt) snapTxt.textContent = running ? 'Snap' : 'PoE2';
+        if (snapTxt) snapTxt.textContent = running ? 'Refresh' : '▶ PoE2';
         btnSnap.setAttribute('data-icon', running ? '↺' : '▶');   // icon-only mode glyph
         btnSnap.classList.toggle('active', !running);   // gild it when it means "launch PoE2"
         btnSnap.classList.toggle('inactive', running);
