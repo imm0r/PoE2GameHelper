@@ -140,6 +140,11 @@ Filter ground drops by rarity (Normal · Magic · Rare · Unique · Currency) an
 
 **Unified overlay manager** — radar, vitals, focus and notification overlays all run through one manager with a shared per-tick context and a single visibility policy: they're hidden from the taskbar (`+ToolWindow`), hide when you alt-tab away from PoE, and no longer flicker on transient memory-read gaps.
 
+<div align="center">
+  <img src="assets/vitals.png" width="800" alt="Vitals overlay configuration — per-bar size, position, colours, opacity and visibility rules">
+  <p><em>Config → Vitals — each bar has its own size/position/colours/opacity and a prioritised visibility rule list (In Combat · On Low Vital · In Town · While Map open).</em></p>
+</div>
+
 ### 🗺 GGPK Maphack
 
 The Radar shows a reveal **in the overlay**. The GGPK Maphack does the same thing **inside the game itself**, by patching PoE2's actual minimap shaders inside the bundle.
