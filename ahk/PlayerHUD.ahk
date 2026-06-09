@@ -29,7 +29,9 @@ class PlayerHUD
 
     __New()
     {
-        this.overlayGui   := Gui("-Caption +AlwaysOnTop -DPIScale +E0x80000")
+        ; +ToolWindow keeps the overlay out of the taskbar / Alt-Tab list, so the
+        ; per-tick Show()/Hide() cycle no longer flashes a taskbar button.
+        this.overlayGui   := Gui("-Caption +AlwaysOnTop +ToolWindow -DPIScale +E0x80000")
         this.overlayGui.BackColor := "010101"
         this.hwnd         := this.overlayGui.Hwnd
         this.memDC        := 0

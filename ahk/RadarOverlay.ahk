@@ -66,7 +66,9 @@ class RadarOverlay
     ; Creates the transparent, click-through overlay GUI window and initialises all GDI state fields.
     __New()
     {
-        this.overlayGui      := Gui("-Caption +AlwaysOnTop -DPIScale +E0x80000")
+        ; +ToolWindow keeps the overlay out of the taskbar / Alt-Tab list, so the
+        ; Show()/Hide() cycle no longer flashes a taskbar button.
+        this.overlayGui      := Gui("-Caption +AlwaysOnTop +ToolWindow -DPIScale +E0x80000")
         this.overlayGui.BackColor := "010101"
         this.windowHandle    := this.overlayGui.Hwnd
         this.memoryDC        := 0
