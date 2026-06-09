@@ -70,6 +70,7 @@ class VitalsBarWindow extends GdiOverlayBase
         this._editInteractive := false
         this._mouseBound      := false
         this._dragging        := false
+        this._fnDragTick      := 0       ; bound poll callback (created lazily on first drag)
         this._downSX := 0, this._downSY := 0     ; cursor screen pos at mouse-down
         this._barDownX := 0, this._barDownY := 0  ; bar window screen pos at mouse-down
     }
@@ -180,16 +181,14 @@ class VitalsBarWindow extends GdiOverlayBase
         this._editInteractive := want
     }
 
+    ; Only WM_LBUTTONDOWN is hooked — the drag itself is driven by a poll timer
+    ; (below) so it never depends on the tiny bar window staying under the cursor.
     _RegisterMouse()
     {
         if this._mouseBound
             return
         this._fnDown := ObjBindMethod(this, "_OnLDown")
-        this._fnMove := ObjBindMethod(this, "_OnMouseMove")
-        this._fnUp   := ObjBindMethod(this, "_OnLUp")
         OnMessage(0x201, this._fnDown)   ; WM_LBUTTONDOWN
-        OnMessage(0x200, this._fnMove)   ; WM_MOUSEMOVE
-        OnMessage(0x202, this._fnUp)     ; WM_LBUTTONUP
         this._mouseBound := true
     }
 
@@ -198,10 +197,8 @@ class VitalsBarWindow extends GdiOverlayBase
         if !this._mouseBound
             return
         OnMessage(0x201, this._fnDown, 0)
-        OnMessage(0x200, this._fnMove, 0)
-        OnMessage(0x202, this._fnUp, 0)
         this._mouseBound := false
-        this._dragging := false
+        this._EndDrag()
     }
 
     _CursorScreen(&cx, &cy)
@@ -212,6 +209,9 @@ class VitalsBarWindow extends GdiOverlayBase
         cy := NumGet(pt, 4, "Int")
     }
 
+    ; Mouse-down on the bar starts the drag: capture the mouse and start a 10 ms
+    ; poll that follows the cursor while the left button is physically held. The
+    ; poll (not per-message moves) is what makes dragging a 0.5 cm-tall bar reliable.
     _OnLDown(wParam, lParam, msg, hwnd)
     {
         if (hwnd != this.hwnd)
@@ -221,39 +221,54 @@ class VitalsBarWindow extends GdiOverlayBase
         this._downSX := cx, this._downSY := cy
         this._barDownX := this._lastX, this._barDownY := this._lastY
         this._dragging := true
+        DllCall("SetCapture", "Ptr", this.hwnd)
+        if !this._fnDragTick
+            this._fnDragTick := ObjBindMethod(this, "_DragTick")
+        SetTimer(this._fnDragTick, 10)
     }
 
-    _OnMouseMove(wParam, lParam, msg, hwnd)
+    ; Poll: reposition the bar to follow the cursor; stop when the button is released.
+    _DragTick()
     {
-        if (hwnd != this.hwnd || !this._dragging)
-            return
         global g_vitalsBars
+        if (!this._dragging)
+        {
+            SetTimer(this._fnDragTick, 0)
+            return
+        }
+        if !GetKeyState("LButton", "P")   ; button released anywhere -> finish
+        {
+            this._EndDrag()
+            SaveVitalsConfig()
+            SetTimer(PushHeaderToWebView, -30)
+            return
+        }
         cx := 0, cy := 0
         this._CursorScreen(&cx, &cy)
         bar := g_vitalsBars[this.barId]
         w := bar.Has("w") ? bar["w"] : 200
         h := bar.Has("h") ? bar["h"] : 16
-        nsx := this._barDownX + (cx - this._downSX)
-        nsy := this._barDownY + (cy - this._downSY)
         gwX := this._gwX, gwY := this._gwY, gwW := this._gwW, gwH := this._gwH
         if (gwW < 1 || gwH < 1)
             return
-        ; Clamp the bar inside the game window.
-        nsx := Min(gwX + gwW - w, Max(gwX, nsx))
+        nsx := this._barDownX + (cx - this._downSX)
+        nsy := this._barDownY + (cy - this._downSY)
+        nsx := Min(gwX + gwW - w, Max(gwX, nsx))   ; clamp inside the game window
         nsy := Min(gwY + gwH - h, Max(gwY, nsy))
         bar["xPct"] := (nsx - gwX) / gwW
         bar["yPct"] := (nsy - gwY) / gwH
-        WinMove(nsx, nsy, , , this.hwnd)        ; immediate feedback
+        WinMove(nsx, nsy, , , this.hwnd)        ; the window IS the bar, so move = draw
         this._lastX := nsx, this._lastY := nsy  ; keep base move-tracking in sync
     }
 
-    _OnLUp(wParam, lParam, msg, hwnd)
+    ; Ends the drag: stop the poll, release capture, clear the flag.
+    _EndDrag()
     {
-        if (hwnd != this.hwnd || !this._dragging)
-            return
+        if this._fnDragTick
+            SetTimer(this._fnDragTick, 0)
+        if this._dragging
+            DllCall("ReleaseCapture")
         this._dragging := false
-        SaveVitalsConfig()
-        SetTimer(PushHeaderToWebView, -30)
     }
 }
 
