@@ -226,15 +226,6 @@
       #cat-bar .cat { padding: 7px 11px; }
       .subtab-row .tab:has(svg) > .nav-label { display: none; }
       .subtab-row .tab { padding: 6px 9px; }
-      .subtab-row[data-cat="config"] .tab { font-size: 9px; padding: 6px 8px; }
-      /* Config's sub-tabs have no icon to shrink to and the row is normally
-         right-aligned (flex-end) under the Config category. At narrow widths
-         flex-end packs any overflow off the LEFT edge — i.e. the first tabs
-         slide under the logo rail and become unreachable. Left-align here so
-         overflow runs off the right (window) edge instead, keeping General…
-         visible. (#tab-bar prefix needed to outrank the later base
-         flex-end rule, which has equal specificity otherwise.) */
-      #tab-bar .subtab-row[data-cat="config"] { justify-content: flex-start; }
       /* Group headers (Live / Tools) collapse; the divider still separates
          the two groups so the grouping still reads without labels. */
       .subtab-group-label { display: none; }
@@ -611,6 +602,8 @@
       font-weight: 600;
       letter-spacing: .12em;
       text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
       cursor: pointer;
       transition: color .15s, border-color .15s, box-shadow .15s
     }
@@ -4093,13 +4086,32 @@
            switchConfigSubTab() instead of switchTab(). This keeps the
            existing category machinery (tabCategory, lastTabPerCategory,
            tree-tab notifications) blissfully unaware of the inner split. -->
-      <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')"><span class="nav-label">General</span></div>
-      <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')"><span class="nav-label">Automation</span></div>
-      <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')"><span class="nav-label">Overlay</span></div>
-      <div class="tab" data-cfgtab="vitals"     onclick="switchConfigSubTab('vitals')"><span class="nav-label">Vitals</span></div>
-      <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')"><span class="nav-label">GGPK</span></div>
-      <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')"><span class="nav-label">Filters</span></div>
-      <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')"><span class="nav-label">Debug</span></div>
+      <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')"><svg viewBox="0 0 24 24">
+          <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+          <circle cx="9" cy="7" r="2" /><circle cx="15" cy="12" r="2" /><circle cx="7" cy="17" r="2" />
+        </svg><span class="nav-label">General</span></div>
+      <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')"><svg viewBox="0 0 24 24">
+          <rect x="5" y="8" width="14" height="11" rx="2" /><line x1="12" y1="4" x2="12" y2="8" /><circle cx="12" cy="3" r="1" />
+          <circle cx="9.5" cy="13" r="1" /><circle cx="14.5" cy="13" r="1" />
+        </svg><span class="nav-label">Automation</span></div>
+      <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')"><svg viewBox="0 0 24 24">
+          <polygon points="12 3 21 8 12 13 3 8" /><polyline points="3 13 12 18 21 13" />
+        </svg><span class="nav-label">Overlay</span></div>
+      <div class="tab" data-cfgtab="vitals"     onclick="switchConfigSubTab('vitals')"><svg viewBox="0 0 24 24">
+          <path d="M20.8 6.6a5 5 0 0 0-8.8-3 5 5 0 0 0-8.8 3c0 4.5 8.8 10 8.8 10s8.8-5.5 8.8-10z" />
+        </svg><span class="nav-label">Vitals</span></div>
+      <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')"><svg viewBox="0 0 24 24">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          <polyline points="3.3 7 12 12 20.7 7" /><line x1="12" y1="22" x2="12" y2="12" />
+        </svg><span class="nav-label">GGPK</span></div>
+      <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')"><svg viewBox="0 0 24 24">
+          <polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5" />
+        </svg><span class="nav-label">Filters</span></div>
+      <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')"><svg viewBox="0 0 24 24">
+          <rect x="8" y="6" width="8" height="12" rx="4" /><line x1="12" y1="6" x2="12" y2="3" />
+          <line x1="3" y1="9" x2="8" y2="11" /><line x1="3" y1="15" x2="8" y2="14" />
+          <line x1="21" y1="9" x2="16" y2="11" /><line x1="21" y1="15" x2="16" y2="14" />
+        </svg><span class="nav-label">Debug</span></div>
       <div class="bar-marker tab-marker"></div>
     </div>
 
