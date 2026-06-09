@@ -216,19 +216,27 @@
       }
     }
 
-    /* ── Compact stage 2b: ≤ 850px — iconify the cat-bar + sub-tab bars ─
+    /* ── Compact stage 2b: ≤ 850px — iconify the SUB-TAB bars ──────────
        Same idea as the pills above, one step further down: drop the text
        label, keep only the SVG glyph. Config's sub-tabs have no icon, so
        the :has(svg) guard leaves their (smaller) text intact instead of
-       collapsing them to empty buttons. */
+       collapsing them to empty buttons. The cat-bar iconifies later (2d). */
     @media (max-width: 850px) {
-      #cat-bar .cat > .nav-label { display: none; }
-      #cat-bar .cat { padding: 7px 11px; }
       .subtab-row .tab:has(svg) > .nav-label { display: none; }
       .subtab-row .tab { padding: 6px 9px; }
       /* Group headers (Live / Tools) collapse; the divider still separates
          the two groups so the grouping still reads without labels. */
       .subtab-group-label { display: none; }
+    }
+
+    /* ── Compact stage 2d: ≤ 640px — iconify the category bar LAST ──────
+       The cat-bar carries only 5 short labels (Game / RE / Data / Hotkeys /
+       Config), so it keeps its text far longer than the pill + sub-tab bars
+       (icon-only at 1080 / 850px). It only collapses to icons down here,
+       where the labels would otherwise start to crowd the row. */
+    @media (max-width: 640px) {
+      #cat-bar .cat > .nav-label { display: none; }
+      #cat-bar .cat { padding: 7px 11px; }
     }
 
     /* ── Compact stage 2c: ≤ 700px — shrink the pills harder ───────────
