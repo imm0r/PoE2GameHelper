@@ -24,7 +24,7 @@ SetWorkingDir(A_ScriptDir)
 #Include Lib/TerrainPathfinder.ahk
 #Include ahk/GdiOverlayBase.ahk
 #Include ahk/RadarOverlay.ahk
-#Include ahk/PlayerHUD.ahk
+#Include ahk/VitalsOverlay.ahk
 #Include ahk/NotificationOverlay.ahk
 #Include ahk/FocusOverlay.ahk
 #Include ahk/OverlayContext.ahk
@@ -111,8 +111,11 @@ g_overlayStatusTextEnabled := true   ; show automation status block on game over
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
 g_overlayManager := 0   ; OverlayManager — owns all overlays; built in LoadOverlaySystem()
 g_radarOverlay := 0   ; reference to the manager-owned RadarOverlay (set in LoadOverlaySystem)
-g_playerHudEnabled := true   ; whether the player HUD overlay is active
-g_playerHud := 0   ; reference to the manager-owned PlayerHUD (set in LoadOverlaySystem)
+g_playerHudEnabled := true   ; master toggle for the vitals overlay (formerly the player HUD)
+g_playerHud := 0   ; legacy alias -> the manager-owned VitalsOverlay (set in LoadOverlaySystem)
+g_vitalsOverlay := 0   ; reference to the manager-owned VitalsOverlay (set in LoadOverlaySystem)
+g_vitalsBars := 0      ; Map(barId -> config Map); seeded by LoadVitalsConfig()
+g_vitalsEditMode := false   ; drag-to-place layout edit mode for the vitals bars
 g_notifyOverlay := 0   ; reference to the manager-owned NotificationOverlay (set in LoadOverlaySystem)
 g_focusOverlay := 0   ; reference to the manager-owned FocusOverlay (set in LoadOverlaySystem)
 g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active

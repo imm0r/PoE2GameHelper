@@ -20,7 +20,7 @@ class OverlayManager
 
         ; Register the built-in overlays. Order = draw/registration order.
         this.Register(RadarOverlay())
-        this.Register(PlayerHUD())
+        this.Register(VitalsOverlay())
         this.Register(NotificationOverlay())
         this.Register(FocusOverlay())
     }
@@ -84,10 +84,12 @@ class OverlayManager
 ; does not apply.
 LoadOverlaySystem()
 {
-    global g_overlayManager, g_radarOverlay, g_playerHud, g_notifyOverlay, g_focusOverlay, g_radarAlpha
+    global g_overlayManager, g_radarOverlay, g_playerHud, g_vitalsOverlay, g_notifyOverlay, g_focusOverlay, g_radarAlpha
+    LoadVitalsConfig()   ; seed g_vitalsBars / g_vitalsEditMode before the overlay first draws
     g_overlayManager := OverlayManager()
     g_radarOverlay   := g_overlayManager.Get("radar")
-    g_playerHud      := g_overlayManager.Get("playerHud")
+    g_vitalsOverlay  := g_overlayManager.Get("vitals")
+    g_playerHud      := g_vitalsOverlay   ; legacy alias (the vitals overlay replaced the HUD)
     g_notifyOverlay  := g_overlayManager.Get("notification")
     g_focusOverlay   := g_overlayManager.Get("focus")
     if (IsSet(g_radarAlpha) && g_radarOverlay)

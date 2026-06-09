@@ -63,7 +63,7 @@ UpdateRadarFast()
                 if IsObject(g_overlayManager)
                 {
                     g_overlayManager.Get("radar").Hide()
-                    g_overlayManager.Get("playerHud").Hide()
+                    g_overlayManager.Get("vitals").Hide()
                 }
                 return
             }
