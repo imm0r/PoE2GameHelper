@@ -59,9 +59,11 @@ class OverlayManager
     _EvaluateGate(ctx)
     {
         global g_uiBrowserHighlight
-        radar := this.Get("radar")
-        hasCircles := (radar && radar._rangeCircles.Length > 0)
-        ctx.keepWhenBackground := ctx.toolFocused || hasCircles
+        ; Keep the overlay visible while the game isn't focused ONLY when our own
+        ; PoEformance UI is focused (so range circles etc. preview while you tweak
+        ; settings). Alt-tabbing to any other window hides it, even with range
+        ; circles enabled.
+        ctx.keepWhenBackground := ctx.toolFocused
         ctx.inspectOverride    := IsSet(g_uiBrowserHighlight) && IsObject(g_uiBrowserHighlight)
         ctx.gate := this._policy.Evaluate(ctx)
     }
