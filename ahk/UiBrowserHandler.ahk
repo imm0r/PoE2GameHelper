@@ -32,12 +32,15 @@ _UiBrowser_GetGameUiPtr()
                 return 0
         }
         uiRootStructPtr := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["UiRootStructPtr"])
-        if !g_reader.IsProbablyValidPointer(uiRootStructPtr)
-            return 0
-        gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
-        if !g_reader.IsProbablyValidPointer(gameUiPtr)
-            gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
-        return gameUiPtr
+        ; The GameUi container (all 100+ elements) IS the UI-root struct pointer
+        ; itself (KB/M) or the gamepad one (controller) — NOT the deref'd
+        ; GameUiPtr(0xBE0). The PoE2 v4.5 UI patch dropped that indirection, so
+        ; +0xBE0 now lands on a 5-child sub-element. Matches PoE2MemoryReader's
+        ; activeGameUiPtr and the reference (InGameState.cs: GameUi.Address = uiManagerPtr).
+        if g_reader.IsProbablyValidPointer(uiRootStructPtr)
+            return uiRootStructPtr
+        gp := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
+        return g_reader.IsProbablyValidPointer(gp) ? gp : 0
     } catch {
         return 0
     }
@@ -79,15 +82,18 @@ UiBrowseRoot()
             }
         }
         uiRootStructPtr := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["UiRootStructPtr"])
-        if !g_reader.IsProbablyValidPointer(uiRootStructPtr) {
-            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 6: UiRootStructPtr invalid (igs=0x' . Format("{:X}", igs) . ')"}') . ")")
-            return
-        }
-        gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
-        if !g_reader.IsProbablyValidPointer(gameUiPtr)
-            gameUiPtr := g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiControllerPtr"])
+        ; GameUi container root = the UI-root struct pointer ITSELF (KB/M) or the
+        ; gamepad UI-root struct (controller) — NOT the deref'd GameUiPtr(0xBE0).
+        ; The PoE2 v4.5 UI patch dropped that indirection, so +0xBE0 now lands on a
+        ; 5-child sub-element instead of the 100+ container (root showed too few
+        ; elements / couldn't iterate deep). Matches PoE2MemoryReader.activeGameUiPtr
+        ; and the reference (InGameState.cs: GameUi.Address = uiManagerPtr).
+        if g_reader.IsProbablyValidPointer(uiRootStructPtr)
+            gameUiPtr := uiRootStructPtr
+        else
+            gameUiPtr := g_reader.Mem.ReadPtr(igs + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
         if !g_reader.IsProbablyValidPointer(gameUiPtr) {
-            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 7: GameUiPtr invalid (uiRootStruct=0x' . Format("{:X}", uiRootStructPtr) . ')"}') . ")")
+            WebViewExec("updateUiBrowser(" . _JsStr('{"error":"DIAG 6: UI-root struct invalid (igs=0x' . Format("{:X}", igs) . ')"}') . ")")
             return
         }
         g_uiBrowserRootPtr := gameUiPtr
