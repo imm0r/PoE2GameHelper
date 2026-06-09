@@ -27,6 +27,9 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/PlayerHUD.ahk
 #Include ahk/NotificationOverlay.ahk
 #Include ahk/FocusOverlay.ahk
+#Include ahk/OverlayContext.ahk
+#Include ahk/PlayOverlayPolicy.ahk
+#Include ahk/OverlayManager.ahk
 #Include ahk/UiTreeBrowser.ahk
 #Include ahk/UiBrowserHandler.ahk
 
@@ -106,11 +109,12 @@ g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
-g_radarOverlay := 0   ; lazy-init on first render call
+g_overlayManager := 0   ; OverlayManager — owns all overlays; built in LoadOverlaySystem()
+g_radarOverlay := 0   ; reference to the manager-owned RadarOverlay (set in LoadOverlaySystem)
 g_playerHudEnabled := true   ; whether the player HUD overlay is active
-g_playerHud := 0   ; lazy-init on first render
-g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
-g_focusOverlay := 0   ; lazy-init (FocusOverlay) — focused-entity test readout
+g_playerHud := 0   ; reference to the manager-owned PlayerHUD (set in LoadOverlaySystem)
+g_notifyOverlay := 0   ; reference to the manager-owned NotificationOverlay (set in LoadOverlaySystem)
+g_focusOverlay := 0   ; reference to the manager-owned FocusOverlay (set in LoadOverlaySystem)
 g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active
 g_localApiEnabled := false   ; local HTTP API (MCP backend) — opt-in; seeded by LoadLocalApiConfig()
 g_localApiPort := 7777       ; loopback port for the local HTTP API
