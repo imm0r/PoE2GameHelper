@@ -81,6 +81,11 @@ class RadarOverlay
         this.highlightedEntityPath := ""   ; path of entity selected in the Entities tab — drawn with a line on the radar
         this._lastMiniMapDiagonal := 0   ; cached minimap diagonal used for large-map projection
         this._lastGwX := -1, this._lastGwY := -1, this._lastGwW := 0, this._lastGwH := 0
+        ; Last valid player world position — reused for a short grace window when a
+        ; snapshot briefly lacks worldPosition (GC / pointer race), so the whole
+        ; overlay (map + dots + status text) doesn't blink out for that frame.
+        this._lastPlayerPos       := 0    ; Map("x","y","h") or 0 when never seen
+        this._lastPlayerPosTick   := 0    ; A_TickCount of the last valid position
         this._penCache   := Map()   ; colorBGR|(width<<24) → HPEN  (created once, reused)
         this._brushCache := Map()   ; colorBGR             → HBRUSH
         this._bgBrush    := 0       ; cached background fill brush
@@ -310,17 +315,38 @@ class RadarOverlay
                 . " " terrDbg . mhDbg
         }
 
+        ; Reuse the last valid player position for a short grace window when this
+        ; snapshot briefly lacks worldPosition (GC / pointer race). Without this the
+        ; whole overlay — map, dots AND the status strings drawn below — blinks out
+        ; for that single frame, which looks like the overlay is flickering.
+        static _POS_GRACE_MS := 800
+        if hasPlayerPosition
+        {
+            pwp := playerRender["worldPosition"]
+            this._lastPlayerPos := Map("x", pwp["x"], "y", pwp["y"]
+                , "h", playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0)
+            this._lastPlayerPosTick := A_TickCount
+        }
+        else if (this._lastPlayerPos && (A_TickCount - this._lastPlayerPosTick) <= _POS_GRACE_MS)
+        {
+            ; Within grace — render this frame with the cached position.
+            hasPlayerPosition := true
+        }
+
         if !hasPlayerPosition
         {
             this._DrawDot(20, 8, 0x0000FF, 5)   ; blue dot = no player found
+            this._RenderStatusOverlay(gameWindowWidth, gameWindowHeight)   ; status block "shows always"
             this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
             return
         }
 
-        playerWorldPosition := playerRender["worldPosition"]
+        playerWorldPosition := (playerRender && playerRender.Has("worldPosition"))
+                             ? playerRender["worldPosition"] : this._lastPlayerPos
         playerWorldX        := playerWorldPosition["x"]
         playerWorldY        := playerWorldPosition["y"]
-        playerTerrainHeight := playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0
+        playerTerrainHeight := playerWorldPosition.Has("h") ? playerWorldPosition["h"]
+                             : (playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0)
 
         ; Cache the minimap diagonal even when the minimap is currently invisible
         ; (the large map needs it, but is often open while the minimap is hidden).
