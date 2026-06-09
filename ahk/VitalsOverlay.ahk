@@ -20,6 +20,12 @@ class VitalsOverlay extends GdiOverlayBase
     {
         super.__New(255)
         this.Name := "vitals"
+        ; Edit/drag state
+        this._editInteractive := false   ; whether the window is currently click-through-off
+        this._mouseBound      := false   ; whether OnMessage mouse hooks are registered
+        this._dragId          := ""      ; bar id currently being dragged ("" = none)
+        this._dragOffX        := 0       ; cursor->bar top-left offset captured at mouse-down
+        this._dragOffY        := 0
     }
 
     ; ── Overlay contract ────────────────────────────────────────────────────
@@ -51,6 +57,7 @@ class VitalsOverlay extends GdiOverlayBase
     Draw(ctx, rect)
     {
         global g_vitalsBars, g_vitalsEditMode
+        this._EnsureEditStyle()   ; sync click-through / mouse hooks with edit mode
         if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
             return
         vit  := this._ExtractVitals(ctx.snapshot)
@@ -155,6 +162,151 @@ class VitalsOverlay extends GdiOverlayBase
         if tPct
             s := (s != "") ? (s " (" Round(pct) "%)") : (Round(pct) "%")
         return s
+    }
+
+    ; ── Edit mode (drag bars on the overlay) ──────────────────────────────────
+
+    ; Syncs the window's click-through state + mouse hooks with g_vitalsEditMode.
+    ; Called every frame from Draw so it self-corrects regardless of toggle timing.
+    ; In edit mode the overlay drops WS_EX_TRANSPARENT so it receives mouse input.
+    _EnsureEditStyle()
+    {
+        global g_vitalsEditMode
+        want := (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false
+        if (want = this._editInteractive)
+            return
+        if !this._styled            ; not shown/styled yet — retry next frame
+            return
+        if want
+        {
+            WinSetExStyle("-0x20", this.hwnd)   ; remove WS_EX_TRANSPARENT -> clickable
+            this._RegisterMouse()
+        }
+        else
+        {
+            WinSetExStyle("+0x20", this.hwnd)   ; restore click-through
+            this._UnregisterMouse()
+        }
+        this._editInteractive := want
+    }
+
+    _RegisterMouse()
+    {
+        if this._mouseBound
+            return
+        this._fnDown := ObjBindMethod(this, "_OnLDown")
+        this._fnMove := ObjBindMethod(this, "_OnMouseMove")
+        this._fnUp   := ObjBindMethod(this, "_OnLUp")
+        OnMessage(0x201, this._fnDown)   ; WM_LBUTTONDOWN
+        OnMessage(0x200, this._fnMove)   ; WM_MOUSEMOVE
+        OnMessage(0x202, this._fnUp)     ; WM_LBUTTONUP
+        this._mouseBound := true
+    }
+
+    _UnregisterMouse()
+    {
+        if !this._mouseBound
+            return
+        OnMessage(0x201, this._fnDown, 0)
+        OnMessage(0x200, this._fnMove, 0)
+        OnMessage(0x202, this._fnUp, 0)
+        this._mouseBound := false
+        this._dragId := ""
+    }
+
+    ; Extracts signed client X/Y from a mouse message lParam.
+    _LParamXY(lParam, &x, &y)
+    {
+        x := lParam & 0xFFFF
+        y := (lParam >> 16) & 0xFFFF
+        if (x > 0x7FFF)
+            x -= 0x10000
+        if (y > 0x7FFF)
+            y -= 0x10000
+    }
+
+    ; Returns the id of the topmost enabled bar under client point (cx,cy), or "".
+    _HitTestBar(cx, cy)
+    {
+        global g_vitalsBars
+        gw := this.bufW, gh := this.bufH
+        hit := ""
+        for id, bar in g_vitalsBars
+        {
+            if !(bar.Has("enabled") && bar["enabled"])
+                continue
+            w := bar.Has("w") ? bar["w"] : 200
+            h := bar.Has("h") ? bar["h"] : 16
+            x := Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * gw)
+            y := Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * gh)
+            if (cx >= x && cx <= x + w && cy >= y && cy <= y + h)
+                hit := id   ; keep last match -> later-drawn (topmost) bar wins
+        }
+        return hit
+    }
+
+    _OnLDown(wParam, lParam, msg, hwnd)
+    {
+        if (hwnd != this.hwnd)
+            return
+        x := 0, y := 0
+        this._LParamXY(lParam, &x, &y)
+        global g_vitalsBars
+        id := this._HitTestBar(x, y)
+        if (id = "")
+            return
+        bar := g_vitalsBars[id]
+        bx := Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * this.bufW)
+        by := Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * this.bufH)
+        this._dragId   := id
+        this._dragOffX := x - bx
+        this._dragOffY := y - by
+    }
+
+    _OnMouseMove(wParam, lParam, msg, hwnd)
+    {
+        if (hwnd != this.hwnd || this._dragId = "")
+            return
+        global g_vitalsBars
+        x := 0, y := 0
+        this._LParamXY(lParam, &x, &y)
+        gw := this.bufW, gh := this.bufH
+        bar := g_vitalsBars[this._dragId]
+        w := bar.Has("w") ? bar["w"] : 200
+        h := bar.Has("h") ? bar["h"] : 16
+        nx := x - this._dragOffX
+        ny := y - this._dragOffY
+        nx := Min(gw - w, Max(0, nx))
+        ny := Min(gh - h, Max(0, ny))
+        bar["xPct"] := (gw > 0) ? (nx / gw) : bar["xPct"]
+        bar["yPct"] := (gh > 0) ? (ny / gh) : bar["yPct"]
+        this._RenderEditFrame()   ; immediate redraw for smooth dragging
+    }
+
+    _OnLUp(wParam, lParam, msg, hwnd)
+    {
+        if (hwnd != this.hwnd || this._dragId = "")
+            return
+        this._dragId := ""
+        SaveVitalsConfig()                          ; persist the new position
+        SetTimer(PushHeaderToWebView, -30)          ; sync the UI X/Y fields
+    }
+
+    ; Lightweight self-contained redraw used while dragging (between manager ticks).
+    _RenderEditFrame()
+    {
+        global g_vitalsBars
+        if (!this.memDC || !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars)))
+            return
+        gw := this.bufW, gh := this.bufH
+        this._ClearBackBuffer(gw, gh)
+        for id, bar in g_vitalsBars
+        {
+            if !(bar.Has("enabled") && bar["enabled"])
+                continue
+            this._DrawBar(bar, id, 0, 0, 100, gw, gh, true)
+        }
+        this._Blit(gw, gh)
     }
 }
 
@@ -285,12 +437,15 @@ BuildVitalsHeaderJson()
 ; mouse handling is wired in a later step; this owns the state + click-through.
 ToggleVitalsEditMode(val := "")
 {
-    global g_vitalsEditMode
+    global g_vitalsEditMode, g_vitalsOverlay
     if (val = "")
         g_vitalsEditMode := !g_vitalsEditMode
     else
         g_vitalsEditMode := (val = true || val = 1 || val = "1" || val = "true")
-    ; The interactive click-through toggle + drag mouse handling are wired in the
-    ; edit-mode step; for now this flips the flag so the overlay shows the bar
-    ; handles/labels and SaveVitalsConfig persists positions edited via the UI.
+    ; Sync the overlay's click-through state + mouse hooks immediately (it also
+    ; self-syncs each frame via _EnsureEditStyle). Persist when leaving edit mode.
+    if (IsSet(g_vitalsOverlay) && IsObject(g_vitalsOverlay))
+        try g_vitalsOverlay._EnsureEditStyle()
+    if !g_vitalsEditMode
+        SaveVitalsConfig()
 }
