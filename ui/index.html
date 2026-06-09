@@ -8911,9 +8911,19 @@
       // Show only player/equipped skills by default; the pill reveals internal ones.
       const filtered = data.filter(s => !_blacklist.has(s.n || '') && (_showInternalSkills || s.pl !== false));
       const internalCount = data.filter(s => s.pl === false && !_blacklist.has(s.n || '')).length;
-      const usable = filtered.filter(s => s.ok);
-      const blocked = filtered.filter(s => !s.ok);
-      const rows = filtered.map(s => {
+      // Dedup by display name (e.g. Blink + BlinkReservation both show "Blink"):
+      // keep the most "active" entry (on cooldown / most uses).
+      const _byDn = new Map();
+      for (const s of filtered) {
+        const key = (s.dn || s.n || '').toLowerCase();
+        const score = (s.rem > 0 ? 4000 : 0) + (!s.ok ? 2000 : 0) + (s.mu || 0) * 100 + (s.tu || 0);
+        const ex = _byDn.get(key);
+        if (!ex || score > ex.score) _byDn.set(key, { s, score });
+      }
+      const visible = [..._byDn.values()].map(v => v.s);
+      const usable = visible.filter(s => s.ok);
+      const blocked = visible.filter(s => !s.ok);
+      const rows = visible.map(s => {
         const dn = escHtml(s.dn || s.n || '?');
         const nm = escHtml(s.n || '?');
         const rawName = s.n || '';
@@ -8928,15 +8938,20 @@
         } else {
           statusCls = 'skill-usable'; statusTxt = '✓ Ready';
         }
-        const cdText = s.cd > 0 ? (s.cd / 1000).toFixed(1) + 's' : '—';
+        // Cooldown column shows the live remaining time (counts down) + a bar; falls
+        // back to the skill's total cooldown when not currently on cooldown.
+        const remS = s.rem > 0 ? s.rem / 1000 : 0;
+        const cdText = remS > 0 ? remS.toFixed(1) + 's' : (s.cd > 0 ? (s.cd / 1000).toFixed(1) + 's' : '—');
+        const cdProgPct = (remS > 0 && s.cd > 0) ? Math.min(100, (s.rem / s.cd) * 100) : 0;
+        const cdProgBar = cdProgPct > 0 ? `<div class="skill-cd-bar"><div class="skill-cd-fill" style="width:${cdProgPct}%"></div></div>` : '';
         const usesText = s.mu > 0 ? `${s.mu - s.ac}/${s.mu}` : '—';
         const cdPct = (s.mu > 0 && s.ac > 0) ? Math.min(100, s.ac / s.mu * 100) : 0;
         const cdBar = s.mu > 0 ? `<div class="skill-cd-bar"><div class="skill-cd-fill" style="width:${cdPct}%"></div></div>` : '';
         const ctName = typeof animName === 'function' ? animName(s.ct) : s.ct;
-        return `<tr style="cursor:pointer" onclick="blacklistAdd('${escAttr(rawName)}')" data-tip="Click to hide"><td data-tip="${nm}">${icImg}${dn}</td><td class="${statusCls}">${statusTxt}</td><td>${cdText}</td><td>${usesText} ${cdBar}</td><td>${s.tu}</td><td data-tip="ID: ${s.ct} / EquipID: ${escHtml(s.eq)}">${escHtml(ctName)}</td></tr>`;
+        return `<tr style="cursor:pointer" onclick="blacklistAdd('${escAttr(rawName)}')" data-tip="Click to hide"><td data-tip="${nm}">${icImg}${dn}</td><td class="${statusCls}">${statusTxt}</td><td>${cdText}${cdProgBar}</td><td>${usesText} ${cdBar}</td><td>${s.tu}</td><td data-tip="ID: ${s.ct} / EquipID: ${escHtml(s.eq)}">${escHtml(ctName)}</td></tr>`;
       }).join('');
       const internalPill = `<button class="inv-tog-pill${_showInternalSkills ? ' active' : ''}" type="button" style="margin-left:1em;vertical-align:middle" onclick="_toggleInternalSkills()" title="Also show internal/non-player skills (Move, Ascend, …)">Internal skills${internalCount ? ` (${internalCount})` : ''}</button>`;
-      el.innerHTML = `<div class="skill-header"><span class="skill-count">${usable.length} usable · ${blocked.length} on cooldown · ${filtered.length} total</span>${internalPill}<span class="skill-debug" style="opacity:0.5;font-size:0.85em;margin-left:1em">ActiveSkill offset: ${asOff}</span></div><table class="skill-table"><thead><tr><th>Skill</th><th>Status</th><th>Cooldown</th><th>Uses</th><th>Total Uses</th><th>Cast Type</th></tr></thead><tbody>${rows}</tbody></table>`;
+      el.innerHTML = `<div class="skill-header"><span class="skill-count">${usable.length} usable · ${blocked.length} on cooldown · ${visible.length} total</span>${internalPill}<span class="skill-debug" style="opacity:0.5;font-size:0.85em;margin-left:1em">ActiveSkill offset: ${asOff}</span></div><table class="skill-table"><thead><tr><th>Skill</th><th>Status</th><th>Cooldown</th><th>Uses</th><th>Total Uses</th><th>Cast Type</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     // ═══════════════════════════════════════════════════════════════════

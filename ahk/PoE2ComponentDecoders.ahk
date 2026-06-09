@@ -831,11 +831,34 @@ class PoE2ComponentDecoders
                 maxUses := this.Mem.ReadInt(entryAddr + PoE2Offsets.ActiveSkillCooldown["MaxUses"])
                 cdTotalMs := this.Mem.ReadInt(entryAddr + PoE2Offsets.ActiveSkillCooldown["TotalCooldownTimeInMs"])
                 cannotBeUsed := (activeCooldownCount >= maxUses) ? true : false
+
+                ; Remaining cooldown: each CooldownsList element (0x10 bytes) holds two
+                ; floats — +0x00 elapsed seconds, +0x04 total seconds. Remaining =
+                ; total - elapsed (the value that drives the countdown + bar).
+                remainingMs := 0
+                if (activeCooldownCount > 0)
+                {
+                    cdListFirst := this.Mem.ReadInt64(entryAddr + PoE2Offsets.ActiveSkillCooldown["CooldownsList"])
+                    if this.IsProbablyValidPointer(cdListFirst)
+                    {
+                        elapsedSec := this.Mem.ReadFloat(cdListFirst + 0x00)
+                        totalSec   := this.Mem.ReadFloat(cdListFirst + 0x04)
+                        if (totalSec > 0 && totalSec < 86400)
+                        {
+                            rem := totalSec - elapsedSec
+                            if (rem < 0)
+                                rem := 0
+                            remainingMs := Round(rem * 1000)
+                        }
+                    }
+                }
+
                 cooldownsByEquipId[equipId] := Map(
                     "activeSkillsDatId", this.Mem.ReadInt(entryAddr + PoE2Offsets.ActiveSkillCooldown["ActiveSkillsDatId"]),
                     "maxUses", maxUses,
                     "activeCooldownCount", activeCooldownCount,
                     "totalCooldownTimeInMs", cdTotalMs,
+                    "remainingMs", remainingMs,
                     "cannotBeUsed", cannotBeUsed
                 )
                 idx += 1
@@ -910,6 +933,7 @@ class PoE2ComponentDecoders
                 "canUse", canUse,
                 "activeCooldowns", (cdInfo ? cdInfo["activeCooldownCount"] : 0),
                 "maxUses", (cdInfo ? cdInfo["maxUses"] : 0),
+                "remainingMs", (cdInfo ? cdInfo["remainingMs"] : 0),
                 "detailsPtr", detailsPtr,
                 "geplRow", geplRow
             )
