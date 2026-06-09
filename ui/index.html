@@ -8814,9 +8814,10 @@
         const changed = vis._changedOffsets || [];
         const panelVis = vis.panelVisible || 0;
         const checkedCount = vis.checkedCount || 0;
-        const panelLocalVis = vis.panelLocalVisible || 0;
-        const panelEffVis = vis.panelEffVisible || 0;
-        const effDiverge = panelLocalVis !== panelEffVis;
+        const knownLocal = vis.knownOpenLocal || [];
+        const knownEff = vis.knownOpenEffective || [];
+        // Saved panels flagged open locally but NOT actually shown (hidden ancestor).
+        const effHidden = knownLocal.filter(n => !knownEff.includes(n));
 
         let liveHtml = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px">`;
         liveHtml += `<div style="font-size:20px;font-weight:700;color:${anyOpen ? '#ef4444' : '#4ade80'}">${anyOpen ? '🔴 PANEL OPEN' : '🟢 ALL CLEAR'}</div>`;
@@ -8832,9 +8833,14 @@
         } else {
           liveHtml += `<span style="color:#e8c44a">⚠ Heuristic mode</span> · Flags: +${newlyVis}/-${newlyHid}`;
         }
-        // Currently-shown panels: local bit vs effective (hierarchical) visibility.
-        liveHtml += ` · Now 👁<span style="color:${panelLocalVis > 0 ? '#ef4444' : '#4ade80'}">${panelLocalVis}</span>/✓<span style="color:${panelEffVis > 0 ? '#ef4444' : '#4ade80'}">${panelEffVis}</span>`;
-        if (effDiverge) liveHtml += ` <span style="color:#e8c44a" data-tip="Locally flagged visible but a hidden ancestor keeps it off-screen">⚠ local≠eff</span>`;
+        // Saved panels: open per local bit, and whether they're actually shown
+        // (effective). Deterministic — only the few saved offsets, no noise.
+        if (knownLocal.length > 0) {
+          liveHtml += ` · 📋 open: <span style="color:#ef4444">${knownLocal.map(escHtml).join(', ')}</span>`;
+          if (effHidden.length > 0) liveHtml += ` <span style="color:#e8c44a" data-tip="Locally flagged open but a hidden ancestor keeps it off-screen — not actually on screen">⚠ eff-hidden: ${effHidden.map(escHtml).join(', ')}</span>`;
+        } else {
+          liveHtml += ` · 📋 <span style="color:#4ade80">no saved panel open</span>`;
+        }
         liveHtml += `</div></div>`;
 
         if (changed && changed.length > 0) {

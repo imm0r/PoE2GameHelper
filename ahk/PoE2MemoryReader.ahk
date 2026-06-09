@@ -1582,10 +1582,6 @@ class PoE2GameStateReader extends PoE2InventoryReader
         panelHidCount := 0
         hasPanelElements := false
         sizeOffset := PoE2Offsets.UiElementBase["UnscaledSize"]
-        ; Effective-visibility tally: panels currently shown locally vs actually
-        ; on screen (hierarchical). Walk only runs for the 0-2 open panels.
-        panelLocalVisNow := 0
-        panelEffVisNow := 0
 
         for _, elem in this._heapUiElems
         {
@@ -1657,14 +1653,6 @@ class PoE2GameStateReader extends PoE2InventoryReader
                     }
                 }
             }
-            ; Effective-visibility tally — only walk panels that are locally
-            ; visible right now (the 0-2 open panels); skip otherwise (no reads).
-            if (isVisNow && (elem.Has("isPanel") ? elem["isPanel"] : false))
-            {
-                panelLocalVisNow += 1
-                if UiTree_HierarchicallyVisible(this, elemPtr)
-                    panelEffVisNow += 1
-            }
         }
 
         ; ── Raw struct pointer-level change detection (1 RPM call for 2KB) ──
@@ -1713,9 +1701,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         vis["newlyHidden"] := newlyHidCount
         vis["panelVisible"] := panelVisCount
         vis["panelHidden"] := panelHidCount
-        vis["panelLocalVisible"] := panelLocalVisNow
-        vis["panelEffVisible"] := panelEffVisNow
-        vis["anyPanelEffectivelyOpen"] := (panelEffVisNow >= 1)
+        ; Deterministic known-panel visibility: check the few SAVED panel offsets'
+        ; local + effective (hierarchical) state — far cleaner than counting all
+        ; panel-sized elements (which was noisy). DRY via ReadKnownPanelVisibility.
+        known := this.ReadKnownPanelVisibility(gameUiPtr)
+        vis["knownOpenLocal"] := known.Has("openPanels") ? known["openPanels"] : []
+        vis["knownOpenEffective"] := known.Has("openPanelsEffective") ? known["openPanelsEffective"] : []
+        vis["panelLocalVisible"] := vis["knownOpenLocal"].Length
+        vis["panelEffVisible"] := vis["knownOpenEffective"].Length
+        vis["anyPanelEffectivelyOpen"] := (vis["knownOpenEffective"].Length >= 1)
         vis["hasPanelElements"] := hasPanelElements
         vis["totalChanged"] := newlyVisCount + newlyHidCount
         vis["ptrsAppeared"] := ptrsAppeared
@@ -1753,6 +1747,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         flagsOff := PoE2Offsets.UiElementBase["Flags"]
         openPanels := []
+        openPanelsEff := []   ; effectively (hierarchically) visible — actually on screen
 
         for panelName, structOff in offsets
         {
@@ -1766,11 +1761,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
             flags := this.Mem.ReadUInt(elemPtr + flagsOff)
             isVis := ((flags >> 11) & 1) ? true : false
             if isVis
+            {
                 openPanels.Push(panelName)
+                ; Effective: own bit AND every ancestor's bit (actually shown).
+                ; Walk only runs here, for locally-visible panels (cheap).
+                if UiTree_HierarchicallyVisible(this, elemPtr)
+                    openPanelsEff.Push(panelName)
+            }
         }
 
         result["anyPanelOpen"] := (openPanels.Length > 0)
         result["openPanels"] := openPanels
+        result["openPanelsEffective"] := openPanelsEff
+        result["anyPanelEffectivelyOpen"] := (openPanelsEff.Length > 0)
         return result
     }
 

@@ -476,6 +476,33 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= '"panelLocalVisible":' (panelVis.Has("panelLocalVisible") ? panelVis["panelLocalVisible"] : 0) ","
         json .= '"panelEffVisible":' (panelVis.Has("panelEffVisible") ? panelVis["panelEffVisible"] : 0) ","
         json .= '"anyPanelEffectivelyOpen":' (panelVis.Has("anyPanelEffectivelyOpen") && panelVis["anyPanelEffectivelyOpen"] ? "true" : "false") ","
+        json .= '"knownOpenLocal":['
+        kol := panelVis.Has("knownOpenLocal") ? panelVis["knownOpenLocal"] : []
+        if (kol && IsObject(kol))
+        {
+            first := true
+            for _, nm in kol
+            {
+                if !first
+                    json .= ","
+                json .= _JsStr(nm)
+                first := false
+            }
+        }
+        json .= '],"knownOpenEffective":['
+        koe := panelVis.Has("knownOpenEffective") ? panelVis["knownOpenEffective"] : []
+        if (koe && IsObject(koe))
+        {
+            first := true
+            for _, nm in koe
+            {
+                if !first
+                    json .= ","
+                json .= _JsStr(nm)
+                first := false
+            }
+        }
+        json .= '],'
         json .= '"_changedOffsets":['
         chOff := panelVis.Has("_changedOffsets") ? panelVis["_changedOffsets"] : []
         if (chOff && IsObject(chOff))
@@ -492,7 +519,7 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= "]"
     }
     else
-        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"panelLocalVisible":0,"panelEffVisible":0,"anyPanelEffectivelyOpen":false,"_changedOffsets":[]'
+        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"panelLocalVisible":0,"panelEffVisible":0,"anyPanelEffectivelyOpen":false,"knownOpenLocal":[],"knownOpenEffective":[],"_changedOffsets":[]'
     json .= "},"
 
     ; Panel discovery
