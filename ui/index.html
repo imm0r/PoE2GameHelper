@@ -9404,9 +9404,15 @@
     // ── Per-bar visibility condition list (drag&drop, add/remove, import/export) ──
     const VCOND_LABELS = { combat: 'In Combat', lowvital: 'On Low', town: 'In Town/Hideout', map: 'On large Map' };
     const _vCondSig = {};
+    // The expected-state bool. Tolerant of AHK's round-trip (booleans come back
+    // as 0/1, since AHK has no boolean type), so undefined/true/1 -> true.
+    function _wantOn(c) {
+      const w = c.want;
+      return !(w === false || w === 0 || w === '0' || w === 'false');
+    }
     // Signature of a bar's conditions+combiner, used to skip needless re-renders.
     function _vCondSigOf(b) {
-      return JSON.stringify((b.conditions || []).map(c => [c.type, c.want !== false, c.resource || '', c.value ?? '']))
+      return JSON.stringify((b.conditions || []).map(c => [c.type, _wantOn(c), c.resource || '', c.value ?? '']))
         + '|' + (b.match || 'all') + '|' + (b.outcome || 'show');
     }
 
@@ -9430,7 +9436,7 @@
       const conds = _vCondArr(id) || [];
       host.innerHTML = conds.length ? conds.map((c, i) => {
         const lbl = VCOND_LABELS[c.type] || c.type;
-        const want = c.want !== false;
+        const want = _wantOn(c);
         const extra = (c.type === 'lowvital')
           ? ` <select class="vcond-add" title="Which resource" onchange="vitalsSetCondRes('${id}',${i},this.value)">`
             + `<option value="es"${c.resource === 'es' ? ' selected' : ''}>ES</option>`
@@ -9471,7 +9477,7 @@
     }
     function vitalsToggleWant(id, idx) {
       const a = _vCondArr(id); if (!a || !a[idx]) return;
-      a[idx].want = (a[idx].want === false);
+      a[idx].want = !_wantOn(a[idx]);
       renderVitalsConds(id); vitalsPush();
     }
     function vitalsSetCondRes(id, idx, res) {
@@ -9506,8 +9512,18 @@
       _vCondDrag = { id, idx };
       e.dataTransfer.effectAllowed = 'move';
       try { e.dataTransfer.setData('text/plain', 'vcond'); } catch (_) {}
+      // Use the whole row as the drag preview (same feel as the Hotkeys tab).
+      const row = e.target.closest('.vrule');
+      if (row) {
+        row.classList.add('hk-dragging');
+        try { e.dataTransfer.setDragImage(row, 12, 12); } catch (_) {}
+      }
+      e.stopPropagation();
     }
-    function vCondDragEnd(e) { _vCondDrag = null; document.querySelectorAll('.hk-dragover').forEach(el => el.classList.remove('hk-dragover')); }
+    function vCondDragEnd(e) {
+      _vCondDrag = null;
+      document.querySelectorAll('.hk-dragover, .hk-dragging').forEach(el => el.classList.remove('hk-dragover', 'hk-dragging'));
+    }
     function vCondDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('hk-dragover'); }
     function vCondDragLeave(e) { e.currentTarget.classList.remove('hk-dragover'); }
     function vCondDrop(e, id, idx) {
@@ -9580,7 +9596,7 @@
           tPct: g('tPct') ? g('tPct').checked : cur.tPct,
         };
         bar.conditions = (Array.isArray(cur.conditions) ? cur.conditions : []).map(c => {
-          const o = { type: c.type, want: c.want !== false };
+          const o = { type: c.type, want: _wantOn(c) };
           if (c.type === 'lowvital') { o.resource = c.resource || 'life'; o.value = +(c.value ?? 50); }
           return o;
         });
