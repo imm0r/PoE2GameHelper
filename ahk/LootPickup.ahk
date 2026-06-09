@@ -149,7 +149,10 @@ _RunLootPickup(radarSnap, gameHwnd)
         ; instead of being mysterious (e.g. wrong inventoryId, glitched item
         ; slot values, …).
         g_lootLastReason := "inventory-full [" g_lootInvDiag "] (" g_lootCache.Count " cached)"
-        return true   ; cache stays — once user empties slots, pickup resumes
+        ; Do NOT claim the tick: claiming it froze the whole AutoPilot in
+        ; place until the user emptied the backpack. The cache stays, so
+        ; pickup resumes once space frees up — exploration continues meanwhile.
+        return false
     }
 
     playerPos := _GetPlayerPos(radarSnap)
@@ -188,7 +191,10 @@ _RunLootPickup(radarSnap, gameHwnd)
         g_lootLastReason := "no-fit(" target["rarity"]
             . " need=" rw "x" rh "/" fpSrc
             . " free=" free " " g_lootCache.Count "cached)"
-        return true   ; engaged — block exploration, retry next tick
+        ; Same as inventory-full: don't claim the tick. Claiming it parked
+        ; the bot next to an item it can't carry — forever, because the item
+        ; keeps refreshing its lastSeenTick while it stays in the sample.
+        return false
     }
 
     ; Project the item's world position to screen; check AvoidZones.
@@ -212,10 +218,12 @@ _RunLootPickup(radarSnap, gameHwnd)
     {
         ; The item itself wouldn't normally be in an avoid zone, but the
         ; projected position might be — e.g. an item dropped right next to a
-        ; waypoint pillar. Skip this tick; either we walk closer first and
-        ; the projection geometry shifts, or the cache eventually expires.
+        ; waypoint pillar. Don't claim the tick: if we blocked exploration
+        ; here the player would never move, the projection would never shift
+        ; off the avoid box, and the bot froze in place. Let exploration
+        ; carry on; the cached item is retried from a different angle later.
         g_lootLastReason := "avoid-zone(" target["rarity"] ")"
-        return true   ; block exploration anyway — still want to come back
+        return false
     }
 
     ; Throttle: one click every ~400 ms. The game itself walks the character
@@ -237,6 +245,9 @@ _RunLootPickup(radarSnap, gameHwnd)
     _lastClickTick     := now
     _lastClickedAddr   := target["addr"]
     _lastClickedRarity := target["rarity"]
+    ; Count the attempt — _NearestCachedItem stops offering this item once
+    ; the budget is spent (unreachable drops: behind ledges, on doodads).
+    target["attempts"] := (target.Has("attempts") ? target["attempts"] : 0) + 1
 
     ; Reading the inventory took some time during the just-fired click; force
     ; an early refresh by invalidating the cached value so the next tick
@@ -509,13 +520,19 @@ _NearestHostileDistance(radarSnap)
 ; empty. We use Euclidean here for the same reason _NearestHostileDistance
 ; does — the click-to-move follows the game's own pathing, so an extra A*
 ; from our side wouldn't change the outcome.
+; Items whose click budget is spent (LOOT_MAX_ATTEMPTS unsuccessful clicks,
+; i.e. unreachable drops) are skipped — without this the bot click-spammed
+; the same impossible item forever and never moved on.
 _NearestCachedItem(cache, playerX, playerY)
 {
+    LOOT_MAX_ATTEMPTS := 12
     bestDist := 999999.0
     best := 0
     for addr, info in cache
     {
         if !(info && IsObject(info))
+            continue
+        if (info.Has("attempts") && info["attempts"] >= LOOT_MAX_ATTEMPTS)
             continue
         dx := info["worldX"] - playerX
         dy := info["worldY"] - playerY
