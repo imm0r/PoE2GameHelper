@@ -1701,6 +1701,15 @@ class PoE2GameStateReader extends PoE2InventoryReader
         vis["newlyHidden"] := newlyHidCount
         vis["panelVisible"] := panelVisCount
         vis["panelHidden"] := panelHidCount
+        ; Deterministic known-panel visibility: check the few SAVED panel offsets'
+        ; local + effective (hierarchical) state — far cleaner than counting all
+        ; panel-sized elements (which was noisy). DRY via ReadKnownPanelVisibility.
+        known := this.ReadKnownPanelVisibility(gameUiPtr)
+        vis["knownOpenLocal"] := known.Has("openPanels") ? known["openPanels"] : []
+        vis["knownOpenEffective"] := known.Has("openPanelsEffective") ? known["openPanelsEffective"] : []
+        vis["panelLocalVisible"] := vis["knownOpenLocal"].Length
+        vis["panelEffVisible"] := vis["knownOpenEffective"].Length
+        vis["anyPanelEffectivelyOpen"] := (vis["knownOpenEffective"].Length >= 1)
         vis["hasPanelElements"] := hasPanelElements
         vis["totalChanged"] := newlyVisCount + newlyHidCount
         vis["ptrsAppeared"] := ptrsAppeared
@@ -1738,6 +1747,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         flagsOff := PoE2Offsets.UiElementBase["Flags"]
         openPanels := []
+        openPanelsEff := []   ; effectively (hierarchically) visible — actually on screen
 
         for panelName, structOff in offsets
         {
@@ -1751,11 +1761,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
             flags := this.Mem.ReadUInt(elemPtr + flagsOff)
             isVis := ((flags >> 11) & 1) ? true : false
             if isVis
+            {
                 openPanels.Push(panelName)
+                ; Effective: own bit AND every ancestor's bit (actually shown).
+                ; Walk only runs here, for locally-visible panels (cheap).
+                if UiTree_HierarchicallyVisible(this, elemPtr)
+                    openPanelsEff.Push(panelName)
+            }
         }
 
         result["anyPanelOpen"] := (openPanels.Length > 0)
         result["openPanels"] := openPanels
+        result["openPanelsEffective"] := openPanelsEff
+        result["anyPanelEffectivelyOpen"] := (openPanelsEff.Length > 0)
         return result
     }
 
@@ -1801,6 +1819,9 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 "flags", flags,
                 "sizeX", sizeX, "sizeY", sizeY,
                 "childCount", childCount,
+                ; Effective (hierarchical) visibility — walk parents only when the
+                ; local bit is set (otherwise it's trivially false, no reads).
+                "effVis", (((flags >> 11) & 1) && UiTree_HierarchicallyVisible(this, ptr)) ? true : false,
                 "ptr", ptr
             )
         }
@@ -1882,6 +1903,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 changes.Push("size:" Round(old["sizeX"], 0) "×" Round(old["sizeY"], 0) "→" Round(sizeX, 0) "×" Round(sizeY, 0))
             if (childCount != old["childCount"])
                 changes.Push("children:" old["childCount"] "→" childCount)
+            ; Effective (hierarchical) visibility change — the reliable "panel
+            ; actually became shown" signal (the local flag may already be set).
+            curEffVis := (((flags >> 11) & 1) && UiTree_HierarchicallyVisible(this, ptr)) ? true : false
+            oldEffVis := old.Has("effVis") ? old["effVis"] : false
+            if (curEffVis != oldEffVis)
+                changes.Push("effVis:" (oldEffVis ? "Y" : "N") "→" (curEffVis ? "Y" : "N"))
 
             if (changes.Length > 0)
             {
@@ -1965,6 +1992,18 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; ── Map element fields ─────────────────────────────────────────────────────
         flags := (N > 0) ? chain[1]["flags"] : 0
         isVisible := (flags >> 11) & 1
+        ; Effective (hierarchical) visibility: bit 11 must be set at EVERY level of
+        ; the already-walked chain (element → … → root). Free — no extra reads.
+        ; Distinguishes "locally flagged visible" from "actually on screen" (e.g.
+        ; the large map element stays locally-visible in town but is hidden by a
+        ; parent — local says open, effective correctly says closed).
+        effVisible := (N > 0) ? true : false
+        for _, link in chain {
+            if (((link["flags"] >> 11) & 1) = 0) {
+                effVisible := false
+                break
+            }
+        }
         sizeW := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"])
         sizeH := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"] + 4)
         shiftX := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"])
@@ -1981,6 +2020,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "localMult", localMult,
             "flags", flags,
             "isVisible", isVisible,
+            "effVisible", effVisible,   ; hierarchical: shown iff every ancestor is too
             "sizeW", sizeW,      ; unscaled element size (UI coords)
             "sizeH", sizeH,
             "shiftX", shiftX,     ; already in screen-pixel units (no additional scaling needed)

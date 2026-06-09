@@ -92,10 +92,13 @@ MemDiffResolveSymbol(symbol, customAddr := 0)
             return 0
         try
         {
+            ; GameUI anchor = the UI-root struct pointer itself (KB/M) or the gamepad
+            ; one (controller). The PoE2 v4.5 patch dropped the old GameUiPtr(0xBE0)
+            ; indirection (see PoE2MemoryReader.activeGameUiPtr / UiBrowserHandler).
             uiRootStructPtr := g_reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.InGameState["UiRootStructPtr"])
-            if !g_reader.IsProbablyValidPointer(uiRootStructPtr)
-                return 0
-            return g_reader.Mem.ReadPtr(uiRootStructPtr + PoE2Offsets.UiRootStruct["GameUiPtr"])
+            if g_reader.IsProbablyValidPointer(uiRootStructPtr)
+                return uiRootStructPtr
+            return g_reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
         }
         catch
             return 0

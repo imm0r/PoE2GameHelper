@@ -473,6 +473,36 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= '"ptrsDisappeared":' (panelVis.Has("ptrsDisappeared") ? panelVis["ptrsDisappeared"] : 0) ","
         json .= '"currentVisible":' (panelVis.Has("currentVisible") ? panelVis["currentVisible"] : 0) ","
         json .= '"baselineVisible":' (panelVis.Has("baselineVisible") ? panelVis["baselineVisible"] : 0) ","
+        json .= '"panelLocalVisible":' (panelVis.Has("panelLocalVisible") ? panelVis["panelLocalVisible"] : 0) ","
+        json .= '"panelEffVisible":' (panelVis.Has("panelEffVisible") ? panelVis["panelEffVisible"] : 0) ","
+        json .= '"anyPanelEffectivelyOpen":' (panelVis.Has("anyPanelEffectivelyOpen") && panelVis["anyPanelEffectivelyOpen"] ? "true" : "false") ","
+        json .= '"knownOpenLocal":['
+        kol := panelVis.Has("knownOpenLocal") ? panelVis["knownOpenLocal"] : []
+        if (kol && IsObject(kol))
+        {
+            first := true
+            for _, nm in kol
+            {
+                if !first
+                    json .= ","
+                json .= _JsStr(nm)
+                first := false
+            }
+        }
+        json .= '],"knownOpenEffective":['
+        koe := panelVis.Has("knownOpenEffective") ? panelVis["knownOpenEffective"] : []
+        if (koe && IsObject(koe))
+        {
+            first := true
+            for _, nm in koe
+            {
+                if !first
+                    json .= ","
+                json .= _JsStr(nm)
+                first := false
+            }
+        }
+        json .= '],'
         json .= '"_changedOffsets":['
         chOff := panelVis.Has("_changedOffsets") ? panelVis["_changedOffsets"] : []
         if (chOff && IsObject(chOff))
@@ -489,7 +519,7 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= "]"
     }
     else
-        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"_changedOffsets":[]'
+        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"panelLocalVisible":0,"panelEffVisible":0,"anyPanelEffectivelyOpen":false,"knownOpenLocal":[],"knownOpenEffective":[],"_changedOffsets":[]'
     json .= "},"
 
     ; Panel discovery
@@ -557,15 +587,20 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         mapDebug := Format("lmPtr=0x{:X} mmPtr=0x{:X}", lmPtr, mmPtr)
         if (lm && IsObject(lm) && lm.Has("isVisible"))
         {
-            largeMapOpen := lm["isVisible"] ? true : false
-            mapDebug .= " lmVis=" (lm["isVisible"] ? "1" : "0") " lmFlags=" (lm.Has("flags") ? lm["flags"] : "?")
+            ; "Open" now means EFFECTIVELY visible (hierarchical) — locally flagged
+            ; AND every ancestor visible — so a map that's locally-on but hidden by
+            ; a parent (e.g. in town) correctly reads as closed.
+            lmEff := lm.Has("effVisible") ? lm["effVisible"] : lm["isVisible"]
+            largeMapOpen := lmEff ? true : false
+            mapDebug .= " lmVis=" (lm["isVisible"] ? "1" : "0") " lmEff=" (lmEff ? "1" : "0") " lmFlags=" (lm.Has("flags") ? lm["flags"] : "?")
         }
         else
             mapDebug .= " lmData=NONE"
         if (mm && IsObject(mm) && mm.Has("isVisible"))
         {
-            miniMapOpen := mm["isVisible"] ? true : false
-            mapDebug .= " mmVis=" (mm["isVisible"] ? "1" : "0")
+            mmEff := mm.Has("effVisible") ? mm["effVisible"] : mm["isVisible"]
+            miniMapOpen := mmEff ? true : false
+            mapDebug .= " mmVis=" (mm["isVisible"] ? "1" : "0") " mmEff=" (mmEff ? "1" : "0")
         }
         else
             mapDebug .= " mmData=NONE"

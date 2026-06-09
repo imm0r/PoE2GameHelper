@@ -914,6 +914,7 @@ SkillProbeRun()
 
     n := 0
     idx := 0
+    firstGepl := 0
     while (idx < cnt && n < 64)
     {
         entry := asFirst + idx * 0x10
@@ -922,6 +923,8 @@ SkillProbeRun()
         if !g_reader.IsProbablyValidPointer(detailsPtr)
             continue
         geplRow := g_reader.Mem.ReadPtr(detailsPtr + PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+        if (firstGepl = 0 && g_reader.IsProbablyValidPointer(geplRow))
+            firstGepl := geplRow
         nm := ""
         try
         {
@@ -945,6 +948,43 @@ SkillProbeRun()
         rpt .= nl
         n += 1
     }
+
+    ; ── GE-row offset analysis — find the patched ActiveSkills-row offset ──
+    ; Name chain: GEPLRow → +0x00 → GE row → +<activeSkillOffset> → ActiveSkills
+    ; row → +0x08 DisplayedName. When a patch moves <activeSkillOffset> the names
+    ; stop resolving (UI shows "ActiveSkill offset: 0"). Scan the GE row for any
+    ; pointer leading to a readable {Id@+0x00, DisplayedName@+0x08} pair — the
+    ; matching offset is the new value for GrantedEffectsDat.ActiveSkillRowPtr.
+    if (firstGepl && g_reader.IsProbablyValidPointer(firstGepl))
+    {
+        geDat := g_reader.Mem.ReadPtr(firstGepl + PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"])
+        rpt .= nl "=== GE-row scan (firstGEPL=0x" Format("{:X}", firstGepl) " geRow=0x" Format("{:X}", geDat)
+            . " known ActiveSkillRowPtr=0x" Format("{:X}", PoE2Offsets.GrantedEffectsDat["ActiveSkillRowPtr"]) ") ===" nl
+        if g_reader.IsProbablyValidPointer(geDat)
+        {
+            so := 0x20
+            while (so <= 0x180)
+            {
+                cand := g_reader.Mem.ReadPtr(geDat + so)
+                if g_reader.IsProbablyValidPointer(cand)
+                {
+                    idP := g_reader.Mem.ReadPtr(cand + 0x00)
+                    dnP := g_reader.Mem.ReadPtr(cand + PoE2Offsets.ActiveSkillsDat["DisplayedName"])
+                    idS := g_reader.IsProbablyValidPointer(idP) ? g_reader.Mem.ReadUnicodeString(idP, 64) : ""
+                    dnS := g_reader.IsProbablyValidPointer(dnP) ? g_reader.Mem.ReadUnicodeString(dnP, 64) : ""
+                    okId := (idS != "" && !InStr(idS, "/") && !InStr(idS, "\") && !InStr(idS, ".dat") && StrLen(idS) < 60)
+                    if (okId && dnS != "")
+                        rpt .= "  +0x" Format("{:X}", so) " -> row=0x" Format("{:X}", cand) "  Id='" idS "'  Name='" dnS "'" nl
+                }
+                so += 8
+            }
+        }
+        else
+            rpt .= "  geRow INVALID -> drift is UPSTREAM: GEPLRow(0x" Format("{:X}", PoE2Offsets.ActiveSkillDetails["GrantedEffectsPerLevelDatRow"])
+                . ") or GEDatPtr(0x" Format("{:X}", PoE2Offsets.GrantedEffectsPerLevelDat["GrantedEffectDatPtr"]) ")" nl
+    }
+    else
+        rpt .= nl "(no valid GEPL row captured -> drift may be in ActiveSkills vec or GEPLRow 0x48)" nl
 
     ; ── Cooldowns vector (Actor.Cooldowns @ 0xB20) ──────────────────────────
     ; ActiveSkillCooldown: 0x08 DatId, 0x10 CooldownsList(vec), 0x30 MaxUses,

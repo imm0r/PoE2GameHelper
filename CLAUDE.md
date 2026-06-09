@@ -36,6 +36,9 @@ inline when authoring commit messages, PR bodies, etc.
 - Variable names follow the existing camelCase / snake_case style of surrounding code.
 - The user often cannot runtime-test (the game is ~140 GB). When a change can only be
   verified in-game, say so and list exactly what to check.
+- **Always end a reply that committed & pushed with the exact pull command** so the
+  user can grab it locally, e.g. `git pull origin <current-dev-branch>`. Every time a
+  change is pushed — no exceptions.
 
 ### Completion-summary format (lean, GitHub-ready)
 When wrapping up a task, output the summary as ONE copyable raw GitHub-flavored

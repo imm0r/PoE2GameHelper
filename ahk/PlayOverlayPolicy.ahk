@@ -142,8 +142,15 @@ class PlayOverlayPolicy
         if (uiElems2 && IsObject(uiElems2))
         {
             lm := uiElems2.Has("largeMapData") ? uiElems2["largeMapData"] : 0
-            if (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"])
-                mapOpen := true
+            if (lm && IsObject(lm) && lm.Has("isVisible"))
+            {
+                ; EFFECTIVE (hierarchical) visibility — a locally-flagged but
+                ; ancestor-hidden large map (e.g. in town) must NOT gate the radar
+                ; on. Falls back to the local bit if effVisible is absent.
+                lmEff := lm.Has("effVisible") ? lm["effVisible"] : lm["isVisible"]
+                if lmEff
+                    mapOpen := true
+            }
         }
         mapOpenEff := mapOpen
         if !mapOpen
