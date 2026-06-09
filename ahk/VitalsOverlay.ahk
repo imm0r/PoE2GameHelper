@@ -92,7 +92,7 @@ class VitalsBarWindow extends GdiOverlayBase
         ; town/map deliberately excluded), then the per-bar priority rule list.
         if !(ctx.gate.Has("vitalsBase") ? ctx.gate["vitalsBase"] : ctx.gate["allowedNoMap"])
             return false
-        return _VitalsRulesShow(bar, ctx.snapshot)
+        return _VitalsCondShow(bar, ctx.snapshot)
     }
 
     ; The window is exactly the bar rectangle, positioned by the bar's fraction.
@@ -313,101 +313,126 @@ _VitalsFormatLabel(bar, cur, max, pct)
     return s
 }
 
-; ── Visibility rules (per-bar priority list) ────────────────────────────────
+; ── Visibility conditions (per-bar list, drag-reorderable in the UI) ─────────
 
-; Evaluates a bar's rule list against the snapshot. Walks the rules in priority
-; order; the first enabled rule whose condition is currently true decides
-; show/hide. If none match, the bar's "otherwise" default applies.
-_VitalsRulesShow(bar, snap)
+; Evaluates a bar's condition list against the snapshot. All (or any) conditions
+; must match per the bar's "match" mode; the "outcome" then decides whether a
+; match means show or hide. An empty list matches vacuously (always shown by
+; default). Returns true when the bar should be visible.
+_VitalsCondShow(bar, snap)
 {
-    low := bar.Has("lowLifePct") ? bar["lowLifePct"] : 50
-    rules := bar.Has("rules") ? bar["rules"] : 0
-    if (rules && Type(rules) = "Array")
+    conds := bar.Has("conditions") ? bar["conditions"] : 0
+    matchAny := (bar.Has("match") && bar["match"] = "any")
+    matched := true
+    if (conds && Type(conds) = "Array" && conds.Length)
     {
-        for r in rules
+        if matchAny
         {
-            if !(IsObject(r) && r.Has("enabled") && r["enabled"])
-                continue
-            if _VitalsCondMatch(r.Has("state") ? r["state"] : "", snap, low)
-                return (r.Has("action") ? r["action"] : "show") = "show"
+            matched := false
+            for c in conds
+                if _VitalsCondMatch(c, snap)
+                {
+                    matched := true
+                    break
+                }
+        }
+        else
+        {
+            for c in conds
+                if !_VitalsCondMatch(c, snap)
+                {
+                    matched := false
+                    break
+                }
         }
     }
-    return (bar.Has("otherwise") ? bar["otherwise"] : "show") = "show"
+    showOnMatch := !(bar.Has("outcome") && bar["outcome"] = "hide")
+    return (matched = showOnMatch)
 }
 
-; Returns true when the named visibility state currently applies.
-_VitalsCondMatch(state, snap, lowLifePct)
+; Returns true when a single condition Map ({type, value}) currently applies.
+_VitalsCondMatch(c, snap)
 {
-    if (state = "town")
+    if !(IsObject(c) && c.Has("type"))
+        return false
+    type := c["type"] ""
+    if (type = "town")
     {
         wad := (snap && IsObject(snap) && snap.Has("worldAreaDat")) ? snap["worldAreaDat"] : 0
         return (wad && IsObject(wad)
             && ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))) ? true : false
     }
-    if (state = "map")
+    if (type = "map")
     {
         inGs := (snap && IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
         ui   := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
         lm   := (ui && IsObject(ui) && ui.Has("largeMapData")) ? ui["largeMapData"] : 0
         return (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"]) ? true : false
     }
-    if (state = "combat")
+    if (type = "combat")
     {
         global g_combatState
         return (IsSet(g_combatState) && g_combatState = "combat") ? true : false
     }
-    if (state = "lowlife")
+    if (type = "lowlife")
     {
         v := _VitalsValue(snap, "life")
-        return (v["max"] > 0 && v["pct"] < lowLifePct) ? true : false
+        thr := (c.Has("value") && c["value"] != "") ? Number(c["value"]) : 50
+        return (v["max"] > 0 && v["pct"] < thr) ? true : false
     }
     return false
 }
 
-; Validates a UI rule payload (Array of {state,action,enabled}) into a clean Array.
-_VitalsNormalizeRules(arr)
+; Validates a UI/import condition payload (Array of {type,value}) into a clean Array.
+_VitalsNormalizeConds(arr)
 {
     out := []
     if !(arr && Type(arr) = "Array")
-        return _VitalsDefaultRules()
+        return out
     static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
-    for r in arr
+    for c in arr
     {
-        if !(IsObject(r) && r.Has("state") && valid.Has(r["state"] ""))
+        if !(IsObject(c) && c.Has("type") && valid.Has(c["type"] ""))
             continue
-        out.Push(Map(
-            "state",   r["state"] "",
-            "action",  (r.Has("action") && r["action"] = "hide") ? "hide" : "show",
-            "enabled", (r.Has("enabled") && r["enabled"]) ? true : false))
+        m := Map("type", c["type"] "")
+        if (m["type"] = "lowlife")
+            m["value"] := (c.Has("value") && c["value"] != "") ? Min(100, Max(1, Integer(c["value"]))) : 50
+        out.Push(m)
     }
-    return out.Length ? out : _VitalsDefaultRules()
-}
-
-; Serialises a rule list to a compact INI string: "state|action|enabled,...".
-_VitalsRulesToStr(rules)
-{
-    parts := []
-    if (rules && Type(rules) = "Array")
-        for r in rules
-            parts.Push(r["state"] "|" r["action"] "|" (r["enabled"] ? "1" : "0"))
-    out := ""
-    for p in parts
-        out .= (out = "" ? "" : ",") p
     return out
 }
 
-; Parses the compact INI string back into a rule list.
-_VitalsRulesFromStr(s)
+; Serialises a condition list to a compact INI string: "type:value,type,...".
+_VitalsCondsToStr(conds)
+{
+    out := ""
+    if (conds && Type(conds) = "Array")
+        for c in conds
+        {
+            tok := c["type"]
+            if (c.Has("value"))
+                tok .= ":" c["value"]
+            out .= (out = "" ? "" : ",") tok
+        }
+    return out
+}
+
+; Parses the compact INI string back into a condition list.
+_VitalsCondsFromStr(s)
 {
     out := []
     static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
     for tok in StrSplit(Trim(s), ",")
     {
-        f := StrSplit(Trim(tok), "|")
-        if (f.Length >= 3 && valid.Has(f[1]))
-            out.Push(Map("state", f[1], "action", (f[2] = "hide") ? "hide" : "show", "enabled", (f[3] = "1")))
+        f := StrSplit(Trim(tok), ":")
+        if (f.Length < 1 || !valid.Has(f[1]))
+            continue
+        m := Map("type", f[1])
+        if (f[1] = "lowlife")
+            m["value"] := (f.Length >= 2 && f[2] != "") ? Min(100, Max(1, Integer(f[2]))) : 50
+        out.Push(m)
     }
-    return out.Length ? out : _VitalsDefaultRules()
+    return out
 }
 
 ; ── Config (self-persist [Vitals]) ──────────────────────────────────────────
@@ -418,18 +443,7 @@ _VitalsDefaultBar(enabled, xPct, yPct, w, h, fg, bg, outline)
     return Map("enabled", enabled, "xPct", xPct, "yPct", yPct, "w", w, "h", h
              , "fg", fg, "bg", bg, "outline", outline, "opacity", 100
              , "tCur", true, "tMax", true, "tPct", true
-             , "rules", _VitalsDefaultRules(), "otherwise", "show", "lowLifePct", 50)
-}
-
-; Default visibility rule list (priority order, all disabled -> behaves like
-; "always visible in-game" until the user enables/reorders them).
-_VitalsDefaultRules()
-{
-    return [
-        Map("state", "combat",  "action", "show", "enabled", false),
-        Map("state", "lowlife", "action", "show", "enabled", false),
-        Map("state", "town",    "action", "show", "enabled", false),
-        Map("state", "map",     "action", "show", "enabled", false)]
+             , "conditions", [], "match", "all", "outcome", "show")
 }
 
 ; Seeds the vitals globals with defaults (unconditionally, per the AHK v2 init
@@ -462,11 +476,9 @@ LoadVitalsConfig()
         bar["tCur"]    := (IniRead(f, "Vitals", pre "tCur", bar["tCur"] ? "1" : "0") = "1")
         bar["tMax"]    := (IniRead(f, "Vitals", pre "tMax", bar["tMax"] ? "1" : "0") = "1")
         bar["tPct"]    := (IniRead(f, "Vitals", pre "tPct", bar["tPct"] ? "1" : "0") = "1")
-        bar["otherwise"]  := (IniRead(f, "Vitals", pre "otherwise", bar["otherwise"]) = "hide") ? "hide" : "show"
-        bar["lowLifePct"] := Min(100, Max(1, Integer(IniRead(f, "Vitals", pre "lowLifePct", bar["lowLifePct"]))))
-        rulesStr := IniRead(f, "Vitals", pre "rules", "")
-        if (rulesStr != "")
-            bar["rules"] := _VitalsRulesFromStr(rulesStr)
+        bar["match"]   := (IniRead(f, "Vitals", pre "match", bar["match"]) = "any") ? "any" : "all"
+        bar["outcome"] := (IniRead(f, "Vitals", pre "outcome", bar["outcome"]) = "hide") ? "hide" : "show"
+        bar["conditions"] := _VitalsCondsFromStr(IniRead(f, "Vitals", pre "conds", ""))
     }
 }
 
@@ -490,9 +502,9 @@ SaveVitalsConfig()
         IniWrite(bar["tCur"] ? "1" : "0", f, "Vitals", pre "tCur")
         IniWrite(bar["tMax"] ? "1" : "0", f, "Vitals", pre "tMax")
         IniWrite(bar["tPct"] ? "1" : "0", f, "Vitals", pre "tPct")
-        IniWrite(bar.Has("otherwise") ? bar["otherwise"] : "show", f, "Vitals", pre "otherwise")
-        IniWrite(bar.Has("lowLifePct") ? bar["lowLifePct"] : 50, f, "Vitals", pre "lowLifePct")
-        IniWrite(_VitalsRulesToStr(bar.Has("rules") ? bar["rules"] : []), f, "Vitals", pre "rules")
+        IniWrite(bar.Has("match") ? bar["match"] : "all", f, "Vitals", pre "match")
+        IniWrite(bar.Has("outcome") ? bar["outcome"] : "show", f, "Vitals", pre "outcome")
+        IniWrite(_VitalsCondsToStr(bar.Has("conditions") ? bar["conditions"] : []), f, "Vitals", pre "conds")
     }
 }
 
@@ -545,12 +557,12 @@ _ApplyVitals(payload)
             bar["tMax"] := p["tMax"] ? true : false
         if (p.Has("tPct"))
             bar["tPct"] := p["tPct"] ? true : false
-        if (p.Has("otherwise"))
-            bar["otherwise"] := (p["otherwise"] = "hide") ? "hide" : "show"
-        if (p.Has("lowLifePct"))
-            bar["lowLifePct"] := Min(100, Max(1, Integer(p["lowLifePct"])))
-        if (p.Has("rules") && Type(p["rules"]) = "Array")
-            bar["rules"] := _VitalsNormalizeRules(p["rules"])
+        if (p.Has("match"))
+            bar["match"] := (p["match"] = "any") ? "any" : "all"
+        if (p.Has("outcome"))
+            bar["outcome"] := (p["outcome"] = "hide") ? "hide" : "show"
+        if (p.Has("conditions") && Type(p["conditions"]) = "Array")
+            bar["conditions"] := _VitalsNormalizeConds(p["conditions"])
     }
 }
 
@@ -562,6 +574,28 @@ BuildVitalsHeaderJson()
         return "{}"
     return JsonFull_Stringify(Map("bars", g_vitalsBars
         , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false), false)
+}
+
+; Imports a bar's visibility config ({conditions, match, outcome}) from a
+; user-picked JSON file (reuses the hotkeys export folder / file picker) and
+; applies it to the given bar, then persists and refreshes the UI header.
+_ImportVitalsVisibility(barId)
+{
+    global g_vitalsBars
+    if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && g_vitalsBars.Has(barId))
+        return
+    parsed := _HotkeysPickAndParse("Import bar visibility")
+    if !(parsed is Map)
+        return
+    bar := g_vitalsBars[barId]
+    if (parsed.Has("conditions") && parsed["conditions"] is Array)
+        bar["conditions"] := _VitalsNormalizeConds(parsed["conditions"])
+    if (parsed.Has("match"))
+        bar["match"] := (parsed["match"] = "any") ? "any" : "all"
+    if (parsed.Has("outcome"))
+        bar["outcome"] := (parsed["outcome"] = "hide") ? "hide" : "show"
+    SaveVitalsConfig()
+    PushHeaderToWebView()
 }
 
 ; Sets (or toggles, when val is "") the drag-to-place edit mode.

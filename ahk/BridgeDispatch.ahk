@@ -133,6 +133,10 @@ _DispatchBridgeCall(method, args)
         case "ToggleVitalsEdit":
             ToggleVitalsEditMode((args.Length >= 1) ? args[1] : "")
             SetTimer(PushHeaderToWebView, -50)
+        case "ImportVitalsVisibility":
+            ivb := (args.Length >= 1) ? args[1] : ""
+            if (ivb != "")
+                SetTimer(() => _ImportVitalsVisibility(ivb), -1)
         case "DecodeComponent":
             ; Lazy-decode a single component for the Entity Inspector. The
             ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine

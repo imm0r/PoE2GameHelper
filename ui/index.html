@@ -5295,8 +5295,7 @@
         #panel-config .vrule-act { cursor: pointer; font-size: 11px; padding: 1px 9px; border-radius: 3px; border: 1px solid var(--codex-rule); user-select: none; }
         #panel-config .vact-show { color: #9fe6a0; border-color: rgba(80,160,80,0.5); }
         #panel-config .vact-hide { color: #e69f9f; border-color: rgba(160,80,80,0.5); }
-        #panel-config .vrule-ord { display: inline-flex; flex-direction: column; width: 15px; height: 20px; overflow: hidden; border-radius: 2px; }
-        #panel-config .vrule-ord .hk-num-btn { border: 1px solid rgba(90,62,34,0.6); }
+        #panel-config .vcond-add { padding: 3px 6px; font-size: 12px; background: var(--codex-bg-soft, #20140c); color: var(--codex-text); border: 1px solid var(--codex-rule); border-radius: 3px; }
         /* Caption next to a pill toggle — carries the text style the old
            wrapping label element used to provide, now that the switch is a .toggle. */
         #panel-hotkeys .hk-cap {
@@ -9370,15 +9369,23 @@
               </div>
               <div class="cfg-row" style="align-items:flex-start"><span class="cfg-label">Visibility state</span>
                 <div style="flex:1;min-width:0">
-                  <div id="vrules-${id}"></div>
-                  <div class="vrule" style="margin-top:6px">
-                    <span class="vrule-name">Otherwise</span>
-                    <span class="vrule-act vact-show" id="vother-${id}" onclick="vitalsOtherToggle('${id}')">Show</span>
-                    <span style="font-size:11px;color:var(--subtext);margin-left:14px">Low&nbsp;Life&nbsp;&lt;</span>
-                    ${_vNum(id, 'lowLifePct', 1, 100, 1)}<span style="color:var(--subtext);font-size:11px">%</span>
+                  <div id="vconds-${id}"></div>
+                  <div class="vrule" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+                    <select id="vaddc-${id}" class="vcond-add">
+                      <option value="combat">In Combat</option>
+                      <option value="lowlife">On Low Life</option>
+                      <option value="town">In Town/Hideout</option>
+                      <option value="map">While Map open</option>
+                    </select>
+                    <button class="hk-btn" title="Add the selected condition to this bar" onclick="vitalsAddCond('${id}')">+ Condition</button>
+                    <span style="flex:1 1 auto"></span>
+                    <span class="vrule-act" id="vmatch-${id}" title="All listed conditions must match / any one is enough" onclick="vitalsToggleMatch('${id}')">Match All</span>
+                    <span class="vrule-act vact-show" id="vout-${id}" title="Whether a match shows or hides the bar" onclick="vitalsToggleOutcome('${id}')">Show</span>
+                    <button class="hk-btn" title="Export this bar's visibility to hotkeys_export/" onclick="vitalsExportVis('${id}')">⤓</button>
+                    <button class="hk-btn" title="Import visibility from a JSON file in hotkeys_export/" onclick="ahkCall('ImportVitalsVisibility','${id}')">⤒</button>
                   </div>
-                  <div class="cfg-help">Top rule wins: the first enabled rule whose state is active
-                    decides show/hide; if none match, “Otherwise” applies. Use ▲▼ to reorder.</div>
+                  <div class="cfg-help">Bar shows when its conditions match (Match&nbsp;All/Any); no
+                    conditions = always shown. Drag&nbsp;⠿ to reorder.</div>
                 </div>
               </div>
             </div>
@@ -9391,59 +9398,107 @@
       if (!host) return;
       host.innerHTML = VITALS_BARS.map(([id, label]) => _vBarSectionHtml(id, label)).join('');
       _vitalsBuilt = true;
-      for (const [id] of VITALS_BARS) renderVitalsRules(id);
+      for (const [id] of VITALS_BARS) renderVitalsConds(id);
     }
 
-    // ── Per-bar visibility rule list ───────────────────────────────────
-    const VSTATE_LABELS = { combat: 'In Combat', lowlife: 'On Low Life', town: 'In Town/Hideout', map: 'While Map open' };
-    const _vRulesSig = {};
+    // ── Per-bar visibility condition list (drag&drop, add/remove, import/export) ──
+    const VCOND_LABELS = { combat: 'In Combat', lowlife: 'On Low Life', town: 'In Town/Hideout', map: 'While Map open' };
+    const _vCondSig = {};
 
-    function _vRulesArr(id) {
+    function _vCondArr(id) {
       const b = _vitalsCfg.bars[id]; if (!b) return null;
-      if (!Array.isArray(b.rules)) b.rules = [];
-      return b.rules;
+      if (!Array.isArray(b.conditions)) b.conditions = [];
+      return b.conditions;
     }
-    function renderVitalsRules(id) {
-      const host = document.getElementById('vrules-' + id);
+    // A themed ▲▼ stepper for the Low-Life threshold (reuses hkNumStep).
+    function _vCondStepper(id, i, val) {
+      return `<span class="hk-num"><input type="number" min="1" max="100" step="1" value="${val}"`
+           + ` onchange="vitalsSetCondVal('${id}',${i},this.value)">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    function renderVitalsConds(id) {
+      const host = document.getElementById('vconds-' + id);
       if (!host) return;
-      const rules = _vRulesArr(id) || [];
-      host.innerHTML = rules.map((r, i) => {
-        const lbl = VSTATE_LABELS[r.state] || r.state;
-        const act = (r.action === 'hide') ? 'Hide' : 'Show';
-        return `<div class="vrule">`
-          + `<label class="toggle"><input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="vitalsRuleSet('${id}',${i},'enabled',this.checked)"><span class="toggle-slider"></span></label>`
-          + `<span class="vrule-name">${lbl}</span>`
-          + `<span class="vrule-act ${r.action === 'hide' ? 'vact-hide' : 'vact-show'}" onclick="vitalsRuleAction('${id}',${i})">${act}</span>`
-          + `<span class="vrule-ord"><button type="button" tabindex="-1" class="hk-num-btn" onclick="vitalsRuleMove('${id}',${i},-1)">▲</button>`
-          + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="vitalsRuleMove('${id}',${i},1)">▼</button></span>`
+      const conds = _vCondArr(id) || [];
+      host.innerHTML = conds.length ? conds.map((c, i) => {
+        const lbl = VCOND_LABELS[c.type] || c.type;
+        const extra = (c.type === 'lowlife')
+          ? ` <span style="color:var(--subtext);font-size:11px">Life&nbsp;&lt;</span> ${_vCondStepper(id, i, c.value ?? 50)} <span style="color:var(--subtext);font-size:11px">%</span>`
+          : '';
+        return `<div class="vrule" ondragover="vCondDragOver(event)" ondragleave="vCondDragLeave(event)" ondrop="vCondDrop(event,'${id}',${i})">`
+          + `<span class="hk-grip" draggable="true" title="Drag to reorder" ondragstart="vCondDragStart(event,'${id}',${i})" ondragend="vCondDragEnd(event)">⠿</span>`
+          + `<span class="vrule-name" style="min-width:0">${lbl}</span>${extra}`
+          + `<span style="flex:1 1 auto"></span>`
+          + `<button class="hk-btn danger" title="Remove this condition" onclick="vitalsDelCond('${id}',${i})">✕</button>`
           + `</div>`;
-      }).join('');
-      const ot = document.getElementById('vother-' + id);
-      if (ot) {
-        const hide = _vitalsCfg.bars[id] && _vitalsCfg.bars[id].otherwise === 'hide';
-        ot.textContent = hide ? 'Hide' : 'Show';
-        ot.className = 'vrule-act ' + (hide ? 'vact-hide' : 'vact-show');
+      }).join('') : `<div class="cfg-help" style="margin:2px 0">No conditions — bar is always shown.</div>`;
+      const mEl = document.getElementById('vmatch-' + id);
+      if (mEl) mEl.textContent = (_vitalsCfg.bars[id] && _vitalsCfg.bars[id].match === 'any') ? 'Match Any' : 'Match All';
+      const oEl = document.getElementById('vout-' + id);
+      if (oEl) {
+        const hide = _vitalsCfg.bars[id] && _vitalsCfg.bars[id].outcome === 'hide';
+        oEl.textContent = hide ? 'Hide' : 'Show';
+        oEl.className = 'vrule-act ' + (hide ? 'vact-hide' : 'vact-show');
       }
     }
-    function vitalsRuleSet(id, idx, field, val) {
-      const a = _vRulesArr(id); if (!a || !a[idx]) return;
-      a[idx][field] = val; vitalsPush();
+    function vitalsAddCond(id) {
+      const a = _vCondArr(id); if (!a) return;
+      const sel = document.getElementById('vaddc-' + id);
+      const type = sel ? sel.value : 'combat';
+      const c = { type };
+      if (type === 'lowlife') c.value = 50;
+      a.push(c);
+      renderVitalsConds(id); vitalsPush();
     }
-    function vitalsRuleAction(id, idx) {
-      const a = _vRulesArr(id); if (!a || !a[idx]) return;
-      a[idx].action = (a[idx].action === 'hide') ? 'show' : 'hide';
-      renderVitalsRules(id); vitalsPush();
+    function vitalsDelCond(id, idx) {
+      const a = _vCondArr(id); if (!a || idx < 0 || idx >= a.length) return;
+      a.splice(idx, 1);
+      renderVitalsConds(id); vitalsPush();
     }
-    function vitalsRuleMove(id, idx, dir) {
-      const a = _vRulesArr(id); if (!a) return;
-      const j = idx + dir; if (j < 0 || j >= a.length) return;
-      const t = a[idx]; a[idx] = a[j]; a[j] = t;
-      renderVitalsRules(id); vitalsPush();
+    function vitalsSetCondVal(id, idx, val) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].value = Math.min(100, Math.max(1, Math.round(+val) || 50));
+      vitalsPush();
     }
-    function vitalsOtherToggle(id) {
+    function vitalsToggleMatch(id) {
       const b = _vitalsCfg.bars[id]; if (!b) return;
-      b.otherwise = (b.otherwise === 'hide') ? 'show' : 'hide';
-      renderVitalsRules(id); vitalsPush();
+      b.match = (b.match === 'any') ? 'all' : 'any';
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsToggleOutcome(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return;
+      b.outcome = (b.outcome === 'hide') ? 'show' : 'hide';
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsExportVis(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return;
+      const obj = { conditions: Array.isArray(b.conditions) ? b.conditions : [], match: b.match || 'all', outcome: b.outcome || 'show' };
+      ahkCall('ExportHotkeysItem', 'vitalsvis', id + '_visibility', JSON.stringify(obj, null, 2));
+    }
+
+    // ── Condition drag & drop (reorders within one bar) ─────────────────
+    let _vCondDrag = null;   // { id, idx }
+    function vCondDragStart(e, id, idx) {
+      _vCondDrag = { id, idx };
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', 'vcond'); } catch (_) {}
+    }
+    function vCondDragEnd(e) { _vCondDrag = null; document.querySelectorAll('.hk-dragover').forEach(el => el.classList.remove('hk-dragover')); }
+    function vCondDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('hk-dragover'); }
+    function vCondDragLeave(e) { e.currentTarget.classList.remove('hk-dragover'); }
+    function vCondDrop(e, id, idx) {
+      e.preventDefault(); e.currentTarget.classList.remove('hk-dragover');
+      if (!_vCondDrag || _vCondDrag.id !== id) { _vCondDrag = null; return; }
+      const a = _vCondArr(id); if (!a) { _vCondDrag = null; return; }
+      const from = _vCondDrag.idx;
+      _vCondDrag = null;
+      if (from === idx || from < 0 || from >= a.length) return;
+      const item = a.splice(from, 1)[0];
+      a.splice(idx, 0, item);
+      renderVitalsConds(id); vitalsPush();
     }
 
     function _vSwatch(id, key, rgb) {
@@ -9472,14 +9527,13 @@
         set('y', +(((b.yPct ?? 0) * 100).toFixed(1)));
         set('opacity', Math.round(b.opacity ?? 100));
         const ov = document.getElementById('v-' + id + '-opval'); if (ov) ov.textContent = Math.round(b.opacity ?? 100) + '%';
-        set('lowLifePct', Math.round(b.lowLifePct ?? 50));
         set('tCur', b.tCur, true);
         set('tMax', b.tMax, true);
         set('tPct', b.tPct, true);
         _vSwatch(id, 'fg', b.fg); _vSwatch(id, 'bg', b.bg); _vSwatch(id, 'outline', b.outline);
-        // Re-render the rule pills only when the rule set actually changed (avoids churn).
-        const sig = JSON.stringify((b.rules || []).map(r => [r.state, r.action, !!r.enabled])) + '|' + (b.otherwise || 'show');
-        if (_vRulesSig[id] !== sig) { _vRulesSig[id] = sig; renderVitalsRules(id); }
+        // Re-render the condition list only when it actually changed (avoids churn).
+        const sig = JSON.stringify((b.conditions || []).map(c => [c.type, c.value ?? ''])) + '|' + (b.match || 'all') + '|' + (b.outcome || 'show');
+        if (_vCondSig[id] !== sig) { _vCondSig[id] = sig; renderVitalsConds(id); }
       }
     }
 
@@ -9496,21 +9550,22 @@
           xPct: (+(g('x') && g('x').value !== '' ? g('x').value : (cur.xPct ?? 0) * 100)) / 100,
           yPct: (+(g('y') && g('y').value !== '' ? g('y').value : (cur.yPct ?? 0) * 100)) / 100,
           opacity: +(g('opacity') && g('opacity').value !== '' ? g('opacity').value : (cur.opacity ?? 100)),
-          lowLifePct: +(g('lowLifePct') && g('lowLifePct').value !== '' ? g('lowLifePct').value : (cur.lowLifePct ?? 50)),
-          otherwise: (cur.otherwise === 'hide') ? 'hide' : 'show',
+          match: (cur.match === 'any') ? 'any' : 'all',
+          outcome: (cur.outcome === 'hide') ? 'hide' : 'show',
           tCur: g('tCur') ? g('tCur').checked : cur.tCur,
           tMax: g('tMax') ? g('tMax').checked : cur.tMax,
           tPct: g('tPct') ? g('tPct').checked : cur.tPct,
         };
-        if (Array.isArray(cur.rules))
-          bar.rules = cur.rules.map(r => ({ state: r.state, action: r.action, enabled: !!r.enabled }));
+        bar.conditions = Array.isArray(cur.conditions)
+          ? cur.conditions.map(c => (c.type === 'lowlife' ? { type: 'lowlife', value: +(c.value ?? 50) } : { type: c.type }))
+          : [];
         if (cur.fg) bar.fg = cur.fg;
         if (cur.bg) bar.bg = cur.bg;
         if (cur.outline) bar.outline = cur.outline;
         payload[id] = bar;
         _vitalsCfg.bars[id] = Object.assign(_vitalsCfg.bars[id] || {}, bar);
         // keep the sig in step with what we just sent so the header echo doesn't re-render
-        _vRulesSig[id] = JSON.stringify((bar.rules || []).map(r => [r.state, r.action, !!r.enabled])) + '|' + bar.otherwise;
+        _vCondSig[id] = JSON.stringify(bar.conditions.map(c => [c.type, c.value ?? ''])) + '|' + bar.match + '|' + bar.outcome;
       }
       clearTimeout(_vitalsPushTimer);
       _vitalsPushTimer = setTimeout(() => ahkCall('SetVitals', payload), 120);
