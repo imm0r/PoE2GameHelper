@@ -1076,8 +1076,8 @@ class PoE2ComponentDecoders
             return knownOff
 
         ; Phase 1: Dat-name scan — look for "ActiveSkills" string ref at offset+8
-        off := 0x40
-        while (off <= 0xC0)
+        off := 0x20
+        while (off <= 0x180)
         {
             try
             {
@@ -1104,8 +1104,8 @@ class PoE2ComponentDecoders
         }
 
         ; Phase 2: Fallback — try reading the full chain at each offset
-        off := 0x40
-        while (off <= 0xC0)
+        off := 0x20
+        while (off <= 0x180)
         {
             asInfo := this._TryReadActiveSkillRow(grantedEffectDatPtr, off)
             if (asInfo["displayName"] != "")
