@@ -27,10 +27,16 @@ class VitalsOverlay extends GdiOverlayBase
     ; Edit mode forces it visible so bars can be placed even with the game blurred.
     ShouldShow(ctx)
     {
-        global g_playerHudEnabled, g_vitalsEditMode
+        global g_playerHudEnabled, g_vitalsEditMode, g_vitalsVisibility
         if (IsSet(g_vitalsEditMode) && g_vitalsEditMode)
             return (ctx.gwW > 100 && ctx.gwH > 100)
-        return ctx.gate["allowed"] && (IsSet(g_playerHudEnabled) ? g_playerHudEnabled : true)
+        if !(IsSet(g_playerHudEnabled) ? g_playerHudEnabled : true)
+            return false
+        ; Visibility mode: "map" = only with the large map open (shares the radar
+        ; gate); "ingame" (default) = visible during combat (no map requirement).
+        mode    := IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"
+        gateKey := (mode = "map") ? "allowed" : "allowedNoMap"
+        return ctx.gate.Has(gateKey) ? ctx.gate[gateKey] : ctx.gate["allowed"]
     }
 
     ; Vitals draw across the whole game window so bars can sit anywhere.
@@ -166,8 +172,9 @@ _VitalsDefaultBar(enabled, xPct, yPct, w, h, fg, bg, outline)
 ; gotcha), then overlays any persisted values from poeformance_config.ini [Vitals].
 LoadVitalsConfig()
 {
-    global g_vitalsEditMode, g_vitalsBars
+    global g_vitalsEditMode, g_vitalsBars, g_vitalsVisibility
     g_vitalsEditMode := false
+    g_vitalsVisibility := "ingame"   ; "ingame" (combat) | "map" (only with large map open)
     ; Default layout: three stacked bars near the top-centre (mirrors the old HUD).
     g_vitalsBars := Map(
         "life", _VitalsDefaultBar(true, 0.430, 0.020, 220, 16, "#DD2222", "#221010", "#555555"),
@@ -177,6 +184,8 @@ LoadVitalsConfig()
     f := _ConfigPath()
     if !FileExist(f)
         return
+    vis := IniRead(f, "Vitals", "visibility", g_vitalsVisibility)
+    g_vitalsVisibility := (vis = "map") ? "map" : "ingame"
     for id, bar in g_vitalsBars
     {
         pre := id "_"
@@ -197,8 +206,9 @@ LoadVitalsConfig()
 ; Writes the current vitals config to poeformance_config.ini [Vitals].
 SaveVitalsConfig()
 {
-    global g_vitalsBars
+    global g_vitalsBars, g_vitalsVisibility
     f := _ConfigPath()
+    IniWrite(IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame", f, "Vitals", "visibility")
     for id, bar in g_vitalsBars
     {
         pre := id "_"
@@ -233,9 +243,14 @@ _VitalsHex(v, fallback)
 ; Only known keys are copied, with clamping, so a bad value can't corrupt a bar.
 _ApplyVitals(payload)
 {
-    global g_vitalsBars
+    global g_vitalsBars, g_vitalsVisibility
     if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && payload && IsObject(payload))
         return
+    if payload.Has("visibility")
+    {
+        v := payload["visibility"] ""
+        g_vitalsVisibility := (v = "map") ? "map" : "ingame"
+    }
     for id, bar in g_vitalsBars
     {
         if !(payload.Has(id) && IsObject(payload[id]))
@@ -258,11 +273,12 @@ _ApplyVitals(payload)
 ; Serialises the vitals config (bars + edit-mode flag) for the WebView header push.
 BuildVitalsHeaderJson()
 {
-    global g_vitalsBars, g_vitalsEditMode
+    global g_vitalsBars, g_vitalsEditMode, g_vitalsVisibility
     if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
         return "{}"
     return JsonFull_Stringify(Map("bars", g_vitalsBars
-        , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false), false)
+        , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false
+        , "visibility", IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"), false)
 }
 
 ; Sets (or toggles, when val is "") the drag-to-place edit mode. The interactive

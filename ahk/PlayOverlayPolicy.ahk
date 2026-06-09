@@ -1,11 +1,13 @@
 ; PlayOverlayPolicy.ahk
-; Single source of truth for "should the play overlays (radar + player HUD) be
-; visible this tick". Ported verbatim from the inlined gate that used to live in
-; UpdateRadarFast (AutoFlask.ahk): the six in-game conditions, the panel-open
-; debounce, the GC-sensitive grace for no-largemap / no-player, the UI-browser
-; inspect override and the foreground gate. Owns the small amount of persistent
-; debounce/grace state across ticks, so the manager can stay stateless.
-; Included by InGameStateMonitor.ahk (before OverlayManager).
+; Single source of truth for play-overlay visibility. Evaluates the in-game gate
+; once per tick and returns TWO results so different overlays can pick their policy:
+;   - "allowed"      : full gate INCLUDING the large-map-open requirement (radar).
+;   - "allowedNoMap" : same gate WITHOUT the large-map requirement (vitals bars,
+;                      which a player wants visible during combat, not only on the map).
+; Ported from the gate that used to live inline in UpdateRadarFast: the six in-game
+; conditions, the panel-open debounce, separate GC-grace for no-largemap / no-player,
+; the UI-browser inspect override and the foreground gate. Owns the debounce/grace
+; state across ticks. Included by InGameStateMonitor.ahk (before OverlayManager).
 
 class PlayOverlayPolicy
 {
@@ -14,20 +16,22 @@ class PlayOverlayPolicy
 
     __New()
     {
-        this._condHideTick       := 0   ; A_TickCount when a GC-sensitive hide reason first appeared
+        this._mapHideTick        := 0   ; A_TickCount when large map first read as closed
+        this._playerHideTick     := 0   ; A_TickCount when player-render first read as missing
         this._panelOpenSinceTick := 0   ; A_TickCount when a panel was first detected open
     }
 
-    ; Evaluates the gate for this tick. Returns Map("allowed", bool, "reason", str).
+    ; Evaluates the gate for this tick.
+    ; Returns Map("allowed", bool, "allowedNoMap", bool, "reason", str).
     ; ctx must have: snapshot, currentState, gameActive, keepWhenBackground, inspectOverride.
     Evaluate(ctx)
     {
-        snap    := ctx.snapshot
-        allowed := true
-        reason  := ""
-
+        snap := ctx.snapshot
         if !(snap && IsObject(snap))
-            return Map("allowed", false, "reason", "no-snapshot")
+            return Map("allowed", false, "allowedNoMap", false, "reason", "no-snapshot")
+
+        core   := true   ; conditions 1,2,3,5,6 (everything except the large map)
+        reason := ""
 
         ; ── Condition 1: reject states that definitely have no player/area ──
         static nonGameStates := Map(
@@ -37,24 +41,24 @@ class PlayOverlayPolicy
             "CreditsState", true, "LoadingState", true)
         if nonGameStates.Has(ctx.currentState)
         {
-            allowed := false
-            reason  := "not-ingame(" ctx.currentState ")"
+            core   := false
+            reason := "not-ingame(" ctx.currentState ")"
         }
 
         ; ── Condition 2: not town or hideout ──
-        if allowed
+        if core
         {
             wad := snap.Has("worldAreaDat") ? snap["worldAreaDat"] : 0
             if (wad && IsObject(wad)
                 && ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"])))
             {
-                allowed := false
-                reason  := "town-hideout"
+                core   := false
+                reason := "town-hideout"
             }
         }
 
         ; ── Condition 3: player must be alive ──
-        if allowed
+        if core
         {
             pv := snap.Has("playerVitals") ? snap["playerVitals"] : 0
             if (pv && IsObject(pv) && pv.Has("stats"))
@@ -62,33 +66,14 @@ class PlayOverlayPolicy
                 st := pv["stats"]
                 if (st.Has("isAlive") && !st["isAlive"])
                 {
-                    allowed := false
-                    reason  := "dead"
+                    core   := false
+                    reason := "dead"
                 }
             }
         }
 
-        ; ── Condition 4: large map must be visible (overlay draws on the large map) ──
-        if allowed
-        {
-            inGs    := snap.Has("inGameState") ? snap["inGameState"] : 0
-            uiElems := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
-            largeMapOpen := false
-            if (uiElems && IsObject(uiElems))
-            {
-                lm := uiElems.Has("largeMapData") ? uiElems["largeMapData"] : 0
-                if (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"])
-                    largeMapOpen := true
-            }
-            if !largeMapOpen
-            {
-                allowed := false
-                reason  := "no-largemap"
-            }
-        }
-
         ; ── Condition 5: no game panel open + chat not active (panel debounced) ──
-        if allowed
+        if core
         {
             panelVis      := snap.Has("panelVisibility") ? snap["panelVisibility"] : 0
             panelDetected := (panelVis && IsObject(panelVis) && panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
@@ -98,7 +83,7 @@ class PlayOverlayPolicy
                     this._panelOpenSinceTick := A_TickCount
                 if ((A_TickCount - this._panelOpenSinceTick) >= PlayOverlayPolicy.PANEL_DEBOUNCE_MS)
                 {
-                    allowed  := false
+                    core     := false
                     newlyVis := panelVis.Has("newlyVisible") ? panelVis["newlyVisible"] : 0
                     reason   := "panel-open(" newlyVis " new)"
                 }
@@ -108,68 +93,85 @@ class PlayOverlayPolicy
                 this._panelOpenSinceTick := 0
             }
 
-            if allowed
+            if core
             {
                 inGs    := snap.Has("inGameState") ? snap["inGameState"] : 0
                 uiElems := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
                 if (uiElems && IsObject(uiElems) && uiElems.Has("isChatActive") && uiElems["isChatActive"])
                 {
-                    allowed := false
-                    reason  := "chat-active"
+                    core   := false
+                    reason := "chat-active"
                 }
             }
         }
 
-        ; ── Condition 6: player render component present (truly in-game) ──
-        if allowed
+        ; ── Condition 6: player render component present (truly in-game), with grace ──
+        if core
         {
             inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
             area := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
             playerRender := (area && IsObject(area) && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
             if !playerRender
             {
-                allowed := false
-                reason  := "no-player"
+                core   := false
+                reason := "no-player"
             }
         }
+        ; no-player grace (GC briefly drops the component)
+        if (!core && reason = "no-player")
+        {
+            if (this._playerHideTick = 0)
+                this._playerHideTick := A_TickCount
+            if ((A_TickCount - this._playerHideTick) < PlayOverlayPolicy.GRACE_MS)
+            {
+                core   := true
+                reason := "grace(no-player)"
+            }
+            else
+                this._playerHideTick := 0
+        }
+        else if core
+        {
+            this._playerHideTick := 0
+        }
+
+        ; ── Condition 4: large map visible (radar only), with its own grace ──
+        mapOpen := false
+        inGs2    := snap.Has("inGameState") ? snap["inGameState"] : 0
+        uiElems2 := (inGs2 && IsObject(inGs2) && inGs2.Has("importantUiElements")) ? inGs2["importantUiElements"] : 0
+        if (uiElems2 && IsObject(uiElems2))
+        {
+            lm := uiElems2.Has("largeMapData") ? uiElems2["largeMapData"] : 0
+            if (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"])
+                mapOpen := true
+        }
+        mapOpenEff := mapOpen
+        if !mapOpen
+        {
+            if (this._mapHideTick = 0)
+                this._mapHideTick := A_TickCount
+            if ((A_TickCount - this._mapHideTick) < PlayOverlayPolicy.GRACE_MS)
+                mapOpenEff := true   ; within grace — treat as still open
+        }
+        else
+            this._mapHideTick := 0
 
         ; ── UI-browser inspect mode overrides all hide conditions ──
         if ctx.inspectOverride
         {
-            allowed := true
-            reason  := "ui-inspect"
-        }
-
-        ; ── Grace for GC-sensitive negatives (no-largemap / no-player) ──
-        if !allowed
-        {
-            if (reason = "no-largemap" || reason = "no-player")
-            {
-                if (this._condHideTick = 0)
-                    this._condHideTick := A_TickCount
-                if ((A_TickCount - this._condHideTick) < PlayOverlayPolicy.GRACE_MS)
-                {
-                    allowed := true              ; within grace — keep showing with last data
-                    reason  := "grace(" reason ")"
-                }
-                else
-                {
-                    this._condHideTick := 0
-                }
-            }
-        }
-        else
-        {
-            this._condHideTick := 0
+            core       := true
+            mapOpenEff := true
+            reason     := "ui-inspect"
         }
 
         ; ── Foreground gate (applied after the snapshot gate, like the original) ──
-        if (allowed && !(ctx.gameActive || ctx.keepWhenBackground))
-        {
-            allowed := false
-            reason  := "not-foreground"
-        }
+        foreground := (ctx.gameActive || ctx.keepWhenBackground)
 
-        return Map("allowed", allowed, "reason", reason)
+        allowedNoMap := core && foreground
+        allowed      := core && mapOpenEff && foreground
+        if (core && !foreground)
+            reason := "not-foreground"
+
+        return Map("allowed", allowed, "allowedNoMap", allowedNoMap, "reason", reason)
     }
 }
