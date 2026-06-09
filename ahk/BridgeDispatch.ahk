@@ -126,6 +126,17 @@ _DispatchBridgeCall(method, args)
                 _ApplyAlertSetting(args[1], args[2])
             SaveEntityAlertsConfig()
             SetTimer(PushHeaderToWebView, -50)
+        case "SetVitals":
+            _ApplyVitals((args.Length >= 1) ? args[1] : 0)
+            SaveVitalsConfig()
+            SetTimer(PushHeaderToWebView, -50)
+        case "ToggleVitalsEdit":
+            ToggleVitalsEditMode((args.Length >= 1) ? args[1] : "")
+            SetTimer(PushHeaderToWebView, -50)
+        case "ImportVitalsVisibility":
+            ivb := (args.Length >= 1) ? args[1] : ""
+            if (ivb != "")
+                SetTimer(() => _ImportVitalsVisibility(ivb), -1)
         case "DecodeComponent":
             ; Lazy-decode a single component for the Entity Inspector. The
             ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine
@@ -137,14 +148,12 @@ _DispatchBridgeCall(method, args)
         case "ToggleZoneNav":
             global g_zoneNavEnabled
             g_zoneNavEnabled := !g_zoneNavEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._navEnabled := g_zoneNavEnabled
+            ; RadarOverlay reads g_zoneNavEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
         case "ToggleMapHack":
             global g_mapHackEnabled
             g_mapHackEnabled := !g_mapHackEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._mapHackEnabled := g_mapHackEnabled
+            ; RadarOverlay reads g_mapHackEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
         case "SetMaphackSource":
@@ -183,7 +192,7 @@ _DispatchBridgeCall(method, args)
                 }
             }
         case "SetConfigSubTab":
-            ; args[1] = one of general / automation / overlay / ggpk /
+            ; args[1] = one of general / automation / overlay / vitals / ggpk /
             ; filters / debug. Anything else is silently ignored so a
             ; bad WebView call can't corrupt the persisted value.
             global g_configSubTab
@@ -191,7 +200,7 @@ _DispatchBridgeCall(method, args)
             {
                 v := args[1]
                 if (v = "general" || v = "automation" || v = "overlay"
-                    || v = "ggpk" || v = "filters" || v = "debug")
+                    || v = "vitals" || v = "ggpk" || v = "filters" || v = "debug")
                 {
                     g_configSubTab := v
                     SetTimer(SaveConfig, -100)
@@ -200,8 +209,7 @@ _DispatchBridgeCall(method, args)
         case "ToggleRangeCircles":
             global g_rangeCirclesEnabled
             g_rangeCirclesEnabled := !g_rangeCirclesEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._rangeCirclesEnabled := g_rangeCirclesEnabled
+            ; RadarOverlay reads g_rangeCirclesEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
         case "ToggleAutoPilot":
             global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason

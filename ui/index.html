@@ -4012,6 +4012,7 @@
       <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')">General</div>
       <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')">Automation</div>
       <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')">Overlay</div>
+      <div class="tab" data-cfgtab="vitals"     onclick="switchConfigSubTab('vitals')">Vitals</div>
       <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
       <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
       <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
@@ -4643,6 +4644,40 @@
         </div><!-- /cfg-subpanel overlay -->
 
         <!-- ════════════════════════════════════════════════════════════
+             VITALS — freely configurable in-game vitals bars (Life / Mana /
+             Energy Shield). Per-bar enable, size, position, colours and text.
+             The per-bar sections are built by renderVitalsBars() into
+             #vitals-bars from the header's vitals config.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="vitals">
+
+          <div class="cfg-section">
+            <details id="det-vitals-general" open ontoggle="syncCfgSections()">
+              <summary><div class="cfg-header">Vitals Bars</div></summary>
+              <div class="cfg-subsection">
+                <div class="cfg-row"><span class="cfg-label">Show vitals</span>
+                  <label class="toggle"><input type="checkbox" id="tog-vitals"
+                      onchange="ahkCall('TogglePlayerHud')"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="cfg-help">Each bar has its own <b>Visibility state</b> rules (in its
+                  section below): a priority list of show/hide rules for In&nbsp;Combat /
+                  On&nbsp;Low&nbsp;Life / In&nbsp;Town / While&nbsp;Map&nbsp;open.</div>
+                <div class="cfg-row"><span class="cfg-label">Edit layout (drag on overlay)</span>
+                  <label class="toggle"><input type="checkbox" id="tog-vitals-edit"
+                      onchange="ahkCall('ToggleVitalsEdit', this.checked)"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="cfg-help">Turn on edit mode, then drag each bar directly on the game
+                  overlay to place it. Turn it off to lock the layout (positions are saved).</div>
+              </div>
+            </details>
+          </div>
+
+          <!-- Per-bar sections (Life / Mana / Energy Shield) built by renderVitalsBars() -->
+          <div id="vitals-bars"></div>
+
+        </div><!-- /cfg-subpanel vitals -->
+
+        <!-- ════════════════════════════════════════════════════════════
              GGPK — bundle/shader modifications. Currently just Map Hack
              (with source picker + apply/revert + custom shader colors);
              reserved as its own sub-tab so future GGPK tweaks have a
@@ -5238,6 +5273,29 @@
           background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
         }
         #panel-alerts .hk-num-btn:active { color: var(--codex-text); }
+        /* Vitals tab (Config panel) — reuse the themed number stepper + pill captions */
+        #panel-config .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
+        #panel-config .hk-num > input[type=number] { width: 72px; padding-right: 18px; }
+        #panel-config .hk-num > input[type=number]::-webkit-inner-spin-button,
+        #panel-config .hk-num > input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #panel-config .hk-num-spin { position: absolute; top: 1px; bottom: 1px; right: 1px; width: 15px; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 1px 1px 0; }
+        #panel-config .hk-num-btn {
+          flex: 1; min-height: 0; padding: 0; margin: 0; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          border: none; border-left: 1px solid rgba(90,62,34,0.6);
+          background: linear-gradient(180deg, rgba(60,42,22,0.92), rgba(28,18,10,0.92));
+          color: var(--codex-gold); font-size: 7px; line-height: 1;
+        }
+        #panel-config .hk-num-btn:first-child { border-bottom: 1px solid rgba(90,62,34,0.6); }
+        #panel-config .hk-num-btn:hover { color: var(--codex-gold-hi); background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96)); }
+        #panel-config .hk-num-btn:active { color: var(--codex-text); }
+        #panel-config .v-cap { color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
+        #panel-config .vrule { display: flex; gap: 8px; align-items: center; padding: 2px 0; font-size: 12px; }
+        #panel-config .vrule-name { min-width: 124px; color: var(--codex-text); font-size: 12px; }
+        #panel-config .vrule-act { cursor: pointer; font-size: 11px; padding: 1px 9px; border-radius: 3px; border: 1px solid var(--codex-rule); user-select: none; }
+        #panel-config .vact-show { color: #9fe6a0; border-color: rgba(80,160,80,0.5); }
+        #panel-config .vact-hide { color: #e69f9f; border-color: rgba(160,80,80,0.5); }
+        #panel-config .vcond-add { padding: 3px 6px; font-size: 12px; background: var(--codex-bg-soft, #20140c); color: var(--codex-text); border: 1px solid var(--codex-rule); border-radius: 3px; }
         /* Caption next to a pill toggle — carries the text style the old
            wrapping label element used to provide, now that the switch is a .toggle. */
         #panel-hotkeys .hk-cap {
@@ -7203,6 +7261,8 @@
       setChk('tog-npcsync', d.npcSync);
       setChk('tog-radar', d.radarEnabled !== undefined ? d.radarEnabled : true);
       setChk('tog-player-hud', d.playerHud !== undefined ? d.playerHud : true);
+      setChk('tog-vitals', d.playerHud !== undefined ? d.playerHud : true);
+      if (d.vitals) vitalsSyncFromHeader(d.vitals);
       setChk('tog-overlay-status', d.overlayStatusText !== undefined ? d.overlayStatusText : true);
       setChk('tog-localapi', d.localApi !== undefined ? d.localApi : false);
       if (d.localApiPort !== undefined) { const lp = document.getElementById('localapi-port'); if (lp) lp.textContent = d.localApiPort; }
@@ -8991,7 +9051,7 @@
     // ═══════════════════════════════════════════════════════════════════
     //  CONFIG HELPERS
     // ═══════════════════════════════════════════════════════════════════
-    const _cfgSectionIds = ['status', 'overview', 'toggles', 'integrations', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output'];
+    const _cfgSectionIds = ['status', 'overview', 'toggles', 'integrations', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output', 'vitals-general', 'vitals-life', 'vitals-mana', 'vitals-es'];
     let _cfgSectionsGuard = 0;
     let _cfgSectionsLoaded = false;
 
@@ -9248,6 +9308,331 @@
         if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
       }
       cpCancel();
+    }
+
+    // ── Vitals tab (configurable Life / Mana / ES bars) ──────────────
+    // Mirrors the AHK vitals config (pushed in the header as d.vitals). The
+    // per-bar sections are generated once into #vitals-bars; values + colour
+    // swatches are synced from the header, and edits are debounced back to AHK
+    // via SetVitals as a flat { life:{…}, mana:{…}, es:{…}, visibility } payload.
+    const VITALS_BARS = [['life', 'Life'], ['mana', 'Mana'], ['es', 'Energy Shield']];
+    let _vitalsCfg = { bars: {}, visibility: 'ingame', edit: false };
+    let _vitalsBuilt = false;
+    let _vitalsPushTimer = null;
+
+    // Themed number stepper (matches the Hotkeys/Alerts tabs: hidden native
+    // spinner + gold ▲▼ wired through the shared hkNumStep()).
+    function _vNum(id, sfx, min, max, step) {
+      const st = step ? ` step="${step}"` : '';
+      return `<span class="hk-num"><input type="number" id="v-${id}-${sfx}" min="${min}" max="${max}"${st}`
+           + ` oninput="vitalsPush()" onchange="vitalsPush()">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    // Pill toggle + caption (the GUI uses pills everywhere, never raw checkboxes).
+    function _vPill(id, sfx, label) {
+      return `<span class="v-cap"><label class="toggle"><input type="checkbox" id="v-${id}-${sfx}"`
+           + ` onchange="vitalsPush()"><span class="toggle-slider"></span></label>${label}</span>`;
+    }
+
+    function _vBarSectionHtml(id, label) {
+      return `
+        <div class="cfg-section">
+          <details id="det-vitals-${id}" open ontoggle="syncCfgSections()">
+            <summary><div class="cfg-header">${label}</div></summary>
+            <div class="cfg-subsection">
+              <div class="cfg-row"><span class="cfg-label">Enabled</span>
+                <label class="toggle"><input type="checkbox" id="v-${id}-enabled"
+                    onchange="vitalsPush()"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Size (W × H px)</span>
+                <span style="display:inline-flex;gap:8px;align-items:center">${_vNum(id, 'w', 4, 4000, 1)}<span style="color:var(--subtext)">×</span>${_vNum(id, 'h', 2, 400, 1)}</span>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Position (X / Y %)</span>
+                <span style="display:inline-flex;gap:8px;align-items:center">${_vNum(id, 'x', 0, 100, 0.5)}<span style="color:var(--subtext)">/</span>${_vNum(id, 'y', 0, 100, 0.5)}</span>
+              </div>
+              <div class="cfg-slider-row"><span class="cfg-label">Opacity</span>
+                <div class="slider-wrap"><span class="slider-val" id="v-${id}-opval">100%</span>
+                  <input type="range" id="v-${id}-opacity" min="0" max="100" step="1" oninput="vitalsOpInput('${id}')"></div>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Colours</span>
+                <span style="display:inline-flex;gap:14px;align-items:center;font-size:11px;color:var(--subtext)">
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-fg" onclick="vitalsPick('${id}','fg')"></span>Fill</span>
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-bg" onclick="vitalsPick('${id}','bg')"></span>Back</span>
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-outline" onclick="vitalsPick('${id}','outline')"></span>Outline</span>
+                </span>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Text</span>
+                <span style="display:inline-flex;gap:14px;align-items:center">${_vPill(id, 'tCur', 'Current')}${_vPill(id, 'tMax', 'Max')}${_vPill(id, 'tPct', 'Percent')}</span>
+              </div>
+              <div class="cfg-row" style="align-items:flex-start"><span class="cfg-label">Visibility state</span>
+                <div style="flex:1;min-width:0">
+                  <div id="vconds-${id}"></div>
+                  <div class="vrule" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+                    <select id="vaddc-${id}" class="vcond-add">
+                      <option value="combat">In Combat</option>
+                      <option value="lowvital">On Low Vital</option>
+                      <option value="town">In Town/Hideout</option>
+                      <option value="map">On large Map</option>
+                    </select>
+                    <button class="hk-btn" title="Add the selected condition to this bar" onclick="vitalsAddCond('${id}')">+ Condition</button>
+                    <span style="flex:1 1 auto"></span>
+                    <span class="vrule-act" id="vmatch-${id}" title="All listed conditions must match / any one is enough" onclick="vitalsToggleMatch('${id}')">Match All</span>
+                    <span class="vrule-act vact-show" id="vout-${id}" title="Whether a match shows or hides the bar" onclick="vitalsToggleOutcome('${id}')">Show</span>
+                    <button class="hk-btn" title="Export this bar's visibility to hotkeys_export/" onclick="vitalsExportVis('${id}')">⤓</button>
+                    <button class="hk-btn" title="Import visibility from a JSON file in hotkeys_export/" onclick="ahkCall('ImportVitalsVisibility','${id}')">⤒</button>
+                  </div>
+                  <div class="cfg-help">Bar shows when its conditions match (Match&nbsp;All/Any); no
+                    conditions = always shown. Drag&nbsp;⠿ to reorder.</div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>`;
+    }
+
+    function renderVitalsBars() {
+      const host = document.getElementById('vitals-bars');
+      if (!host) return;
+      host.innerHTML = VITALS_BARS.map(([id, label]) => _vBarSectionHtml(id, label)).join('');
+      _vitalsBuilt = true;
+      for (const [id] of VITALS_BARS) renderVitalsConds(id);
+    }
+
+    // ── Per-bar visibility condition list (drag&drop, add/remove, import/export) ──
+    const VCOND_LABELS = { combat: 'In Combat', lowvital: 'On Low', town: 'In Town/Hideout', map: 'On large Map' };
+    const _vCondSig = {};
+    // The expected-state bool. Tolerant of AHK's round-trip (booleans come back
+    // as 0/1, since AHK has no boolean type), so undefined/true/1 -> true.
+    function _wantOn(c) {
+      const w = c.want;
+      return !(w === false || w === 0 || w === '0' || w === 'false');
+    }
+    // Signature of a bar's conditions+combiner, used to skip needless re-renders.
+    function _vCondSigOf(b) {
+      return JSON.stringify((b.conditions || []).map(c => [c.type, _wantOn(c), c.resource || '', c.value ?? '']))
+        + '|' + (b.match || 'all') + '|' + (b.outcome || 'show');
+    }
+
+    function _vCondArr(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return null;
+      if (!Array.isArray(b.conditions)) b.conditions = [];
+      return b.conditions;
+    }
+    // A themed ▲▼ stepper for the Low-Life threshold (reuses hkNumStep).
+    function _vCondStepper(id, i, val) {
+      return `<span class="hk-num"><input type="number" min="1" max="100" step="1" value="${val}"`
+           + ` onchange="vitalsSetCondVal('${id}',${i},this.value)">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    function renderVitalsConds(id) {
+      const host = document.getElementById('vconds-' + id);
+      if (!host) return;
+      const conds = _vCondArr(id) || [];
+      host.innerHTML = conds.length ? conds.map((c, i) => {
+        const lbl = VCOND_LABELS[c.type] || c.type;
+        const want = _wantOn(c);
+        const extra = (c.type === 'lowvital')
+          ? ` <select class="vcond-add" title="Which resource" onchange="vitalsSetCondRes('${id}',${i},this.value)">`
+            + `<option value="es"${c.resource === 'es' ? ' selected' : ''}>ES</option>`
+            + `<option value="life"${(c.resource || 'life') === 'life' ? ' selected' : ''}>Life</option>`
+            + `<option value="mana"${c.resource === 'mana' ? ' selected' : ''}>Mana</option></select>`
+            + ` <span style="color:var(--subtext);font-size:11px">&lt;</span> ${_vCondStepper(id, i, c.value ?? 50)} <span style="color:var(--subtext);font-size:11px">%</span>`
+          : '';
+        return `<div class="vrule" ondragover="vCondDragOver(event)" ondragleave="vCondDragLeave(event)" ondrop="vCondDrop(event,'${id}',${i})">`
+          + `<span class="hk-grip" draggable="true" title="Drag to reorder" ondragstart="vCondDragStart(event,'${id}',${i})" ondragend="vCondDragEnd(event)">⠿</span>`
+          + `<span class="vrule-act ${want ? 'vact-show' : 'vact-hide'}" title="Condition must be True (state present) or False (state absent) to match" onclick="vitalsToggleWant('${id}',${i})">${want ? 'True' : 'False'}</span>`
+          + `<span class="vrule-name" style="min-width:0">${lbl}</span>${extra}`
+          + `<span style="flex:1 1 auto"></span>`
+          + `<button class="hk-btn danger" title="Remove this condition" onclick="vitalsDelCond('${id}',${i})">✕</button>`
+          + `</div>`;
+      }).join('') : `<div class="cfg-help" style="margin:2px 0">No conditions — bar is always shown.</div>`;
+      const mEl = document.getElementById('vmatch-' + id);
+      if (mEl) mEl.textContent = (_vitalsCfg.bars[id] && _vitalsCfg.bars[id].match === 'any') ? 'Match Any' : 'Match All';
+      const oEl = document.getElementById('vout-' + id);
+      if (oEl) {
+        const hide = _vitalsCfg.bars[id] && _vitalsCfg.bars[id].outcome === 'hide';
+        oEl.textContent = hide ? 'Hide' : 'Show';
+        oEl.className = 'vrule-act ' + (hide ? 'vact-hide' : 'vact-show');
+      }
+    }
+    function vitalsAddCond(id) {
+      const a = _vCondArr(id); if (!a) return;
+      const sel = document.getElementById('vaddc-' + id);
+      const type = sel ? sel.value : 'combat';
+      const c = { type, want: true };
+      if (type === 'lowvital') { c.resource = 'life'; c.value = 50; }
+      a.push(c);
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsDelCond(id, idx) {
+      const a = _vCondArr(id); if (!a || idx < 0 || idx >= a.length) return;
+      a.splice(idx, 1);
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsToggleWant(id, idx) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].want = !_wantOn(a[idx]);
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsSetCondRes(id, idx, res) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].resource = res;
+      vitalsPush();
+    }
+    function vitalsSetCondVal(id, idx, val) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].value = Math.min(100, Math.max(1, Math.round(+val) || 50));
+      vitalsPush();
+    }
+    function vitalsToggleMatch(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return;
+      b.match = (b.match === 'any') ? 'all' : 'any';
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsToggleOutcome(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return;
+      b.outcome = (b.outcome === 'hide') ? 'show' : 'hide';
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsExportVis(id) {
+      const b = _vitalsCfg.bars[id]; if (!b) return;
+      const obj = { conditions: Array.isArray(b.conditions) ? b.conditions : [], match: b.match || 'all', outcome: b.outcome || 'show' };
+      ahkCall('ExportHotkeysItem', 'vitalsvis', id + '_visibility', JSON.stringify(obj, null, 2));
+    }
+
+    // ── Condition drag & drop (reorders within one bar) ─────────────────
+    let _vCondDrag = null;   // { id, idx }
+    function vCondDragStart(e, id, idx) {
+      _vCondDrag = { id, idx };
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', 'vcond'); } catch (_) {}
+      // Use the whole row as the drag preview (same feel as the Hotkeys tab).
+      const row = e.target.closest('.vrule');
+      if (row) {
+        row.classList.add('hk-dragging');
+        try { e.dataTransfer.setDragImage(row, 12, 12); } catch (_) {}
+      }
+      e.stopPropagation();
+    }
+    function vCondDragEnd(e) {
+      _vCondDrag = null;
+      document.querySelectorAll('.hk-dragover, .hk-dragging').forEach(el => el.classList.remove('hk-dragover', 'hk-dragging'));
+    }
+    function vCondDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('hk-dragover'); }
+    function vCondDragLeave(e) { e.currentTarget.classList.remove('hk-dragover'); }
+    function vCondDrop(e, id, idx) {
+      e.preventDefault(); e.currentTarget.classList.remove('hk-dragover');
+      if (!_vCondDrag || _vCondDrag.id !== id) { _vCondDrag = null; return; }
+      const a = _vCondArr(id); if (!a) { _vCondDrag = null; return; }
+      const from = _vCondDrag.idx;
+      _vCondDrag = null;
+      if (from === idx || from < 0 || from >= a.length) return;
+      const item = a.splice(from, 1)[0];
+      a.splice(idx, 0, item);
+      renderVitalsConds(id); vitalsPush();
+    }
+
+    function _vSwatch(id, key, rgb) {
+      const el = document.getElementById('vsw-' + id + '-' + key);
+      if (el) el.style.setProperty('--swatch-color', cpHexToCssRgba((rgb || '#000000').replace('#', '') + 'FF'));
+    }
+
+    function vitalsSyncFromHeader(v) {
+      if (!v || typeof v !== 'object') return;
+      _vitalsCfg.bars = v.bars || _vitalsCfg.bars || {};
+      _vitalsCfg.edit = !!v.edit;
+      if (!_vitalsBuilt) renderVitalsBars();
+      const te = document.getElementById('tog-vitals-edit'); if (te) te.checked = _vitalsCfg.edit;
+      const af = document.activeElement;
+      for (const [id] of VITALS_BARS) {
+        const b = _vitalsCfg.bars[id]; if (!b) continue;
+        const set = (sfx, val, isChk) => {
+          const el = document.getElementById('v-' + id + '-' + sfx);
+          if (!el || el === af) return;   // don't clobber a field being edited
+          if (isChk) el.checked = !!val; else el.value = val;
+        };
+        set('enabled', b.enabled, true);
+        set('w', Math.round(b.w));
+        set('h', Math.round(b.h));
+        set('x', +(((b.xPct ?? 0) * 100).toFixed(1)));
+        set('y', +(((b.yPct ?? 0) * 100).toFixed(1)));
+        set('opacity', Math.round(b.opacity ?? 100));
+        const ov = document.getElementById('v-' + id + '-opval');
+        const osl = document.getElementById('v-' + id + '-opacity');
+        if (ov) { ov.textContent = Math.round(b.opacity ?? 100) + '%'; if (osl) _posVal(osl, ov); }
+        set('tCur', b.tCur, true);
+        set('tMax', b.tMax, true);
+        set('tPct', b.tPct, true);
+        _vSwatch(id, 'fg', b.fg); _vSwatch(id, 'bg', b.bg); _vSwatch(id, 'outline', b.outline);
+        // Re-render the condition list only when it actually changed (avoids churn).
+        const sig = _vCondSigOf(b);
+        if (_vCondSig[id] !== sig) { _vCondSig[id] = sig; renderVitalsConds(id); }
+      }
+    }
+
+    function vitalsPush() {
+      if (!_vitalsBuilt) return;
+      const payload = {};
+      for (const [id] of VITALS_BARS) {
+        const g = sfx => document.getElementById('v-' + id + '-' + sfx);
+        const cur = _vitalsCfg.bars[id] || {};
+        const bar = {
+          enabled: g('enabled') ? g('enabled').checked : cur.enabled,
+          w: +(g('w') && g('w').value !== '' ? g('w').value : cur.w),
+          h: +(g('h') && g('h').value !== '' ? g('h').value : cur.h),
+          xPct: (+(g('x') && g('x').value !== '' ? g('x').value : (cur.xPct ?? 0) * 100)) / 100,
+          yPct: (+(g('y') && g('y').value !== '' ? g('y').value : (cur.yPct ?? 0) * 100)) / 100,
+          opacity: +(g('opacity') && g('opacity').value !== '' ? g('opacity').value : (cur.opacity ?? 100)),
+          match: (cur.match === 'any') ? 'any' : 'all',
+          outcome: (cur.outcome === 'hide') ? 'hide' : 'show',
+          tCur: g('tCur') ? g('tCur').checked : cur.tCur,
+          tMax: g('tMax') ? g('tMax').checked : cur.tMax,
+          tPct: g('tPct') ? g('tPct').checked : cur.tPct,
+        };
+        bar.conditions = (Array.isArray(cur.conditions) ? cur.conditions : []).map(c => {
+          const o = { type: c.type, want: _wantOn(c) };
+          if (c.type === 'lowvital') { o.resource = c.resource || 'life'; o.value = +(c.value ?? 50); }
+          return o;
+        });
+        if (cur.fg) bar.fg = cur.fg;
+        if (cur.bg) bar.bg = cur.bg;
+        if (cur.outline) bar.outline = cur.outline;
+        payload[id] = bar;
+        _vitalsCfg.bars[id] = Object.assign(_vitalsCfg.bars[id] || {}, bar);
+        // keep the sig in step with what we just sent so the header echo doesn't re-render
+        _vCondSig[id] = _vCondSigOf(bar);
+      }
+      clearTimeout(_vitalsPushTimer);
+      _vitalsPushTimer = setTimeout(() => ahkCall('SetVitals', payload), 120);
+    }
+
+    function vitalsOpInput(id) {
+      const el = document.getElementById('v-' + id + '-opacity');
+      const ov = document.getElementById('v-' + id + '-opval');
+      if (el && ov) { ov.textContent = Math.round(+el.value) + '%'; _posVal(el, ov); }
+      vitalsPush();
+    }
+
+    function vitalsPick(id, key) {
+      const cur = (_vitalsCfg.bars[id] && _vitalsCfg.bars[id][key]) || '#888888';
+      openColorPicker('vitals', {
+        hex: cur.replace('#', '') + 'FF',
+        title: id.toUpperCase() + ' — ' + (key === 'fg' ? 'Fill' : key === 'bg' ? 'Background' : 'Outline'),
+        swatchEl: document.getElementById('vsw-' + id + '-' + key),
+        onConfirm: (h) => {
+          const rgb = '#' + h.slice(0, 6);
+          if (!_vitalsCfg.bars[id]) _vitalsCfg.bars[id] = {};
+          _vitalsCfg.bars[id][key] = rgb;
+          _vSwatch(id, key, rgb);
+          vitalsPush();
+        }
+      });
     }
 
     // ── HSV ↔ RGB conversion helpers ─────────────────────────────────

@@ -16,7 +16,9 @@ class GdiOverlayBase
     ; transAlpha is the overall window opacity 0-255 (the 010101 colour-key stays transparent).
     __New(transAlpha := 255)
     {
-        this.overlayGui := Gui("-Caption +AlwaysOnTop -DPIScale +E0x80000")
+        ; +ToolWindow keeps the overlay out of the taskbar / Alt-Tab list, so the
+        ; per-tick Show()/Hide() cycle no longer flashes a taskbar button.
+        this.overlayGui := Gui("-Caption +AlwaysOnTop +ToolWindow -DPIScale +E0x80000")
         this.overlayGui.BackColor := "010101"
         this.hwnd        := this.overlayGui.Hwnd
         this.memDC       := 0
@@ -28,9 +30,107 @@ class GdiOverlayBase
         this._alpha      := transAlpha
         this._lastX      := -1
         this._lastY      := -1
+        this._lastW      := 0
+        this._lastH      := 0
         this._penCache   := Map()
         this._brushCache := Map()
         this._fontCache  := Map()
+        this._bgBrush    := 0          ; cached transparent-key fill brush (back-buffer clear)
+        ; ── Overlay contract (driven by OverlayManager) ──────────────────────
+        this.Name        := "overlay"  ; subclasses override with a stable id
+        this.Enabled     := true       ; master on/off toggle (manager hides when false)
+        this._hideSince  := 0          ; A_TickCount when ShouldShow first went false (hide debounce)
+    }
+
+    ; ── Overlay contract ─────────────────────────────────────────────────────
+    ; Template method run once per tick by OverlayManager. Subclasses do NOT
+    ; override Update(); they override the three hooks below. Update() owns the
+    ; uniform Enabled → ShouldShow → Layout → draw → blit flow and is the single
+    ; place that decides show vs. hide, which keeps every overlay flicker-free by
+    ; construction.
+    ;
+    ; Hide-debounce: a single-tick ShouldShow=false (e.g. a gate condition like
+    ; isAlive briefly mis-reading during the game's GC) must NOT blink the overlay.
+    ; While already visible, a false result keeps the last frame on screen and only
+    ; hides after HIDE_DEBOUNCE_MS of continuous false. Showing is always immediate.
+    static HIDE_DEBOUNCE_MS := 250
+
+    Update(ctx)
+    {
+        if (!this.Enabled || !this.ShouldShow(ctx))
+        {
+            this._RequestHide()
+            return
+        }
+        rect := this.Layout(ctx)
+        if (!rect || rect["w"] < 1 || rect["h"] < 1)
+        {
+            this._RequestHide()
+            return
+        }
+        this._hideSince := 0
+        if !this._EnsureShown(rect["x"], rect["y"], rect["w"], rect["h"])
+            return
+        this._ClearBackBuffer(rect["w"], rect["h"])
+        this.Draw(ctx, rect)
+        this._Blit(rect["w"], rect["h"])
+    }
+
+    ; Debounced hide: keeps the last drawn frame on screen for up to
+    ; HIDE_DEBOUNCE_MS of continuous "should hide" before actually hiding, so a
+    ; one-tick visibility blip never flickers the overlay.
+    _RequestHide()
+    {
+        if !this.isVisible          ; never shown / already hidden — nothing to debounce
+            return
+        if (this._hideSince = 0)
+            this._hideSince := A_TickCount
+        if ((A_TickCount - this._hideSince) >= GdiOverlayBase.HIDE_DEBOUNCE_MS)
+        {
+            this.Hide()
+            this._hideSince := 0
+        }
+        ; else: within the debounce window — leave the last frame up, do nothing.
+    }
+
+    ; Visibility policy — return true to show this frame, false to hide.
+    ; Default: always show. Override per overlay (e.g. foreground/gate checks).
+    ShouldShow(ctx) => true
+
+    ; Returns the screen rectangle as Map("x","y","w","h"), or 0 to hide.
+    ; Must be overridden by drawing subclasses.
+    Layout(ctx) => 0
+
+    ; Draws the overlay content onto the back-buffer (memDC). rect is the Map
+    ; returned by Layout(). Must be overridden by drawing subclasses.
+    Draw(ctx, rect)
+    {
+    }
+
+    ; Clears the back-buffer to the transparent colour key (010101) so the
+    ; previous frame's pixels don't bleed through. Brush is cached once.
+    _ClearBackBuffer(w, h)
+    {
+        if !this._bgBrush
+            this._bgBrush := DllCall("CreateSolidBrush", "UInt", 0x010101, "Ptr")
+        this._FillRectBrush(0, 0, w, h, this._bgBrush)
+    }
+
+    ; FillRect helper that takes a ready HBRUSH (used by _ClearBackBuffer).
+    _FillRectBrush(x, y, w, h, hBrush)
+    {
+        r := Buffer(16, 0)
+        NumPut("Int", x, r, 0), NumPut("Int", y, r, 4)
+        NumPut("Int", x + w, r, 8), NumPut("Int", y + h, r, 12)
+        DllCall("FillRect", "Ptr", this.memDC, "Ptr", r, "Ptr", hBrush)
+    }
+
+    ; Sets overlay opacity (0-255). Applied on the next _EnsureShown styling pass.
+    SetAlpha(alpha)
+    {
+        this._alpha := alpha
+        if (this._styled && this.isVisible)
+            WinSetTransColor("010101 " this._alpha, this.hwnd)
     }
 
     __Delete()
@@ -90,23 +190,22 @@ class GdiOverlayBase
     ; and that the back-buffer matches w x h. Returns true when memDC is ready to draw.
     _EnsureShown(x, y, w, h)
     {
-        if (x != this._lastX || y != this._lastY)
-        {
-            if this.isVisible
-                WinMove(x, y, w, h, this.hwnd)
-            this._lastX := x
-            this._lastY := y
-        }
         if !this.isVisible
         {
             this.overlayGui.Show("x" x " y" y " w" w " h" h " NoActivate")
             this.isVisible := true
+            this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
             if !this._styled
             {
                 WinSetTransColor("010101 " this._alpha, this.hwnd)
                 WinSetExStyle("+0x20", this.hwnd)   ; WS_EX_TRANSPARENT -> click-through
                 this._styled := true
             }
+        }
+        else if (x != this._lastX || y != this._lastY || w != this._lastW || h != this._lastH)
+        {
+            WinMove(x, y, w, h, this.hwnd)
+            this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
         }
         if (this.bufW != w || this.bufH != h)
             this._InitBuffers(w, h)
@@ -184,6 +283,8 @@ class GdiOverlayBase
             DllCall("DeleteObject", "Ptr", brush)
         for _, font in this._fontCache
             DllCall("DeleteObject", "Ptr", font)
+        if this._bgBrush
+            DllCall("DeleteObject", "Ptr", this._bgBrush)
         if this.bitmap
         {
             stockBmp := DllCall("GetStockObject", "Int", 0, "Ptr")

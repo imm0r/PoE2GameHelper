@@ -248,7 +248,7 @@ class PoE2Offsets
         "UnknownIdAndEquipmentInfo", 0x40,
         "GrantedEffectsPerLevelDatRow", 0x48,
         "GrantedEffectStatSetsPerLevelDatRow", 0x50,
-        "TotalUses", 0xE4,            ; Gordin/GameHelper2 Actor.cs (was 0x98)
+        "TotalUses", 0xD8,            ; cumulative cast counter; a game patch moved it from 0xE4 (verified via skill probe diff)
         "TotalCooldownTimeInMs", 0xE8 ; Gordin/GameHelper2 Actor.cs (was 0xA8)
     )
 

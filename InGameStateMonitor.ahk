@@ -24,9 +24,12 @@ SetWorkingDir(A_ScriptDir)
 #Include Lib/TerrainPathfinder.ahk
 #Include ahk/GdiOverlayBase.ahk
 #Include ahk/RadarOverlay.ahk
-#Include ahk/PlayerHUD.ahk
+#Include ahk/VitalsOverlay.ahk
 #Include ahk/NotificationOverlay.ahk
 #Include ahk/FocusOverlay.ahk
+#Include ahk/OverlayContext.ahk
+#Include ahk/PlayOverlayPolicy.ahk
+#Include ahk/OverlayManager.ahk
 #Include ahk/UiTreeBrowser.ahk
 #Include ahk/UiBrowserHandler.ahk
 
@@ -42,7 +45,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.4.12.2"
+POEFORMANCE_VERSION := "0.45.11.6"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -106,11 +109,16 @@ g_radarEnabled := true   ; whether radar overlay is active
 g_radarAlpha := 255    ; overlay opacity (0=transparent, 255=opaque)
 g_overlayStatusTextEnabled := true   ; show automation status block on game overlay
 g_cfgOpenSections := "status,overview,toggles,autoflask,radar,entities,actions,al-conditions,al-timing,al-output"  ; comma-separated open detail sections
-g_radarOverlay := 0   ; lazy-init on first render call
-g_playerHudEnabled := true   ; whether the player HUD overlay is active
-g_playerHud := 0   ; lazy-init on first render
-g_notifyOverlay := 0   ; lazy-init on first alert (NotificationOverlay)
-g_focusOverlay := 0   ; lazy-init (FocusOverlay) — focused-entity test readout
+g_overlayManager := 0   ; OverlayManager — owns all overlays; built in LoadOverlaySystem()
+g_radarOverlay := 0   ; reference to the manager-owned RadarOverlay (set in LoadOverlaySystem)
+g_playerHudEnabled := true   ; master toggle for the vitals overlay (formerly the player HUD)
+g_playerHud := 0   ; legacy alias -> the manager-owned VitalsOverlay (set in LoadOverlaySystem)
+g_vitalsOverlay := 0   ; reference to the manager-owned VitalsOverlay (set in LoadOverlaySystem)
+g_vitalsBars := 0      ; Map(barId -> config Map); seeded by LoadVitalsConfig()
+g_vitalsEditMode := false   ; drag-to-place layout edit mode for the vitals bars
+g_vitalsNeedsCombat := false   ; true when a vitals bar uses an "In Combat" condition (gates the standalone combat detector)
+g_notifyOverlay := 0   ; reference to the manager-owned NotificationOverlay (set in LoadOverlaySystem)
+g_focusOverlay := 0   ; reference to the manager-owned FocusOverlay (set in LoadOverlaySystem)
 g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active
 g_localApiEnabled := false   ; local HTTP API (MCP backend) — opt-in; seeded by LoadLocalApiConfig()
 g_localApiPort := 7777       ; loopback port for the local HTTP API
@@ -311,6 +319,7 @@ LoadLootPickupConfig()
 LoadEntityGroups()
 LoadEntityAlertsConfig()
 LoadLocalApiConfig()      ; local HTTP API (MCP backend) settings + Winsock constants
+LoadOverlaySystem()       ; build the OverlayManager + all overlays; wire legacy globals
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 

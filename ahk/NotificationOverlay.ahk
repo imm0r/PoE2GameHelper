@@ -1,9 +1,9 @@
 ; NotificationOverlay.ahk
 ; Map-independent notification overlay (entity-alert banners, future toasts).
-; Unlike RadarOverlay / PlayerHUD it is NOT tied to the large-map / panel gate: it shows
-; whenever the game window is focused and a notification is active, and stays fully hidden
-; (no blit) otherwise. Extends GdiOverlayBase. Driven once per tick via Tick(); content is
-; set via SetBanner(). Depends on ResolvePoEWindow() (AutoFlask.ahk).
+; Unlike RadarOverlay / PlayerHUD it does NOT follow the play-overlay gate: it shows
+; whenever the game window is focused and a banner is active, and stays fully hidden
+; otherwise. Extends GdiOverlayBase and is driven by OverlayManager via the uniform
+; ShouldShow/Layout/Draw contract. Content is set via SetBanner() (EntityAlerts).
 ; Included by InGameStateMonitor.ahk (after GdiOverlayBase).
 
 class NotificationOverlay extends GdiOverlayBase
@@ -22,6 +22,7 @@ class NotificationOverlay extends GdiOverlayBase
     __New()
     {
         super.__New(255)
+        this.Name         := "notification"
         this._bannerText  := ""
         this._bannerUntil := 0
         this._bannerColor := NotificationOverlay.COLOR_TEXT
@@ -36,54 +37,40 @@ class NotificationOverlay extends GdiOverlayBase
         this._bannerUntil := A_TickCount + Abs(durationMs)
     }
 
-    ; Per-tick driver (call early in UpdateRadarFast, before the radar hide-returns).
-    ; No-op + hidden when nothing is active OR the game isn't foreground — so the idle cost is
-    ; just a couple of cheap checks (no WinGetPos, no blit).
-    Tick()
+    ; ── Overlay contract ────────────────────────────────────────────────────
+    ; Visible only while a banner is active AND the game window is focused
+    ; (map-independent — does NOT use the play-overlay gate).
+    ShouldShow(ctx)
     {
         if (this._bannerText = "" || A_TickCount > this._bannerUntil)
-        {
-            this.Hide()
-            return
-        }
-        gameHwnd := ResolvePoEWindow()
-        if (!gameHwnd || !WinActive("ahk_id " gameHwnd))
-        {
-            this.Hide()
-            return
-        }
-        gwX := 0, gwY := 0, gwW := 0, gwH := 0
-        try WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
-        if (gwW < 200 || gwH < 100)
-        {
-            this.Hide()
-            return
-        }
-        this._RenderBanner(gwX, gwY, gwW, gwH)
+            return false
+        if !ctx.gameActive
+            return false
+        return (ctx.gwW >= 200 && ctx.gwH >= 100)
     }
 
-    ; Lays out and draws the banner bar (background + gold border + centered text), then blits.
-    _RenderBanner(gwX, gwY, gwW, gwH)
+    ; Centered horizontally, near the top of the game window. Width follows the text.
+    Layout(ctx)
     {
         font := this._GetFont(NotificationOverlay.FONT_HEIGHT, NotificationOverlay.FONT_WEIGHT)
-        m := this._MeasureText(font, this._bannerText)
-        padX := NotificationOverlay.PAD_X, padY := NotificationOverlay.PAD_Y
-        barW := m["w"] + padX * 2
-        barH := m["h"] + padY * 2
+        m    := this._MeasureText(font, this._bannerText)
+        barW := m["w"] + NotificationOverlay.PAD_X * 2
+        barH := m["h"] + NotificationOverlay.PAD_Y * 2
+        return Map("x", ctx.gwX + (ctx.gwW - barW) // 2
+                 , "y", ctx.gwY + Round(ctx.gwH * NotificationOverlay.TOP_FRACTION)
+                 , "w", barW, "h", barH)
+    }
 
-        x := gwX + (gwW - barW) // 2
-        y := gwY + Round(gwH * NotificationOverlay.TOP_FRACTION)
+    ; Background bar + gold border + banner text.
+    Draw(ctx, rect)
+    {
+        w := rect["w"], h := rect["h"]
+        this._FillRect(0, 0, w, h, NotificationOverlay.COLOR_BG)
+        this._DrawRectOutline(0, 0, w, h, NotificationOverlay.COLOR_BORDER, 2)
 
-        if !this._EnsureShown(x, y, barW, barH)
-            return
-
-        this._FillRect(0, 0, barW, barH, NotificationOverlay.COLOR_BG)
-        this._DrawRectOutline(0, 0, barW, barH, NotificationOverlay.COLOR_BORDER, 2)
-
+        font := this._GetFont(NotificationOverlay.FONT_HEIGHT, NotificationOverlay.FONT_WEIGHT)
         oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
-        this._DrawText(padX, padY, this._bannerText, this._bannerColor)
+        this._DrawText(NotificationOverlay.PAD_X, NotificationOverlay.PAD_Y, this._bannerText, this._bannerColor)
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldFont)
-
-        this._Blit(barW, barH)
     }
 }

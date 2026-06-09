@@ -27,7 +27,7 @@
 ;   LargeMap:  stored position = MAP CENTER   → center = pos + defaultShift + shift
 ;              mapDiagonal = sqrt(windowWidth² + windowHeight²)  (rawsz=0 → window as equivalent)
 
-class RadarOverlay
+class RadarOverlay extends GdiOverlayBase
 {
     ; Transparency color: near black (0x000000 is ignored by some systems)
     static TRANSPARENT_BACKGROUND := 0x010101
@@ -66,23 +66,18 @@ class RadarOverlay
     ; Creates the transparent, click-through overlay GUI window and initialises all GDI state fields.
     __New()
     {
-        this.overlayGui      := Gui("-Caption +AlwaysOnTop -DPIScale +E0x80000")
-        this.overlayGui.BackColor := "010101"
-        this.windowHandle    := this.overlayGui.Hwnd
-        this.memoryDC        := 0
-        this.backBitmap      := 0
-        this.bufferWidth     := 0
-        this.bufferHeight    := 0
-        this.isVisible            := false
-        this.stylesApplied        := false
-        this._alpha               := 255     ; overlay opacity (0-255), set via SetAlpha()
+        ; GdiOverlayBase owns the transparent click-through window, the double
+        ; buffer, the pen/brush caches, the bg-clear brush and the Show/Hide/blit
+        ; plumbing. RadarOverlay only adds its own state below.
+        super.__New(255)
+        this.Name := "radar"
         this.highlightedEntityPath := ""   ; path of entity selected in the Entities tab — drawn with a line on the radar
         this._lastMiniMapDiagonal := 0   ; cached minimap diagonal used for large-map projection
-        this._lastGwX := -1, this._lastGwY := -1, this._lastGwW := 0, this._lastGwH := 0
-        this._penCache   := Map()   ; colorBGR|(width<<24) → HPEN  (created once, reused)
-        this._brushCache := Map()   ; colorBGR             → HBRUSH
-        this._bgBrush    := 0       ; cached background fill brush
-        this._frameRect  := Buffer(16, 0)  ; reused RECT for FillRect
+        ; Last valid player world position — reused for a short grace window when a
+        ; snapshot briefly lacks worldPosition (GC / pointer race), so the whole
+        ; overlay (map + dots + status text) doesn't blink out for that frame.
+        this._lastPlayerPos       := 0    ; Map("x","y","h") or 0 when never seen
+        this._lastPlayerPosTick   := 0    ; A_TickCount of the last valid position
 
         ; Entity-group filters (all visible by default)
         this.ShowEnemyNormal := true
@@ -165,46 +160,68 @@ class RadarOverlay
         this._textBatch   := []      ; text entries: [x, y, text, colorBGR]
     }
 
-    ; Main render entry point: aligns the overlay window, clears the back-buffer, and draws all map layers.
-    ; Params: snapshot - full game state snapshot; gameWindow* - screen position and size of the PoE window.
-    ; Main method — called on every snapshot update.
-    ; gameWindowX/Y/Width/Height: position and size of the PoE window in screen coordinates.
-    Render(snapshot, gameWindowX, gameWindowY, gameWindowWidth, gameWindowHeight)
+    ; Pulls the radar's per-frame config straight from the toggle globals (the
+    ; overlay owns reading its own settings, so the driver no longer pokes a dozen
+    ; properties every tick). Also applies the highlighted-entity auto-expire.
+    _SyncConfig(snapshot)
     {
-        if (gameWindowWidth < 100 || gameWindowHeight < 100)
-            return
+        global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss
+        global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
+        global g_debugMode, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
+        global g_radarAlpha, g_highlightedEntityPath
 
-        ; Align the overlay window to the game window — only when position/size has changed
-        if (gameWindowX != this._lastGwX || gameWindowY != this._lastGwY
-         || gameWindowWidth != this._lastGwW || gameWindowHeight != this._lastGwH)
-        {
-            WinMove(gameWindowX, gameWindowY, gameWindowWidth, gameWindowHeight, this.windowHandle)
-            this._lastGwX := gameWindowX, this._lastGwY := gameWindowY
-            this._lastGwW := gameWindowWidth, this._lastGwH := gameWindowHeight
-        }
-        if !this.isVisible
-        {
-            this.overlayGui.Show("x" gameWindowX " y" gameWindowY " w" gameWindowWidth " h" gameWindowHeight " NoActivate")
-            this.isVisible := true
-            if !this.stylesApplied
-            {
-                WinSetTransColor("010101 " this._alpha, this.windowHandle)
-                WinSetExStyle("+0x20", this.windowHandle)   ; WS_EX_TRANSPARENT → click-through
-                this.stylesApplied := true
-            }
-        }
+        this.ShowEnemyNormal := g_radarShowEnemyNormal
+        this.ShowEnemyRare   := g_radarShowEnemyRare
+        this.ShowEnemyBoss   := g_radarShowEnemyBoss
+        this.ShowMinions     := g_radarShowMinions
+        this.ShowNpcs        := g_radarShowNpcs
+        this.ShowChests      := g_radarShowChests
+        this.DebugMode       := g_debugMode
+        this._navEnabled     := g_zoneNavEnabled
+        this._mapHackEnabled := g_mapHackEnabled
+        this._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
+        if (IsSet(g_radarAlpha) && this._alpha != g_radarAlpha)
+            this.SetAlpha(g_radarAlpha)
 
-        if (this.bufferWidth != gameWindowWidth || this.bufferHeight != gameWindowHeight)
-            this._InitBuffers(gameWindowWidth, gameWindowHeight)
-        if !this.memoryDC
-            return
+        ; Auto-expire entity tracking once the target is finished (opened
+        ; chest/strongbox or dead monster) so the tracking line/label stop
+        ; pinning a completed objective.
+        if (IsSet(g_highlightedEntityPath) && g_highlightedEntityPath != ""
+            && _TrackedEntityExpired(snapshot, g_highlightedEntityPath))
+            g_highlightedEntityPath := ""
+        this.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
+    }
 
-        ; Clear back-buffer with transparency colour (brush created once and cached)
-        if !this._bgBrush
-            this._bgBrush := DllCall("CreateSolidBrush", "UInt", RadarOverlay.TRANSPARENT_BACKGROUND, "Ptr")
-        NumPut("Int", gameWindowWidth,  this._frameRect, 8)
-        NumPut("Int", gameWindowHeight, this._frameRect, 12)
-        DllCall("FillRect", "Ptr", this.memoryDC, "Ptr", this._frameRect, "Ptr", this._bgBrush)
+    ; ── Overlay contract (driven by OverlayManager) ─────────────────────────
+    ; Visibility: the radar follows the shared play-overlay gate, plus the user's
+    ; radar on/off toggle (g_radarEnabled).
+    ShouldShow(ctx)
+    {
+        global g_radarEnabled
+        return ctx.gate["allowed"] && (IsSet(g_radarEnabled) ? g_radarEnabled : true)
+    }
+
+    ; Layout: the radar draws across the whole game window.
+    Layout(ctx)
+    {
+        if (ctx.gwW < 100 || ctx.gwH < 100)
+            return 0
+        return Map("x", ctx.gwX, "y", ctx.gwY, "w", ctx.gwW, "h", ctx.gwH)
+    }
+
+    ; Draw entry point: pulls per-frame config from the globals, then draws all
+    ; map layers. The window placement, buffer sizing and back-buffer clear are
+    ; handled by GdiOverlayBase.Update() before this runs; the final blit happens
+    ; after it returns. _FinishFrame() does the atlas + batch flush + UI highlight.
+    ; gameWindowX/Y/Width/Height mirror the rect for the unchanged body below.
+    Draw(ctx, rect)
+    {
+        this._SyncConfig(ctx.snapshot)
+        snapshot         := ctx.snapshot
+        gameWindowX      := rect["x"]
+        gameWindowY      := rect["y"]
+        gameWindowWidth  := rect["w"]
+        gameWindowHeight := rect["h"]
 
         ; Extract data from the snapshot
         inGameState    := (snapshot && snapshot.Has("inGameState"))           ? snapshot["inGameState"]                 : 0
@@ -308,17 +325,38 @@ class RadarOverlay
                 . " " terrDbg . mhDbg
         }
 
+        ; Reuse the last valid player position for a short grace window when this
+        ; snapshot briefly lacks worldPosition (GC / pointer race). Without this the
+        ; whole overlay — map, dots AND the status strings drawn below — blinks out
+        ; for that single frame, which looks like the overlay is flickering.
+        static _POS_GRACE_MS := 800
+        if hasPlayerPosition
+        {
+            pwp := playerRender["worldPosition"]
+            this._lastPlayerPos := Map("x", pwp["x"], "y", pwp["y"]
+                , "h", playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0)
+            this._lastPlayerPosTick := A_TickCount
+        }
+        else if (this._lastPlayerPos && (A_TickCount - this._lastPlayerPosTick) <= _POS_GRACE_MS)
+        {
+            ; Within grace — render this frame with the cached position.
+            hasPlayerPosition := true
+        }
+
         if !hasPlayerPosition
         {
             this._DrawDot(20, 8, 0x0000FF, 5)   ; blue dot = no player found
-            this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+            this._RenderStatusOverlay(gameWindowWidth, gameWindowHeight)   ; status block "shows always"
+            this._FinishFrame(gameWindowWidth, gameWindowHeight)
             return
         }
 
-        playerWorldPosition := playerRender["worldPosition"]
+        playerWorldPosition := (playerRender && playerRender.Has("worldPosition"))
+                             ? playerRender["worldPosition"] : this._lastPlayerPos
         playerWorldX        := playerWorldPosition["x"]
         playerWorldY        := playerWorldPosition["y"]
-        playerTerrainHeight := playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0
+        playerTerrainHeight := playerWorldPosition.Has("h") ? playerWorldPosition["h"]
+                             : (playerRender.Has("terrainHeight") ? playerRender["terrainHeight"] : 0.0)
 
         ; Cache the minimap diagonal even when the minimap is currently invisible
         ; (the large map needs it, but is often open while the minimap is hidden).
@@ -489,7 +527,7 @@ class RadarOverlay
         ; from Config > Radar > "Status Text on Overlay".
         this._RenderStatusOverlay(gameWindowWidth, gameWindowHeight)
 
-        this._BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+        this._FinishFrame(gameWindowWidth, gameWindowHeight)
     }
 
     ; ── Status overlay ────────────────────────────────────────────────────
@@ -573,7 +611,7 @@ class RadarOverlay
             lines.Push(["FLASK  " g_autoFlaskLastReason, COL_GOLD])
 
         ; Queue the text lines into the existing batch — flushes in
-        ; _FlushBatch (called from _BlitWithHighlight) so the lines land
+        ; _FlushBatch (called from _FinishFrame) so the lines land
         ; on top of the radar / entity dots already rendered.
         y := baseY
         for _, ln in lines
@@ -583,14 +621,15 @@ class RadarOverlay
         }
     }
 
-    ; Draws UI Browser highlight (if active) then blits the back-buffer to screen.
-    ; Called instead of _Blit so the highlight is always the topmost drawn layer.
-    ; _FlushBatch() is called here — this is the single flush point per frame.
-    _BlitWithHighlight(gameWindowWidth, gameWindowHeight)
+    ; Finishes the frame on the back-buffer: atlas overlay, flush of all queued
+    ; draw ops, then the optional UI-Browser highlight rect (topmost layer).
+    ; GdiOverlayBase.Update() performs the actual blit right after Draw() returns,
+    ; so this no longer blits itself — it is the single flush point per frame.
+    _FinishFrame(gameWindowWidth, gameWindowHeight)
     {
         ; Atlas overlay (dormant until g_atlasRender is populated by the reader).
         this._RenderAtlas()
-        ; Flush all queued draw operations before the optional highlight rect and blit.
+        ; Flush all queued draw operations before the optional highlight rect.
         this._FlushBatch()
 
         global g_uiBrowserHighlight
@@ -604,7 +643,6 @@ class RadarOverlay
             if (hw > 4 && hh > 4 && hx < gameWindowWidth && hy < gameWindowHeight)
                 this._DrawRect(hx, hy, hw, hh, 0x0000FF, 3)
         }
-        this._Blit(gameWindowWidth, gameWindowHeight)
     }
 
     ; Renders entity dots onto one map layer using isometric projection and the game's UI scale math.
@@ -962,9 +1000,9 @@ class RadarOverlay
                     NumPut("Int", Round(mapCenterY + (0-dGX-dGY)     * projectionSin), pathPts, (i-1)*8+4)
                 }
                 pen    := this._GetPen(hlColor, lineWidth)
-                oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-                DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pathPts, "Int", n)
-                DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+                oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+                DllCall("Polyline", "Ptr", this.memDC, "Ptr", pathPts, "Int", n)
+                DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
             }
             else
                 this._DrawLine(Round(mapCenterX), Round(mapCenterY), hlScreenX, hlScreenY, hlColor, lineWidth)
@@ -1034,9 +1072,9 @@ class RadarOverlay
                 NumPut("Int", Round(mapCenterY + (0-dGX-dGY)   * projectionSin), navPts, (i-1)*8+4)
             }
             pen    := this._GetPen(navColor, navWidth)
-            oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-            DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", navPts, "Int", n)
-            DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+            oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+            DllCall("Polyline", "Ptr", this.memDC, "Ptr", navPts, "Int", n)
+            DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
         }
 
         ; ── Combat path: A* route to the currently targeted enemy ─────────
@@ -1060,9 +1098,9 @@ class RadarOverlay
                 NumPut("Int", Round(mapCenterY + (0-dGX-dGY) * projectionSin), combatPts, (i-1)*8+4)
             }
             pen    := this._GetPen(combatColor, combatWidth)
-            oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-            DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", combatPts, "Int", cn)
-            DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+            oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+            DllCall("Polyline", "Ptr", this.memDC, "Ptr", combatPts, "Int", cn)
+            DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
         }
 
         ; Debug entity-filter stats — collected for the WebView debug tab.
@@ -1126,23 +1164,7 @@ class RadarOverlay
     }
 
     ; ── GDI drawing helpers ──────────────────────────────────────────────────────────────
-
-    ; Returns a cached HPEN for (colorBGR, width). Creates on first use, never deleted until __Delete.
-    _GetPen(colorBGR, width := 1)
-    {
-        key := colorBGR | (width << 24)
-        if !this._penCache.Has(key)
-            this._penCache[key] := DllCall("CreatePen", "Int", 0, "Int", width, "UInt", colorBGR, "Ptr")
-        return this._penCache[key]
-    }
-
-    ; Returns a cached HBRUSH for colorBGR. Creates on first use, never deleted until __Delete.
-    _GetBrush(colorBGR)
-    {
-        if !this._brushCache.Has(colorBGR)
-            this._brushCache[colorBGR] := DllCall("CreateSolidBrush", "UInt", colorBGR, "Ptr")
-        return this._brushCache[colorBGR]
-    }
+    ; _GetPen / _GetBrush are inherited from GdiOverlayBase (same cached impl).
 
     ; ── Batch collector methods ──────────────────────────────────────────────────────────
     ; These methods do NOT draw immediately — they collect draw operations in RAM.
@@ -1199,7 +1221,7 @@ class RadarOverlay
     ;   → 1 SelectObject + 1 PolyPolyline instead of 4 DllCalls × n.
     _FlushBatch()
     {
-        dc := this.memoryDC
+        dc := this.memDC
 
         ; ── 1. Lines ─────────────────────────────────────────────────────────────────────
         for key, segs in this._lineBatch
@@ -1251,7 +1273,7 @@ class RadarOverlay
     ; Technique: BeginPath + n×Ellipse + EndPath + StrokeAndFillPath per color/radius group.
     _FlushDotLayer(batch)
     {
-        dc := this.memoryDC
+        dc := this.memDC
         for key, dots in batch
         {
             color  := key & 0xFFFFFF
@@ -1278,12 +1300,12 @@ class RadarOverlay
     {
         pen       := this._GetPen(colorBGR, penWidth)
         nullBrush := DllCall("GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH
-        oldPen    := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen,       "Ptr")
-        oldBrush  := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", nullBrush, "Ptr")
-        DllCall("Rectangle", "Ptr", this.memoryDC,
+        oldPen    := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen,       "Ptr")
+        oldBrush  := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", nullBrush, "Ptr")
+        DllCall("Rectangle", "Ptr", this.memDC,
                 "Int", screenX, "Int", screenY, "Int", screenX + width, "Int", screenY + height)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldBrush)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldBrush)
     }
 
     ; ── Range circle API ─────────────────────────────────────────────────────────────────
@@ -1323,9 +1345,9 @@ class RadarOverlay
         }
 
         pen    := this._GetPen(colorBGR, 2)
-        oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-        DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pts, "Int", n)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+        oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", n)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
 
         if (label != "")
             this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
@@ -1362,7 +1384,7 @@ class RadarOverlay
                 cx := 0, cy := 0
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&cx, &cy)
-                this._DrawPixelCircle(cx - this._lastGwX, cy - this._lastGwY,
+                this._DrawPixelCircle(cx - this._lastX, cy - this._lastY,
                     rec["circleCursorPx"], COL_CUR)
             }
             ; Player pixel circle (player projected to screen → client coords).
@@ -1370,7 +1392,7 @@ class RadarOverlay
             {
                 ps := this._PlayerScreenPos()
                 if (ps)
-                    this._DrawPixelCircle(ps["x"] - this._lastGwX, ps["y"] - this._lastGwY,
+                    this._DrawPixelCircle(ps["x"] - this._lastX, ps["y"] - this._lastY,
                         rec["circlePlayerPx"], COL_CUR)
             }
             ; Text block.
@@ -1405,7 +1427,7 @@ class RadarOverlay
         if !(nodes is Array) || !nodes.Length
             return
 
-        ox := this._lastGwX, oy := this._lastGwY
+        ox := this._lastX, oy := this._lastY
         COL_CONN := 0x707070    ; node-graph connections (grey, BGR)
         COL_NAME := 0x8AD6F0    ; map names (gold-ish, BGR)
         COL_PATH := 0xFFC040    ; player → target route (cyan, BGR)
@@ -1507,41 +1529,13 @@ class RadarOverlay
             NumPut("Int", Round(cy + radiusPx * Sin(angle)), pts, (A_Index - 1) * 8 + 4)
         }
         pen := this._GetPen(colorBGR, 2)
-        oldPen := DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", pen, "Ptr")
-        DllCall("Polyline", "Ptr", this.memoryDC, "Ptr", pts, "Int", n)
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", oldPen)
+        oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", n)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
     }
 
     ; ── Internal buffer management ───────────────────────────────────────────────────────
-
-    ; Creates (or re-creates) the compatible memory DC and DIB bitmap used for off-screen rendering.
-    _InitBuffers(width, height)
-    {
-        if this.backBitmap
-        {
-            stockBitmap := DllCall("GetStockObject", "Int", 0, "Ptr")
-            DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", stockBitmap)
-            DllCall("DeleteObject", "Ptr", this.backBitmap)
-            DllCall("DeleteDC",     "Ptr", this.memoryDC)
-        }
-        screenDC          := DllCall("GetDC", "Ptr", this.windowHandle, "Ptr")
-        this.memoryDC     := DllCall("CreateCompatibleDC",     "Ptr", screenDC,              "Ptr")
-        this.backBitmap   := DllCall("CreateCompatibleBitmap", "Ptr", screenDC, "Int", width, "Int", height, "Ptr")
-        DllCall("SelectObject", "Ptr", this.memoryDC, "Ptr", this.backBitmap)
-        DllCall("ReleaseDC", "Ptr", this.windowHandle, "Ptr", screenDC)
-        this.bufferWidth  := width
-        this.bufferHeight := height
-    }
-
-    ; Copies the completed back-buffer to the overlay window's screen DC for flicker-free display.
-    _Blit(width, height)
-    {
-        screenDC := DllCall("GetDC", "Ptr", this.windowHandle, "Ptr")
-        DllCall("BitBlt", "Ptr", screenDC,
-                "Int", 0, "Int", 0, "Int", width, "Int", height,
-                "Ptr", this.memoryDC, "Int", 0, "Int", 0, "UInt", 0x00CC0020)   ; SRCCOPY
-        DllCall("ReleaseDC", "Ptr", this.windowHandle, "Ptr", screenDC)
-    }
+    ; _InitBuffers / _Blit are inherited from GdiOverlayBase (same impl).
 
     ; ── Map Hack: walkable terrain border overlay ──────────────────────────────────
 
@@ -1794,7 +1788,7 @@ class RadarOverlay
         NumPut("Int", p2x, pts, 16), NumPut("Int", p2y, pts, 20)
 
         DllCall("PlgBlt",
-            "Ptr", this.memoryDC,
+            "Ptr", this.memDC,
             "Ptr", pts,
             "Ptr", this._mapHackDC,
             "Int", 0, "Int", 0,
@@ -1804,39 +1798,14 @@ class RadarOverlay
             "Int", 0, "Int", 0)
     }
 
-    ; Hides the overlay GUI window and resets the visibility flag.
-    Hide()
-    {
-        if this.isVisible
-        {
-            this.overlayGui.Hide()
-            this.isVisible := false
-        }
-    }
+    ; Hide() and SetAlpha() are inherited from GdiOverlayBase.
 
-    ; Sets the opacity of all drawn content (0=invisible, 255=fully opaque).
-    ; Combined with the color-key so background stays fully transparent.
-    SetAlpha(alpha)
-    {
-        this._alpha := alpha
-        if this.windowHandle
-            WinSetTransColor("010101 " alpha, this.windowHandle)
-    }
-
-    ; Destructor: hides the overlay and releases all GDI objects (cached pens/brushes + back-buffer).
+    ; Destructor: hide, release the maphack bitmap pair, then let the base free the
+    ; cached pens/brushes and the back-buffer.
     __Delete()
     {
         this.Hide()
         this._DestroyMapHackBitmap()
-        for _, pen in this._penCache
-            DllCall("DeleteObject", "Ptr", pen)
-        for _, brush in this._brushCache
-            DllCall("DeleteObject", "Ptr", brush)
-        if this._bgBrush
-            DllCall("DeleteObject", "Ptr", this._bgBrush)
-        if this.backBitmap
-            DllCall("DeleteObject", "Ptr", this.backBitmap)
-        if this.memoryDC
-            DllCall("DeleteDC", "Ptr", this.memoryDC)
+        super.__Delete()
     }
 }

@@ -393,6 +393,29 @@ TryCombatAutomation(radarSnap, gameHwnd)
 ; ── Combat Detection ──────────────────────────────────────────────────────
 ; Scans entity cache for hostile, alive, targetable monsters within range.
 ; Returns: Map with hostileCount, nearestDist, nearestPath
+; Lightweight, always-available combat-presence check. Mirrors the bot's
+; idle<->combat state machine but uses cheap Euclidean distance (no terrain
+; pathfinding) so it can run every tick when the AutoPilot bot is off. Reuses
+; the same g_combatRange / g_combatDisengageRange tuning for engage/disengage
+; hysteresis and updates the shared g_combatState. No return value.
+UpdateCombatPresence(radarSnap)
+{
+    global g_combatState, g_combatRange, g_combatDisengageRange
+    info := _DetectCombat(radarSnap)
+    n := info["hostileCount"]
+    d := info["nearestDist"]   ; Euclidean (terrain distance is bot-only)
+    if (g_combatState = "combat")
+    {
+        if (n = 0 || d > g_combatDisengageRange)
+            g_combatState := "idle"
+    }
+    else
+    {
+        if (n > 0 && d <= g_combatRange)
+            g_combatState := "combat"
+    }
+}
+
 _DetectCombat(radarSnap)
 {
     global g_combatRange, g_reader

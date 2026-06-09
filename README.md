@@ -4,7 +4,7 @@
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
-![Version](https://img.shields.io/badge/version-v0.4.12.2-blue)
+![Version](https://img.shields.io/badge/version-v0.45.11.6-blue)
 ![Build](https://img.shields.io/badge/build-stable-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
@@ -133,7 +133,12 @@ Filter ground drops by rarity (Normal · Magic · Rare · Unique · Currency) an
 
 **Zone Navigation** — A\* pathfinder with adaptive step sizes (2/4/8) and automatic AreaTransition detection.
 
-**Player HUD** — compact vitals overlay readable at a glance during combat.
+**Vitals overlay** — a fully configurable replacement for the old fixed Player HUD. Life, Mana and Energy Shield each render as their **own** independently placeable bar — drag-to-place edit mode, per-bar size, foreground/background/outline colours, opacity, and any combination of current / max / percentage text.
+
+- **Per-bar visibility rules** — each bar carries a prioritised condition list (drag & drop to reorder, add/remove, import/export). Conditions include **On Low Vital** (ES / Life / Mana threshold), **In Combat**, and per-condition **True / False** booleans, combined with Match All / Any and a Show / Hide outcome.
+- **Combat without the bot** — the **In Combat** condition is driven by a lightweight, proximity-only combat detector, so a bar can appear/disappear based on nearby hostiles even when AutoPilot is switched off (and it costs nothing when no bar uses it).
+
+**Unified overlay manager** — radar, vitals, focus and notification overlays all run through one manager with a shared per-tick context and a single visibility policy: they're hidden from the taskbar (`+ToolWindow`), hide when you alt-tab away from PoE, and no longer flicker on transient memory-read gaps.
 
 ### 🗺 GGPK Maphack
 
@@ -360,8 +365,13 @@ InGameStateMonitor.ahk          ─ main entry / WebView host (the only .ahk in 
 │   └── ProcessMemory.ahk            ─ RPM wrapper, pointer chain helpers
 │
 ├── Overlays
+│   ├── OverlayManager.ahk      ─ owns every overlay, shared per-tick context
+│   ├── OverlayContext.ahk      ─ snapshot/reader/window state passed to overlays
+│   ├── PlayOverlayPolicy.ahk   ─ single play-overlay visibility gate
+│   ├── GdiOverlayBase.ahk      ─ reusable transparent, click-through GDI layer
 │   ├── RadarOverlay.ahk        ─ GDI overlay + zone reveal + A* drawing
-│   ├── PlayerHUD.ahk           ─ compact vitals overlay
+│   ├── VitalsOverlay.ahk       ─ configurable Life/Mana/ES bars (replaces PlayerHUD)
+│   ├── NotificationOverlay.ahk ─ map-independent banner layer
 │   └── Lib/TerrainPathfinder.ahk ─ A* with adaptive step sizing
 │
 ├── GGPK Maphack (.NET 8)
