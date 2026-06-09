@@ -231,24 +231,29 @@
       .subtab-group-label { display: none; }
     }
 
-    /* ── Compact stage 2c: ≤ 700px — let the PILL row scroll sideways ───
-       The pills + Snap/PoE2 button are flex: nowrap, so at a window this
-       narrow they could run past the right edge and clip the Snap button
-       off. Allow a horizontal scroll instead, so nothing becomes
-       unreachable — the scrollbar (the shared brass ::-webkit-scrollbar
-       style defined above) only appears when the row actually overflows.
-       overflow-y MUST be hidden (not visible): a horizontal-only scroll
-       otherwise promotes the vertical axis to auto and a stray vertical
-       scrollbar can appear; the pill glows clip a hair at this width, an
-       accepted trade for a window this small. */
+    /* ── Compact stage 2c: ≤ 700px — shrink the pills harder ───────────
+       Squeeze the icon pills (tighter padding/gap, smaller glyph + dot) so
+       the whole row — pills + Snap/PoE2 button — keeps fitting on one line
+       WITHOUT a scrollbar. A scrollbar would add its height to bar 1 and
+       push the logo out of line with the sub-tab bar, so we avoid it
+       entirely here. overflow: hidden is only a guard so the rightmost
+       items can't spill over the window controls at extreme widths. */
     @media (max-width: 700px) {
       #header-pills {
-        overflow-x: auto;
-        overflow-y: hidden;
+        overflow: hidden;
+        gap: 4px;
       }
-      /* Only override the height — the thumb/track keep the shared brass
-         ::-webkit-scrollbar style. 5px is slim enough for the short row. */
-      #header-pills::-webkit-scrollbar { height: 5px; }
+      #header-pills .pill {
+        padding: 2px 4px;
+        gap: 2px;
+      }
+      #header-pills .pill .dot {
+        width: 5px;
+        height: 5px;
+      }
+      #header-pills .pill[data-icon]::after {
+        font-size: 11px;
+      }
     }
     /* Inner gilded hair-rule beneath the brown border. Mirrors the inventory
        toolbar's signature so the whole top of the app reads as one frame. */
