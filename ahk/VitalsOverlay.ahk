@@ -478,8 +478,9 @@ _VitalsDefaultBar(enabled, xPct, yPct, w, h, fg, bg, outline)
 ; gotcha), then overlays any persisted values from poeformance_config.ini [Vitals].
 LoadVitalsConfig()
 {
-    global g_vitalsEditMode, g_vitalsBars
+    global g_vitalsEditMode, g_vitalsBars, g_vitalsNeedsCombat
     g_vitalsEditMode := false
+    g_vitalsNeedsCombat := false   ; recomputed below once conditions are known
     ; Default layout: three stacked bars near the top-centre (mirrors the old HUD).
     g_vitalsBars := Map(
         "life", _VitalsDefaultBar(true, 0.430, 0.020, 220, 16, "#DD2222", "#221010", "#555555"),
@@ -507,6 +508,29 @@ LoadVitalsConfig()
         bar["match"]   := (IniRead(f, "Vitals", pre "match", bar["match"]) = "any") ? "any" : "all"
         bar["outcome"] := (IniRead(f, "Vitals", pre "outcome", bar["outcome"]) = "hide") ? "hide" : "show"
         bar["conditions"] := _VitalsCondsFromStr(IniRead(f, "Vitals", pre "conds", ""))
+    }
+    _VitalsRecomputeNeeds()
+}
+
+; Recomputes g_vitalsNeedsCombat: true when any bar has an "In Combat"
+; condition, so the hot path only runs the standalone combat detector when a
+; visibility rule actually depends on it. No parameters; no return value.
+_VitalsRecomputeNeeds()
+{
+    global g_vitalsBars, g_vitalsNeedsCombat
+    g_vitalsNeedsCombat := false
+    if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
+        return
+    for id, bar in g_vitalsBars
+    {
+        if !(bar.Has("conditions") && Type(bar["conditions"]) = "Array")
+            continue
+        for c in bar["conditions"]
+            if (IsObject(c) && c.Has("type") && c["type"] = "combat")
+            {
+                g_vitalsNeedsCombat := true
+                return
+            }
     }
 }
 
@@ -592,6 +616,7 @@ _ApplyVitals(payload)
         if (p.Has("conditions") && Type(p["conditions"]) = "Array")
             bar["conditions"] := _VitalsNormalizeConds(p["conditions"])
     }
+    _VitalsRecomputeNeeds()
 }
 
 ; Serialises the vitals config (bars + edit-mode flag + visibility) for the header push.
@@ -622,6 +647,7 @@ _ImportVitalsVisibility(barId)
         bar["match"] := (parsed["match"] = "any") ? "any" : "all"
     if (parsed.Has("outcome"))
         bar["outcome"] := (parsed["outcome"] = "hide") ? "hide" : "show"
+    _VitalsRecomputeNeeds()
     SaveVitalsConfig()
     PushHeaderToWebView()
 }

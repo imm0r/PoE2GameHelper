@@ -24,6 +24,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_overlayManager, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs
+        global g_autoPilotEnabled, g_vitalsNeedsCombat
         if g_updatesPaused
         {
             if IsObject(g_overlayManager)
@@ -73,6 +74,14 @@ UpdateRadarFast()
 
         ; ── AutoPilot (state machine: combat → explore, owns shared guards) ──
         TryAutoPilot(radarSnap)
+
+        ; ── Standalone combat presence ──────────────────────────────────────
+        ; The AutoPilot loop only maintains g_combatState while it is enabled.
+        ; When the bot is off but a feature needs combat (e.g. a Vitals bar with
+        ; an "In Combat" condition), keep the flag fresh with a lightweight,
+        ; proximity-only detector. Skipped entirely when nothing needs it.
+        if (!g_autoPilotEnabled && IsSet(g_vitalsNeedsCombat) && g_vitalsNeedsCombat)
+            UpdateCombatPresence(radarSnap)
 
         ; ── Entity alerts + banner — every tick, outside the claim chain, map-independent ──
         TryEntityAlerts(radarSnap)

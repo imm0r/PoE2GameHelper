@@ -116,6 +116,7 @@ g_playerHud := 0   ; legacy alias -> the manager-owned VitalsOverlay (set in Loa
 g_vitalsOverlay := 0   ; reference to the manager-owned VitalsOverlay (set in LoadOverlaySystem)
 g_vitalsBars := 0      ; Map(barId -> config Map); seeded by LoadVitalsConfig()
 g_vitalsEditMode := false   ; drag-to-place layout edit mode for the vitals bars
+g_vitalsNeedsCombat := false   ; true when a vitals bar uses an "In Combat" condition (gates the standalone combat detector)
 g_notifyOverlay := 0   ; reference to the manager-owned NotificationOverlay (set in LoadOverlaySystem)
 g_focusOverlay := 0   ; reference to the manager-owned FocusOverlay (set in LoadOverlaySystem)
 g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active
