@@ -10,39 +10,49 @@ _JsonParseSimple(json)
 {
     json := Trim(json)
     if (SubStr(json, 1, 1) = "{")
-    {
-        result := Map()
-        inner := SubStr(json, 2, StrLen(json) - 2)
-        pos := 1
-        while (pos <= StrLen(inner))
-        {
-            ; Skip whitespace and commas
-            while (pos <= StrLen(inner) && InStr(", `t`r`n", SubStr(inner, pos, 1)))
-                pos++
-            if (pos > StrLen(inner))
-                break
-            ; Read quoted key
-            if (SubStr(inner, pos, 1) != '"')
-                break
-            pos++
-            keyEnd := InStr(inner, '"', true, pos)
-            if !keyEnd
-                break
-            key := SubStr(inner, pos, keyEnd - pos)
-            pos := keyEnd + 1
-            ; Skip colon and whitespace
-            while (pos <= StrLen(inner) && InStr(": `t", SubStr(inner, pos, 1)))
-                pos++
-            ; Read value (string, number, bool, array, or nested object)
-            valResult := _JsonReadValue(inner, pos)
-            result[key] := valResult[1]
-            pos := valResult[2]
-        }
-        return result
-    }
+        return _JsonReadObject(json, 1)[1]
     if (SubStr(json, 1, 1) = "[")
         return _JsonReadArray(json, 1)[1]
     return json
+}
+
+; Reads a JSON object starting at position pos (on the opening brace) in string s.
+; Recurses into nested objects/arrays via _JsonReadValue. Returns: [Map, newPosition].
+_JsonReadObject(s, pos)
+{
+    result := Map()
+    pos++  ; skip opening brace
+    while (pos <= StrLen(s))
+    {
+        ; Skip whitespace and commas
+        while (pos <= StrLen(s) && InStr(", `t`r`n", SubStr(s, pos, 1)))
+            pos++
+        if (pos > StrLen(s))
+            break
+        ch := SubStr(s, pos, 1)
+        if (ch = "}")
+        {
+            pos++
+            break
+        }
+        ; Read quoted key
+        if (ch != '"')
+            break
+        pos++
+        keyEnd := InStr(s, '"', true, pos)
+        if !keyEnd
+            break
+        key := SubStr(s, pos, keyEnd - pos)
+        pos := keyEnd + 1
+        ; Skip colon and whitespace
+        while (pos <= StrLen(s) && InStr(": `t`r`n", SubStr(s, pos, 1)))
+            pos++
+        ; Read value (string, number, bool, array, or nested object)
+        valResult := _JsonReadValue(s, pos)
+        result[key] := valResult[1]
+        pos := valResult[2]
+    }
+    return [result, pos]
 }
 
 ; Reads a single JSON value starting at position pos in string s.
@@ -77,28 +87,7 @@ _JsonReadValue(s, pos)
     if (ch = "[")
         return _JsonReadArray(s, pos)
     if (ch = "{")
-    {
-        ; Nested object — skip balanced braces and return empty Map
-        depth := 0
-        start := pos
-        while (pos <= StrLen(s))
-        {
-            c := SubStr(s, pos, 1)
-            if (c = "{")
-                depth++
-            else if (c = "}")
-            {
-                depth--
-                if (depth = 0)
-                {
-                    pos++
-                    break
-                }
-            }
-            pos++
-        }
-        return [Map(), pos]
-    }
+        return _JsonReadObject(s, pos)   ; nested object — parse recursively
     ; Number, boolean, or null literal
     end := pos
     while (end <= StrLen(s) && !InStr(",]}", SubStr(s, end, 1)))
