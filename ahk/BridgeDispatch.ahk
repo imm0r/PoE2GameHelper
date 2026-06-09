@@ -137,14 +137,12 @@ _DispatchBridgeCall(method, args)
         case "ToggleZoneNav":
             global g_zoneNavEnabled
             g_zoneNavEnabled := !g_zoneNavEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._navEnabled := g_zoneNavEnabled
+            ; RadarOverlay reads g_zoneNavEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
         case "ToggleMapHack":
             global g_mapHackEnabled
             g_mapHackEnabled := !g_mapHackEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._mapHackEnabled := g_mapHackEnabled
+            ; RadarOverlay reads g_mapHackEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
         case "SetMaphackSource":
@@ -200,8 +198,7 @@ _DispatchBridgeCall(method, args)
         case "ToggleRangeCircles":
             global g_rangeCirclesEnabled
             g_rangeCirclesEnabled := !g_rangeCirclesEnabled
-            if (g_radarOverlay)
-                g_radarOverlay._rangeCirclesEnabled := g_rangeCirclesEnabled
+            ; RadarOverlay reads g_rangeCirclesEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
         case "ToggleAutoPilot":
             global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
