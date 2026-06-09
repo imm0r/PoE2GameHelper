@@ -9526,7 +9526,9 @@
         set('x', +(((b.xPct ?? 0) * 100).toFixed(1)));
         set('y', +(((b.yPct ?? 0) * 100).toFixed(1)));
         set('opacity', Math.round(b.opacity ?? 100));
-        const ov = document.getElementById('v-' + id + '-opval'); if (ov) ov.textContent = Math.round(b.opacity ?? 100) + '%';
+        const ov = document.getElementById('v-' + id + '-opval');
+        const osl = document.getElementById('v-' + id + '-opacity');
+        if (ov) { ov.textContent = Math.round(b.opacity ?? 100) + '%'; if (osl) _posVal(osl, ov); }
         set('tCur', b.tCur, true);
         set('tMax', b.tMax, true);
         set('tPct', b.tPct, true);
@@ -9574,7 +9576,7 @@
     function vitalsOpInput(id) {
       const el = document.getElementById('v-' + id + '-opacity');
       const ov = document.getElementById('v-' + id + '-opval');
-      if (el && ov) ov.textContent = Math.round(+el.value) + '%';
+      if (el && ov) { ov.textContent = Math.round(+el.value) + '%'; _posVal(el, ov); }
       vitalsPush();
     }
 
