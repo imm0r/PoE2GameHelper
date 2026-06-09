@@ -85,6 +85,11 @@ PatchMaint_StageData()
     else
         _PM_Step("data", "running", "GGPK refresh failed: " ((Type(res) = "Map") ? res["msg"] : "unknown"))
 
+    ; Dump the poe_data_tools CSVs (feeds build_item_names_csv.py → skill /
+    ; unique-IVI name maps). Best-effort: a failure just leaves those two maps
+    ; at their committed (possibly stale) values instead of breaking.
+    _PM_RunDumpTables()
+
     pyRes := _PM_RunPythonPipeline()
     pyOk := (Type(pyRes) = "Map" && pyRes["ok"])
 
@@ -107,7 +112,12 @@ _PM_RunPythonPipeline()
         return Map("ran", false, "ok", false)
     }
     toolsDir := A_ScriptDir "\tools"
-    scripts := ["extract_stats_dat.py", "build_stat_desc_map.py", "build_item_names.py", "extract_monster_names.py"]
+    ; build_item_names_csv.py runs LAST: it supersedes build_item_names.py and
+    ; additionally emits skill_name_map.tsv + unique_ivi_name_map.tsv (skill /
+    ; unique-by-IVI names). It needs the poe_data_tools CSVs from the dump_tables
+    ; step (_PM_RunDumpTables, run just before this); if those are missing it
+    ; exits cleanly and the older scripts' output stands.
+    scripts := ["extract_stats_dat.py", "build_stat_desc_map.py", "build_item_names.py", "extract_monster_names.py", "build_item_names_csv.py"]
     okCount := 0
     ranCount := 0
     for i, s in scripts
@@ -137,6 +147,50 @@ _PM_RunPythonPipeline()
     if (ranCount > 0)
         _PM_Step("data", "running", "Python regeneration: " okCount "/" ranCount " script(s) ok.")
     return Map("ran", ranCount > 0, "ok", okCount > 0)
+}
+
+; Dumps the .datc64 tables to CSV via tools/dump_tables.bat (poe_data_tools.exe),
+; which build_item_names_csv.py then reads to build skill_name_map.tsv +
+; unique_ivi_name_map.tsv. Best-effort: skips when the tool/bat is missing, and
+; passes the Steam library root derived from the cached GGPK index path when it
+; can (else lets the bat auto-detect). Returns Map("ran", bool, "ok", bool).
+_PM_RunDumpTables()
+{
+    toolsDir := A_ScriptDir "\tools"
+    batPath  := toolsDir "\dump_tables.bat"
+    pdtPath  := toolsDir "\poe_data_tools.exe"
+    if !(FileExist(batPath) && FileExist(pdtPath))
+    {
+        _PM_Step("data", "running", "dump_tables.bat / poe_data_tools.exe missing — skipping CSV dump (skill / unique-IVI maps keep their committed values).")
+        return Map("ran", false, "ok", false)
+    }
+
+    ; Derive the Steam library root from <root>\steamapps\common\…\_.index.bin.
+    steamArg := ""
+    idx := IniRead(_ConfigPath(), "GgpkTools", "lastIndexPath", "")
+    p := InStr(idx, "\steamapps\")
+    if (p > 0)
+        steamArg := ' "' SubStr(idx, 1, p - 1) '"'
+
+    _PM_Step("data", "running", "Dumping .datc64 tables (poe_data_tools)…")
+    stderrF := A_Temp "\poe-dumptables.stderr.txt"
+    try FileDelete(stderrF)
+    exit := 1
+    try {
+        exit := RunWait(A_ComSpec ' /c "' batPath '"' steamArg ' 2> "' stderrF '"', toolsDir, "Hide")
+    } catch as ex {
+        exit := -1
+    }
+    ok := (exit = 0)
+    if !ok
+    {
+        tail := ""
+        try tail := Trim(FileRead(stderrF, "UTF-8"), " `r`n`t")
+        try LogError("PatchMaint dump_tables exit " exit (tail = "" ? "" : ": " tail))
+        _PM_Step("data", "running", "CSV dump failed (exit " exit ") — skill / unique-IVI maps keep their committed values.")
+    }
+    try FileDelete(stderrF)
+    return Map("ran", true, "ok", ok)
 }
 
 ; Returns a working Python launcher prefix ("py -3" / "python" / "python3") or
