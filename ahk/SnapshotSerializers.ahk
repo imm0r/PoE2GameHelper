@@ -648,6 +648,7 @@ _BuildSkillsJson(snapshot)
             canUse      := (s.Has("canUse") && s["canUse"]) ? "true" : "false"
             activeCds   := s.Has("activeCooldowns") ? Integer(s["activeCooldowns"]) : 0
             maxUses     := s.Has("maxUses")     ? Integer(s["maxUses"])     : 0
+            remainingMs := s.Has("remainingMs") ? Integer(s["remainingMs"]) : 0
             equipId     := s.Has("equipId")     ? s["equipId"]             : 0
             equipHex    := Format("0x{:X}", equipId & 0xFFFFFFFF)
             ; Player/equipped skill (true) vs internal action skill (false). The UI
@@ -665,6 +666,7 @@ _BuildSkillsJson(snapshot)
                 . ',"ok":' canUse
                 . ',"ac":' activeCds
                 . ',"mu":' maxUses
+                . ',"rem":' remainingMs
                 . ',"pl":' isPlayer
                 . ',"eq":"' equipHex '"}'
             first := false
