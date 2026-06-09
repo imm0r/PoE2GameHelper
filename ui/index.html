@@ -157,7 +157,7 @@
         row-gap: 3px;
       }
       #header-pills .hbtn {
-        padding: 2px 7px;
+        padding: 0 7px;
         font-size: 9px;
         letter-spacing: 0.06em;
       }
@@ -581,7 +581,11 @@
       margin-left: auto;
       display: flex;
       gap: 4px;
-      align-items: center
+      /* Stretch to the pill-row height and pass that down to the Snap/PoE2
+         button so it ends up exactly as tall as the pills (which define the
+         row height) across every compact stage. */
+      align-self: stretch;
+      align-items: stretch
     }
 
     /* Header utility buttons (Snap, etc.) — Cinzel small-caps in codex tones. */
@@ -589,9 +593,14 @@
       background: linear-gradient(180deg, rgba(28,18,10,0.85), rgba(20,12,6,0.95));
       border: 1px solid var(--codex-rule);
       color: var(--codex-text-dim);
-      padding: 4px 12px;
+      /* No vertical padding — the button stretches to the pill-row height
+         (see #header-right) and centers its label, so its box matches the
+         pills exactly instead of being a few px taller. */
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
       font-family: var(--codex-display);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       letter-spacing: .12em;
       text-transform: uppercase;
