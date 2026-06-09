@@ -9373,9 +9373,9 @@
                   <div class="vrule" style="margin-top:6px;flex-wrap:wrap;gap:6px">
                     <select id="vaddc-${id}" class="vcond-add">
                       <option value="combat">In Combat</option>
-                      <option value="lowlife">On Low Life</option>
+                      <option value="lowvital">On Low Vital</option>
                       <option value="town">In Town/Hideout</option>
-                      <option value="map">While Map open</option>
+                      <option value="map">On large Map</option>
                     </select>
                     <button class="hk-btn" title="Add the selected condition to this bar" onclick="vitalsAddCond('${id}')">+ Condition</button>
                     <span style="flex:1 1 auto"></span>
@@ -9402,8 +9402,13 @@
     }
 
     // ── Per-bar visibility condition list (drag&drop, add/remove, import/export) ──
-    const VCOND_LABELS = { combat: 'In Combat', lowlife: 'On Low Life', town: 'In Town/Hideout', map: 'While Map open' };
+    const VCOND_LABELS = { combat: 'In Combat', lowvital: 'On Low', town: 'In Town/Hideout', map: 'On large Map' };
     const _vCondSig = {};
+    // Signature of a bar's conditions+combiner, used to skip needless re-renders.
+    function _vCondSigOf(b) {
+      return JSON.stringify((b.conditions || []).map(c => [c.type, c.want !== false, c.resource || '', c.value ?? '']))
+        + '|' + (b.match || 'all') + '|' + (b.outcome || 'show');
+    }
 
     function _vCondArr(id) {
       const b = _vitalsCfg.bars[id]; if (!b) return null;
@@ -9425,11 +9430,17 @@
       const conds = _vCondArr(id) || [];
       host.innerHTML = conds.length ? conds.map((c, i) => {
         const lbl = VCOND_LABELS[c.type] || c.type;
-        const extra = (c.type === 'lowlife')
-          ? ` <span style="color:var(--subtext);font-size:11px">Life&nbsp;&lt;</span> ${_vCondStepper(id, i, c.value ?? 50)} <span style="color:var(--subtext);font-size:11px">%</span>`
+        const want = c.want !== false;
+        const extra = (c.type === 'lowvital')
+          ? ` <select class="vcond-add" title="Which resource" onchange="vitalsSetCondRes('${id}',${i},this.value)">`
+            + `<option value="es"${c.resource === 'es' ? ' selected' : ''}>ES</option>`
+            + `<option value="life"${(c.resource || 'life') === 'life' ? ' selected' : ''}>Life</option>`
+            + `<option value="mana"${c.resource === 'mana' ? ' selected' : ''}>Mana</option></select>`
+            + ` <span style="color:var(--subtext);font-size:11px">&lt;</span> ${_vCondStepper(id, i, c.value ?? 50)} <span style="color:var(--subtext);font-size:11px">%</span>`
           : '';
         return `<div class="vrule" ondragover="vCondDragOver(event)" ondragleave="vCondDragLeave(event)" ondrop="vCondDrop(event,'${id}',${i})">`
           + `<span class="hk-grip" draggable="true" title="Drag to reorder" ondragstart="vCondDragStart(event,'${id}',${i})" ondragend="vCondDragEnd(event)">⠿</span>`
+          + `<span class="vrule-act ${want ? 'vact-show' : 'vact-hide'}" title="Condition must be True (state present) or False (state absent) to match" onclick="vitalsToggleWant('${id}',${i})">${want ? 'True' : 'False'}</span>`
           + `<span class="vrule-name" style="min-width:0">${lbl}</span>${extra}`
           + `<span style="flex:1 1 auto"></span>`
           + `<button class="hk-btn danger" title="Remove this condition" onclick="vitalsDelCond('${id}',${i})">✕</button>`
@@ -9448,8 +9459,8 @@
       const a = _vCondArr(id); if (!a) return;
       const sel = document.getElementById('vaddc-' + id);
       const type = sel ? sel.value : 'combat';
-      const c = { type };
-      if (type === 'lowlife') c.value = 50;
+      const c = { type, want: true };
+      if (type === 'lowvital') { c.resource = 'life'; c.value = 50; }
       a.push(c);
       renderVitalsConds(id); vitalsPush();
     }
@@ -9457,6 +9468,16 @@
       const a = _vCondArr(id); if (!a || idx < 0 || idx >= a.length) return;
       a.splice(idx, 1);
       renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsToggleWant(id, idx) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].want = (a[idx].want === false);
+      renderVitalsConds(id); vitalsPush();
+    }
+    function vitalsSetCondRes(id, idx, res) {
+      const a = _vCondArr(id); if (!a || !a[idx]) return;
+      a[idx].resource = res;
+      vitalsPush();
     }
     function vitalsSetCondVal(id, idx, val) {
       const a = _vCondArr(id); if (!a || !a[idx]) return;
@@ -9534,7 +9555,7 @@
         set('tPct', b.tPct, true);
         _vSwatch(id, 'fg', b.fg); _vSwatch(id, 'bg', b.bg); _vSwatch(id, 'outline', b.outline);
         // Re-render the condition list only when it actually changed (avoids churn).
-        const sig = JSON.stringify((b.conditions || []).map(c => [c.type, c.value ?? ''])) + '|' + (b.match || 'all') + '|' + (b.outcome || 'show');
+        const sig = _vCondSigOf(b);
         if (_vCondSig[id] !== sig) { _vCondSig[id] = sig; renderVitalsConds(id); }
       }
     }
@@ -9558,16 +9579,18 @@
           tMax: g('tMax') ? g('tMax').checked : cur.tMax,
           tPct: g('tPct') ? g('tPct').checked : cur.tPct,
         };
-        bar.conditions = Array.isArray(cur.conditions)
-          ? cur.conditions.map(c => (c.type === 'lowlife' ? { type: 'lowlife', value: +(c.value ?? 50) } : { type: c.type }))
-          : [];
+        bar.conditions = (Array.isArray(cur.conditions) ? cur.conditions : []).map(c => {
+          const o = { type: c.type, want: c.want !== false };
+          if (c.type === 'lowvital') { o.resource = c.resource || 'life'; o.value = +(c.value ?? 50); }
+          return o;
+        });
         if (cur.fg) bar.fg = cur.fg;
         if (cur.bg) bar.bg = cur.bg;
         if (cur.outline) bar.outline = cur.outline;
         payload[id] = bar;
         _vitalsCfg.bars[id] = Object.assign(_vitalsCfg.bars[id] || {}, bar);
         // keep the sig in step with what we just sent so the header echo doesn't re-render
-        _vCondSig[id] = JSON.stringify(bar.conditions.map(c => [c.type, c.value ?? ''])) + '|' + bar.match + '|' + bar.outcome;
+        _vCondSig[id] = _vCondSigOf(bar);
       }
       clearTimeout(_vitalsPushTimer);
       _vitalsPushTimer = setTimeout(() => ahkCall('SetVitals', payload), 120);

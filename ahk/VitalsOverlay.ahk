@@ -350,68 +350,87 @@ _VitalsCondShow(bar, snap)
     return (matched = showOnMatch)
 }
 
-; Returns true when a single condition Map ({type, value}) currently applies.
+; Returns true when a single condition Map ({type, want, resource, value})
+; currently holds. Each condition carries its own expected boolean ("want"):
+; the raw game state is compared against it, so "map want=false" matches when
+; the large map is NOT open. Defaults: want=true, resource=life, value=50.
 _VitalsCondMatch(c, snap)
 {
     if !(IsObject(c) && c.Has("type"))
         return false
     type := c["type"] ""
+    want := (c.Has("want") && !c["want"]) ? false : true
+    raw  := false
     if (type = "town")
     {
         wad := (snap && IsObject(snap) && snap.Has("worldAreaDat")) ? snap["worldAreaDat"] : 0
-        return (wad && IsObject(wad)
+        raw := (wad && IsObject(wad)
             && ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))) ? true : false
     }
-    if (type = "map")
+    else if (type = "map")
     {
         inGs := (snap && IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
         ui   := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
         lm   := (ui && IsObject(ui) && ui.Has("largeMapData")) ? ui["largeMapData"] : 0
-        return (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"]) ? true : false
+        raw := (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"]) ? true : false
     }
-    if (type = "combat")
+    else if (type = "combat")
     {
         global g_combatState
-        return (IsSet(g_combatState) && g_combatState = "combat") ? true : false
+        raw := (IsSet(g_combatState) && g_combatState = "combat") ? true : false
     }
-    if (type = "lowlife")
+    else if (type = "lowvital")
     {
-        v := _VitalsValue(snap, "life")
+        res := (c.Has("resource") && c["resource"] != "") ? c["resource"] "" : "life"
+        v   := _VitalsValue(snap, res)
         thr := (c.Has("value") && c["value"] != "") ? Number(c["value"]) : 50
-        return (v["max"] > 0 && v["pct"] < thr) ? true : false
+        raw := (v["max"] > 0 && v["pct"] < thr) ? true : false
     }
-    return false
+    else
+        return false
+    return (raw = want)
 }
 
-; Validates a UI/import condition payload (Array of {type,value}) into a clean Array.
+; Validates a UI/import condition payload (Array of {type,want,resource,value})
+; into a clean Array. Legacy "lowlife" maps to "lowvital" (resource life).
 _VitalsNormalizeConds(arr)
 {
     out := []
     if !(arr && Type(arr) = "Array")
         return out
-    static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
+    static valid    := Map("combat", 1, "lowvital", 1, "town", 1, "map", 1)
+    static validRes := Map("life", 1, "es", 1, "mana", 1)
     for c in arr
     {
-        if !(IsObject(c) && c.Has("type") && valid.Has(c["type"] ""))
+        if !(IsObject(c) && c.Has("type"))
             continue
-        m := Map("type", c["type"] "")
-        if (m["type"] = "lowlife")
-            m["value"] := (c.Has("value") && c["value"] != "") ? Min(100, Max(1, Integer(c["value"]))) : 50
+        t := c["type"] ""
+        if (t = "lowlife")
+            t := "lowvital"
+        if !valid.Has(t)
+            continue
+        m := Map("type", t, "want", (c.Has("want") && !c["want"]) ? false : true)
+        if (t = "lowvital")
+        {
+            m["resource"] := (c.Has("resource") && validRes.Has(c["resource"] "")) ? c["resource"] "" : "life"
+            m["value"]    := (c.Has("value") && c["value"] != "") ? Min(100, Max(1, Integer(c["value"]))) : 50
+        }
         out.Push(m)
     }
     return out
 }
 
-; Serialises a condition list to a compact INI string: "type:value,type,...".
+; Serialises a condition list to a compact INI string. Token per condition:
+; "type|want" plus "|resource|value" for lowvital; tokens joined with ",".
 _VitalsCondsToStr(conds)
 {
     out := ""
     if (conds && Type(conds) = "Array")
         for c in conds
         {
-            tok := c["type"]
-            if (c.Has("value"))
-                tok .= ":" c["value"]
+            tok := c["type"] "|" ((c.Has("want") && !c["want"]) ? "0" : "1")
+            if (c["type"] = "lowvital")
+                tok .= "|" (c.Has("resource") ? c["resource"] : "life") "|" (c.Has("value") ? c["value"] : 50)
             out .= (out = "" ? "" : ",") tok
         }
     return out
@@ -421,15 +440,24 @@ _VitalsCondsToStr(conds)
 _VitalsCondsFromStr(s)
 {
     out := []
-    static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
+    static valid    := Map("combat", 1, "lowvital", 1, "town", 1, "map", 1)
+    static validRes := Map("life", 1, "es", 1, "mana", 1)
     for tok in StrSplit(Trim(s), ",")
     {
-        f := StrSplit(Trim(tok), ":")
-        if (f.Length < 1 || !valid.Has(f[1]))
+        f := StrSplit(Trim(tok), "|")
+        if (f.Length < 1)
             continue
-        m := Map("type", f[1])
-        if (f[1] = "lowlife")
-            m["value"] := (f.Length >= 2 && f[2] != "") ? Min(100, Max(1, Integer(f[2]))) : 50
+        t := f[1]
+        if (t = "lowlife")
+            t := "lowvital"
+        if !valid.Has(t)
+            continue
+        m := Map("type", t, "want", (f.Length >= 2 && f[2] = "0") ? false : true)
+        if (t = "lowvital")
+        {
+            m["resource"] := (f.Length >= 3 && validRes.Has(f[3])) ? f[3] : "life"
+            m["value"]    := (f.Length >= 4 && f[4] != "") ? Min(100, Max(1, Integer(f[4]))) : 50
+        }
         out.Push(m)
     }
     return out
