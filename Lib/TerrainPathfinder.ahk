@@ -23,6 +23,7 @@ class TerrainPathfinder
         this._dsz  := 0
         this._maxW := 0
         this._lastDebug := ""
+        this._lastFailExhausted := false
     }
 
     ; Stores terrain data from ReadTerrainData() result.
@@ -45,6 +46,12 @@ class TerrainPathfinder
 
     ; The last debug/reason string from FindPath().
     LastDebug => this._lastDebug
+
+    ; True when the last FindPath() failure exhausted the search space
+    ; (genuinely no route in the padded bounding box) as opposed to giving
+    ; up on its iteration/deadline budget. Callers use this to distinguish
+    ; "unreachable — skip the target" from "just far away — keep trying".
+    LastFailExhausted => this._lastFailExhausted
 
     ; Returns true if grid cell (gx, gy) is walkable (packed nibble terrain data).
     IsWalkable(gx, gy)
@@ -110,6 +117,7 @@ class TerrainPathfinder
     FindPath(startGX, startGY, endGX, endGY)
     {
         buf := this._buf, bpr := this._bpr, rows := this._rows, dsz := this._dsz
+        this._lastFailExhausted := false
         if !buf
         {
             this._lastDebug := "no-terrain"
@@ -128,6 +136,9 @@ class TerrainPathfinder
         eNudge := this.NudgeToWalkable(endGX, endGY)
         if (!sNudge || !eNudge)
         {
+            ; No walkable cell anywhere near an endpoint — treat as a true
+            ; unreachable, not a budget timeout.
+            this._lastFailExhausted := true
             this._lastDebug := "nudge-fail sW=" (sNudge ? "1" : "0") " eW=" (eNudge ? "1" : "0")
             return []
         }
@@ -233,6 +244,11 @@ class TerrainPathfinder
 
         if !found
         {
+            ; Empty heap = the whole (padded) search area was explored and
+            ; the goal was never reached → genuinely no route. A non-empty
+            ; heap means we bailed on the iteration cap or the deadline —
+            ; the target may well be reachable, just far / expensive.
+            this._lastFailExhausted := (heap.Length = 0)
             this._lastDebug := "astar-fail iter=" iter "/" MAX_ITER " heap=" heap.Length " rawD=" rawDist " STEP=" STEP
             return []
         }

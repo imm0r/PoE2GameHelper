@@ -327,7 +327,9 @@ _RunExploration(radarSnap, gameHwnd)
     ; are guaranteed available at this point — both were validated above.
     if (!_planBuilt)
     {
-        _plan := _BuildExplorationPlan(terrain, radarSnap, pGX, pGY)
+        ; _totalWalkable counts coarse (4×4) cells — scale to fine cells so
+        ; the plan's sample spacing reflects the actually walkable area.
+        _plan := _BuildExplorationPlan(terrain, radarSnap, pGX, pGY, _totalWalkable * _STEP * _STEP)
         _planIdx := 1
         _planBuilt := true
         _targetCX := -1   ; force fresh A* on first plan waypoint
@@ -358,7 +360,14 @@ _RunExploration(radarSnap, gameHwnd)
     ; Pick the target: next plan waypoint, or frontier search as a fallback
     ; when the plan is exhausted (catches any leftover unvisited corners
     ; that the sparse sampling missed).
-    if (_planIdx <= _plan.Length && _targetCX < 0)
+    ;
+    ; retryPath: A* previously gave up on its time/iteration budget for the
+    ; current target (NOT unreachable — see LastFailExhausted below). While
+    ; the path is missing, the direct-click fallback further down keeps the
+    ; character moving toward the target; re-attempt A* every 1.5 s — a
+    ; closer start usually lets it finish within budget.
+    retryPath := (_targetCX >= 0 && _pathCoords.Length = 0 && (now - _lastTargetTick) > 1500)
+    if (_planIdx <= _plan.Length && (_targetCX < 0 || retryPath))
     {
         wp := _plan[_planIdx]
         tGX := wp[1]
@@ -370,59 +379,78 @@ _RunExploration(radarSnap, gameHwnd)
         _lastTargetTick := now
         if (_pathCoords.Length = 0)
         {
-            ; A* failed — the waypoint is unreachable from here (walkable
-            ; "island" disconnected from the player's region, or behind a
-            ; closed blockage). Mark its cell visited and skip it instead of
-            ; falling through to the blind "click directly toward target"
-            ; branch, which would click into a wall every 400 ms forever.
-            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
-                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
-            _targetCX := -1
-            _planIdx++
-            g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% wp=" _planIdx "/" _plan.Length ")"
-            return
+            if (_pf.LastFailExhausted)
+            {
+                ; A* explored its whole search area without reaching the
+                ; waypoint — genuinely unreachable (walkable "island"
+                ; disconnected from the player's region). Mark its cell
+                ; visited and skip it instead of falling through to the
+                ; blind "click directly toward target" branch, which would
+                ; click into a wall every 400 ms forever.
+                _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                    , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+                _targetCX := -1
+                _planIdx++
+                g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% wp=" _planIdx "/" _plan.Length ")"
+                return
+            }
+            ; Budget timeout (far target on a huge map) — keep the target and
+            ; fall through: the direct-click fallback walks us closer.
         }
     }
-    else if (_planIdx > _plan.Length && (_targetCX < 0 || (now - _lastTargetTick) > 2000))
+    else if (_planIdx > _plan.Length)
     {
-        ; Plan exhausted — fall back to greedy frontier search.
-        frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
-                                          buf, _bpr, _rows, dsz, _STEP)
-        if (frontier)
+        ; Plan exhausted — greedy frontier search. The target is STICKY: it
+        ; stays until its coarse cell gets marked visited (vision sweep once
+        ; the player is near) or stuck-detection clears it. The previous
+        ; "re-search every 2 s" let the nearest frontier flip direction as
+        ; the player walked, ping-ponging the bot with zero progress.
+        if (_targetCX >= 0 && _targetCY >= 0 && _targetCX < _coarseW && _targetCY < _coarseH
+            && NumGet(_visited.Ptr, _targetCY * _coarseW + _targetCX, "UChar") = 1)
+            _targetCX := -1
+        if (_targetCX < 0 || retryPath)
         {
-            _targetCX := frontier[1]
-            _targetCY := frontier[2]
+            if (_targetCX < 0)
+            {
+                frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
+                                                  buf, _bpr, _rows, dsz, _STEP)
+                if (!frontier)
+                {
+                    g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
+                    return
+                }
+                _targetCX := frontier[1]
+                _targetCY := frontier[2]
+            }
             tGX := _targetCX * _STEP
             tGY := _targetCY * _STEP
             _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
             _pathIdx := 1
+            _lastTargetTick := now
             if (_pathCoords.Length = 0)
             {
-                ; Unreachable frontier (same island problem as plan waypoints).
-                ; Mark it visited so the spiral search returns the next-nearest
-                ; frontier on the following tick instead of this one again.
-                _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
-                    , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
-                _targetCX := -1
-                _lastTargetTick := now
-                g_exploreLastReason := "frontier-unreachable(" g_exploreCurrentPercent "%)"
-                return
+                if (_pf.LastFailExhausted)
+                {
+                    ; Unreachable frontier (island) — mark it visited so the
+                    ; spiral search returns the next-nearest frontier on the
+                    ; following tick instead of this one again.
+                    _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                        , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+                    _targetCX := -1
+                    g_exploreLastReason := "frontier-unreachable(" g_exploreCurrentPercent "%)"
+                    return
+                }
+                ; Budget timeout — keep the sticky target; direct-click
+                ; fallback below moves us closer until A* succeeds.
             }
         }
-        else
-        {
-            _targetCX := -1
-            g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
-            return
-        }
-        _lastTargetTick := now
     }
 
     ; ── Follow path: click toward next waypoint ──────────────────────
     ; Throttle clicks to every 400ms
     if ((now - _lastClickTick) < 400)
     {
-        planTag := (_plan.Length > 0)
+        planTag := (_planIdx <= _plan.Length)
             ? (" wp=" _planIdx "/" _plan.Length)
             : " frontier"
         g_exploreLastReason := "moving(" g_exploreCurrentPercent "%" planTag
@@ -839,7 +867,8 @@ _FindNearbyInteractable(radarSnap, playerWX, playerWY, playerWZ, clickCounts)
 ;     current waypoint is unreachable, so re-plan from the new position
 ;
 ; Returns: Array of [gridX, gridY, kind] tuples. Empty array on failure.
-_BuildExplorationPlan(terrain, radarSnap, startGX, startGY)
+; walkableFine: estimated count of walkable fine cells (0 = unknown).
+_BuildExplorationPlan(terrain, radarSnap, startGX, startGY, walkableFine := 0)
 {
     plan := []
     if !(terrain && IsObject(terrain))
@@ -854,10 +883,15 @@ _BuildExplorationPlan(terrain, radarSnap, startGX, startGY)
         return plan
 
     ; ── Sample walkable cells in a regular grid ─────────────────────
-    ; Spacing chosen to land ~SAMPLE_TARGET points across the zone. Min
-    ; 20 cells so individual waypoints stay visually distinct.
+    ; Spacing chosen to land ~SAMPLE_TARGET points on WALKABLE terrain.
+    ; Basing it on the full grid box broke mostly-void layouts (bridge/
+    ; tower zones like Spires of Deshar, where only a few percent of the
+    ; box is walkable): the spacing came out huge, almost no samples hit
+    ; walkable cells, the plan degenerated to a handful of stops and
+    ; exploration fell into frontier ping-pong right away. Min 20 cells
+    ; so individual waypoints stay visually distinct.
     SAMPLE_TARGET := 60
-    area := gridW * rows
+    area := (walkableFine > 0) ? walkableFine : gridW * rows
     spacing := Max(20, Round(Sqrt(area / SAMPLE_TARGET)))
     half := spacing // 2
 
