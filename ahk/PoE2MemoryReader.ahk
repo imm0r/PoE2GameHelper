@@ -1992,6 +1992,18 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; ── Map element fields ─────────────────────────────────────────────────────
         flags := (N > 0) ? chain[1]["flags"] : 0
         isVisible := (flags >> 11) & 1
+        ; Effective (hierarchical) visibility: bit 11 must be set at EVERY level of
+        ; the already-walked chain (element → … → root). Free — no extra reads.
+        ; Distinguishes "locally flagged visible" from "actually on screen" (e.g.
+        ; the large map element stays locally-visible in town but is hidden by a
+        ; parent — local says open, effective correctly says closed).
+        effVisible := (N > 0) ? true : false
+        for _, link in chain {
+            if (((link["flags"] >> 11) & 1) = 0) {
+                effVisible := false
+                break
+            }
+        }
         sizeW := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"])
         sizeH := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.UiElementBase["UnscaledSize"] + 4)
         shiftX := this.Mem.ReadFloat(mapElemPtr + PoE2Offsets.MapUiElement["Shift"])
@@ -2008,6 +2020,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "localMult", localMult,
             "flags", flags,
             "isVisible", isVisible,
+            "effVisible", effVisible,   ; hierarchical: shown iff every ancestor is too
             "sizeW", sizeW,      ; unscaled element size (UI coords)
             "sizeH", sizeH,
             "shiftX", shiftX,     ; already in screen-pixel units (no additional scaling needed)

@@ -587,15 +587,20 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         mapDebug := Format("lmPtr=0x{:X} mmPtr=0x{:X}", lmPtr, mmPtr)
         if (lm && IsObject(lm) && lm.Has("isVisible"))
         {
-            largeMapOpen := lm["isVisible"] ? true : false
-            mapDebug .= " lmVis=" (lm["isVisible"] ? "1" : "0") " lmFlags=" (lm.Has("flags") ? lm["flags"] : "?")
+            ; "Open" now means EFFECTIVELY visible (hierarchical) — locally flagged
+            ; AND every ancestor visible — so a map that's locally-on but hidden by
+            ; a parent (e.g. in town) correctly reads as closed.
+            lmEff := lm.Has("effVisible") ? lm["effVisible"] : lm["isVisible"]
+            largeMapOpen := lmEff ? true : false
+            mapDebug .= " lmVis=" (lm["isVisible"] ? "1" : "0") " lmEff=" (lmEff ? "1" : "0") " lmFlags=" (lm.Has("flags") ? lm["flags"] : "?")
         }
         else
             mapDebug .= " lmData=NONE"
         if (mm && IsObject(mm) && mm.Has("isVisible"))
         {
-            miniMapOpen := mm["isVisible"] ? true : false
-            mapDebug .= " mmVis=" (mm["isVisible"] ? "1" : "0")
+            mmEff := mm.Has("effVisible") ? mm["effVisible"] : mm["isVisible"]
+            miniMapOpen := mmEff ? true : false
+            mapDebug .= " mmVis=" (mm["isVisible"] ? "1" : "0") " mmEff=" (mmEff ? "1" : "0")
         }
         else
             mapDebug .= " mmData=NONE"
