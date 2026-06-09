@@ -4659,7 +4659,7 @@
                   <label class="toggle"><input type="checkbox" id="tog-vitals"
                       onchange="ahkCall('TogglePlayerHud')"><span class="toggle-slider"></span></label>
                 </div>
-                <div class="cfg-row"><span class="cfg-label">Visible when</span>
+                <div class="cfg-row"><span class="cfg-label">Visibility state</span>
                   <select id="vitals-visibility" onchange="vitalsSetVisibility(this.value)"
                       style="padding:3px 6px;font-size:12px">
                     <option value="ingame">In combat (always in-game)</option>
@@ -5277,6 +5277,23 @@
           background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96));
         }
         #panel-alerts .hk-num-btn:active { color: var(--codex-text); }
+        /* Vitals tab (Config panel) — reuse the themed number stepper + pill captions */
+        #panel-config .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
+        #panel-config .hk-num > input[type=number] { width: 72px; padding-right: 18px; }
+        #panel-config .hk-num > input[type=number]::-webkit-inner-spin-button,
+        #panel-config .hk-num > input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        #panel-config .hk-num-spin { position: absolute; top: 1px; bottom: 1px; right: 1px; width: 15px; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 1px 1px 0; }
+        #panel-config .hk-num-btn {
+          flex: 1; min-height: 0; padding: 0; margin: 0; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          border: none; border-left: 1px solid rgba(90,62,34,0.6);
+          background: linear-gradient(180deg, rgba(60,42,22,0.92), rgba(28,18,10,0.92));
+          color: var(--codex-gold); font-size: 7px; line-height: 1;
+        }
+        #panel-config .hk-num-btn:first-child { border-bottom: 1px solid rgba(90,62,34,0.6); }
+        #panel-config .hk-num-btn:hover { color: var(--codex-gold-hi); background: linear-gradient(180deg, rgba(82,58,30,0.96), rgba(40,26,14,0.96)); }
+        #panel-config .hk-num-btn:active { color: var(--codex-text); }
+        #panel-config .v-cap { color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
         /* Caption next to a pill toggle — carries the text style the old
            wrapping label element used to provide, now that the switch is a .toggle. */
         #panel-hotkeys .hk-cap {
@@ -9301,6 +9318,23 @@
     let _vitalsBuilt = false;
     let _vitalsPushTimer = null;
 
+    // Themed number stepper (matches the Hotkeys/Alerts tabs: hidden native
+    // spinner + gold ▲▼ wired through the shared hkNumStep()).
+    function _vNum(id, sfx, min, max, step) {
+      const st = step ? ` step="${step}"` : '';
+      return `<span class="hk-num"><input type="number" id="v-${id}-${sfx}" min="${min}" max="${max}"${st}`
+           + ` oninput="vitalsPush()" onchange="vitalsPush()">`
+           + `<span class="hk-num-spin">`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button>`
+           + `</span></span>`;
+    }
+    // Pill toggle + caption (the GUI uses pills everywhere, never raw checkboxes).
+    function _vPill(id, sfx, label) {
+      return `<span class="v-cap"><label class="toggle"><input type="checkbox" id="v-${id}-${sfx}"`
+           + ` onchange="vitalsPush()"><span class="toggle-slider"></span></label>${label}</span>`;
+    }
+
     function _vBarSectionHtml(id, label) {
       return `
         <div class="cfg-section">
@@ -9312,38 +9346,24 @@
                     onchange="vitalsPush()"><span class="toggle-slider"></span></label>
               </div>
               <div class="cfg-row"><span class="cfg-label">Size (W × H px)</span>
-                <span style="display:inline-flex;gap:6px;align-items:center">
-                  <input type="number" id="v-${id}-w" min="4" max="4000" oninput="vitalsPush()" style="width:64px">
-                  <span style="color:var(--subtext)">×</span>
-                  <input type="number" id="v-${id}-h" min="2" max="400" oninput="vitalsPush()" style="width:54px">
-                </span>
+                <span style="display:inline-flex;gap:8px;align-items:center">${_vNum(id, 'w', 4, 4000, 1)}<span style="color:var(--subtext)">×</span>${_vNum(id, 'h', 2, 400, 1)}</span>
               </div>
               <div class="cfg-row"><span class="cfg-label">Position (X / Y %)</span>
-                <span style="display:inline-flex;gap:6px;align-items:center">
-                  <input type="number" id="v-${id}-x" min="0" max="100" step="0.5" oninput="vitalsPush()" style="width:64px">
-                  <span style="color:var(--subtext)">/</span>
-                  <input type="number" id="v-${id}-y" min="0" max="100" step="0.5" oninput="vitalsPush()" style="width:64px">
-                </span>
+                <span style="display:inline-flex;gap:8px;align-items:center">${_vNum(id, 'x', 0, 100, 0.5)}<span style="color:var(--subtext)">/</span>${_vNum(id, 'y', 0, 100, 0.5)}</span>
               </div>
-              <div class="cfg-row"><span class="cfg-label">Opacity</span>
-                <span style="display:inline-flex;gap:8px;align-items:center">
-                  <input type="range" id="v-${id}-opacity" min="0" max="100" step="1" oninput="vitalsOpInput('${id}')" style="width:120px">
-                  <span id="v-${id}-opval" style="font-size:11px;color:var(--subtext);min-width:34px">100%</span>
-                </span>
+              <div class="cfg-slider-row"><span class="cfg-label">Opacity</span>
+                <div class="slider-wrap"><span class="slider-val" id="v-${id}-opval">100%</span>
+                  <input type="range" id="v-${id}-opacity" min="0" max="100" step="1" oninput="vitalsOpInput('${id}')"></div>
               </div>
               <div class="cfg-row"><span class="cfg-label">Colours</span>
-                <span style="display:inline-flex;gap:12px;align-items:center;font-size:11px;color:var(--subtext)">
+                <span style="display:inline-flex;gap:14px;align-items:center;font-size:11px;color:var(--subtext)">
                   <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-fg" onclick="vitalsPick('${id}','fg')"></span>Fill</span>
                   <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-bg" onclick="vitalsPick('${id}','bg')"></span>Back</span>
                   <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-outline" onclick="vitalsPick('${id}','outline')"></span>Outline</span>
                 </span>
               </div>
               <div class="cfg-row"><span class="cfg-label">Text</span>
-                <span style="display:inline-flex;gap:12px;align-items:center;font-size:11px;color:var(--subtext)">
-                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tCur" onchange="vitalsPush()">Current</label>
-                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tMax" onchange="vitalsPush()">Max</label>
-                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tPct" onchange="vitalsPush()">Percent</label>
-                </span>
+                <span style="display:inline-flex;gap:14px;align-items:center">${_vPill(id, 'tCur', 'Current')}${_vPill(id, 'tMax', 'Max')}${_vPill(id, 'tPct', 'Percent')}</span>
               </div>
             </div>
           </details>
