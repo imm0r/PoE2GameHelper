@@ -78,7 +78,7 @@ class VitalsBarWindow extends GdiOverlayBase
     ; ── Overlay contract ────────────────────────────────────────────────────
     ShouldShow(ctx)
     {
-        global g_playerHudEnabled, g_vitalsBars, g_vitalsEditMode, g_vitalsVisibility
+        global g_playerHudEnabled, g_vitalsBars, g_vitalsEditMode
         if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && g_vitalsBars.Has(this.barId))
             return false
         bar := g_vitalsBars[this.barId]
@@ -88,9 +88,11 @@ class VitalsBarWindow extends GdiOverlayBase
             return false
         if (IsSet(g_vitalsEditMode) && g_vitalsEditMode)
             return (ctx.gwW > 100 && ctx.gwH > 100)
-        mode    := IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"
-        gateKey := (mode = "map") ? "allowed" : "allowedNoMap"
-        return ctx.gate.Has(gateKey) ? ctx.gate[gateKey] : ctx.gate["allowed"]
+        ; Hard safety gate (in-game, alive, player present, no panel, foreground;
+        ; town/map deliberately excluded), then the per-bar priority rule list.
+        if !(ctx.gate.Has("vitalsBase") ? ctx.gate["vitalsBase"] : ctx.gate["allowedNoMap"])
+            return false
+        return _VitalsRulesShow(bar, ctx.snapshot)
     }
 
     ; The window is exactly the bar rectangle, positioned by the bar's fraction.
@@ -311,6 +313,103 @@ _VitalsFormatLabel(bar, cur, max, pct)
     return s
 }
 
+; ── Visibility rules (per-bar priority list) ────────────────────────────────
+
+; Evaluates a bar's rule list against the snapshot. Walks the rules in priority
+; order; the first enabled rule whose condition is currently true decides
+; show/hide. If none match, the bar's "otherwise" default applies.
+_VitalsRulesShow(bar, snap)
+{
+    low := bar.Has("lowLifePct") ? bar["lowLifePct"] : 50
+    rules := bar.Has("rules") ? bar["rules"] : 0
+    if (rules && Type(rules) = "Array")
+    {
+        for r in rules
+        {
+            if !(IsObject(r) && r.Has("enabled") && r["enabled"])
+                continue
+            if _VitalsCondMatch(r.Has("state") ? r["state"] : "", snap, low)
+                return (r.Has("action") ? r["action"] : "show") = "show"
+        }
+    }
+    return (bar.Has("otherwise") ? bar["otherwise"] : "show") = "show"
+}
+
+; Returns true when the named visibility state currently applies.
+_VitalsCondMatch(state, snap, lowLifePct)
+{
+    if (state = "town")
+    {
+        wad := (snap && IsObject(snap) && snap.Has("worldAreaDat")) ? snap["worldAreaDat"] : 0
+        return (wad && IsObject(wad)
+            && ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))) ? true : false
+    }
+    if (state = "map")
+    {
+        inGs := (snap && IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
+        ui   := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
+        lm   := (ui && IsObject(ui) && ui.Has("largeMapData")) ? ui["largeMapData"] : 0
+        return (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"]) ? true : false
+    }
+    if (state = "combat")
+    {
+        global g_combatState
+        return (IsSet(g_combatState) && g_combatState = "combat") ? true : false
+    }
+    if (state = "lowlife")
+    {
+        v := _VitalsValue(snap, "life")
+        return (v["max"] > 0 && v["pct"] < lowLifePct) ? true : false
+    }
+    return false
+}
+
+; Validates a UI rule payload (Array of {state,action,enabled}) into a clean Array.
+_VitalsNormalizeRules(arr)
+{
+    out := []
+    if !(arr && Type(arr) = "Array")
+        return _VitalsDefaultRules()
+    static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
+    for r in arr
+    {
+        if !(IsObject(r) && r.Has("state") && valid.Has(r["state"] ""))
+            continue
+        out.Push(Map(
+            "state",   r["state"] "",
+            "action",  (r.Has("action") && r["action"] = "hide") ? "hide" : "show",
+            "enabled", (r.Has("enabled") && r["enabled"]) ? true : false))
+    }
+    return out.Length ? out : _VitalsDefaultRules()
+}
+
+; Serialises a rule list to a compact INI string: "state|action|enabled,...".
+_VitalsRulesToStr(rules)
+{
+    parts := []
+    if (rules && Type(rules) = "Array")
+        for r in rules
+            parts.Push(r["state"] "|" r["action"] "|" (r["enabled"] ? "1" : "0"))
+    out := ""
+    for p in parts
+        out .= (out = "" ? "" : ",") p
+    return out
+}
+
+; Parses the compact INI string back into a rule list.
+_VitalsRulesFromStr(s)
+{
+    out := []
+    static valid := Map("combat", 1, "lowlife", 1, "town", 1, "map", 1)
+    for tok in StrSplit(Trim(s), ",")
+    {
+        f := StrSplit(Trim(tok), "|")
+        if (f.Length >= 3 && valid.Has(f[1]))
+            out.Push(Map("state", f[1], "action", (f[2] = "hide") ? "hide" : "show", "enabled", (f[3] = "1")))
+    }
+    return out.Length ? out : _VitalsDefaultRules()
+}
+
 ; ── Config (self-persist [Vitals]) ──────────────────────────────────────────
 
 ; Returns a fresh default bar config Map. Positions are fractions of the game window.
@@ -318,16 +417,27 @@ _VitalsDefaultBar(enabled, xPct, yPct, w, h, fg, bg, outline)
 {
     return Map("enabled", enabled, "xPct", xPct, "yPct", yPct, "w", w, "h", h
              , "fg", fg, "bg", bg, "outline", outline, "opacity", 100
-             , "tCur", true, "tMax", true, "tPct", true)
+             , "tCur", true, "tMax", true, "tPct", true
+             , "rules", _VitalsDefaultRules(), "otherwise", "show", "lowLifePct", 50)
+}
+
+; Default visibility rule list (priority order, all disabled -> behaves like
+; "always visible in-game" until the user enables/reorders them).
+_VitalsDefaultRules()
+{
+    return [
+        Map("state", "combat",  "action", "show", "enabled", false),
+        Map("state", "lowlife", "action", "show", "enabled", false),
+        Map("state", "town",    "action", "show", "enabled", false),
+        Map("state", "map",     "action", "show", "enabled", false)]
 }
 
 ; Seeds the vitals globals with defaults (unconditionally, per the AHK v2 init
 ; gotcha), then overlays any persisted values from poeformance_config.ini [Vitals].
 LoadVitalsConfig()
 {
-    global g_vitalsEditMode, g_vitalsBars, g_vitalsVisibility
+    global g_vitalsEditMode, g_vitalsBars
     g_vitalsEditMode := false
-    g_vitalsVisibility := "ingame"   ; "ingame" (combat) | "map" (only with large map open)
     ; Default layout: three stacked bars near the top-centre (mirrors the old HUD).
     g_vitalsBars := Map(
         "life", _VitalsDefaultBar(true, 0.430, 0.020, 220, 16, "#DD2222", "#221010", "#555555"),
@@ -337,8 +447,6 @@ LoadVitalsConfig()
     f := _ConfigPath()
     if !FileExist(f)
         return
-    vis := IniRead(f, "Vitals", "visibility", g_vitalsVisibility)
-    g_vitalsVisibility := (vis = "map") ? "map" : "ingame"
     for id, bar in g_vitalsBars
     {
         pre := id "_"
@@ -354,15 +462,19 @@ LoadVitalsConfig()
         bar["tCur"]    := (IniRead(f, "Vitals", pre "tCur", bar["tCur"] ? "1" : "0") = "1")
         bar["tMax"]    := (IniRead(f, "Vitals", pre "tMax", bar["tMax"] ? "1" : "0") = "1")
         bar["tPct"]    := (IniRead(f, "Vitals", pre "tPct", bar["tPct"] ? "1" : "0") = "1")
+        bar["otherwise"]  := (IniRead(f, "Vitals", pre "otherwise", bar["otherwise"]) = "hide") ? "hide" : "show"
+        bar["lowLifePct"] := Min(100, Max(1, Integer(IniRead(f, "Vitals", pre "lowLifePct", bar["lowLifePct"]))))
+        rulesStr := IniRead(f, "Vitals", pre "rules", "")
+        if (rulesStr != "")
+            bar["rules"] := _VitalsRulesFromStr(rulesStr)
     }
 }
 
 ; Writes the current vitals config to poeformance_config.ini [Vitals].
 SaveVitalsConfig()
 {
-    global g_vitalsBars, g_vitalsVisibility
+    global g_vitalsBars
     f := _ConfigPath()
-    IniWrite(IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame", f, "Vitals", "visibility")
     for id, bar in g_vitalsBars
     {
         pre := id "_"
@@ -378,6 +490,9 @@ SaveVitalsConfig()
         IniWrite(bar["tCur"] ? "1" : "0", f, "Vitals", pre "tCur")
         IniWrite(bar["tMax"] ? "1" : "0", f, "Vitals", pre "tMax")
         IniWrite(bar["tPct"] ? "1" : "0", f, "Vitals", pre "tPct")
+        IniWrite(bar.Has("otherwise") ? bar["otherwise"] : "show", f, "Vitals", pre "otherwise")
+        IniWrite(bar.Has("lowLifePct") ? bar["lowLifePct"] : 50, f, "Vitals", pre "lowLifePct")
+        IniWrite(_VitalsRulesToStr(bar.Has("rules") ? bar["rules"] : []), f, "Vitals", pre "rules")
     }
 }
 
@@ -394,18 +509,13 @@ _VitalsHex(v, fallback)
     return fallback
 }
 
-; Merges a UI payload (Map of barId -> settings Map, plus optional "visibility")
-; into g_vitalsBars in place. Only known keys are copied, with clamping.
+; Merges a UI payload (Map of barId -> settings Map) into g_vitalsBars in place.
+; Only known keys are copied, with clamping/validation.
 _ApplyVitals(payload)
 {
-    global g_vitalsBars, g_vitalsVisibility
+    global g_vitalsBars
     if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && payload && IsObject(payload))
         return
-    if payload.Has("visibility")
-    {
-        v := payload["visibility"] ""
-        g_vitalsVisibility := (v = "map") ? "map" : "ingame"
-    }
     for id, bar in g_vitalsBars
     {
         if !(payload.Has(id) && IsObject(payload[id]))
@@ -435,18 +545,23 @@ _ApplyVitals(payload)
             bar["tMax"] := p["tMax"] ? true : false
         if (p.Has("tPct"))
             bar["tPct"] := p["tPct"] ? true : false
+        if (p.Has("otherwise"))
+            bar["otherwise"] := (p["otherwise"] = "hide") ? "hide" : "show"
+        if (p.Has("lowLifePct"))
+            bar["lowLifePct"] := Min(100, Max(1, Integer(p["lowLifePct"])))
+        if (p.Has("rules") && Type(p["rules"]) = "Array")
+            bar["rules"] := _VitalsNormalizeRules(p["rules"])
     }
 }
 
 ; Serialises the vitals config (bars + edit-mode flag + visibility) for the header push.
 BuildVitalsHeaderJson()
 {
-    global g_vitalsBars, g_vitalsEditMode, g_vitalsVisibility
+    global g_vitalsBars, g_vitalsEditMode
     if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
         return "{}"
     return JsonFull_Stringify(Map("bars", g_vitalsBars
-        , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false
-        , "visibility", IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"), false)
+        , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false), false)
 }
 
 ; Sets (or toggles, when val is "") the drag-to-place edit mode.

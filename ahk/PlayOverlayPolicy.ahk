@@ -45,16 +45,16 @@ class PlayOverlayPolicy
             reason := "not-ingame(" ctx.currentState ")"
         }
 
-        ; ── Condition 2: not town or hideout ──
+        ; ── Condition 2: town / hideout — tracked separately. Radar + HUD hide
+        ;    there (via !inTown below); the vitals bars can opt in via their own
+        ;    rules, so it must NOT fail the shared 'core'. ──
+        inTown := false
         if core
         {
             wad := snap.Has("worldAreaDat") ? snap["worldAreaDat"] : 0
             if (wad && IsObject(wad)
                 && ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"])))
-            {
-                core   := false
-                reason := "town-hideout"
-            }
+                inTown := true
         }
 
         ; ── Condition 3: player must be alive ──
@@ -160,6 +160,7 @@ class PlayOverlayPolicy
         if ctx.inspectOverride
         {
             core       := true
+            inTown     := false
             mapOpenEff := true
             reason     := "ui-inspect"
         }
@@ -167,11 +168,18 @@ class PlayOverlayPolicy
         ; ── Foreground gate (applied after the snapshot gate, like the original) ──
         foreground := (ctx.gameActive || ctx.keepWhenBackground)
 
-        allowedNoMap := core && foreground
-        allowed      := core && mapOpenEff && foreground
+        ; vitalsBase = the hard safety gate for the vitals bars: in-game, alive,
+        ; player present, no panel/chat, foreground — but town/map are left to the
+        ; per-bar visibility rules, so it intentionally ignores inTown / mapOpen.
+        vitalsBase   := core && foreground
+        allowedNoMap := core && !inTown && foreground
+        allowed      := core && !inTown && mapOpenEff && foreground
+        if (core && inTown && reason = "")
+            reason := "town-hideout"
         if (core && !foreground)
             reason := "not-foreground"
 
-        return Map("allowed", allowed, "allowedNoMap", allowedNoMap, "reason", reason)
+        return Map("allowed", allowed, "allowedNoMap", allowedNoMap
+                 , "vitalsBase", vitalsBase, "reason", reason)
     }
 }

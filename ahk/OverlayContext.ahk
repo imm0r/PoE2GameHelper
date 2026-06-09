@@ -23,6 +23,6 @@ class OverlayContext
         this.inspectOverride    := false   ; UI-browser inspect mode forces play overlays visible
         this.paused             := false   ; global updates-paused flag
         this.currentState       := ""      ; current game state name (e.g. "InGameState")
-        this.gate               := Map("allowed", false, "allowedNoMap", false, "reason", "")  ; play-overlay gate result
+        this.gate               := Map("allowed", false, "allowedNoMap", false, "vitalsBase", false, "reason", "")  ; play-overlay gate result
     }
 }
