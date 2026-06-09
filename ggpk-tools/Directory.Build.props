@@ -32,4 +32,15 @@
   <PropertyGroup>
     <LibGGPK3Root>$(MSBuildThisFileDirectory)..\external\LibGGPK3</LibGGPK3Root>
   </PropertyGroup>
+
+  <!--
+    Shared publish output. Both tools (PoeDataExtract + PoePatcher) publish
+    into ggpk-tools/bin/ so they sit side by side and a single oo2core.dll
+    next to them serves both. MSBuildThisFileDirectory is this props file's
+    folder (= ggpk-tools/), so it's the same target for every project here.
+    bin/ is gitignored. Override per-publish with `-o <dir>` if needed.
+  -->
+  <PropertyGroup>
+    <PublishDir>$(MSBuildThisFileDirectory)bin\</PublishDir>
+  </PropertyGroup>
 </Project>

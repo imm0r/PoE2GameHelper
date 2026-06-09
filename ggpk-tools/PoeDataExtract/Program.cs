@@ -1,3 +1,4 @@
+using GgpkTools;
 using PoeDataExtract.Extractors;
 
 namespace PoeDataExtract;

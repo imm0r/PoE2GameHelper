@@ -79,9 +79,13 @@ dotnet publish PoeDataExtract -c Release -r win-x64 --self-contained -p:PublishA
 dotnet publish PoePatcher     -c Release -r win-x64 --self-contained -p:PublishAot=true
 ```
 
-Output binaries land in `*/bin/Release/net8.0/win-x64/publish/`. Drop
-`oo2core.dll` next to each `.exe` (rename from `oo2core_9_win64.dll`
-if your source has the versioned name).
+Both tools publish into the **shared `ggpk-tools/bin/` folder** (set via
+`Directory.Build.props`'s `PublishDir`), so they sit side by side and a
+**single `oo2core.dll`** next to them serves both — and it's the folder
+the overlay's bridge looks in first. You don't normally need to place the
+DLL by hand: `PoeDataExtract`/`PoePatcher` auto-provision it on first run
+(see the Oodle prerequisite above). To drop it manually, put one
+`oo2core.dll` into `ggpk-tools/bin/` (rename from `oo2core_9_win64.dll`).
 
 ## Usage
 

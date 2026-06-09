@@ -575,7 +575,13 @@ class GgpkToolBridge
     {
         toolFile := this._ToolFileName(toolDirName)
         root := A_ScriptDir "\ggpk-tools\" toolDirName
+        ; Shared deployment folder: both tools publish here (see
+        ; ggpk-tools/Directory.Build.props PublishDir), so a single
+        ; oo2core.dll next to them serves both. Preferred over the
+        ; per-project publish output.
+        shared := A_ScriptDir "\ggpk-tools\bin"
         candidates := [
+            shared "\" toolFile ".exe",
             root "\bin\Release\net8.0\win-x64\publish\" toolFile ".exe",
             root "\bin\Release\net8.0\win-x64\" toolFile ".exe",
             root "\bin\Release\net8.0\" toolFile ".dll"

@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace PoeDataExtract;
+namespace GgpkTools;
 
 /// <summary>
 /// Makes the proprietary Oodle native library (oo2core) available next to

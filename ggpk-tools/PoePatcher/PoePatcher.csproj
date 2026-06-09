@@ -13,4 +13,13 @@
     <ProjectReference Include="$(LibGGPK3Root)\LibBundledGGPK3\LibBundledGGPK3.csproj" />
   </ItemGroup>
 
+  <!--
+    Shared Oodle auto-provisioner (namespace GgpkTools), authored under
+    PoeDataExtract. Linked rather than duplicated so both tools resolve
+    oo2core.dll identically.
+  -->
+  <ItemGroup>
+    <Compile Include="..\PoeDataExtract\OodleResolver.cs" Link="OodleResolver.cs" />
+  </ItemGroup>
+
 </Project>

@@ -1,3 +1,4 @@
+using GgpkTools;
 using LibBundle3;
 using PoePatcher.Patches;
 
@@ -26,6 +27,7 @@ internal static class Program
             ["minimap"] = new MinimapPatch(),
         };
 
+    [STAThread] // required for the comdlg32 file picker the Oodle resolver may show
     private static int Main(string[] args)
     {
         if (args.Length == 0) { PrintUsage(); return 1; }
@@ -37,6 +39,14 @@ internal static class Program
                 Console.Out.WriteLine($"{kv.Key}\t{kv.Value.Description}");
             return 0;
         }
+
+        // Every remaining verb opens a bundle, so make the Oodle native DLL
+        // available first. Prompt only for genuine manual CLI use (stdio not
+        // redirected, no --no-prompt) so the AHK shell-out never pops a dialog.
+        bool allowPrompt = !HasFlag(args, "--no-prompt")
+            && !Console.IsErrorRedirected && !Console.IsInputRedirected;
+        OodleResolver.EnsureAvailable(FindGgpkHint(args), allowPrompt);
+
         if (verb.Equals("extract", StringComparison.OrdinalIgnoreCase))
             return RunExtract(args.AsSpan(1));
 
@@ -254,6 +264,21 @@ internal static class Program
     {
         Console.Error.WriteLine(msg);
         return code;
+    }
+
+    private static bool HasFlag(string[] args, string flag)
+    {
+        foreach (var a in args)
+            if (a.Equals(flag, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    // The --ggpk value, used to anchor the Oodle scan on the right drive.
+    private static string? FindGgpkHint(string[] args)
+    {
+        for (int i = 0; i + 1 < args.Length; i++)
+            if (args[i].Equals("--ggpk", StringComparison.OrdinalIgnoreCase)) return args[i + 1];
+        return null;
     }
 
     private static void PrintUsage()
