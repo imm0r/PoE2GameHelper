@@ -73,3 +73,21 @@ class OverlayManager
             try ov.Hide()
     }
 }
+
+; Builds the OverlayManager (which constructs + registers every overlay) and points
+; the legacy g_* overlay globals at the manager-owned instances so existing call
+; sites (CombatAutomation, WebViewBridge, EntityAlerts, BridgeDispatch, …) keep
+; working unchanged. Called once from InGameStateMonitor before the main return, so
+; the AHK v2 module-init gotcha (top-level globals in #Include'd modules don't run)
+; does not apply.
+LoadOverlaySystem()
+{
+    global g_overlayManager, g_radarOverlay, g_playerHud, g_notifyOverlay, g_focusOverlay, g_radarAlpha
+    g_overlayManager := OverlayManager()
+    g_radarOverlay   := g_overlayManager.Get("radar")
+    g_playerHud      := g_overlayManager.Get("playerHud")
+    g_notifyOverlay  := g_overlayManager.Get("notification")
+    g_focusOverlay   := g_overlayManager.Get("focus")
+    if (IsSet(g_radarAlpha) && g_radarOverlay)
+        g_radarOverlay.SetAlpha(g_radarAlpha)
+}

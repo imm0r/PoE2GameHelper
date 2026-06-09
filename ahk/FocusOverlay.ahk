@@ -1,8 +1,9 @@
 ; FocusOverlay.ahk
 ; Small always-on-top, click-through GDI overlay that prints a few text lines
 ; (focused-entity debug readout) near the top-left of the PoE window. Test surface
-; for the targeted-monster + hovered-world-object resolution. Extends GdiOverlayBase.
-; Driven once per tick via Tick(); content set via SetLines().
+; for the targeted-monster + hovered-world-object resolution. Extends GdiOverlayBase
+; and is driven by OverlayManager via the uniform ShouldShow/Layout/Draw contract.
+; It builds its own lines each tick from the snapshot via BuildFocusLines().
 ; Included by InGameStateMonitor.ahk (after GdiOverlayBase).
 
 class FocusOverlay extends GdiOverlayBase
@@ -23,48 +24,31 @@ class FocusOverlay extends GdiOverlayBase
     __New()
     {
         super.__New(255)
+        this.Name   := "focus"
         this._lines := []
     }
 
-    ; Sets the lines to display (array of strings). An empty array hides the overlay.
-    SetLines(lines)
+    ; ── Overlay contract ────────────────────────────────────────────────────
+    ; Enabled via g_focusOverlayEnabled; visible only when the game is focused and
+    ; the snapshot yields at least one focus line. Lines are (re)built here so
+    ; Layout/Draw can reuse them without re-reading memory.
+    ShouldShow(ctx)
     {
-        this._lines := (lines && Type(lines) = "Array") ? lines : []
+        global g_focusOverlayEnabled
+        this._lines := []
+        if !(IsSet(g_focusOverlayEnabled) && g_focusOverlayEnabled)
+            return false
+        if (!ctx.gameActive || ctx.gwW < 200 || ctx.gwH < 100)
+            return false
+        try this._lines := BuildFocusLines(ctx.reader, ctx.snapshot)
+        return (Type(this._lines) = "Array" && this._lines.Length > 0)
     }
 
-    ; Per-tick driver (call from UpdateRadarFast). Foreground-gated; hidden when
-    ; there are no lines or the game isn't the active window.
-    Tick()
+    ; Sized to the widest line + stacked height, anchored top-left of the viewport.
+    Layout(ctx)
     {
-        if (this._lines.Length = 0)
-        {
-            this.Hide()
-            return
-        }
-        gameHwnd := ResolvePoEWindow()
-        if (!gameHwnd || !WinActive("ahk_id " gameHwnd))
-        {
-            this.Hide()
-            return
-        }
-        gwX := 0, gwY := 0, gwW := 0, gwH := 0
-        try WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
-        if (gwW < 200 || gwH < 100)
-        {
-            this.Hide()
-            return
-        }
-        this._Render(gwX, gwY, gwW, gwH)
-    }
-
-    ; Lays out the lines (widest line + stacked height), draws bg + border + each
-    ; line, then blits. One cached font; measured per line.
-    _Render(gwX, gwY, gwW, gwH)
-    {
-        font := this._GetFont(FocusOverlay.FONT_HEIGHT, FocusOverlay.FONT_WEIGHT)
-        padX := FocusOverlay.PAD_X, padY := FocusOverlay.PAD_Y, gap := FocusOverlay.LINE_GAP
-
-        maxW := 0
+        font  := this._GetFont(FocusOverlay.FONT_HEIGHT, FocusOverlay.FONT_WEIGHT)
+        maxW  := 0
         lineH := 0
         for _, ln in this._lines
         {
@@ -74,27 +58,38 @@ class FocusOverlay extends GdiOverlayBase
             if (m["h"] > lineH)
                 lineH := m["h"]
         }
+        padX := FocusOverlay.PAD_X, padY := FocusOverlay.PAD_Y, gap := FocusOverlay.LINE_GAP
         barW := maxW + padX * 2
         barH := this._lines.Length * lineH + (this._lines.Length - 1) * gap + padY * 2
+        return Map("x", ctx.gwX + Round(ctx.gwW * FocusOverlay.LEFT_FRACTION)
+                 , "y", ctx.gwY + Round(ctx.gwH * FocusOverlay.TOP_FRACTION)
+                 , "w", barW, "h", barH)
+    }
 
-        x := gwX + Round(gwW * FocusOverlay.LEFT_FRACTION)
-        y := gwY + Round(gwH * FocusOverlay.TOP_FRACTION)
+    ; Background + border + each line.
+    Draw(ctx, rect)
+    {
+        w := rect["w"], h := rect["h"]
+        this._FillRect(0, 0, w, h, FocusOverlay.COLOR_BG)
+        this._DrawRectOutline(0, 0, w, h, FocusOverlay.COLOR_BORDER, 1)
 
-        if !this._EnsureShown(x, y, barW, barH)
-            return
-
-        this._FillRect(0, 0, barW, barH, FocusOverlay.COLOR_BG)
-        this._DrawRectOutline(0, 0, barW, barH, FocusOverlay.COLOR_BORDER, 1)
-
+        font := this._GetFont(FocusOverlay.FONT_HEIGHT, FocusOverlay.FONT_WEIGHT)
         oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
-        ty := padY
+        padX := FocusOverlay.PAD_X, gap := FocusOverlay.LINE_GAP
+        ; Recompute the line height the same way Layout did, for vertical stepping.
+        lineH := 0
+        for _, ln in this._lines
+        {
+            m := this._MeasureText(font, ln)
+            if (m["h"] > lineH)
+                lineH := m["h"]
+        }
+        ty := FocusOverlay.PAD_Y
         for _, ln in this._lines
         {
             this._DrawText(padX, ty, ln, FocusOverlay.COLOR_TEXT)
             ty += lineH + gap
         }
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldFont)
-
-        this._Blit(barW, barH)
     }
 }

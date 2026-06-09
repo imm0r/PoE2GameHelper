@@ -2,11 +2,13 @@
 ; Lightweight always-on-top, click-through GDI overlay showing game state and player vitals.
 ;
 ; Displays: current game state, life bar, mana bar, energy shield bar (when applicable).
-; Positioned at top-center of the game window. Rendered via double-buffered GDI.
+; Positioned at top-center of the game window. Extends GdiOverlayBase, which owns the
+; transparent window, the double buffer, the pen/brush/font caches and the Show/Hide/blit
+; plumbing. The HUD only adds its visibility policy, layout and frame rendering.
 ;
 ; Included by InGameStateMonitor.ahk
 
-class PlayerHUD
+class PlayerHUD extends GdiOverlayBase
 {
     ; BGR colors
     static COLOR_BG         := 0x302020   ; dark background for bars
@@ -29,102 +31,79 @@ class PlayerHUD
 
     __New()
     {
-        ; +ToolWindow keeps the overlay out of the taskbar / Alt-Tab list, so the
-        ; per-tick Show()/Hide() cycle no longer flashes a taskbar button.
-        this.overlayGui   := Gui("-Caption +AlwaysOnTop +ToolWindow -DPIScale +E0x80000")
-        this.overlayGui.BackColor := "010101"
-        this.hwnd         := this.overlayGui.Hwnd
-        this.memDC        := 0
-        this.bitmap       := 0
-        this.bufW         := 0
-        this.bufH         := 0
-        this.isVisible    := false
-        this._styled      := false
-        this._lastX       := -1
-        this._lastY       := -1
-        this._penCache    := Map()
-        this._brushCache  := Map()
-        this._font        := 0
-        this._fontSmall   := 0
+        super.__New(230)        ; HUD opacity 230 (background colour-key stays transparent)
+        this.Name := "playerHud"
     }
 
-    __Delete()
+    ; ── Overlay contract (driven by OverlayManager) ─────────────────────────
+    ; The HUD shares the play-overlay gate with the radar (they show together),
+    ; gated additionally by the user's HUD on/off toggle.
+    ShouldShow(ctx)
     {
-        this._Cleanup()
+        global g_playerHudEnabled
+        return ctx.gate["allowed"] && (IsSet(g_playerHudEnabled) ? g_playerHudEnabled : true)
     }
 
-    ; Updates the HUD with fresh data and renders it.
-    ; Params:
-    ;   data - Map with keys: stateName, areaLevel, lifePct, manaPct, esPct,
-    ;          lifeCur, lifeMax, manaCur, manaMax, esCur, esMax
-    ;   gwX, gwY, gwW, gwH - game window position/size
-    Update(data, gwX, gwY, gwW, gwH)
+    ; Top-center of the game window.
+    Layout(ctx)
     {
-        if (gwW < 100 || gwH < 100)
-            return
-
-        w := PlayerHUD.HUD_WIDTH
-        h := PlayerHUD.HUD_HEIGHT
-        x := gwX + Floor((gwW - w) / 2)
-        y := gwY + 2
-
-        if (x != this._lastX || y != this._lastY)
-        {
-            if this.isVisible
-                WinMove(x, y, w, h, this.hwnd)
-            this._lastX := x
-            this._lastY := y
-        }
-
-        if !this.isVisible
-        {
-            this.overlayGui.Show("x" x " y" y " w" w " h" h " NoActivate")
-            this.isVisible := true
-            if !this._styled
-            {
-                WinSetTransColor("010101 230", this.hwnd)
-                WinSetExStyle("+0x20", this.hwnd)
-                this._styled := true
-            }
-        }
-
-        if (this.bufW != w || this.bufH != h)
-            this._InitBuffers(w, h)
-        if !this.memDC
-            return
-
-        this._RenderFrame(data, w, h)
-        this._Blit(w, h)
+        if (ctx.gwW < 100 || ctx.gwH < 100)
+            return 0
+        w := PlayerHUD.HUD_WIDTH, h := PlayerHUD.HUD_HEIGHT
+        return Map("x", ctx.gwX + Floor((ctx.gwW - w) / 2), "y", ctx.gwY + 2, "w", w, "h", h)
     }
 
-    Hide()
+    ; Builds the vitals data from the snapshot, then renders the frame.
+    Draw(ctx, rect)
     {
-        if this.isVisible
+        data := this._ExtractHud(ctx.snapshot, ctx.currentState)
+        this._RenderFrame(data, rect["w"], rect["h"])
+    }
+
+    ; Extracts state + life/mana/ES from the radar snapshot into a flat Map.
+    _ExtractHud(snap, currentState)
+    {
+        data := Map()
+        data["stateName"] := currentState
+        data["areaLevel"] := (snap && IsObject(snap) && snap.Has("areaLevel")) ? snap["areaLevel"] : 0
+
+        pv := (snap && IsObject(snap) && snap.Has("playerVitals")) ? snap["playerVitals"] : 0
+        if (pv && IsObject(pv) && pv.Has("stats"))
         {
-            this.overlayGui.Hide()
-            this.isVisible := false
+            stats := pv["stats"]
+            lifeCur := stats.Has("lifeCurrent") ? stats["lifeCurrent"] : 0
+            lifeMax := stats.Has("lifeMax") ? stats["lifeMax"] : 1
+            manaCur := stats.Has("manaCurrent") ? stats["manaCurrent"] : 0
+            manaMax := stats.Has("manaMax") ? stats["manaMax"] : 1
+            esCur   := stats.Has("esCurrent") ? stats["esCurrent"] : 0
+            esMax   := stats.Has("esMax") ? stats["esMax"] : 0
+
+            data["lifeCur"] := lifeCur
+            data["lifeMax"] := lifeMax
+            data["lifePct"] := lifeMax > 0 ? (lifeCur / lifeMax) * 100 : 0
+            data["manaCur"] := manaCur
+            data["manaMax"] := manaMax
+            data["manaPct"] := manaMax > 0 ? (manaCur / manaMax) * 100 : 0
+            data["esCur"]   := esCur
+            data["esMax"]   := esMax
+            data["esPct"]   := esMax > 0 ? (esCur / esMax) * 100 : 0
         }
+        else
+        {
+            data["lifeCur"] := 0, data["lifeMax"] := 0, data["lifePct"] := 0
+            data["manaCur"] := 0, data["manaMax"] := 0, data["manaPct"] := 0
+            data["esCur"] := 0, data["esMax"] := 0, data["esPct"] := 0
+        }
+        return data
     }
 
     ; ── Rendering ─────────────────────────────────────────────────────────
 
     _RenderFrame(data, w, h)
     {
-        ; Clear with near-black (transparency key)
-        bgBrush := this._GetBrush(0x010101)
-        rect := Buffer(16, 0)
-        NumPut("Int", 0, rect, 0)
-        NumPut("Int", 0, rect, 4)
-        NumPut("Int", w, rect, 8)
-        NumPut("Int", h, rect, 12)
-        DllCall("FillRect", "Ptr", this.memDC, "Ptr", rect, "Ptr", bgBrush)
-
-        ; Draw semi-transparent background panel
-        panelBrush := this._GetBrush(PlayerHUD.COLOR_BG)
-        DllCall("FillRect", "Ptr", this.memDC, "Ptr", rect, "Ptr", panelBrush)
-
-        if !this._font
-            this._CreateFonts()
+        ; Solid dark HUD panel over the whole rect (the back-buffer was already
+        ; cleared to the transparent key by GdiOverlayBase.Update()).
+        this._FillRectBrush(0, 0, w, h, this._GetBrush(PlayerHUD.COLOR_BG))
 
         pad := PlayerHUD.PADDING
 
@@ -136,7 +115,7 @@ class PlayerHUD
         if (areaLevel > 0 && stateName = "InGameState")
             stateText .= "  ·  Zone Lv " areaLevel
 
-        oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", this._font, "Ptr")
+        oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", this._GetFont(-13, 600), "Ptr")
         this._DrawText(pad, pad, stateText, stateColor)
 
         ; Line 2: Life bar + Mana bar (side by side)
@@ -161,7 +140,7 @@ class PlayerHUD
         this._DrawBar(pad * 2 + barW, barY, barW, barH, manaPct, PlayerHUD.COLOR_MANA)
 
         ; Text labels below bars
-        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", this._fontSmall, "Ptr")
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", this._GetFont(-11, 400), "Ptr")
         labelY := barY + barH + 2
         lifeLabel := lifeCur "/" lifeMax " (" Round(lifePct) "%)"
         manaLabel := manaCur "/" manaMax " (" Round(manaPct) "%)"
@@ -201,27 +180,14 @@ class PlayerHUD
     _DrawBar(x, y, w, h, pct, fillColor)
     {
         ; Empty bar background
-        emptyBrush := this._GetBrush(PlayerHUD.COLOR_BAR_EMPTY)
-        rect := Buffer(16, 0)
-        NumPut("Int", x, rect, 0)
-        NumPut("Int", y, rect, 4)
-        NumPut("Int", x + w, rect, 8)
-        NumPut("Int", y + h, rect, 12)
-        DllCall("FillRect", "Ptr", this.memDC, "Ptr", rect, "Ptr", emptyBrush)
+        this._FillRectBrush(x, y, w, h, this._GetBrush(PlayerHUD.COLOR_BAR_EMPTY))
 
         ; Filled portion
         if (pct > 0)
         {
             fillW := Floor(w * Min(pct, 100) / 100)
             if (fillW > 0)
-            {
-                fillBrush := this._GetBrush(fillColor)
-                NumPut("Int", x, rect, 0)
-                NumPut("Int", y, rect, 4)
-                NumPut("Int", x + fillW, rect, 8)
-                NumPut("Int", y + h, rect, 12)
-                DllCall("FillRect", "Ptr", this.memDC, "Ptr", rect, "Ptr", fillBrush)
-            }
+                this._FillRectBrush(x, y, fillW, h, this._GetBrush(fillColor))
         }
 
         ; Border
@@ -233,107 +199,5 @@ class PlayerHUD
                 "Int", x, "Int", y, "Int", x + w, "Int", y + h)
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldBrush)
-    }
-
-    ; ── GDI helpers ───────────────────────────────────────────────────────
-
-    _DrawText(sx, sy, text, colorBGR)
-    {
-        DllCall("SetTextColor", "Ptr", this.memDC, "UInt", colorBGR)
-        DllCall("SetBkMode",    "Ptr", this.memDC, "Int", 1)
-        DllCall("TextOutW", "Ptr", this.memDC,
-                "Int", sx, "Int", sy, "Str", text, "Int", StrLen(text))
-    }
-
-    _GetPen(colorBGR, width := 1)
-    {
-        key := colorBGR | (width << 24)
-        if !this._penCache.Has(key)
-            this._penCache[key] := DllCall("CreatePen", "Int", 0, "Int", width, "UInt", colorBGR, "Ptr")
-        return this._penCache[key]
-    }
-
-    _GetBrush(colorBGR)
-    {
-        if !this._brushCache.Has(colorBGR)
-            this._brushCache[colorBGR] := DllCall("CreateSolidBrush", "UInt", colorBGR, "Ptr")
-        return this._brushCache[colorBGR]
-    }
-
-    _CreateFonts()
-    {
-        this._font := DllCall("CreateFontW",
-            "Int", -13,                         ; height (negative = char height)
-            "Int", 0,                           ; width
-            "Int", 0, "Int", 0,                 ; escapement, orientation
-            "Int", 600,                         ; weight (semi-bold)
-            "UInt", 0,                          ; italic
-            "UInt", 0, "UInt", 0,               ; underline, strikeout
-            "UInt", 1,                          ; charset (DEFAULT)
-            "UInt", 0, "UInt", 0, "UInt", 5,    ; out precision, clip, quality (CLEARTYPE)
-            "UInt", 0,                          ; pitch
-            "Str", "Segoe UI",
-            "Ptr")
-
-        this._fontSmall := DllCall("CreateFontW",
-            "Int", -11,
-            "Int", 0,
-            "Int", 0, "Int", 0,
-            "Int", 400,                         ; normal weight
-            "UInt", 0,
-            "UInt", 0, "UInt", 0,
-            "UInt", 1,
-            "UInt", 0, "UInt", 0, "UInt", 5,
-            "UInt", 0,
-            "Str", "Segoe UI",
-            "Ptr")
-    }
-
-    ; ── Buffer management ─────────────────────────────────────────────────
-
-    _InitBuffers(w, h)
-    {
-        if this.bitmap
-        {
-            stockBmp := DllCall("GetStockObject", "Int", 0, "Ptr")
-            DllCall("SelectObject", "Ptr", this.memDC, "Ptr", stockBmp)
-            DllCall("DeleteObject", "Ptr", this.bitmap)
-            DllCall("DeleteDC",     "Ptr", this.memDC)
-        }
-        scrDC       := DllCall("GetDC", "Ptr", this.hwnd, "Ptr")
-        this.memDC  := DllCall("CreateCompatibleDC",     "Ptr", scrDC, "Ptr")
-        this.bitmap := DllCall("CreateCompatibleBitmap", "Ptr", scrDC, "Int", w, "Int", h, "Ptr")
-        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", this.bitmap)
-        DllCall("ReleaseDC", "Ptr", this.hwnd, "Ptr", scrDC)
-        this.bufW := w
-        this.bufH := h
-    }
-
-    _Blit(w, h)
-    {
-        scrDC := DllCall("GetDC", "Ptr", this.hwnd, "Ptr")
-        DllCall("BitBlt", "Ptr", scrDC,
-                "Int", 0, "Int", 0, "Int", w, "Int", h,
-                "Ptr", this.memDC, "Int", 0, "Int", 0, "UInt", 0x00CC0020)
-        DllCall("ReleaseDC", "Ptr", this.hwnd, "Ptr", scrDC)
-    }
-
-    _Cleanup()
-    {
-        for _, pen in this._penCache
-            DllCall("DeleteObject", "Ptr", pen)
-        for _, brush in this._brushCache
-            DllCall("DeleteObject", "Ptr", brush)
-        if this._font
-            DllCall("DeleteObject", "Ptr", this._font)
-        if this._fontSmall
-            DllCall("DeleteObject", "Ptr", this._fontSmall)
-        if this.bitmap
-        {
-            stockBmp := DllCall("GetStockObject", "Int", 0, "Ptr")
-            DllCall("SelectObject", "Ptr", this.memDC, "Ptr", stockBmp)
-            DllCall("DeleteObject", "Ptr", this.bitmap)
-            DllCall("DeleteDC",     "Ptr", this.memDC)
-        }
     }
 }

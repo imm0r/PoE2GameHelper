@@ -8,7 +8,7 @@
 ;
 ; The monster scan reads the ALREADY-DECODED radar snapshot (no second enumeration);
 ; only a single fresh Targetable byte is read per monster. The hover resolve is a
-; short pointer chain. Drives g_focusOverlay from UpdateRadarFast via TickFocusOverlay.
+; short pointer chain. BuildFocusLines() is consumed by FocusOverlay (driven by OverlayManager).
 ; Included by InGameStateMonitor.ahk.
 
 ; Returns the Targetable component address cached on a snapshot entity, or 0.
@@ -161,19 +161,9 @@ BuildFocusLines(reader, snap)
     return lines
 }
 
-; Per-tick driver: lazily creates g_focusOverlay, builds the lines and ticks it.
-; Cheap when nothing is focused (a few reads + a hidden gui). Called from
-; UpdateRadarFast when g_focusOverlayEnabled is set.
-TickFocusOverlay(reader, snap)
-{
-    global g_focusOverlay
-    if !IsObject(g_focusOverlay)
-        g_focusOverlay := FocusOverlay()
-    lines := []
-    try lines := BuildFocusLines(reader, snap)
-    g_focusOverlay.SetLines(lines)
-    g_focusOverlay.Tick()
-}
+; NOTE: the focus overlay is now driven by OverlayManager through the FocusOverlay
+; class itself (it builds its lines from the snapshot in ShouldShow via
+; BuildFocusLines). The old TickFocusOverlay() driver has been removed.
 
 ; Toggles the focused-entity test overlay on/off (bridge case ToggleFocusOverlay).
 ToggleFocusOverlay()

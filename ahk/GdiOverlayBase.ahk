@@ -30,6 +30,8 @@ class GdiOverlayBase
         this._alpha      := transAlpha
         this._lastX      := -1
         this._lastY      := -1
+        this._lastW      := 0
+        this._lastH      := 0
         this._penCache   := Map()
         this._brushCache := Map()
         this._fontCache  := Map()
@@ -162,23 +164,22 @@ class GdiOverlayBase
     ; and that the back-buffer matches w x h. Returns true when memDC is ready to draw.
     _EnsureShown(x, y, w, h)
     {
-        if (x != this._lastX || y != this._lastY)
-        {
-            if this.isVisible
-                WinMove(x, y, w, h, this.hwnd)
-            this._lastX := x
-            this._lastY := y
-        }
         if !this.isVisible
         {
             this.overlayGui.Show("x" x " y" y " w" w " h" h " NoActivate")
             this.isVisible := true
+            this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
             if !this._styled
             {
                 WinSetTransColor("010101 " this._alpha, this.hwnd)
                 WinSetExStyle("+0x20", this.hwnd)   ; WS_EX_TRANSPARENT -> click-through
                 this._styled := true
             }
+        }
+        else if (x != this._lastX || y != this._lastY || w != this._lastW || h != this._lastH)
+        {
+            WinMove(x, y, w, h, this.hwnd)
+            this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
         }
         if (this.bufW != w || this.bufH != h)
             this._InitBuffers(w, h)

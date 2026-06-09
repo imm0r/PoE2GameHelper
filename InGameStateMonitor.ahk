@@ -315,6 +315,7 @@ LoadLootPickupConfig()
 LoadEntityGroups()
 LoadEntityAlertsConfig()
 LoadLocalApiConfig()      ; local HTTP API (MCP backend) settings + Winsock constants
+LoadOverlaySystem()       ; build the OverlayManager + all overlays; wire legacy globals
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 

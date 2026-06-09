@@ -23,14 +23,11 @@ UpdateRadarFast()
     _running := true
     try
     {
-        global g_reader, g_radarOverlay, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs, g_radarEnabled, g_radarAlpha
-        global g_playerHudEnabled, g_playerHud, g_notifyOverlay, g_focusOverlay, g_focusOverlayEnabled
+        global g_reader, g_overlayManager, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs
         if g_updatesPaused
         {
-            if g_radarOverlay
-                g_radarOverlay.Hide()
-            if g_playerHud
-                g_playerHud.Hide()
+            if IsObject(g_overlayManager)
+                g_overlayManager.HideAll()
             return
         }
         if !IsObject(g_reader)
@@ -61,10 +58,13 @@ UpdateRadarFast()
                 _overlayHideTick := A_TickCount
             if (!_lastValidSnap || (A_TickCount - _overlayHideTick) > _OVERLAY_GRACE_MS)
             {
-                if g_radarOverlay
-                    g_radarOverlay.Hide()
-                if g_playerHud
-                    g_playerHud.Hide()
+                ; Hard read failure: hide the play overlays, leave the banner /
+                ; focus overlay untouched (they self-resolve next valid tick).
+                if IsObject(g_overlayManager)
+                {
+                    g_overlayManager.Get("radar").Hide()
+                    g_overlayManager.Get("playerHud").Hide()
+                }
                 return
             }
         }
@@ -76,285 +76,49 @@ UpdateRadarFast()
 
         ; ── Entity alerts + banner — every tick, outside the claim chain, map-independent ──
         TryEntityAlerts(radarSnap)
-        if g_notifyOverlay
-            g_notifyOverlay.Tick()
+        if !IsObject(g_overlayManager)
+            return
 
-        ; ── Focused-entity test overlay (targeted monster + hovered world object) ──
-        if (IsSet(g_focusOverlayEnabled) && g_focusOverlayEnabled)
-            TickFocusOverlay(g_reader, radarSnap)
-        else if IsObject(g_focusOverlay)
-            g_focusOverlay.Hide()
+        ; ── Drive every overlay through the manager ──────────────────────────
+        ; Refresh the shared context (snapshot, reader, game-window rect,
+        ; foreground state); the manager evaluates the play-overlay gate once and
+        ; runs each overlay's Update(ctx). All per-overlay visibility / layout /
+        ; draw logic now lives in the overlay classes + PlayOverlayPolicy.
+        ctx := g_overlayManager.context
+        ctx.snapshot     := radarSnap
+        ctx.reader       := g_reader
+        ctx.paused       := g_updatesPaused
+        ctx.currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
 
-        currentState := radarSnap.Has("currentStateName") ? radarSnap["currentStateName"] : ""
-
-        ; ── Determine overlay visibility ──────────────────────────────────────
-        ; Overlays should only show when ALL conditions are met:
-        ;   1. InGameState   2. Not town/hideout   3. Player alive
-        ;   4. Large map visible   5. No panel/chat open   6. Player render component
-        overlayAllowed := true
-        hideReason := ""
-
-        ; Condition 1: Reject only states that definitely have no player/area
-        ; (login / character management / credits). Don't gate on
-        ; currentState != "InGameState" alone — after a zone change the game
-        ; can keep transitional states (AreaLoadingState etc.) on top of the
-        ; state stack for tens of seconds, or report a state pointer we don't
-        ; recognize ('GameNotLoaded'), even though areaInstance, playerRender
-        ; and terrain are all valid (the snapshot's ResolveInGameStateAddress
-        ; scoring picks the right InGameState by data, not by name). Conds 2-6
-        ; below already filter out anything that isn't actually in-game.
-        nonGameStates := Map(
-            "PreGameState", true,
-            "LoginState", true,
-            "WaitingState", true,
-            "CreateCharacterState", true,
-            "SelectCharacterState", true,
-            "DeleteCharacterState", true,
-            "ChangePasswordState", true,
-            "CreditsState", true,
-            "LoadingState", true
-        )
-        if (nonGameStates.Has(currentState))
+        gameHwnd := ResolvePoEWindow()
+        ctx.gameHwnd := gameHwnd
+        if gameHwnd
         {
-            overlayAllowed := false
-            hideReason := "not-ingame(" currentState ")"
-        }
-
-        ; Condition 2: Not town or hideout
-        if overlayAllowed
-        {
-            wad := radarSnap.Has("worldAreaDat") ? radarSnap["worldAreaDat"] : 0
-            if (wad && IsObject(wad))
-            {
-                if ((wad.Has("isTown") && wad["isTown"]) || (wad.Has("isHideout") && wad["isHideout"]))
-                {
-                    overlayAllowed := false
-                    hideReason := "town-hideout"
-                }
-            }
-        }
-
-        ; Condition 3: Player must be alive
-        if overlayAllowed
-        {
-            pv := radarSnap.Has("playerVitals") ? radarSnap["playerVitals"] : 0
-            if (pv && IsObject(pv) && pv.Has("stats"))
-            {
-                stats := pv["stats"]
-                if (stats.Has("isAlive") && !stats["isAlive"])
-                {
-                    overlayAllowed := false
-                    hideReason := "dead"
-                }
-            }
-        }
-
-        ; Condition 4: Large map must be visible (overlay draws on the large map)
-        if overlayAllowed
-        {
-            inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
-            uiElems := (inGs && IsObject(inGs) && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
-            largeMapOpen := false
-            if (uiElems && IsObject(uiElems))
-            {
-                lm := uiElems.Has("largeMapData") ? uiElems["largeMapData"] : 0
-                if (lm && IsObject(lm) && lm.Has("isVisible") && lm["isVisible"])
-                    largeMapOpen := true
-            }
-            if !largeMapOpen
-            {
-                overlayAllowed := false
-                hideReason := "no-largemap"
-            }
-        }
-
-        ; Condition 5: No game panel open + chat not active
-        if overlayAllowed
-        {
-            ; Visibility-differential check: any newly visible elements = panel open
-            ; Temporal debounce: combat UI elements can briefly flicker visibility flags,
-            ; so require the "panel open" signal to persist for 500ms before hiding.
-            ; Real panels stay open for seconds; combat noise lasts < 200ms.
-            static _panelOpenSinceTick := 0
-            static _PANEL_DEBOUNCE_MS := 500
-            panelVis := radarSnap.Has("panelVisibility") ? radarSnap["panelVisibility"] : 0
-            panelDetected := false
-            if (panelVis && IsObject(panelVis))
-                panelDetected := (panelVis.Has("anyPanelOpen") && panelVis["anyPanelOpen"])
-
-            if panelDetected
-            {
-                if (_panelOpenSinceTick = 0)
-                    _panelOpenSinceTick := A_TickCount
-                if ((A_TickCount - _panelOpenSinceTick) >= _PANEL_DEBOUNCE_MS)
-                {
-                    overlayAllowed := false
-                    newlyVis := panelVis.Has("newlyVisible") ? panelVis["newlyVisible"] : 0
-                    hideReason := "panel-open(" newlyVis " new)"
-                }
-            }
-            else
-            {
-                _panelOpenSinceTick := 0
-            }
-
-            ; Chat check (ImportantUiElements)
-            if overlayAllowed
-            {
-                if !IsSet(uiElems)
-                {
-                    inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
-                    uiElems := (inGs && inGs.Has("importantUiElements")) ? inGs["importantUiElements"] : 0
-                }
-                if (uiElems && IsObject(uiElems) && uiElems.Has("isChatActive") && uiElems["isChatActive"])
-                {
-                    overlayAllowed := false
-                    hideReason := "chat-active"
-                }
-            }
-        }
-
-        ; Condition 6: Player render component present (truly in-game)
-        inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
-        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-        playerRender := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        if (overlayAllowed && !playerRender)
-        {
-            overlayAllowed := false
-            hideReason := "no-player"
-        }
-
-        ; ── Push debug panel data periodically (every 500ms) ────────────────
-        static _debugPanelPushTick := 0
-        if (A_TickCount - _debugPanelPushTick > 500)
-        {
-            PushDebugPanelsToWebView(radarSnap, overlayAllowed, hideReason)
-            PushRadarDebugToWebView(overlayAllowed, hideReason)
-            _debugPanelPushTick := A_TickCount
-        }
-
-        ; ── UI Browser inspect mode overrides all hide conditions ────────────
-        ; When a highlight is active the user is actively inspecting an element;
-        ; show the overlay regardless of map state, panels, or focus.
-        global g_uiBrowserHighlight
-        if IsObject(g_uiBrowserHighlight)
-            overlayAllowed := true
-
-        ; ── Hide overlays if conditions not met ──────────────────────────────
-        ; GC-susceptible conditions (no-largemap, no-player) get a grace period
-        ; to avoid flicker from brief memory read failures.
-        static _overlayCondHideTick := 0
-        if !overlayAllowed
-        {
-            gcSensitive := (hideReason = "no-largemap" || hideReason = "no-player")
-            if gcSensitive
-            {
-                if (_overlayCondHideTick = 0)
-                    _overlayCondHideTick := A_TickCount
-                if ((A_TickCount - _overlayCondHideTick) < _OVERLAY_GRACE_MS)
-                {
-                    ; Within grace — skip hide, continue to render with last data
-                }
-                else
-                {
-                    _overlayCondHideTick := 0
-                    if g_radarOverlay
-                        g_radarOverlay.Hide()
-                    if g_playerHud
-                        g_playerHud.Hide()
-                    return
-                }
-            }
-            else
-            {
-                ; Deliberate state changes (panel open, chat, dead) — hide immediately
-                _overlayCondHideTick := 0
-                if g_radarOverlay
-                    g_radarOverlay.Hide()
-                if g_playerHud
-                    g_playerHud.Hide()
-                return
-            }
+            global g_webGui
+            ctx.gameActive  := WinActive("ahk_id " gameHwnd) ? true : false
+            ctx.toolFocused := (IsObject(g_webGui) && WinActive("ahk_id " g_webGui.Hwnd)) ? true : false
+            gwX := 0, gwY := 0, gwW := 0, gwH := 0
+            try WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
+            ctx.gwX := gwX, ctx.gwY := gwY, ctx.gwW := gwW, ctx.gwH := gwH
         }
         else
         {
-            _overlayCondHideTick := 0
+            ctx.gameActive := false, ctx.toolFocused := false
+            ctx.gwX := 0, ctx.gwY := 0, ctx.gwW := 0, ctx.gwH := 0
         }
 
-        ; ── Game window checks ────────────────────────────────────────────────
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
+        radarRenderStart := A_TickCount
+        g_overlayManager.Tick(ctx)
+        g_radarRenderMs := A_TickCount - radarRenderStart
+
+        ; ── Debug panel push (every 500 ms), using the resolved gate ─────────
+        static _debugPanelPushTick := 0
+        if (A_TickCount - _debugPanelPushTick > 500)
         {
-            if g_radarOverlay
-                g_radarOverlay.Hide()
-            if g_playerHud
-                g_playerHud.Hide()
-            return
+            PushDebugPanelsToWebView(radarSnap, ctx.gate["allowed"], ctx.gate["reason"])
+            PushRadarDebugToWebView(ctx.gate["allowed"], ctx.gate["reason"])
+            _debugPanelPushTick := A_TickCount
         }
-
-        if !WinActive("ahk_id " gameHwnd)
-        {
-            ; Keep rendering when our own tool window is focused (user clicks in PoEformance)
-            ; or when range circles are set (config preview mode).
-            ; Any other window in focus → hide.
-            global g_webGui
-            hasCircles := (g_radarOverlay && g_radarOverlay._rangeCircles.Length > 0)
-            toolFocused := IsObject(g_webGui) && WinActive("ahk_id " g_webGui.Hwnd)
-            if (!hasCircles && !toolFocused)
-            {
-                if g_radarOverlay
-                    g_radarOverlay.Hide()
-                if g_playerHud
-                    g_playerHud.Hide()
-                return
-            }
-        }
-
-        ; ── Render overlays ───────────────────────────────────────────────────
-        if (!g_radarOverlay && g_radarEnabled)
-        {
-            g_radarOverlay := RadarOverlay()
-            g_radarOverlay._alpha := g_radarAlpha
-        }
-
-        global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss, g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
-        global g_debugMode, g_highlightedEntityPath, g_zoneNavEnabled, g_mapHackEnabled
-
-        WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
-
-        if (g_radarEnabled && g_radarOverlay)
-        {
-            g_radarOverlay.ShowEnemyNormal := g_radarShowEnemyNormal
-            g_radarOverlay.ShowEnemyRare := g_radarShowEnemyRare
-            g_radarOverlay.ShowEnemyBoss := g_radarShowEnemyBoss
-            g_radarOverlay.ShowMinions := g_radarShowMinions
-            g_radarOverlay.ShowNpcs := g_radarShowNpcs
-            g_radarOverlay.ShowChests := g_radarShowChests
-            g_radarOverlay.DebugMode := g_debugMode
-            g_radarOverlay._navEnabled := g_zoneNavEnabled
-            g_radarOverlay._mapHackEnabled := g_mapHackEnabled
-            g_radarOverlay._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
-            ; Auto-expire entity tracking once the target is finished (opened
-            ; chest/strongbox or dead monster) so the tracking line/label stop
-            ; pinning a completed objective. Only clears when a matching entity
-            ; exists and none are still active — avoids dropping tracking when the
-            ; target briefly leaves the radar sample.
-            if (IsSet(g_highlightedEntityPath) && g_highlightedEntityPath != ""
-                && _TrackedEntityExpired(radarSnap, g_highlightedEntityPath))
-                g_highlightedEntityPath := ""
-            g_radarOverlay.highlightedEntityPath := IsSet(g_highlightedEntityPath) ? g_highlightedEntityPath : ""
-
-            radarRenderStart := A_TickCount
-            g_radarOverlay.Render(radarSnap, gwX, gwY, gwW, gwH)
-            g_radarRenderMs := A_TickCount - radarRenderStart
-        }
-        else if (!g_radarEnabled && g_radarOverlay)
-        {
-            g_radarOverlay.Hide()
-        }
-
-        ; Player HUD
-        _UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
     }
     catch as ex
     {
@@ -365,74 +129,6 @@ UpdateRadarFast()
     {
         _running := false
     }
-}
-
-; Extracts player vitals from the radar snapshot and feeds them to the PlayerHUD overlay.
-_UpdatePlayerHUD(radarSnap, currentState, gameHwnd)
-{
-    global g_playerHudEnabled, g_playerHud
-    if !g_playerHudEnabled
-    {
-        if g_playerHud
-            g_playerHud.Hide()
-        return
-    }
-
-    if !gameHwnd
-    {
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
-        {
-            if g_playerHud
-                g_playerHud.Hide()
-            return
-        }
-        if !WinActive("ahk_id " gameHwnd)
-        {
-            if g_playerHud
-                g_playerHud.Hide()
-            return
-        }
-    }
-
-    if !g_playerHud
-        g_playerHud := PlayerHUD()
-
-    ; Build data Map for the HUD
-    hudData := Map()
-    hudData["stateName"] := currentState
-    hudData["areaLevel"] := radarSnap.Has("areaLevel") ? radarSnap["areaLevel"] : 0
-
-    pv := radarSnap.Has("playerVitals") ? radarSnap["playerVitals"] : 0
-    if (pv && IsObject(pv) && pv.Has("stats"))
-    {
-        stats := pv["stats"]
-        lifeCur := stats.Has("lifeCurrent") ? stats["lifeCurrent"] : 0
-        lifeMax := stats.Has("lifeMax") ? stats["lifeMax"] : 1
-        manaCur := stats.Has("manaCurrent") ? stats["manaCurrent"] : 0
-        manaMax := stats.Has("manaMax") ? stats["manaMax"] : 1
-        esCur := stats.Has("esCurrent") ? stats["esCurrent"] : 0
-        esMax := stats.Has("esMax") ? stats["esMax"] : 0
-
-        hudData["lifeCur"] := lifeCur
-        hudData["lifeMax"] := lifeMax
-        hudData["lifePct"] := lifeMax > 0 ? (lifeCur / lifeMax) * 100 : 0
-        hudData["manaCur"] := manaCur
-        hudData["manaMax"] := manaMax
-        hudData["manaPct"] := manaMax > 0 ? (manaCur / manaMax) * 100 : 0
-        hudData["esCur"] := esCur
-        hudData["esMax"] := esMax
-        hudData["esPct"] := esMax > 0 ? (esCur / esMax) * 100 : 0
-    }
-    else
-    {
-        hudData["lifeCur"] := 0, hudData["lifeMax"] := 0, hudData["lifePct"] := 0
-        hudData["manaCur"] := 0, hudData["manaMax"] := 0, hudData["manaPct"] := 0
-        hudData["esCur"] := 0, hudData["esMax"] := 0, hudData["esPct"] := 0
-    }
-
-    WinGetPos(&gwX, &gwY, &gwW, &gwH, "ahk_id " gameHwnd)
-    g_playerHud.Update(hudData, gwX, gwY, gwW, gwH)
 }
 
 ; Timer callback fired every 150 ms; reads a minimal flask/vitals snapshot and delegates to TryAutoFlask.
