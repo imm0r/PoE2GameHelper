@@ -396,18 +396,30 @@ _ApplyVitals(payload)
         if !(payload.Has(id) && IsObject(payload[id]))
             continue
         p := payload[id]
-        if p.Has("enabled")  bar["enabled"] := p["enabled"] ? true : false
-        if p.Has("xPct")     bar["xPct"]    := Min(1.0, Max(0.0, Float(p["xPct"])))
-        if p.Has("yPct")     bar["yPct"]    := Min(1.0, Max(0.0, Float(p["yPct"])))
-        if p.Has("w")        bar["w"]       := Min(4000, Max(4, Integer(p["w"])))
-        if p.Has("h")        bar["h"]       := Min(400,  Max(2, Integer(p["h"])))
-        if p.Has("opacity")  bar["opacity"] := Min(100,  Max(0, Integer(p["opacity"])))
-        if p.Has("fg")       bar["fg"]      := _VitalsHex(p["fg"], bar["fg"])
-        if p.Has("bg")       bar["bg"]      := _VitalsHex(p["bg"], bar["bg"])
-        if p.Has("outline")  bar["outline"] := _VitalsHex(p["outline"], bar["outline"])
-        if p.Has("tCur")     bar["tCur"]    := p["tCur"] ? true : false
-        if p.Has("tMax")     bar["tMax"]    := p["tMax"] ? true : false
-        if p.Has("tPct")     bar["tPct"]    := p["tPct"] ? true : false
+        if (p.Has("enabled"))
+            bar["enabled"] := p["enabled"] ? true : false
+        if (p.Has("xPct"))
+            bar["xPct"] := Min(1.0, Max(0.0, Float(p["xPct"])))
+        if (p.Has("yPct"))
+            bar["yPct"] := Min(1.0, Max(0.0, Float(p["yPct"])))
+        if (p.Has("w"))
+            bar["w"] := Min(4000, Max(4, Integer(p["w"])))
+        if (p.Has("h"))
+            bar["h"] := Min(400, Max(2, Integer(p["h"])))
+        if (p.Has("opacity"))
+            bar["opacity"] := Min(100, Max(0, Integer(p["opacity"])))
+        if (p.Has("fg"))
+            bar["fg"] := _VitalsHex(p["fg"], bar["fg"])
+        if (p.Has("bg"))
+            bar["bg"] := _VitalsHex(p["bg"], bar["bg"])
+        if (p.Has("outline"))
+            bar["outline"] := _VitalsHex(p["outline"], bar["outline"])
+        if (p.Has("tCur"))
+            bar["tCur"] := p["tCur"] ? true : false
+        if (p.Has("tMax"))
+            bar["tMax"] := p["tMax"] ? true : false
+        if (p.Has("tPct"))
+            bar["tPct"] := p["tPct"] ? true : false
     }
 }
 
