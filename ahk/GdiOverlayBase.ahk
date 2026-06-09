@@ -39,6 +39,7 @@ class GdiOverlayBase
         ; ── Overlay contract (driven by OverlayManager) ──────────────────────
         this.Name        := "overlay"  ; subclasses override with a stable id
         this.Enabled     := true       ; master on/off toggle (manager hides when false)
+        this._hideSince  := 0          ; A_TickCount when ShouldShow first went false (hide debounce)
     }
 
     ; ── Overlay contract ─────────────────────────────────────────────────────
@@ -47,24 +48,49 @@ class GdiOverlayBase
     ; uniform Enabled → ShouldShow → Layout → draw → blit flow and is the single
     ; place that decides show vs. hide, which keeps every overlay flicker-free by
     ; construction.
+    ;
+    ; Hide-debounce: a single-tick ShouldShow=false (e.g. a gate condition like
+    ; isAlive briefly mis-reading during the game's GC) must NOT blink the overlay.
+    ; While already visible, a false result keeps the last frame on screen and only
+    ; hides after HIDE_DEBOUNCE_MS of continuous false. Showing is always immediate.
+    static HIDE_DEBOUNCE_MS := 250
+
     Update(ctx)
     {
         if (!this.Enabled || !this.ShouldShow(ctx))
         {
-            this.Hide()
+            this._RequestHide()
             return
         }
         rect := this.Layout(ctx)
         if (!rect || rect["w"] < 1 || rect["h"] < 1)
         {
-            this.Hide()
+            this._RequestHide()
             return
         }
+        this._hideSince := 0
         if !this._EnsureShown(rect["x"], rect["y"], rect["w"], rect["h"])
             return
         this._ClearBackBuffer(rect["w"], rect["h"])
         this.Draw(ctx, rect)
         this._Blit(rect["w"], rect["h"])
+    }
+
+    ; Debounced hide: keeps the last drawn frame on screen for up to
+    ; HIDE_DEBOUNCE_MS of continuous "should hide" before actually hiding, so a
+    ; one-tick visibility blip never flickers the overlay.
+    _RequestHide()
+    {
+        if !this.isVisible          ; never shown / already hidden — nothing to debounce
+            return
+        if (this._hideSince = 0)
+            this._hideSince := A_TickCount
+        if ((A_TickCount - this._hideSince) >= GdiOverlayBase.HIDE_DEBOUNCE_MS)
+        {
+            this.Hide()
+            this._hideSince := 0
+        }
+        ; else: within the debounce window — leave the last frame up, do nothing.
     }
 
     ; Visibility policy — return true to show this frame, false to hide.
