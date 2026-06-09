@@ -8548,6 +8548,7 @@
     <div class="uib-prop-row"><span class="uib-prop-key">UI Path</span><span class="uib-prop-val" style="color:#e8c674">${escHtml(idxPathStr)}</span></div>
     <div class="uib-prop-row"><span class="uib-prop-key">Parent</span>${hv(p.parentPtr || '')}</div>
     <div class="uib-prop-row"><span class="uib-prop-key">Visible (local)</span>${p.isVisible ? '<span class="uib-prop-val bool-true">TRUE</span>' : '<span class="uib-prop-val bool-false">FALSE</span>'}</div>
+    <div class="uib-prop-row"><span class="uib-prop-key">Visible (effective)</span>${p.effectiveVisible ? '<span class="uib-prop-val bool-true">TRUE</span>' : '<span class="uib-prop-val bool-false">FALSE</span>'}</div>
     <div class="uib-prop-row"><span class="uib-prop-key">Children</span>${nv(p.childCount || 0)}</div>
 
     <div class="uib-prop-section" style="color:#7be07b">--- Position ---</div>

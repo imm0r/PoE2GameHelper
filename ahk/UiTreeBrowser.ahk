@@ -157,6 +157,36 @@ _UiPackColor(r, g, b, a)
     return (ri << 24) | (gi << 16) | (bi << 8) | ai
 }
 
+; True iff the element AND every ancestor (walked up via Parent +0xB8) have the
+; local visible bit (bit 11) set — i.e. it's actually shown, not just locally
+; flagged (an element can have its own bit set while a hidden parent keeps it
+; off-screen). Cheap: one small read per level, capped at 16. Stops at rootPtr
+; (when given) or a self-referencing parent. Ported from the community C#
+; HierarchicallyVisible helper. Returns false on any read failure (fail-safe).
+UiTree_HierarchicallyVisible(reader, elemPtr, rootPtr := 0)
+{
+    if (!IsObject(reader) || !reader.IsProbablyValidPointer(elemPtr))
+        return false
+    flagsOff  := PoE2Offsets.UiElementBase["Flags"]
+    parentOff := PoE2Offsets.UiElementBase["ParentPtr"]
+    cur := elemPtr
+    guard := 0
+    while (reader.IsProbablyValidPointer(cur) && guard < 16)
+    {
+        guard += 1
+        fl := reader.Mem.ReadUInt(cur + flagsOff)
+        if (((fl >> 11) & 1) = 0)
+            return false
+        if (rootPtr && cur = rootPtr)
+            break
+        par := reader.Mem.ReadPtr(cur + parentOff)
+        if (par = cur)
+            break
+        cur := par
+    }
+    return true
+}
+
 ; Walks up from elemPtr through parent pointers until rootPtr (or hitting NULL),
 ; finding each step's index in its parent's children array.
 ; Returns: Array of integers like [1, 41, 1] (root → element).

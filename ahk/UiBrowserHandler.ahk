@@ -366,6 +366,11 @@ PushUiBrowserState()
         screenPxX := screenPosX * sf
         screenPxY := screenPosY * sf
 
+        ; Effective (hierarchical) visibility: own bit AND every ancestor's bit,
+        ; walked up to the browser root. Distinguishes "locally flagged visible"
+        ; from "actually on screen" (a hidden parent keeps a child off-screen).
+        effVisible := UiTree_HierarchicallyVisible(g_reader, g_uiBrowserCurrentPtr, g_uiBrowserRootPtr)
+
         ; Build props JSON — use _UibF() for floats to avoid locale-specific decimal comma
         sid := StrReplace(elem["stringId"], "\", "\\")
         sid := StrReplace(sid, '"', '\"')
@@ -377,6 +382,7 @@ PushUiBrowserState()
             . ',"stringId":"' . sid . '"'
             . ',"fontName":"' . fnt . '"'
             . ',"isVisible":' . (elem["isVisible"] ? "true" : "false")
+            . ',"effectiveVisible":' . (effVisible ? "true" : "false")
             . ',"shouldModifyPos":' . (elem["shouldModifyPos"] ? "true" : "false")
             . ',"childCount":' . elem["childCount"]
             . ',"flags":"' . Format("0x{:08X}", elem["flags"]) . '"'
