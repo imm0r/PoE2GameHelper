@@ -215,3 +215,66 @@ SaveVitalsConfig()
         IniWrite(bar["tPct"] ? "1" : "0", f, "Vitals", pre "tPct")
     }
 }
+
+; ── Bridge helpers (JS <-> AHK) ─────────────────────────────────────────────
+
+; Sanitises a "#RRGGBB" colour string; returns fallback when malformed.
+_VitalsHex(v, fallback)
+{
+    s := Trim(v "")
+    if (SubStr(s, 1, 1) != "#")
+        s := "#" s
+    if (StrLen(s) = 7 && RegExMatch(s, "i)^#[0-9a-f]{6}$"))
+        return s
+    return fallback
+}
+
+; Merges a UI payload (Map of barId -> settings Map) into g_vitalsBars in place.
+; Only known keys are copied, with clamping, so a bad value can't corrupt a bar.
+_ApplyVitals(payload)
+{
+    global g_vitalsBars
+    if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && payload && IsObject(payload))
+        return
+    for id, bar in g_vitalsBars
+    {
+        if !(payload.Has(id) && IsObject(payload[id]))
+            continue
+        p := payload[id]
+        if p.Has("enabled")  bar["enabled"] := p["enabled"] ? true : false
+        if p.Has("xPct")     bar["xPct"]    := Min(1.0, Max(0.0, Float(p["xPct"])))
+        if p.Has("yPct")     bar["yPct"]    := Min(1.0, Max(0.0, Float(p["yPct"])))
+        if p.Has("w")        bar["w"]       := Min(4000, Max(4, Integer(p["w"])))
+        if p.Has("h")        bar["h"]       := Min(400,  Max(2, Integer(p["h"])))
+        if p.Has("fg")       bar["fg"]      := _VitalsHex(p["fg"], bar["fg"])
+        if p.Has("bg")       bar["bg"]      := _VitalsHex(p["bg"], bar["bg"])
+        if p.Has("outline")  bar["outline"] := _VitalsHex(p["outline"], bar["outline"])
+        if p.Has("tCur")     bar["tCur"]    := p["tCur"] ? true : false
+        if p.Has("tMax")     bar["tMax"]    := p["tMax"] ? true : false
+        if p.Has("tPct")     bar["tPct"]    := p["tPct"] ? true : false
+    }
+}
+
+; Serialises the vitals config (bars + edit-mode flag) for the WebView header push.
+BuildVitalsHeaderJson()
+{
+    global g_vitalsBars, g_vitalsEditMode
+    if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
+        return "{}"
+    return JsonFull_Stringify(Map("bars", g_vitalsBars
+        , "edit", (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false), false)
+}
+
+; Sets (or toggles, when val is "") the drag-to-place edit mode. The interactive
+; mouse handling is wired in a later step; this owns the state + click-through.
+ToggleVitalsEditMode(val := "")
+{
+    global g_vitalsEditMode
+    if (val = "")
+        g_vitalsEditMode := !g_vitalsEditMode
+    else
+        g_vitalsEditMode := (val = true || val = 1 || val = "1" || val = "true")
+    ; The interactive click-through toggle + drag mouse handling are wired in the
+    ; edit-mode step; for now this flips the flag so the overlay shows the bar
+    ; handles/labels and SaveVitalsConfig persists positions edited via the UI.
+}

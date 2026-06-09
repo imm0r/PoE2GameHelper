@@ -126,6 +126,13 @@ _DispatchBridgeCall(method, args)
                 _ApplyAlertSetting(args[1], args[2])
             SaveEntityAlertsConfig()
             SetTimer(PushHeaderToWebView, -50)
+        case "SetVitals":
+            _ApplyVitals((args.Length >= 1) ? args[1] : 0)
+            SaveVitalsConfig()
+            SetTimer(PushHeaderToWebView, -50)
+        case "ToggleVitalsEdit":
+            ToggleVitalsEditMode((args.Length >= 1) ? args[1] : "")
+            SetTimer(PushHeaderToWebView, -50)
         case "DecodeComponent":
             ; Lazy-decode a single component for the Entity Inspector. The
             ; radar fast-path skips Stats/Buffs/Actor/Animated/StateMachine
