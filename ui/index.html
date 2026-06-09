@@ -9325,6 +9325,12 @@
                   <input type="number" id="v-${id}-y" min="0" max="100" step="0.5" oninput="vitalsPush()" style="width:64px">
                 </span>
               </div>
+              <div class="cfg-row"><span class="cfg-label">Opacity</span>
+                <span style="display:inline-flex;gap:8px;align-items:center">
+                  <input type="range" id="v-${id}-opacity" min="0" max="100" step="1" oninput="vitalsOpInput('${id}')" style="width:120px">
+                  <span id="v-${id}-opval" style="font-size:11px;color:var(--subtext);min-width:34px">100%</span>
+                </span>
+              </div>
               <div class="cfg-row"><span class="cfg-label">Colours</span>
                 <span style="display:inline-flex;gap:12px;align-items:center;font-size:11px;color:var(--subtext)">
                   <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-fg" onclick="vitalsPick('${id}','fg')"></span>Fill</span>
@@ -9377,6 +9383,8 @@
         set('h', Math.round(b.h));
         set('x', +(((b.xPct ?? 0) * 100).toFixed(1)));
         set('y', +(((b.yPct ?? 0) * 100).toFixed(1)));
+        set('opacity', Math.round(b.opacity ?? 100));
+        const ov = document.getElementById('v-' + id + '-opval'); if (ov) ov.textContent = Math.round(b.opacity ?? 100) + '%';
         set('tCur', b.tCur, true);
         set('tMax', b.tMax, true);
         set('tPct', b.tPct, true);
@@ -9396,6 +9404,7 @@
           h: +(g('h') && g('h').value !== '' ? g('h').value : cur.h),
           xPct: (+(g('x') && g('x').value !== '' ? g('x').value : (cur.xPct ?? 0) * 100)) / 100,
           yPct: (+(g('y') && g('y').value !== '' ? g('y').value : (cur.yPct ?? 0) * 100)) / 100,
+          opacity: +(g('opacity') && g('opacity').value !== '' ? g('opacity').value : (cur.opacity ?? 100)),
           tCur: g('tCur') ? g('tCur').checked : cur.tCur,
           tMax: g('tMax') ? g('tMax').checked : cur.tMax,
           tPct: g('tPct') ? g('tPct').checked : cur.tPct,
@@ -9412,6 +9421,13 @@
     }
 
     function vitalsSetVisibility(_v) { vitalsPush(); }
+
+    function vitalsOpInput(id) {
+      const el = document.getElementById('v-' + id + '-opacity');
+      const ov = document.getElementById('v-' + id + '-opval');
+      if (el && ov) ov.textContent = Math.round(+el.value) + '%';
+      vitalsPush();
+    }
 
     function vitalsPick(id, key) {
       const cur = (_vitalsCfg.bars[id] && _vitalsCfg.bars[id][key]) || '#888888';

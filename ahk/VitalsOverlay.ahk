@@ -1,181 +1,171 @@
 ; VitalsOverlay.ahk
 ; Configurable player-vitals bar overlay (Life / Mana / Energy Shield). Replaces the
-; old fixed PlayerHUD bar box: each bar is independently enabled, positioned (as a
+; old fixed PlayerHUD bar box. Each bar is independently enabled, positioned (as a
 ; fraction of the game window, so it survives resolution changes), sized, coloured
-; (foreground / background / outline) and labelled (current / max / percent / off).
-; Extends GdiOverlayBase and is driven by OverlayManager through the standard
-; ShouldShow/Layout/Draw contract. Config lives in the g_vitalsBars / g_vitalsEnabled
-; globals and self-persists to poeformance_config.ini [Vitals].
+; (foreground / background / outline), labelled (current / max / percent / off) AND
+; given its own opacity.
 ;
-; Drag-to-place (edit mode) is layered on top in a later step; the data model + the
-; xPct/yPct positions are the foundation it writes to.
-; Included by InGameStateMonitor.ahk (after GdiOverlayBase).
+; Per-bar opacity needs per-bar transparency, which a single colour-key window can't
+; do (it has one window-wide alpha). So each bar is its OWN small overlay window
+; (VitalsBarWindow): the window covers exactly the bar, and the window's alpha = the
+; bar's opacity. VitalsOverlay is a thin controller registered with OverlayManager
+; that drives the three bar windows. Config lives in g_vitalsBars and self-persists to
+; poeformance_config.ini [Vitals]. Included by InGameStateMonitor.ahk (after GdiOverlayBase).
 
-class VitalsOverlay extends GdiOverlayBase
+; ── Controller: registered as the "vitals" overlay; owns the per-bar windows ──
+class VitalsOverlay
+{
+    static BAR_IDS := ["life", "mana", "es"]
+
+    __New()
+    {
+        this.Name    := "vitals"
+        this.Enabled := true
+        this._bars   := Map()
+        for id in VitalsOverlay.BAR_IDS
+            this._bars[id] := VitalsBarWindow(id)
+    }
+
+    ; Driven once per tick by OverlayManager: forward to each bar window's own
+    ; GdiOverlayBase Update() template (ShouldShow/Layout/Draw + hide-debounce).
+    Update(ctx)
+    {
+        for id, w in this._bars
+        {
+            try w.Update(ctx)
+            catch as e
+                LogError("VitalsBar:" id, e)
+        }
+    }
+
+    ; Hides every bar window (pause / hard snapshot failure / master off).
+    Hide()
+    {
+        for id, w in this._bars
+            try w.Hide()
+    }
+
+    ; Immediately syncs every bar window's edit interactivity (called on toggle).
+    _EnsureEditStyle()
+    {
+        for id, w in this._bars
+            try w._EnsureEditStyle()
+    }
+}
+
+; ── One small click-through window per bar; its window alpha = the bar opacity ──
+class VitalsBarWindow extends GdiOverlayBase
 {
     static FONT_HEIGHT := -13
     static FONT_WEIGHT := 600
 
-    __New()
+    __New(barId)
     {
         super.__New(255)
-        this.Name := "vitals"
-        ; Edit/drag state
-        this._editInteractive := false   ; whether the window is currently click-through-off
-        this._mouseBound      := false   ; whether OnMessage mouse hooks are registered
-        this._dragId          := ""      ; bar id currently being dragged ("" = none)
-        this._dragOffX        := 0       ; cursor->bar top-left offset captured at mouse-down
-        this._dragOffY        := 0
+        this.barId := barId
+        this.Name  := "vitals-" barId
+        ; Game-window rect captured each Draw, needed by the async drag handlers.
+        this._gwX := 0, this._gwY := 0, this._gwW := 0, this._gwH := 0
+        ; Edit / drag state
+        this._editInteractive := false
+        this._mouseBound      := false
+        this._dragging        := false
+        this._downSX := 0, this._downSY := 0     ; cursor screen pos at mouse-down
+        this._barDownX := 0, this._barDownY := 0  ; bar window screen pos at mouse-down
     }
 
     ; ── Overlay contract ────────────────────────────────────────────────────
-    ; Shares the play-overlay gate with the radar, plus a master enable toggle.
-    ; Edit mode forces it visible so bars can be placed even with the game blurred.
     ShouldShow(ctx)
     {
-        global g_playerHudEnabled, g_vitalsEditMode, g_vitalsVisibility
-        if (IsSet(g_vitalsEditMode) && g_vitalsEditMode)
-            return (ctx.gwW > 100 && ctx.gwH > 100)
+        global g_playerHudEnabled, g_vitalsBars, g_vitalsEditMode, g_vitalsVisibility
+        if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars) && g_vitalsBars.Has(this.barId))
+            return false
+        bar := g_vitalsBars[this.barId]
+        if !(bar.Has("enabled") && bar["enabled"])
+            return false
         if !(IsSet(g_playerHudEnabled) ? g_playerHudEnabled : true)
             return false
-        ; Visibility mode: "map" = only with the large map open (shares the radar
-        ; gate); "ingame" (default) = visible during combat (no map requirement).
+        if (IsSet(g_vitalsEditMode) && g_vitalsEditMode)
+            return (ctx.gwW > 100 && ctx.gwH > 100)
         mode    := IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"
         gateKey := (mode = "map") ? "allowed" : "allowedNoMap"
         return ctx.gate.Has(gateKey) ? ctx.gate[gateKey] : ctx.gate["allowed"]
     }
 
-    ; Vitals draw across the whole game window so bars can sit anywhere.
+    ; The window is exactly the bar rectangle, positioned by the bar's fraction.
     Layout(ctx)
     {
+        global g_vitalsBars
         if (ctx.gwW < 100 || ctx.gwH < 100)
             return 0
-        return Map("x", ctx.gwX, "y", ctx.gwY, "w", ctx.gwW, "h", ctx.gwH)
+        bar := g_vitalsBars[this.barId]
+        w := bar.Has("w") ? bar["w"] : 200
+        h := bar.Has("h") ? bar["h"] : 16
+        x := ctx.gwX + Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * ctx.gwW)
+        y := ctx.gwY + Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * ctx.gwH)
+        return Map("x", x, "y", y, "w", w, "h", h)
     }
 
-    ; Draws every enabled bar at its configured fraction-of-window position.
+    ; Draws the bar in window-local coordinates; the whole window IS the bar, so
+    ; the window alpha (set from the bar's opacity) gives per-bar transparency.
     Draw(ctx, rect)
     {
         global g_vitalsBars, g_vitalsEditMode
-        this._EnsureEditStyle()   ; sync click-through / mouse hooks with edit mode
-        if !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars))
+        this._EnsureEditStyle()
+        this._gwX := ctx.gwX, this._gwY := ctx.gwY, this._gwW := ctx.gwW, this._gwH := ctx.gwH
+        if !(IsSet(g_vitalsBars) && g_vitalsBars.Has(this.barId))
             return
-        vit  := this._ExtractVitals(ctx.snapshot)
-        gw   := rect["w"], gh := rect["h"]
-        edit := (IsSet(g_vitalsEditMode) && g_vitalsEditMode)
+        bar := g_vitalsBars[this.barId]
 
-        for id, bar in g_vitalsBars
-        {
-            if !(bar.Has("enabled") && bar["enabled"])
-                continue
-            if !vit.Has(id)
-                continue
-            v := vit[id]
-            ; In edit mode show full bars with sample fill so empty pools stay grabbable.
-            pct := edit ? 100 : v["pct"]
-            this._DrawBar(bar, id, v["cur"], v["max"], pct, gw, gh, edit)
-        }
-    }
+        ; Per-bar opacity -> window alpha (0..100 -> 0..255).
+        op := bar.Has("opacity") ? bar["opacity"] : 100
+        ta := Round(Min(100, Max(0, op)) / 100 * 255)
+        if (this._alpha != ta)
+            this.SetAlpha(ta)
 
-    ; ── Internal ──────────────────────────────────────────────────────────────
+        edit := (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false
+        v    := _VitalsValue(ctx.snapshot, this.barId)
+        pct  := edit ? 100 : v["pct"]
+        w    := rect["w"], h := rect["h"]
 
-    ; Reads life / mana / ES current+max+percent from the snapshot into a Map.
-    _ExtractVitals(snap)
-    {
-        out := Map("life", Map("cur",0,"max",0,"pct",0)
-                 , "mana", Map("cur",0,"max",0,"pct",0)
-                 , "es",   Map("cur",0,"max",0,"pct",0))
-        pv := (snap && IsObject(snap) && snap.Has("playerVitals")) ? snap["playerVitals"] : 0
-        if !(pv && IsObject(pv) && pv.Has("stats"))
-            return out
-        st := pv["stats"]
-        for id, keys in Map("life", ["lifeCurrent","lifeMax"]
-                          , "mana", ["manaCurrent","manaMax"]
-                          , "es",   ["esCurrent","esMax"])
-        {
-            c := st.Has(keys[1]) ? st[keys[1]] : 0
-            m := st.Has(keys[2]) ? st[keys[2]] : 0
-            out[id] := Map("cur", c, "max", m, "pct", (m > 0 ? (c / m) * 100 : 0))
-        }
-        return out
-    }
+        bgCol := GroupColorToBgr(bar.Has("bg")      ? bar["bg"]      : "#222222")
+        fgCol := GroupColorToBgr(bar.Has("fg")      ? bar["fg"]      : "#DD2222")
+        olCol := GroupColorToBgr(bar.Has("outline") ? bar["outline"] : "#555555")
 
-    ; Draws one configured bar (background, fill, outline, optional label, and an
-    ; edit-mode handle frame) onto the back-buffer in window-local coordinates.
-    _DrawBar(bar, id, cur, max, pct, gw, gh, edit)
-    {
-        w := bar.Has("w") ? bar["w"] : 200
-        h := bar.Has("h") ? bar["h"] : 16
-        x := Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * gw)
-        y := Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * gh)
-
-        bgCol  := GroupColorToBgr(bar.Has("bg")      ? bar["bg"]      : "#222222")
-        fgCol  := GroupColorToBgr(bar.Has("fg")      ? bar["fg"]      : "#DD2222")
-        olCol  := GroupColorToBgr(bar.Has("outline") ? bar["outline"] : "#555555")
-
-        ; Background
-        this._FillRect(x, y, w, h, bgCol)
-        ; Fill (left-anchored proportional to pct)
+        this._FillRect(0, 0, w, h, bgCol)
         if (pct > 0)
         {
             fillW := Floor(w * Min(pct, 100) / 100)
             if (fillW > 0)
-                this._FillRect(x, y, fillW, h, fgCol)
+                this._FillRect(0, 0, fillW, h, fgCol)
         }
-        ; Outline
-        this._DrawRectOutline(x, y, w, h, olCol, edit ? 2 : 1)
+        this._DrawRectOutline(0, 0, w, h, olCol, edit ? 2 : 1)
 
-        ; Label (current / max / percent), unless all text flags are off
-        label := this._FormatLabel(bar, cur, max, pct)
+        label := _VitalsFormatLabel(bar, v["cur"], v["max"], pct)
         if (label != "")
         {
-            font := this._GetFont(VitalsOverlay.FONT_HEIGHT, VitalsOverlay.FONT_WEIGHT)
+            font := this._GetFont(VitalsBarWindow.FONT_HEIGHT, VitalsBarWindow.FONT_WEIGHT)
             old  := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
-            this._DrawText(x + 4, y + (h // 2) - 7, label, 0xFFFFFF)
+            this._DrawText(4, (h // 2) - 7, label, 0xFFFFFF)
             DllCall("SelectObject", "Ptr", this.memDC, "Ptr", old)
         }
-
-        ; Edit-mode affordance: a small id tag above the bar.
         if edit
         {
-            font := this._GetFont(VitalsOverlay.FONT_HEIGHT, VitalsOverlay.FONT_WEIGHT)
+            font := this._GetFont(VitalsBarWindow.FONT_HEIGHT, VitalsBarWindow.FONT_WEIGHT)
             old  := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
-            this._DrawText(x, y - 14, StrUpper(id), 0x66E0FF)
+            this._DrawText(2, 0, StrUpper(this.barId), 0x66E0FF)
             DllCall("SelectObject", "Ptr", this.memDC, "Ptr", old)
         }
     }
 
-    ; Builds the bar label from the per-bar text flags (tCur / tMax / tPct).
-    ; Returns "" when no text flag is set.
-    _FormatLabel(bar, cur, max, pct)
-    {
-        tCur := bar.Has("tCur") && bar["tCur"]
-        tMax := bar.Has("tMax") && bar["tMax"]
-        tPct := bar.Has("tPct") && bar["tPct"]
-        s := ""
-        if (tCur && tMax)
-            s := cur "/" max
-        else if tCur
-            s := cur ""
-        else if tMax
-            s := max ""
-        if tPct
-            s := (s != "") ? (s " (" Round(pct) "%)") : (Round(pct) "%")
-        return s
-    }
-
-    ; ── Edit mode (drag bars on the overlay) ──────────────────────────────────
-
-    ; Syncs the window's click-through state + mouse hooks with g_vitalsEditMode.
-    ; Called every frame from Draw so it self-corrects regardless of toggle timing.
-    ; In edit mode the overlay drops WS_EX_TRANSPARENT so it receives mouse input.
+    ; ── Edit mode (drag the bar window) ───────────────────────────────────────
     _EnsureEditStyle()
     {
         global g_vitalsEditMode
         want := (IsSet(g_vitalsEditMode) && g_vitalsEditMode) ? true : false
         if (want = this._editInteractive)
             return
-        if !this._styled            ; not shown/styled yet — retry next frame
+        if !this._styled
             return
         if want
         {
@@ -211,103 +201,99 @@ class VitalsOverlay extends GdiOverlayBase
         OnMessage(0x200, this._fnMove, 0)
         OnMessage(0x202, this._fnUp, 0)
         this._mouseBound := false
-        this._dragId := ""
+        this._dragging := false
     }
 
-    ; Extracts signed client X/Y from a mouse message lParam.
-    _LParamXY(lParam, &x, &y)
+    _CursorScreen(&cx, &cy)
     {
-        x := lParam & 0xFFFF
-        y := (lParam >> 16) & 0xFFFF
-        if (x > 0x7FFF)
-            x -= 0x10000
-        if (y > 0x7FFF)
-            y -= 0x10000
-    }
-
-    ; Returns the id of the topmost enabled bar under client point (cx,cy), or "".
-    _HitTestBar(cx, cy)
-    {
-        global g_vitalsBars
-        gw := this.bufW, gh := this.bufH
-        hit := ""
-        for id, bar in g_vitalsBars
-        {
-            if !(bar.Has("enabled") && bar["enabled"])
-                continue
-            w := bar.Has("w") ? bar["w"] : 200
-            h := bar.Has("h") ? bar["h"] : 16
-            x := Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * gw)
-            y := Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * gh)
-            if (cx >= x && cx <= x + w && cy >= y && cy <= y + h)
-                hit := id   ; keep last match -> later-drawn (topmost) bar wins
-        }
-        return hit
+        pt := Buffer(8, 0)
+        DllCall("GetCursorPos", "Ptr", pt)
+        cx := NumGet(pt, 0, "Int")
+        cy := NumGet(pt, 4, "Int")
     }
 
     _OnLDown(wParam, lParam, msg, hwnd)
     {
         if (hwnd != this.hwnd)
             return
-        x := 0, y := 0
-        this._LParamXY(lParam, &x, &y)
-        global g_vitalsBars
-        id := this._HitTestBar(x, y)
-        if (id = "")
-            return
-        bar := g_vitalsBars[id]
-        bx := Round((bar.Has("xPct") ? bar["xPct"] : 0.4) * this.bufW)
-        by := Round((bar.Has("yPct") ? bar["yPct"] : 0.05) * this.bufH)
-        this._dragId   := id
-        this._dragOffX := x - bx
-        this._dragOffY := y - by
+        cx := 0, cy := 0
+        this._CursorScreen(&cx, &cy)
+        this._downSX := cx, this._downSY := cy
+        this._barDownX := this._lastX, this._barDownY := this._lastY
+        this._dragging := true
     }
 
     _OnMouseMove(wParam, lParam, msg, hwnd)
     {
-        if (hwnd != this.hwnd || this._dragId = "")
+        if (hwnd != this.hwnd || !this._dragging)
             return
         global g_vitalsBars
-        x := 0, y := 0
-        this._LParamXY(lParam, &x, &y)
-        gw := this.bufW, gh := this.bufH
-        bar := g_vitalsBars[this._dragId]
+        cx := 0, cy := 0
+        this._CursorScreen(&cx, &cy)
+        bar := g_vitalsBars[this.barId]
         w := bar.Has("w") ? bar["w"] : 200
         h := bar.Has("h") ? bar["h"] : 16
-        nx := x - this._dragOffX
-        ny := y - this._dragOffY
-        nx := Min(gw - w, Max(0, nx))
-        ny := Min(gh - h, Max(0, ny))
-        bar["xPct"] := (gw > 0) ? (nx / gw) : bar["xPct"]
-        bar["yPct"] := (gh > 0) ? (ny / gh) : bar["yPct"]
-        this._RenderEditFrame()   ; immediate redraw for smooth dragging
+        nsx := this._barDownX + (cx - this._downSX)
+        nsy := this._barDownY + (cy - this._downSY)
+        gwX := this._gwX, gwY := this._gwY, gwW := this._gwW, gwH := this._gwH
+        if (gwW < 1 || gwH < 1)
+            return
+        ; Clamp the bar inside the game window.
+        nsx := Min(gwX + gwW - w, Max(gwX, nsx))
+        nsy := Min(gwY + gwH - h, Max(gwY, nsy))
+        bar["xPct"] := (nsx - gwX) / gwW
+        bar["yPct"] := (nsy - gwY) / gwH
+        WinMove(nsx, nsy, , , this.hwnd)        ; immediate feedback
+        this._lastX := nsx, this._lastY := nsy  ; keep base move-tracking in sync
     }
 
     _OnLUp(wParam, lParam, msg, hwnd)
     {
-        if (hwnd != this.hwnd || this._dragId = "")
+        if (hwnd != this.hwnd || !this._dragging)
             return
-        this._dragId := ""
-        SaveVitalsConfig()                          ; persist the new position
-        SetTimer(PushHeaderToWebView, -30)          ; sync the UI X/Y fields
+        this._dragging := false
+        SaveVitalsConfig()
+        SetTimer(PushHeaderToWebView, -30)
     }
+}
 
-    ; Lightweight self-contained redraw used while dragging (between manager ticks).
-    _RenderEditFrame()
-    {
-        global g_vitalsBars
-        if (!this.memDC || !(IsSet(g_vitalsBars) && IsObject(g_vitalsBars)))
-            return
-        gw := this.bufW, gh := this.bufH
-        this._ClearBackBuffer(gw, gh)
-        for id, bar in g_vitalsBars
-        {
-            if !(bar.Has("enabled") && bar["enabled"])
-                continue
-            this._DrawBar(bar, id, 0, 0, 100, gw, gh, true)
-        }
-        this._Blit(gw, gh)
-    }
+; ── Shared helpers ──────────────────────────────────────────────────────────
+
+; Returns Map("cur","max","pct") for one bar id from the snapshot.
+_VitalsValue(snap, barId)
+{
+    keys := Map("life", ["lifeCurrent", "lifeMax"]
+              , "mana", ["manaCurrent", "manaMax"]
+              , "es",   ["esCurrent",   "esMax"])
+    out := Map("cur", 0, "max", 0, "pct", 0)
+    if !keys.Has(barId)
+        return out
+    pv := (snap && IsObject(snap) && snap.Has("playerVitals")) ? snap["playerVitals"] : 0
+    if !(pv && IsObject(pv) && pv.Has("stats"))
+        return out
+    st := pv["stats"]
+    k  := keys[barId]
+    c  := st.Has(k[1]) ? st[k[1]] : 0
+    m  := st.Has(k[2]) ? st[k[2]] : 0
+    return Map("cur", c, "max", m, "pct", (m > 0 ? (c / m) * 100 : 0))
+}
+
+; Builds the bar label from the per-bar text flags. Returns "" when all are off.
+_VitalsFormatLabel(bar, cur, max, pct)
+{
+    tCur := bar.Has("tCur") && bar["tCur"]
+    tMax := bar.Has("tMax") && bar["tMax"]
+    tPct := bar.Has("tPct") && bar["tPct"]
+    s := ""
+    if (tCur && tMax)
+        s := cur "/" max
+    else if tCur
+        s := cur ""
+    else if tMax
+        s := max ""
+    if tPct
+        s := (s != "") ? (s " (" Round(pct) "%)") : (Round(pct) "%")
+    return s
 }
 
 ; ── Config (self-persist [Vitals]) ──────────────────────────────────────────
@@ -316,7 +302,7 @@ class VitalsOverlay extends GdiOverlayBase
 _VitalsDefaultBar(enabled, xPct, yPct, w, h, fg, bg, outline)
 {
     return Map("enabled", enabled, "xPct", xPct, "yPct", yPct, "w", w, "h", h
-             , "fg", fg, "bg", bg, "outline", outline
+             , "fg", fg, "bg", bg, "outline", outline, "opacity", 100
              , "tCur", true, "tMax", true, "tPct", true)
 }
 
@@ -349,6 +335,7 @@ LoadVitalsConfig()
         bar["fg"]      := IniRead(f, "Vitals", pre "fg", bar["fg"])
         bar["bg"]      := IniRead(f, "Vitals", pre "bg", bar["bg"])
         bar["outline"] := IniRead(f, "Vitals", pre "outline", bar["outline"])
+        bar["opacity"] := Integer(IniRead(f, "Vitals", pre "opacity", bar["opacity"]))
         bar["tCur"]    := (IniRead(f, "Vitals", pre "tCur", bar["tCur"] ? "1" : "0") = "1")
         bar["tMax"]    := (IniRead(f, "Vitals", pre "tMax", bar["tMax"] ? "1" : "0") = "1")
         bar["tPct"]    := (IniRead(f, "Vitals", pre "tPct", bar["tPct"] ? "1" : "0") = "1")
@@ -372,6 +359,7 @@ SaveVitalsConfig()
         IniWrite(bar["fg"],      f, "Vitals", pre "fg")
         IniWrite(bar["bg"],      f, "Vitals", pre "bg")
         IniWrite(bar["outline"], f, "Vitals", pre "outline")
+        IniWrite(bar["opacity"], f, "Vitals", pre "opacity")
         IniWrite(bar["tCur"] ? "1" : "0", f, "Vitals", pre "tCur")
         IniWrite(bar["tMax"] ? "1" : "0", f, "Vitals", pre "tMax")
         IniWrite(bar["tPct"] ? "1" : "0", f, "Vitals", pre "tPct")
@@ -391,8 +379,8 @@ _VitalsHex(v, fallback)
     return fallback
 }
 
-; Merges a UI payload (Map of barId -> settings Map) into g_vitalsBars in place.
-; Only known keys are copied, with clamping, so a bad value can't corrupt a bar.
+; Merges a UI payload (Map of barId -> settings Map, plus optional "visibility")
+; into g_vitalsBars in place. Only known keys are copied, with clamping.
 _ApplyVitals(payload)
 {
     global g_vitalsBars, g_vitalsVisibility
@@ -413,6 +401,7 @@ _ApplyVitals(payload)
         if p.Has("yPct")     bar["yPct"]    := Min(1.0, Max(0.0, Float(p["yPct"])))
         if p.Has("w")        bar["w"]       := Min(4000, Max(4, Integer(p["w"])))
         if p.Has("h")        bar["h"]       := Min(400,  Max(2, Integer(p["h"])))
+        if p.Has("opacity")  bar["opacity"] := Min(100,  Max(0, Integer(p["opacity"])))
         if p.Has("fg")       bar["fg"]      := _VitalsHex(p["fg"], bar["fg"])
         if p.Has("bg")       bar["bg"]      := _VitalsHex(p["bg"], bar["bg"])
         if p.Has("outline")  bar["outline"] := _VitalsHex(p["outline"], bar["outline"])
@@ -422,7 +411,7 @@ _ApplyVitals(payload)
     }
 }
 
-; Serialises the vitals config (bars + edit-mode flag) for the WebView header push.
+; Serialises the vitals config (bars + edit-mode flag + visibility) for the header push.
 BuildVitalsHeaderJson()
 {
     global g_vitalsBars, g_vitalsEditMode, g_vitalsVisibility
@@ -433,8 +422,7 @@ BuildVitalsHeaderJson()
         , "visibility", IsSet(g_vitalsVisibility) ? g_vitalsVisibility : "ingame"), false)
 }
 
-; Sets (or toggles, when val is "") the drag-to-place edit mode. The interactive
-; mouse handling is wired in a later step; this owns the state + click-through.
+; Sets (or toggles, when val is "") the drag-to-place edit mode.
 ToggleVitalsEditMode(val := "")
 {
     global g_vitalsEditMode, g_vitalsOverlay
@@ -442,8 +430,8 @@ ToggleVitalsEditMode(val := "")
         g_vitalsEditMode := !g_vitalsEditMode
     else
         g_vitalsEditMode := (val = true || val = 1 || val = "1" || val = "true")
-    ; Sync the overlay's click-through state + mouse hooks immediately (it also
-    ; self-syncs each frame via _EnsureEditStyle). Persist when leaving edit mode.
+    ; Sync each bar window's click-through state + mouse hooks immediately (they
+    ; also self-sync each frame via _EnsureEditStyle). Persist when leaving edit.
     if (IsSet(g_vitalsOverlay) && IsObject(g_vitalsOverlay))
         try g_vitalsOverlay._EnsureEditStyle()
     if !g_vitalsEditMode
