@@ -473,6 +473,9 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= '"ptrsDisappeared":' (panelVis.Has("ptrsDisappeared") ? panelVis["ptrsDisappeared"] : 0) ","
         json .= '"currentVisible":' (panelVis.Has("currentVisible") ? panelVis["currentVisible"] : 0) ","
         json .= '"baselineVisible":' (panelVis.Has("baselineVisible") ? panelVis["baselineVisible"] : 0) ","
+        json .= '"panelLocalVisible":' (panelVis.Has("panelLocalVisible") ? panelVis["panelLocalVisible"] : 0) ","
+        json .= '"panelEffVisible":' (panelVis.Has("panelEffVisible") ? panelVis["panelEffVisible"] : 0) ","
+        json .= '"anyPanelEffectivelyOpen":' (panelVis.Has("anyPanelEffectivelyOpen") && panelVis["anyPanelEffectivelyOpen"] ? "true" : "false") ","
         json .= '"_changedOffsets":['
         chOff := panelVis.Has("_changedOffsets") ? panelVis["_changedOffsets"] : []
         if (chOff && IsObject(chOff))
@@ -489,7 +492,7 @@ PushDebugPanelsToWebView(radarSnap, overlayAllowed := true, hideReason := "")
         json .= "]"
     }
     else
-        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"_changedOffsets":[]'
+        json .= '"anyPanelOpen":false,"newlyVisible":0,"newlyHidden":0,"totalChanged":0,"ptrsAppeared":0,"ptrsDisappeared":0,"currentVisible":0,"baselineVisible":0,"panelLocalVisible":0,"panelEffVisible":0,"anyPanelEffectivelyOpen":false,"_changedOffsets":[]'
     json .= "},"
 
     ; Panel discovery

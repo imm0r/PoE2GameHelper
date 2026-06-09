@@ -8814,6 +8814,9 @@
         const changed = vis._changedOffsets || [];
         const panelVis = vis.panelVisible || 0;
         const checkedCount = vis.checkedCount || 0;
+        const panelLocalVis = vis.panelLocalVisible || 0;
+        const panelEffVis = vis.panelEffVisible || 0;
+        const effDiverge = panelLocalVis !== panelEffVis;
 
         let liveHtml = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px">`;
         liveHtml += `<div style="font-size:20px;font-weight:700;color:${anyOpen ? '#ef4444' : '#4ade80'}">${anyOpen ? '🔴 PANEL OPEN' : '🟢 ALL CLEAR'}</div>`;
@@ -8829,6 +8832,9 @@
         } else {
           liveHtml += `<span style="color:#e8c44a">⚠ Heuristic mode</span> · Flags: +${newlyVis}/-${newlyHid}`;
         }
+        // Currently-shown panels: local bit vs effective (hierarchical) visibility.
+        liveHtml += ` · Now 👁<span style="color:${panelLocalVis > 0 ? '#ef4444' : '#4ade80'}">${panelLocalVis}</span>/✓<span style="color:${panelEffVis > 0 ? '#ef4444' : '#4ade80'}">${panelEffVis}</span>`;
+        if (effDiverge) liveHtml += ` <span style="color:#e8c44a" data-tip="Locally flagged visible but a hidden ancestor keeps it off-screen">⚠ local≠eff</span>`;
         liveHtml += `</div></div>`;
 
         if (changed && changed.length > 0) {
@@ -8877,6 +8883,7 @@
           ['Overlay Allowed', overlay.allowed, overlay.allowed ? 'allowed' : 'blocked'],
           ['Hide Reason', overlay.hideReason || '—', ''],
           ['Current State', overlay.currentState || '—', ''],
+          ['Panel open (local/eff)', `${vis.panelLocalVisible || 0} / ${vis.panelEffVisible || 0}`, vis.anyPanelEffectivelyOpen ? 'blocked' : 'allowed'],
           ['Large Map Open', overlay.largeMapOpen, overlay.largeMapOpen ? 'allowed' : 'blocked'],
           ['Mini Map Open', overlay.miniMapOpen, ''],
           ['Map Debug', overlay.mapDebug || '—', ''],
