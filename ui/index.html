@@ -4012,6 +4012,7 @@
       <div class="tab" data-cfgtab="general"    onclick="switchConfigSubTab('general')">General</div>
       <div class="tab" data-cfgtab="automation" onclick="switchConfigSubTab('automation')">Automation</div>
       <div class="tab" data-cfgtab="overlay"    onclick="switchConfigSubTab('overlay')">Overlay</div>
+      <div class="tab" data-cfgtab="vitals"     onclick="switchConfigSubTab('vitals')">Vitals</div>
       <div class="tab" data-cfgtab="ggpk"       onclick="switchConfigSubTab('ggpk')">GGPK</div>
       <div class="tab" data-cfgtab="filters"    onclick="switchConfigSubTab('filters')">Filters</div>
       <div class="tab" data-cfgtab="debug"      onclick="switchConfigSubTab('debug')">Debug</div>
@@ -4641,6 +4642,44 @@
         </div>
 
         </div><!-- /cfg-subpanel overlay -->
+
+        <!-- ════════════════════════════════════════════════════════════
+             VITALS — freely configurable in-game vitals bars (Life / Mana /
+             Energy Shield). Per-bar enable, size, position, colours and text.
+             The per-bar sections are built by renderVitalsBars() into
+             #vitals-bars from the header's vitals config.
+             ════════════════════════════════════════════════════════════ -->
+        <div class="cfg-subpanel" data-cfgtab="vitals">
+
+          <div class="cfg-section">
+            <details id="det-vitals-general" open ontoggle="syncCfgSections()">
+              <summary><div class="cfg-header">Vitals Bars</div></summary>
+              <div class="cfg-subsection">
+                <div class="cfg-row"><span class="cfg-label">Show vitals</span>
+                  <label class="toggle"><input type="checkbox" id="tog-vitals"
+                      onchange="ahkCall('TogglePlayerHud')"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="cfg-row"><span class="cfg-label">Visible when</span>
+                  <select id="vitals-visibility" onchange="vitalsSetVisibility(this.value)"
+                      style="padding:3px 6px;font-size:12px">
+                    <option value="ingame">In combat (always in-game)</option>
+                    <option value="map">Only with map open</option>
+                  </select>
+                </div>
+                <div class="cfg-row"><span class="cfg-label">Edit layout (drag on overlay)</span>
+                  <label class="toggle"><input type="checkbox" id="tog-vitals-edit"
+                      onchange="ahkCall('ToggleVitalsEdit', this.checked)"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="cfg-help">Turn on edit mode, then drag each bar directly on the game
+                  overlay to place it. Turn it off to lock the layout (positions are saved).</div>
+              </div>
+            </details>
+          </div>
+
+          <!-- Per-bar sections (Life / Mana / Energy Shield) built by renderVitalsBars() -->
+          <div id="vitals-bars"></div>
+
+        </div><!-- /cfg-subpanel vitals -->
 
         <!-- ════════════════════════════════════════════════════════════
              GGPK — bundle/shader modifications. Currently just Map Hack
@@ -7203,6 +7242,8 @@
       setChk('tog-npcsync', d.npcSync);
       setChk('tog-radar', d.radarEnabled !== undefined ? d.radarEnabled : true);
       setChk('tog-player-hud', d.playerHud !== undefined ? d.playerHud : true);
+      setChk('tog-vitals', d.playerHud !== undefined ? d.playerHud : true);
+      if (d.vitals) vitalsSyncFromHeader(d.vitals);
       setChk('tog-overlay-status', d.overlayStatusText !== undefined ? d.overlayStatusText : true);
       setChk('tog-localapi', d.localApi !== undefined ? d.localApi : false);
       if (d.localApiPort !== undefined) { const lp = document.getElementById('localapi-port'); if (lp) lp.textContent = d.localApiPort; }
@@ -8991,7 +9032,7 @@
     // ═══════════════════════════════════════════════════════════════════
     //  CONFIG HELPERS
     // ═══════════════════════════════════════════════════════════════════
-    const _cfgSectionIds = ['status', 'overview', 'toggles', 'integrations', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output'];
+    const _cfgSectionIds = ['status', 'overview', 'toggles', 'integrations', 'autoflask', 'autopilot', 'rangecircles', 'radar', 'maphack', 'blacklist', 'entities', 'actions', 'radar-debug', 'debug-panels', 'debug-discovery', 'debug-diff', 'debug-overlay', 'offset-compare', 'al-conditions', 'al-timing', 'al-output', 'vitals-general', 'vitals-life', 'vitals-mana', 'vitals-es'];
     let _cfgSectionsGuard = 0;
     let _cfgSectionsLoaded = false;
 
@@ -9248,6 +9289,144 @@
         if (swatch) swatch.style.setProperty('--swatch-color', cpHexToCssRgba(hex));
       }
       cpCancel();
+    }
+
+    // ── Vitals tab (configurable Life / Mana / ES bars) ──────────────
+    // Mirrors the AHK vitals config (pushed in the header as d.vitals). The
+    // per-bar sections are generated once into #vitals-bars; values + colour
+    // swatches are synced from the header, and edits are debounced back to AHK
+    // via SetVitals as a flat { life:{…}, mana:{…}, es:{…}, visibility } payload.
+    const VITALS_BARS = [['life', 'Life'], ['mana', 'Mana'], ['es', 'Energy Shield']];
+    let _vitalsCfg = { bars: {}, visibility: 'ingame', edit: false };
+    let _vitalsBuilt = false;
+    let _vitalsPushTimer = null;
+
+    function _vBarSectionHtml(id, label) {
+      return `
+        <div class="cfg-section">
+          <details id="det-vitals-${id}" open ontoggle="syncCfgSections()">
+            <summary><div class="cfg-header">${label}</div></summary>
+            <div class="cfg-subsection">
+              <div class="cfg-row"><span class="cfg-label">Enabled</span>
+                <label class="toggle"><input type="checkbox" id="v-${id}-enabled"
+                    onchange="vitalsPush()"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Size (W × H px)</span>
+                <span style="display:inline-flex;gap:6px;align-items:center">
+                  <input type="number" id="v-${id}-w" min="4" max="4000" oninput="vitalsPush()" style="width:64px">
+                  <span style="color:var(--subtext)">×</span>
+                  <input type="number" id="v-${id}-h" min="2" max="400" oninput="vitalsPush()" style="width:54px">
+                </span>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Position (X / Y %)</span>
+                <span style="display:inline-flex;gap:6px;align-items:center">
+                  <input type="number" id="v-${id}-x" min="0" max="100" step="0.5" oninput="vitalsPush()" style="width:64px">
+                  <span style="color:var(--subtext)">/</span>
+                  <input type="number" id="v-${id}-y" min="0" max="100" step="0.5" oninput="vitalsPush()" style="width:64px">
+                </span>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Colours</span>
+                <span style="display:inline-flex;gap:12px;align-items:center;font-size:11px;color:var(--subtext)">
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-fg" onclick="vitalsPick('${id}','fg')"></span>Fill</span>
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-bg" onclick="vitalsPick('${id}','bg')"></span>Back</span>
+                  <span style="display:inline-flex;gap:5px;align-items:center"><span class="cp-swatch" id="vsw-${id}-outline" onclick="vitalsPick('${id}','outline')"></span>Outline</span>
+                </span>
+              </div>
+              <div class="cfg-row"><span class="cfg-label">Text</span>
+                <span style="display:inline-flex;gap:12px;align-items:center;font-size:11px;color:var(--subtext)">
+                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tCur" onchange="vitalsPush()">Current</label>
+                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tMax" onchange="vitalsPush()">Max</label>
+                  <label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" id="v-${id}-tPct" onchange="vitalsPush()">Percent</label>
+                </span>
+              </div>
+            </div>
+          </details>
+        </div>`;
+    }
+
+    function renderVitalsBars() {
+      const host = document.getElementById('vitals-bars');
+      if (!host) return;
+      host.innerHTML = VITALS_BARS.map(([id, label]) => _vBarSectionHtml(id, label)).join('');
+      _vitalsBuilt = true;
+    }
+
+    function _vSwatch(id, key, rgb) {
+      const el = document.getElementById('vsw-' + id + '-' + key);
+      if (el) el.style.setProperty('--swatch-color', cpHexToCssRgba((rgb || '#000000').replace('#', '') + 'FF'));
+    }
+
+    function vitalsSyncFromHeader(v) {
+      if (!v || typeof v !== 'object') return;
+      _vitalsCfg.bars = v.bars || _vitalsCfg.bars || {};
+      _vitalsCfg.visibility = v.visibility || 'ingame';
+      _vitalsCfg.edit = !!v.edit;
+      if (!_vitalsBuilt) renderVitalsBars();
+      const vs = document.getElementById('vitals-visibility'); if (vs && vs !== document.activeElement) vs.value = _vitalsCfg.visibility;
+      const te = document.getElementById('tog-vitals-edit'); if (te) te.checked = _vitalsCfg.edit;
+      const af = document.activeElement;
+      for (const [id] of VITALS_BARS) {
+        const b = _vitalsCfg.bars[id]; if (!b) continue;
+        const set = (sfx, val, isChk) => {
+          const el = document.getElementById('v-' + id + '-' + sfx);
+          if (!el || el === af) return;   // don't clobber a field being edited
+          if (isChk) el.checked = !!val; else el.value = val;
+        };
+        set('enabled', b.enabled, true);
+        set('w', Math.round(b.w));
+        set('h', Math.round(b.h));
+        set('x', +(((b.xPct ?? 0) * 100).toFixed(1)));
+        set('y', +(((b.yPct ?? 0) * 100).toFixed(1)));
+        set('tCur', b.tCur, true);
+        set('tMax', b.tMax, true);
+        set('tPct', b.tPct, true);
+        _vSwatch(id, 'fg', b.fg); _vSwatch(id, 'bg', b.bg); _vSwatch(id, 'outline', b.outline);
+      }
+    }
+
+    function vitalsPush() {
+      if (!_vitalsBuilt) return;
+      const payload = { visibility: (document.getElementById('vitals-visibility') || {}).value || 'ingame' };
+      for (const [id] of VITALS_BARS) {
+        const g = sfx => document.getElementById('v-' + id + '-' + sfx);
+        const cur = _vitalsCfg.bars[id] || {};
+        const bar = {
+          enabled: g('enabled') ? g('enabled').checked : cur.enabled,
+          w: +(g('w') && g('w').value !== '' ? g('w').value : cur.w),
+          h: +(g('h') && g('h').value !== '' ? g('h').value : cur.h),
+          xPct: (+(g('x') && g('x').value !== '' ? g('x').value : (cur.xPct ?? 0) * 100)) / 100,
+          yPct: (+(g('y') && g('y').value !== '' ? g('y').value : (cur.yPct ?? 0) * 100)) / 100,
+          tCur: g('tCur') ? g('tCur').checked : cur.tCur,
+          tMax: g('tMax') ? g('tMax').checked : cur.tMax,
+          tPct: g('tPct') ? g('tPct').checked : cur.tPct,
+        };
+        if (cur.fg) bar.fg = cur.fg;
+        if (cur.bg) bar.bg = cur.bg;
+        if (cur.outline) bar.outline = cur.outline;
+        payload[id] = bar;
+        _vitalsCfg.bars[id] = Object.assign(_vitalsCfg.bars[id] || {}, bar);
+      }
+      _vitalsCfg.visibility = payload.visibility;
+      clearTimeout(_vitalsPushTimer);
+      _vitalsPushTimer = setTimeout(() => ahkCall('SetVitals', payload), 120);
+    }
+
+    function vitalsSetVisibility(_v) { vitalsPush(); }
+
+    function vitalsPick(id, key) {
+      const cur = (_vitalsCfg.bars[id] && _vitalsCfg.bars[id][key]) || '#888888';
+      openColorPicker('vitals', {
+        hex: cur.replace('#', '') + 'FF',
+        title: id.toUpperCase() + ' — ' + (key === 'fg' ? 'Fill' : key === 'bg' ? 'Background' : 'Outline'),
+        swatchEl: document.getElementById('vsw-' + id + '-' + key),
+        onConfirm: (h) => {
+          const rgb = '#' + h.slice(0, 6);
+          if (!_vitalsCfg.bars[id]) _vitalsCfg.bars[id] = {};
+          _vitalsCfg.bars[id][key] = rgb;
+          _vSwatch(id, key, rgb);
+          vitalsPush();
+        }
+      });
     }
 
     // ── HSV ↔ RGB conversion helpers ─────────────────────────────────
