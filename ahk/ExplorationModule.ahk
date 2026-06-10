@@ -579,14 +579,14 @@ _RunExploration(radarSnap, gameHwnd)
     }
 
     ; ── Per-target progress watchdog ──────────────────────────────────
-    ; The classic failure on multi-level zones (e.g. The Spires of Deshar):
-    ; the walkable grid is 2D, several floors overlap in XY, and A* happily
-    ; routes across a seam the character can't physically cross. The game's
-    ; click-to-move then shuffles the character back and forth near the
-    ; ledge — it keeps MOVING, so the stand-still stuck check never fires.
-    ; Track the closest the player has come to the CURRENT target; if that
-    ; best distance hasn't improved for 6 s, the target is unreachable in
-    ; practice — mark it visited and move on to the next waypoint.
+    ; PATH-RELATIVE progress: measure approach to the NEXT path waypoint,
+    ; not straight-line distance to the final target. A* routes around gaps,
+    ; so a valid path often leads AWAY from the target first (debug video:
+    ; target in +Y, path runs -Y around a chasm) - a target-distance
+    ; watchdog then sees the straight-line worsen and wrongly abandons a
+    ; good path after 6 s. Approaching the next hop (or advancing _pathIdx
+    ; in the follow block below) counts as progress; only genuine
+    ; no-movement for 6 s skips the target.
     if (_targetCX >= 0)
     {
         if (_targetCX != _wdTgtCX || _targetCY != _wdTgtCY)
@@ -597,16 +597,26 @@ _RunExploration(radarSnap, gameHwnd)
             _wdBestDist := 999999
             _wdBestTick := now
         }
-        wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
-        ; Export the current target for the debug overlay: world coordinates,
-        ; straight-line distance, and the height delta target-vs-player (the
-        ; decisive cross-floor indicator: a few hundred units = other storey,
-        ; i.e. the reachability region leaked across a seam somewhere).
+        ; Progress metric: distance to the immediate next path hop when a
+        ; path exists, else straight-line to the target (no path = direct
+        ; click, straight-line is then the only signal we have).
+        if (_pathCoords.Length > 0 && _pathIdx >= 1 && _pathIdx <= _pathCoords.Length)
+        {
+            hop := _pathCoords[_pathIdx]
+            wdDist := Abs(pGX - hop[1]) + Abs(pGY - hop[2])
+        }
+        else
+            wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
+
+        ; Debug overlay: target world coordinates, straight-line distance to
+        ; the final target, and the height delta target-vs-player.
+        tgtChebyshev := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
         g_exploreTargetWX   := _targetCX * _STEP * ratio
         g_exploreTargetWY   := _targetCY * _STEP * ratio
-        g_exploreTargetDist := Round(wdDist * ratio)
+        g_exploreTargetDist := Round(tgtChebyshev * ratio)
         g_exploreTargetHD   := hzOk
             ? Round(TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) - playerWZ) : ""
+
         if (wdDist < _wdBestDist - 4)
         {
             _wdBestDist := wdDist
@@ -668,13 +678,18 @@ _RunExploration(radarSnap, gameHwnd)
         }
         if (bestIdx > _pathIdx)
         {
+            ; Advancing a hop is progress — re-baseline the watchdog onto the
+            ; new hop (reset best distance, not just the timer) so a longer
+            ; following segment can't trip the 6 s no-progress skip.
             _pathIdx := bestIdx
-            _wdBestTick := now   ; passing waypoints is watchdog progress
+            _wdBestDist := 999999
+            _wdBestTick := now
         }
         if (bestD < 15)
         {
             ; Standing on the closest waypoint — aim past it.
             _pathIdx := bestIdx + 1
+            _wdBestDist := 999999
             _wdBestTick := now
             if (_pathIdx > _pathCoords.Length)
             {
@@ -824,10 +839,23 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
-    ; Move mouse and click
+    ; Move mouse and click.
+    ; Read the cursor back after SetCursorPos: if the OS clamps/blocks the
+    ; move (cursor clipping, UIPI against an elevated game, DPI remap) then
+    ; mouse_event fires at the OLD position and the character walks toward
+    ; the wrong spot — a failure invisible from the click coordinates alone.
+    ; Both the intended click point and the actual cursor land in the debug
+    ; overlay so a mismatch is obvious on screen.
+    global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
+    global g_explorePlayerSX, g_explorePlayerSY
     DllCall("SetCursorPos", "int", screenPos["x"], "int", screenPos["y"])
     Sleep(30)
-    ; Left mouse down+up via mouse_event (bypasses UIPI like SetCursorPos)
+    curPt := Buffer(8, 0)
+    DllCall("GetCursorPos", "Ptr", curPt)
+    g_exploreClickX := screenPos["x"], g_exploreClickY := screenPos["y"]
+    g_exploreCurX   := NumGet(curPt, 0, "Int"), g_exploreCurY := NumGet(curPt, 4, "Int")
+    g_explorePlayerSX := (pSp ? pSp["x"] : 0), g_explorePlayerSY := (pSp ? pSp["y"] : 0)
+    ; Left mouse down+up via mouse_event (uses the current cursor position).
     DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTDOWN
     Sleep(30)
     DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTUP
