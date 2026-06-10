@@ -931,6 +931,7 @@ OnTreeTabChanged(*)
 
 #Include ahk/AutoFlask.ahk
 #Include ahk/AvoidZones.ahk
+#Include ahk/TerrainHeights.ahk
 #Include ahk/CombatAutomation.ahk
 #Include ahk/ItemSizeRegistry.ahk
 #Include ahk/LootPickup.ahk

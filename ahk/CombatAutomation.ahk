@@ -75,6 +75,9 @@ TryCombatAutomation(radarSnap, gameHwnd)
                 _combatPF.SetTerrain(terrain)
                 _pfTerrainSz := tsz
             }
+            ; Height-aware pathing (multi-level zones): shared context with
+            ; exploration; only active once it passed self-validation.
+            _combatPF.SetHeights(GetTerrainHeightContext(radarSnap))
         }
 
         terrainDist := nearestDist
