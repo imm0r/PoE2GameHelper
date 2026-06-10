@@ -22,6 +22,8 @@ _DispatchBridgeCall(method, args)
             SetTimer(ToggleRadar, -1)
         case "TogglePlayerHud":
             SetTimer(TogglePlayerHud, -1)
+        case "ToggleOverlayPoeOnly":
+            SetTimer(ToggleOverlayPoeOnly, -1)
         case "ToggleDebug":
             SetTimer(ToggleDebugMode, -1)
         case "TogglePause":

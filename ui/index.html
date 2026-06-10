@@ -3883,12 +3883,6 @@
       style="cursor:pointer" data-icon="❚❚">
       <div class="dot"></div><span id="pill-updates-text">Live</span>
     </div>
-    <!-- Snap-or-Start dual pill — refreshes the tree when PoE2 is up, or
-         launches PoE2 when it isn't. Text / icon / state set from the header
-         push (d.poeRunning); click routed by snapOrStartPoe() via dataset.mode. -->
-    <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
-      <div class="dot"></div><span id="snap-text">Refresh</span>
-    </div>
     <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
@@ -3905,8 +3899,21 @@
     <div class="pill inactive clickable" id="pill-hud" onclick="ahkCall('TogglePlayerHud')" data-tip="Toggle Player HUD" data-icon="♥">
       <div class="dot"></div><span id="pill-hud-text">HUD ON</span>
     </div>
+    <!-- Overlay visibility scope — toggles whether the play overlays follow tool
+         focus too (default) or are restricted to the PoE2 window only. State /
+         label set from the header push (d.overlayPoeOnly). -->
+    <div class="pill inactive clickable" id="pill-overlay-scope" onclick="ahkCall('ToggleOverlayPoeOnly')"
+      data-tip="Overlay visibility scope" data-icon="👁">
+      <div class="dot"></div><span id="pill-overlay-scope-text">Overlay: Game+Tool</span>
+    </div>
     <div class="pill inactive" id="pill-maphack" data-tip="Maphack / Zone Scanner" data-icon="🗺">
       <div class="dot"></div><span id="pill-maphack-text">Map —</span>
+    </div>
+    <!-- Snap-or-Start dual pill — refreshes the tree when PoE2 is up, or
+         launches PoE2 when it isn't. Text / icon / state set from the header
+         push (d.poeRunning); click routed by snapOrStartPoe() via dataset.mode. -->
+    <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
+      <div class="dot"></div><span id="snap-text">Refresh</span>
     </div>
     <div class="pill inactive" id="pill-fps" data-icon="⏱">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
@@ -7263,6 +7270,18 @@
         const on = d.playerHud !== false && d.playerHud !== 'false';
         pillHud.className = 'pill clickable ' + (on ? 'active' : 'inactive');
         document.getElementById('pill-hud-text').textContent = 'HUD ' + (on ? 'ON' : 'OFF');
+      }
+      // Overlay visibility scope pill — gold/active when overlays are restricted
+      // to the PoE2 window only; inactive when they also follow our tool's focus.
+      const pillOlScope = document.getElementById('pill-overlay-scope');
+      if (pillOlScope) {
+        const poeOnly = d.overlayPoeOnly === true || d.overlayPoeOnly === 'true';
+        pillOlScope.className = 'pill clickable ' + (poeOnly ? 'active' : 'inactive');
+        document.getElementById('pill-overlay-scope-text').textContent =
+          'Overlay: ' + (poeOnly ? 'Game only' : 'Game+Tool');
+        pillOlScope.setAttribute('data-tip', poeOnly
+          ? 'Overlays show only while PoE2 is focused — click to also show while this tool is focused'
+          : 'Overlays show while PoE2 or this tool is focused — click to restrict to PoE2 only');
       }
 
       // Maphack / Zone Scanner pill
