@@ -84,6 +84,18 @@ _RunExploration(radarSnap, gameHwnd)
     static _coarseH := 0
     static _bpr := 0
     static _rows := 0
+    ; Reachability region (height-aware flood fill from the player's start
+    ; cell, time-sliced across ticks — see the builder in the navigation
+    ; section). Once complete it filters plan samples / frontier candidates
+    ; and re-bases the exploration percentage on the REACHABLE area only.
+    static _regionMap := 0         ; Buffer — byte per coarse cell (1 = reachable)
+    static _regionQ := []
+    static _regionQHead := 1
+    static _regionDone := false
+    static _regionWalkable := 0
+    static _regionVisitedCnt := 0
+    static _DIRX := [1, -1, 0, 0]
+    static _DIRY := [0, 0, 1, -1]
 
     tsz := terrain["dataSize"]
     if (tsz != _terrainSz)
@@ -129,6 +141,14 @@ _RunExploration(radarSnap, gameHwnd)
         }
         _totalWalkable := count
         _visitedWalkable := 0
+
+        ; Reset reachability-region state
+        _regionMap := 0
+        _regionQ := []
+        _regionQHead := 1
+        _regionDone := false
+        _regionWalkable := 0
+        _regionVisitedCnt := 0
 
         ; Flag that navigation state needs reset
         _areaResetDone := 0
@@ -192,7 +212,11 @@ _RunExploration(radarSnap, gameHwnd)
                                     if (((byt >> ((gx & 1) * 4)) & 0xF) != 0)
                                     {
                                         NumPut("UChar", 1, _visited.Ptr, cellIdx)
-                                        _visitedWalkable++
+                                        ; Once the reachability region is known, only
+                                        ; in-region cells count toward the percentage
+                                        ; (the bit is still set so skip-loops work).
+                                        if (!_regionDone || (_regionMap && NumGet(_regionMap.Ptr, cellIdx, "UChar") = 1))
+                                            _visitedWalkable++
                                     }
                                 }
                             }
@@ -273,6 +297,85 @@ _RunExploration(radarSnap, gameHwnd)
 
     now := A_TickCount
 
+    ; ── Reachability-region builder (time-sliced BFS) ─────────────────
+    ; Flood fill over the coarse grid from the player's start cell.
+    ; Passability: corner-walkable + height step ≤ 120 world units per
+    ; 4-cell hop (when the height context validated — otherwise pure 2D).
+    ; ~10 ms per tick until complete. On completion the exploration
+    ; percentage is re-based on the reachable area (multi-level zones sat
+    ; at 1-2% forever because every floor counted) and the plan is rebuilt
+    ; with samples filtered to the region — which is what stops the route
+    ; from zigzagging toward other-floor targets.
+    hzPending := (heightCtx && IsObject(heightCtx) && heightCtx["val"] = "pending")
+    if (!_regionDone && !hzPending)
+    {
+        if (!_regionMap)
+        {
+            _regionMap := Buffer(_coarseW * _coarseH, 0)
+            if (pcX >= 0 && pcX < _coarseW && pcY >= 0 && pcY < _coarseH)
+            {
+                seedIdx := pcY * _coarseW + pcX
+                NumPut("UChar", 1, _regionMap.Ptr, seedIdx)
+                _regionQ.Push(seedIdx)
+                if _IsGridCellWalkable(pcX * _STEP, pcY * _STEP, buf, dsz, _bpr, gridW, _rows)
+                {
+                    _regionWalkable++
+                    if (NumGet(_visited.Ptr, seedIdx, "UChar") = 1)
+                        _regionVisitedCnt++
+                }
+            }
+        }
+        budgetEnd := A_TickCount + 10
+        while (_regionQHead <= _regionQ.Length)
+        {
+            if (Mod(_regionQHead, 128) = 0 && A_TickCount >= budgetEnd)
+                break
+            cellIdx := _regionQ[_regionQHead]
+            _regionQHead++
+            cx := Mod(cellIdx, _coarseW)
+            cy := cellIdx // _coarseW
+            curH := hzOk ? TerrainHeightAt(heightCtx, cx * _STEP, cy * _STEP) : 0
+            k := 1
+            while (k <= 4)
+            {
+                nx := cx + _DIRX[k]
+                ny := cy + _DIRY[k]
+                k++
+                if (nx < 0 || nx >= _coarseW || ny < 0 || ny >= _coarseH)
+                    continue
+                nIdx := ny * _coarseW + nx
+                if (NumGet(_regionMap.Ptr, nIdx, "UChar") != 0)
+                    continue
+                if !_IsGridCellWalkable(nx * _STEP, ny * _STEP, buf, dsz, _bpr, gridW, _rows)
+                    continue
+                if (hzOk && Abs(TerrainHeightAt(heightCtx, nx * _STEP, ny * _STEP) - curH) > 120)
+                    continue
+                NumPut("UChar", 1, _regionMap.Ptr, nIdx)
+                _regionQ.Push(nIdx)
+                _regionWalkable++
+                if (NumGet(_visited.Ptr, nIdx, "UChar") = 1)
+                    _regionVisitedCnt++
+            }
+        }
+        if (_regionMap && _regionQHead > _regionQ.Length)
+        {
+            _regionDone := true
+            _regionQ := []   ; release queue memory
+            _regionQHead := 1
+            if (_regionWalkable > 0)
+            {
+                ; Re-base the percentage on the reachable area and rebuild
+                ; the plan so samples get region-filtered.
+                _totalWalkable := _regionWalkable
+                _visitedWalkable := Min(_regionVisitedCnt, _regionWalkable)
+                _planBuilt := false
+            }
+        }
+    }
+    ; Region filter handle for plan building / frontier search — only used
+    ; once the fill completed with a non-degenerate result.
+    regionFilter := (_regionDone && _regionMap && _regionWalkable > 0) ? _regionMap : 0
+
     ; ── Proactive door/switch opening (AutoOpen-style) ────────────────
     ; Scan every 300ms for closed doors & unswitched switches within range
     if ((now - _doorClickTick) > 300)
@@ -345,7 +448,8 @@ _RunExploration(radarSnap, gameHwnd)
     {
         ; _totalWalkable counts coarse (4×4) cells — scale to fine cells so
         ; the plan's sample spacing reflects the actually walkable area.
-        _plan := _BuildExplorationPlan(terrain, radarSnap, pGX, pGY, _totalWalkable * _STEP * _STEP)
+        _plan := _BuildExplorationPlan(terrain, radarSnap, pGX, pGY
+            , _totalWalkable * _STEP * _STEP, regionFilter, _coarseW, _STEP)
         _planIdx := 1
         _planBuilt := true
         _targetCX := -1   ; force fresh A* on first plan waypoint
@@ -429,7 +533,7 @@ _RunExploration(radarSnap, gameHwnd)
             if (_targetCX < 0)
             {
                 frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
-                                                  buf, _bpr, _rows, dsz, _STEP)
+                                                  buf, _bpr, _rows, dsz, _STEP, regionFilter)
                 if (!frontier)
                 {
                     g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
@@ -715,9 +819,11 @@ _ExploreMarkCoarseVisited(visited, cx, cy, coarseW, coarseH, STEP, buf, dsz, bpr
 }
 
 ; ── Find nearest unvisited walkable cell (frontier) ──────────────────────
-; Spiral search from player's coarse position outward.
+; Spiral search from player's coarse position outward. `region` (optional
+; reachability map, byte per coarse cell) excludes cells the player can't
+; physically reach (other floors, disconnected islands).
 ; Returns [cx, cy] or 0 if none found.
-_FindNearestFrontier(pcX, pcY, visited, cW, cH, buf, bpr, rows, dsz, STEP)
+_FindNearestFrontier(pcX, pcY, visited, cW, cH, buf, bpr, rows, dsz, STEP, region := 0)
 {
     ; Spiral search: scan outward in rings
     maxRadius := Max(cW, cH)
@@ -735,7 +841,7 @@ _FindNearestFrontier(pcX, pcY, visited, cW, cH, buf, bpr, rows, dsz, STEP)
             {
                 cx := pcX + dxVal
                 cy := pcY + dy
-                result := _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP)
+                result := _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, region)
                 if result
                     return result
             }
@@ -751,7 +857,7 @@ _FindNearestFrontier(pcX, pcY, visited, cW, cH, buf, bpr, rows, dsz, STEP)
             {
                 cx := pcX + dx
                 cy := pcY + dy
-                result := _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP)
+                result := _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, region)
                 if result
                     return result
                 dx++
@@ -766,9 +872,13 @@ _FindNearestFrontier(pcX, pcY, visited, cW, cH, buf, bpr, rows, dsz, STEP)
     return 0
 }
 
-_CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP)
+_CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, region := 0)
 {
     if (cx < 0 || cx >= cW || cy < 0 || cy >= cH)
+        return 0
+
+    ; Must be reachable from the player's start (when the region is known)
+    if (region && NumGet(region.Ptr, cy * cW + cx, "UChar") = 0)
         return 0
 
     cellIdx := cy * cW + cx
@@ -1004,7 +1114,11 @@ _FindNearbyInteractable(radarSnap, playerWX, playerWY, playerWZ, clickCounts)
 ;
 ; Returns: Array of [gridX, gridY, kind] tuples. Empty array on failure.
 ; walkableFine: estimated count of walkable fine cells (0 = unknown).
-_BuildExplorationPlan(terrain, radarSnap, startGX, startGY, walkableFine := 0)
+; region/regionW/regionStep: optional reachability map (byte per coarse
+; cell) — samples and transitions outside the player's reachable region
+; are dropped, which keeps the tour from zigzagging toward other floors.
+_BuildExplorationPlan(terrain, radarSnap, startGX, startGY, walkableFine := 0
+    , region := 0, regionW := 0, regionStep := 4)
 {
     plan := []
     if !(terrain && IsObject(terrain))
@@ -1044,7 +1158,18 @@ _BuildExplorationPlan(terrain, radarSnap, startGX, startGY, walkableFine := 0)
             {
                 byt := NumGet(buf.Ptr, tIdx, "UChar")
                 if (((byt >> ((cx & 1) * 4)) & 0xF) != 0)
+                {
+                    if (region && regionW > 0)
+                    {
+                        rIdx := (cy // regionStep) * regionW + (cx // regionStep)
+                        if (rIdx >= region.Size || NumGet(region.Ptr, rIdx, "UChar") = 0)
+                        {
+                            cx += spacing
+                            continue
+                        }
+                    }
                     samples.Push([cx, cy])
+                }
             }
             cx += spacing
         }
@@ -1096,8 +1221,16 @@ _BuildExplorationPlan(terrain, radarSnap, startGX, startGY, walkableFine := 0)
             rawGX := Round(wx / ratio)
             rawGY := Round(wy / ratio)
             nudged := _NudgeToWalkableCell(rawGX, rawGY, buf, dsz, bpr, gridW, rows, 16)
-            if nudged
-                transitions.Push(nudged)
+            if !nudged
+                continue
+            ; Drop transitions outside the reachable region (other floors)
+            if (region && regionW > 0)
+            {
+                rIdx := (nudged[2] // regionStep) * regionW + (nudged[1] // regionStep)
+                if (rIdx >= region.Size || NumGet(region.Ptr, rIdx, "UChar") = 0)
+                    continue
+            }
+            transitions.Push(nudged)
         }
     }
 
