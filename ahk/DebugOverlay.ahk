@@ -106,6 +106,7 @@ class DebugOverlay extends GdiOverlayBase
         global g_exploreCurrentPercent, g_exploreLastReason
         global g_exploreHeightDiag, g_exploreRegionDiag
         global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
+        global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
         global g_autoFlaskEnabled, g_autoFlaskLastReason
         global POEFORMANCE_VERSION
 
@@ -144,11 +145,20 @@ class DebugOverlay extends GdiOverlayBase
                 if (hz != "" || rg != "")
                     lines.Push(["    " hz (hz != "" && rg != "" ? " · " : "") rg, DebugOverlay.COL_DIM])
 
-                ; Current navigation target: world coordinates + straight-line
-                ; distance (world units; ~10.9 units per grid cell).
+                ; Player position (world + render Z) and the current target:
+                ; world coordinates, straight-line distance, and the height
+                ; delta vs the player (hΔ of several hundred units = the
+                ; target sits on another storey → region/path leaked a seam).
+                if (IsSet(g_explorePosWX))
+                    lines.Push(["    pos: " g_explorePosWX "," g_explorePosWY "  h=" g_explorePosH
+                        , DebugOverlay.COL_DIM])
                 if (IsSet(g_exploreTargetDist) && g_exploreTargetDist >= 0)
+                {
+                    hd := (IsSet(g_exploreTargetHD) && g_exploreTargetHD != "")
+                        ? ("  hΔ=" g_exploreTargetHD) : ""
                     lines.Push(["    target: " Round(g_exploreTargetWX) "," Round(g_exploreTargetWY)
-                        . "  d=" Round(g_exploreTargetDist), DebugOverlay.COL_GOLD])
+                        . "  d=" Round(g_exploreTargetDist) hd, DebugOverlay.COL_GOLD])
+                }
                 else
                     lines.Push(["    target: -", DebugOverlay.COL_DIM])
             }
