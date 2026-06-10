@@ -839,10 +839,23 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
-    ; Move mouse and click
+    ; Move mouse and click.
+    ; Read the cursor back after SetCursorPos: if the OS clamps/blocks the
+    ; move (cursor clipping, UIPI against an elevated game, DPI remap) then
+    ; mouse_event fires at the OLD position and the character walks toward
+    ; the wrong spot — a failure invisible from the click coordinates alone.
+    ; Both the intended click point and the actual cursor land in the debug
+    ; overlay so a mismatch is obvious on screen.
+    global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
+    global g_explorePlayerSX, g_explorePlayerSY
     DllCall("SetCursorPos", "int", screenPos["x"], "int", screenPos["y"])
     Sleep(30)
-    ; Left mouse down+up via mouse_event (bypasses UIPI like SetCursorPos)
+    curPt := Buffer(8, 0)
+    DllCall("GetCursorPos", "Ptr", curPt)
+    g_exploreClickX := screenPos["x"], g_exploreClickY := screenPos["y"]
+    g_exploreCurX   := NumGet(curPt, 0, "Int"), g_exploreCurY := NumGet(curPt, 4, "Int")
+    g_explorePlayerSX := (pSp ? pSp["x"] : 0), g_explorePlayerSY := (pSp ? pSp["y"] : 0)
+    ; Left mouse down+up via mouse_event (uses the current cursor position).
     DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTDOWN
     Sleep(30)
     DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTUP

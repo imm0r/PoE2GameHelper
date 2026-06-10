@@ -107,6 +107,8 @@ class DebugOverlay extends GdiOverlayBase
         global g_exploreHeightDiag, g_exploreRegionDiag
         global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
         global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
+        global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
+        global g_explorePlayerSX, g_explorePlayerSY
         global g_autoFlaskEnabled, g_autoFlaskLastReason
         global POEFORMANCE_VERSION
 
@@ -161,6 +163,29 @@ class DebugOverlay extends GdiOverlayBase
                 }
                 else
                     lines.Push(["    target: -", DebugOverlay.COL_DIM])
+
+                ; Click diagnostics — intended click point vs the cursor read
+                ; back after SetCursorPos, plus the player's on-screen point.
+                ; If cur != click the OS rejected the move (the cursor never
+                ; reached the click target → the character walks to the wrong
+                ; place); that line turns red. clkΔ is the pixel gap from the
+                ; player to the click — a tiny value means we are clicking
+                ; almost on top of the character (no real movement).
+                if (IsSet(g_exploreClickX))
+                {
+                    miss := (Abs(g_exploreClickX - g_exploreCurX) > 2
+                          || Abs(g_exploreClickY - g_exploreCurY) > 2)
+                    lines.Push(["    click: " g_exploreClickX "," g_exploreClickY
+                        . "  cur: " g_exploreCurX "," g_exploreCurY (miss ? "  !!" : "")
+                        , miss ? DebugOverlay.COL_BLOOD : DebugOverlay.COL_DIM])
+                    if (IsSet(g_explorePlayerSX))
+                    {
+                        clkD := Abs(g_exploreClickX - g_explorePlayerSX)
+                              + Abs(g_exploreClickY - g_explorePlayerSY)
+                        lines.Push(["    plr@ " g_explorePlayerSX "," g_explorePlayerSY
+                            . "  clkD=" clkD, DebugOverlay.COL_DIM])
+                    }
+                }
             }
         }
 
