@@ -17,6 +17,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this.GameStatesAddress := 0
         this.StaticAddresses := Map()
         this.MemChrMode := -1
+        this._lastPreAttachScanTick := -1000000
         this.PatternScanReport := Map(
             "missingCritical", [],
             "missingOptional", [],
@@ -196,13 +197,31 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (!strictPatterns)
         {
             this.GameStatesAddress := this.ResolveGameStatesAddressFromStaticPattern()
-            if (this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
-                return true
+            if !(this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
+                this.GameStatesAddress := this.ResolveGameStatesAddressFallback()
 
-            this.GameStatesAddress := this.ResolveGameStatesAddressFallback()
             if (this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
+            {
+                ; Fast path resolved the critical GameStates anchor — but the
+                ; OTHER static patterns (terrain rotation tables, file root,
+                ; cull size) still need resolving. This branch used to return
+                ; early WITHOUT ever running the full scan, leaving
+                ; StaticAddresses empty — the terrain-height feature then
+                ; reported "no-pattern" forever even though its patterns were
+                ; perfectly fine. With the INI pattern cache the full scan
+                ; costs ~0 ms on every start after the first per game patch.
+                this.StaticAddresses := this.FindStaticAddresses()
                 return true
+            }
         }
+
+        ; Pre-attach full scan (fast path could not resolve GameStates —
+        ; the game is usually still loading). EnsureConnected retries every
+        ; 2 s; throttle so a not-yet-readable module isn't rescanned in a
+        ; tight loop. Strict callers always scan.
+        if (!strictPatterns && (A_TickCount - this._lastPreAttachScanTick) < 15000)
+            return false
+        this._lastPreAttachScanTick := A_TickCount
 
         this.StaticAddresses := this.FindStaticAddresses()
 
@@ -286,6 +305,22 @@ class PoE2GameStateReader extends PoE2InventoryReader
     ; Returns: Map of pattern name → resolved address for every uniquely matched pattern.
     FindStaticAddresses()
     {
+        ; Block timer interruptions for the duration of the scan. AHK timers
+        ; preempt running code — the ~100 ms radar tick otherwise interleaves
+        ; with the scan and consumes nearly all wall time, so the per-pattern
+        ; and global budgets (which measure wall time) expire after only a
+        ; couple of patterns and the rest land in skippedScan. The freeze is
+        ; one-time per game patch; afterwards the INI cache resolves
+        ; instantly.
+        prevCrit := Critical("On")
+        try
+            return this._FindStaticAddressesScan()
+        finally
+            Critical(prevCrit)
+    }
+
+    _FindStaticAddressesScan()
+    {
         result := Map()
         patterns := this.GetStaticPatterns()
         optionalNames := PoE2StaticOffsetsPatterns.GetOptionalNames()
@@ -293,21 +328,70 @@ class PoE2GameStateReader extends PoE2InventoryReader
         missingOptional := []
         duplicateCritical := []
         duplicateOptional := []
+        skippedScan := []
         found := []
-        scanDeadline := A_TickCount + 30000
+        scanStart := A_TickCount
+        scanDeadline := scanStart + 60000
 
         moduleBytes := this.Mem.GetModuleSnapshot(true)
         moduleSize := moduleBytes ? moduleBytes.Size : 0
+        moduleBase := moduleBytes ? this.Mem.ModuleSnapshotBase : 0
 
-        for patternInfo in patterns
+        ; ── Cache fast-path ───────────────────────────────────────────────
+        ; Scan results depend only on the game binary; as long as the module
+        ; size is identical the resolved offsets are too. Skips the multi-
+        ; second startup scan on every run until the next game patch.
+        cached := this._LoadPatternCache(patterns, moduleSize, moduleBase)
+        if cached
+        {
+            cachedResult := cached["result"]
+            for name, addr in cachedResult
+                found.Push(name)
+            for _, nm in cached["missing"]
+            {
+                if optionalNames.Has(nm)
+                    missingOptional.Push(nm)
+                else
+                    missingCritical.Push(nm)
+            }
+            this.PatternScanReport := Map(
+                "missingCritical", missingCritical,
+                "missingOptional", missingOptional,
+                "duplicateCritical", duplicateCritical,
+                "duplicateOptional", duplicateOptional,
+                "skippedScan", skippedScan,
+                "found", found,
+                "fromCache", true
+            )
+            try LogError("PatternScan | cache=hit | found=" found.Length "/" patterns.Length
+                . " | miss=" this._JoinNames(missingCritical)
+                . " | modSize=" moduleSize)
+            return cachedResult
+        }
+
+        for patternIdx, patternInfo in patterns
         {
             if (A_TickCount > scanDeadline)
+            {
+                ; Budget exhausted before these patterns were scanned — track
+                ; them separately from "missing" so consumers can tell
+                ; "pattern not in this game build" from "scan never ran".
+                while (patternIdx <= patterns.Length)
+                {
+                    skippedScan.Push(patterns[patternIdx]["name"])
+                    patternIdx += 1
+                }
                 break
+            }
 
             parsed := this.ParsePattern(patternInfo["pattern"])
             matchAddresses := []
+            ; Per-pattern slice of the budget — one slow pattern must not
+            ; starve the patterns scheduled after it (the terrain-rotation
+            ; pair sat at the end of the list and never got scanned).
+            patternDeadline := Min(scanDeadline, A_TickCount + 10000)
             if (moduleBytes)
-                matchAddresses := this.FindPatternAddressesInBuffer(moduleBytes, moduleSize, this.Mem.ModuleSnapshotBase, parsed, 2, scanDeadline)
+                matchAddresses := this.FindPatternAddressesInBuffer(moduleBytes, moduleSize, this.Mem.ModuleSnapshotBase, parsed, 2, patternDeadline)
 
             if (matchAddresses.Length = 0)
             {
@@ -361,10 +445,96 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "missingOptional", missingOptional,
             "duplicateCritical", duplicateCritical,
             "duplicateOptional", duplicateOptional,
-            "found", found
+            "skippedScan", skippedScan,
+            "found", found,
+            "fromCache", false
         )
 
+        ; One summary line per scan in the error log — makes "which pattern
+        ; failed how" diagnosable from a log paste instead of guesswork.
+        try LogError("PatternScan | cache=miss | took=" (A_TickCount - scanStart) "ms"
+            . " | modSize=" moduleSize
+            . " | found=" this._JoinNames(found)
+            . " | miss=" this._JoinNames(missingCritical)
+            . " | dup=" this._JoinNames(duplicateCritical)
+            . " | skip=" this._JoinNames(skippedScan))
+
+        ; Persist complete scan verdicts — including "miss" markers, so
+        ; genuinely absent patterns don't force a full rescan on every
+        ; start. Two guards: no deadline-skipped patterns (their verdicts
+        ; are unknown), and Game States must have been found (a half-loaded
+        ; module reads as zero-filled chunks — caching THAT verdict would
+        ; poison the cache until the next game patch).
+        if (skippedScan.Length = 0 && result.Has("Game States") && moduleSize > 0 && moduleBase)
+            this._SavePatternCache(result, patterns, moduleSize, moduleBase)
+
         return result
+    }
+
+    ; Joins an array of pattern names into "a, b, c" (or "-" when empty).
+    _JoinNames(arr)
+    {
+        out := ""
+        for _, nm in arr
+            out .= (out = "" ? "" : ", ") nm
+        return (out = "") ? "-" : out
+    }
+
+    ; Loads cached pattern verdicts from the INI when the game binary is
+    ; unchanged (same module size). Found patterns are stored as offsets
+    ; from the module base (ASLR moves the base every run); genuinely
+    ; absent ones as the literal "miss". Returns Map("result", Map of
+    ; name → absolute address, "missing", [names]), or 0 when the cache is
+    ; stale/incomplete.
+    _LoadPatternCache(patterns, moduleSize, moduleBase)
+    {
+        if (!moduleSize || !moduleBase)
+            return 0
+        ini := A_ScriptDir "\poeformance_config.ini"
+        cachedSize := 0
+        try cachedSize := Integer(IniRead(ini, "PatternCache", "ModuleSize", "0"))
+        if (cachedSize = 0 || cachedSize != moduleSize)
+            return 0
+        resultMap := Map()
+        missing := []
+        for patternInfo in patterns
+        {
+            val := ""
+            try val := IniRead(ini, "PatternCache", patternInfo["name"], "")
+            if (val = "")
+                return 0   ; pattern set changed since the cache was written
+            if (val = "miss")
+            {
+                missing.Push(patternInfo["name"])
+                continue
+            }
+            addr := 0
+            try addr := moduleBase + Integer(val)
+            if (!addr || !this.IsProbablyValidPointer(addr))
+                return 0
+            resultMap[patternInfo["name"]] := addr
+        }
+        return Map("result", resultMap, "missing", missing)
+    }
+
+    ; Writes the full scan verdict (offsets or "miss" per pattern) + module
+    ; size to the INI.
+    _SavePatternCache(result, patterns, moduleSize, moduleBase)
+    {
+        ini := A_ScriptDir "\poeformance_config.ini"
+        try
+        {
+            try IniDelete(ini, "PatternCache")
+            IniWrite(moduleSize, ini, "PatternCache", "ModuleSize")
+            for patternInfo in patterns
+            {
+                name := patternInfo["name"]
+                if result.Has(name)
+                    IniWrite(result[name] - moduleBase, ini, "PatternCache", name)
+                else
+                    IniWrite("miss", ini, "PatternCache", name)
+            }
+        }
     }
 
     ; Returns true if any critical pattern had zero matches or more than one match after scanning.
@@ -433,6 +603,29 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (anchorIndex < 0)
             anchorIndex := 0
 
+        ; Anchor upgrade: the scan memchr()s for the anchor byte and pays one
+        ; DllCall per candidate, so anchor rarity dominates scan time. All our
+        ; patterns start with REX prefixes / common opcodes (0x48, 0x8B, …)
+        ; that occur every ~15 bytes of x64 code — anchored there, a single
+        ; pattern took seconds and the 30 s budget ran out before the later
+        ; patterns (the terrain-rotation pair) were ever scanned. Prefer the
+        ; first literal byte that is NOT in the common-x64-bytes set.
+        static COMMON_X64 := Map(
+            0x00,1, 0x01,1, 0x04,1, 0x05,1, 0x0F,1, 0x24,1, 0x33,1,
+            0x40,1, 0x41,1, 0x44,1, 0x45,1, 0x48,1, 0x49,1, 0x4C,1, 0x4D,1,
+            0x74,1, 0x75,1, 0x83,1, 0x84,1, 0x85,1, 0x89,1, 0x8B,1, 0x8D,1,
+            0x90,1, 0xB9,1, 0xC0,1, 0xC3,1, 0xCC,1, 0xE8,1, 0xFF,1)
+        idx := 0
+        while (idx < data.Length)
+        {
+            if (mask[idx + 1] && !COMMON_X64.Has(data[idx + 1]))
+            {
+                anchorIndex := idx
+                break
+            }
+            idx += 1
+        }
+
         return Map(
             "data", data,
             "mask", mask,
@@ -467,9 +660,43 @@ class PoE2GameStateReader extends PoE2InventoryReader
     ; Searches buffer for all occurrences of parsedPattern, returning up to maxMatches results.
     ; Uses MemChr on the anchor byte as a fast pre-filter before running the full mask comparison.
     ; Returns: array of absolute addresses (baseAddress + buffer offset of each match).
-    FindPatternAddressesInBuffer(buffer, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
+    ; Returns the executable address of the native masked-pattern scanner
+    ; (compiled from tools/pattern_scan.c, embedded as machine code), or 0
+    ; when allocation fails. The interpreted scan loop below pays one
+    ; DllCall per anchor candidate — minutes for a ~45 MB module; the
+    ; native scan finishes in ~100 ms.
+    ; Signature (Win64): pattern_scan(buf, bufLen, pat, mask, patLen, out, maxMatches) → count
+    _GetNativeScanner()
     {
-        if (!buffer || bufferSize <= 0)
+        static codePtr := 0
+        if codePtr
+            return codePtr
+        static hex := "415641554154555756534c8b5424604c8b6c24684c8b6424704d85d20f9ec04939d2"
+            . "4889ce0f9fc108c80f85800000004d85e47e7b31c0eb100f1f80000000004883c001"
+            . "4939c27e6741803c010074f04c29d2498d3c0031c931ed488d1c06eb100f1f800000"
+            . "00004883c1014839ca7c410fb60738040b75ef31c04c8d1c0e9041803c0100740b45"
+            . "0fb634004538340375d64883c0014939c27fe5488d450149894ced004889c54939c4"
+            . "7fbceb04669031ed4889e85b5e5f5d415c415d415ec3"
+        len := StrLen(hex) // 2
+        ; MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE
+        p := DllCall("VirtualAlloc", "Ptr", 0, "UPtr", len, "UInt", 0x3000, "UInt", 0x40, "Ptr")
+        if !p
+            return 0
+        loop len
+            NumPut("UChar", Integer("0x" SubStr(hex, A_Index * 2 - 1, 2)), p, A_Index - 1)
+        ; W^X hygiene: execute-read once the bytes are written
+        old := 0
+        DllCall("VirtualProtect", "Ptr", p, "UPtr", len, "UInt", 0x20, "UInt*", &old)
+        codePtr := p
+        return codePtr
+    }
+
+    ; NOTE: the haystack parameter must NOT be named "buffer" — AHK v2 names
+    ; are case-insensitive, so it would shadow the global Buffer class and
+    ; break the Buffer(...) constructor calls below.
+    FindPatternAddressesInBuffer(hayBuf, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
+    {
+        if (!hayBuf || bufferSize <= 0)
             return []
 
         patternData := parsedPattern["data"]
@@ -481,8 +708,31 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         matches := []
 
+        ; ── Native fast path ──────────────────────────────────────────────
+        scanner := this._GetNativeScanner()
+        if scanner
+        {
+            patBuf := Buffer(patternLen)
+            maskBuf := Buffer(patternLen)
+            loop patternLen
+            {
+                NumPut("UChar", patternData[A_Index], patBuf, A_Index - 1)
+                NumPut("UChar", patternMask[A_Index] ? 1 : 0, maskBuf, A_Index - 1)
+            }
+            cap := (maxMatches > 0) ? maxMatches : 16
+            outBuf := Buffer(cap * 8, 0)
+            n := DllCall(scanner
+                , "Ptr", hayBuf.Ptr, "Int64", bufferSize
+                , "Ptr", patBuf.Ptr, "Ptr", maskBuf.Ptr, "Int64", patternLen
+                , "Ptr", outBuf.Ptr, "Int64", cap, "Int64")
+            loop n
+                matches.Push(baseAddress + NumGet(outBuf, (A_Index - 1) * 8, "Int64"))
+            return matches
+        }
+
+        ; ── Interpreted fallback (only when VirtualAlloc failed) ──────────
         lastStart := bufferSize - patternLen
-        ptr := buffer.Ptr
+        ptr := hayBuf.Ptr
         anchorByte := patternData[anchorIndex + 1]
         i := 0
         while (i <= lastStart)

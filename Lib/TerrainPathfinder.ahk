@@ -23,6 +23,13 @@ class TerrainPathfinder
         this._dsz  := 0
         this._maxW := 0
         this._lastDebug := ""
+        this._lastFailExhausted := false
+        this._hctx := 0
+        this._dfActive := false
+        this._dfDist := 0
+        this._dfClosed := 0
+        this._dfHeap := []
+        this._dfPops := 0
     }
 
     ; Stores terrain data from ReadTerrainData() result.
@@ -43,8 +50,41 @@ class TerrainPathfinder
 
     HasTerrain() => this._buf != 0
 
+    ; Attaches (or detaches with 0) a terrain-height context from
+    ; GetTerrainHeightContext(). Only a context that passed self-validation
+    ; ("ok") activates the height-aware checks; "pending"/"bad"/0 keep the
+    ; pathfinder in plain 2D mode. Hot fields are cached as properties so
+    ; the A*/LoS loops can do memo lookups without per-step Map access.
+    ;
+    ; Slope threshold: 30 world units per fine cell of distance (stairs and
+    ; ramps stay well below it; cross-floor seams on multi-level zones are
+    ; hundreds of units). Heights are memoized at 4-cell resolution, so the
+    ; effective minimum span is 4 cells.
+    SetHeights(ctx)
+    {
+        if (ctx && IsObject(ctx) && ctx["val"] = "ok")
+        {
+            this._hctx     := ctx
+            this._hMemoVal := ctx["memoVal"].Ptr
+            this._hMemoDone:= ctx["memoDone"].Ptr
+            this._hMemoW   := ctx["memoW"]
+            this._hGridW   := ctx["gridW"]
+            this._hRows    := ctx["rows"]
+        }
+        else
+            this._hctx := 0
+    }
+
+    HeightsEnabled => this._hctx != 0
+
     ; The last debug/reason string from FindPath().
     LastDebug => this._lastDebug
+
+    ; True when the last FindPath() failure exhausted the search space
+    ; (genuinely no route in the padded bounding box) as opposed to giving
+    ; up on its iteration/deadline budget. Callers use this to distinguish
+    ; "unreachable — skip the target" from "just far away — keep trying".
+    LastFailExhausted => this._lastFailExhausted
 
     ; Returns true if grid cell (gx, gy) is walkable (packed nibble terrain data).
     IsWalkable(gx, gy)
@@ -60,8 +100,28 @@ class TerrainPathfinder
     }
 
     ; Bresenham line-of-sight: true iff all cells on the line are walkable.
-    HasLineOfSight(x0, y0, x1, y1)
+    ; With a validated height context the line must also stay on one level —
+    ; otherwise path smoothing would happily cut across a floor seam that
+    ; the height-aware A* just routed around. ignoreHeights=true skips the
+    ; height rule (plain 2D walkability test) — callers use it to tell
+    ; "blocked by a wall" apart from "blocked by height noise".
+    ; The memo-hit path is inlined (raw NumGets on cached pointers); only
+    ; uncached cells fall back to TerrainHeightAt, which computes and
+    ; memoizes them.
+    HasLineOfSight(x0, y0, x1, y1, ignoreHeights := false)
     {
+        heightsOn := (this._hctx != 0) && !ignoreHeights
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            cxq := (x0 < 0) ? 0 : (x0 >= hGW ? hGW - 1 : x0)
+            cyq := (y0 < 0) ? 0 : (y0 >= hRows ? hRows - 1 : y0)
+            mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+            lastH := NumGet(hDone, mIdx, "UChar")
+                ? NumGet(hVal, mIdx * 4, "Float")
+                : TerrainHeightAt(this._hctx, x0, y0)
+        }
         dx := Abs(x1 - x0), dy := Abs(y1 - y0)
         sx := (x0 < x1) ? 1 : -1
         sy := (y0 < y1) ? 1 : -1
@@ -71,6 +131,19 @@ class TerrainPathfinder
         {
             if !this.IsWalkable(x, y)
                 return false
+            if (heightsOn)
+            {
+                cxq := (x < 0) ? 0 : (x >= hGW ? hGW - 1 : x)
+                cyq := (y < 0) ? 0 : (y >= hRows ? hRows - 1 : y)
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                h := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, x, y)
+                ; 120 = 30 units/cell × the 4-cell memo resolution
+                if (Abs(h - lastH) > 120)
+                    return false
+                lastH := h
+            }
             if (x = x1 && y = y1)
                 return true
             e2 := err * 2
@@ -110,6 +183,7 @@ class TerrainPathfinder
     FindPath(startGX, startGY, endGX, endGY)
     {
         buf := this._buf, bpr := this._bpr, rows := this._rows, dsz := this._dsz
+        this._lastFailExhausted := false
         if !buf
         {
             this._lastDebug := "no-terrain"
@@ -128,6 +202,9 @@ class TerrainPathfinder
         eNudge := this.NudgeToWalkable(endGX, endGY)
         if (!sNudge || !eNudge)
         {
+            ; No walkable cell anywhere near an endpoint — treat as a true
+            ; unreachable, not a budget timeout.
+            this._lastFailExhausted := true
             this._lastDebug := "nudge-fail sW=" (sNudge ? "1" : "0") " eW=" (eNudge ? "1" : "0")
             return []
         }
@@ -173,6 +250,15 @@ class TerrainPathfinder
         iter     := 0
         found    := false
         deadline := A_TickCount + ((rawDist > 400) ? 500 : 200)
+        heightsOn := this._hctx != 0
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            ; Max height delta per STEP-hop: 30 units/cell × hop length
+            ; (4-cell floor because heights are memoized at 1/4 resolution).
+            hAllow := 30.0 * Max(STEP, 4)
+        }
 
         while (heap.Length > 0 && iter < MAX_ITER && A_TickCount < deadline)
         {
@@ -201,6 +287,19 @@ class TerrainPathfinder
             cy := (curKey - cx) // STRIDE
             curG := gScore[curKey]
 
+            ; Height of the node being expanded — once per node, inlined
+            ; memo-hit path (raw NumGets), miss falls back to TerrainHeightAt.
+            if heightsOn
+            {
+                gx0 := cx * STEP, gy0 := cy * STEP
+                cxq := (gx0 >= hGW) ? hGW - 1 : gx0
+                cyq := (gy0 >= hRows) ? hRows - 1 : gy0
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                curH := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, gx0, gy0)
+            }
+
             loop 8
             {
                 ii := A_Index
@@ -212,6 +311,20 @@ class TerrainPathfinder
                 ; Check walkability at actual grid coordinates.
                 if !this.IsWalkable(nx * STEP, ny * STEP)
                     continue
+                ; Reject cross-floor seams (multi-level zones) when heights
+                ; are available — same walkable nibble, different storey.
+                if heightsOn
+                {
+                    gx1 := nx * STEP, gy1 := ny * STEP
+                    cxq := (gx1 >= hGW) ? hGW - 1 : gx1
+                    cyq := (gy1 >= hRows) ? hRows - 1 : gy1
+                    mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                    nH := NumGet(hDone, mIdx, "UChar")
+                        ? NumGet(hVal, mIdx * 4, "Float")
+                        : TerrainHeightAt(this._hctx, gx1, gy1)
+                    if (Abs(nH - curH) > hAllow)
+                        continue
+                }
 
                 nKey := ny * STRIDE + nx
                 if closed.Has(nKey)
@@ -233,6 +346,11 @@ class TerrainPathfinder
 
         if !found
         {
+            ; Empty heap = the whole (padded) search area was explored and
+            ; the goal was never reached → genuinely no route. A non-empty
+            ; heap means we bailed on the iteration cap or the deadline —
+            ; the target may well be reachable, just far / expensive.
+            this._lastFailExhausted := (heap.Length = 0)
             this._lastDebug := "astar-fail iter=" iter "/" MAX_ITER " heap=" heap.Length " rawD=" rawDist " STEP=" STEP
             return []
         }
@@ -260,6 +378,281 @@ class TerrainPathfinder
 
         return this._SmoothPath(path)
     }
+
+    ; ── Distance field (myrahz/Radar PathFinder.cs architecture) ─────
+    ; Instead of computing one path and following it with an index (which
+    ; goes stale the moment the player leaves it), a Dijkstra/A* cost field
+    ; is flooded FROM THE TARGET outward, time-sliced across ticks. A fresh
+    ; path from the CURRENT player position is then read every tick by
+    ; walking downhill in the field (each flooded cell was reached via a
+    ; strictly-cheaper parent, so min-cost descent always terminates at the
+    ; target). The field stays valid no matter where the player wanders.
+
+    ; Starts a new field toward fine-grid target (tgx, tgy). pgx/pgy is the
+    ; player position — used only to pick the coarse STEP and as the
+    ; first expansion heuristic. Returns false when no walkable cell exists
+    ; near the target (treat as unreachable).
+    DFieldStart(tgx, tgy, pgx, pgy)
+    {
+        this._dfActive := false
+        if !this._buf
+            return false
+        nudge := this.NudgeToWalkable(tgx, tgy)
+        if !nudge
+            return false
+        ; Same coarse-step heuristics as FindPath: far targets use a coarser
+        ; grid so the flood stays cheap.
+        rawDist := Max(Abs(pgx - tgx), Abs(pgy - tgy))
+        STEP := (rawDist > 500) ? 8 : (rawDist > 200) ? 4 : 2
+        cmW := this._maxW // STEP + 1
+        cmH := this._rows // STEP + 1
+        this._dfStep   := STEP
+        this._dfW      := cmW
+        this._dfH      := cmH
+        this._dfDist   := Buffer(cmW * cmH * 4, 0)   ; UInt cost+1 per cell, 0 = unset
+        this._dfClosed := Buffer(cmW * cmH, 0)
+        this._dfReqX   := tgx                         ; identity for DFieldMatches
+        this._dfReqY   := tgy
+        tcx := nudge[1] // STEP
+        tcy := nudge[2] // STEP
+        this._dfTcx := tcx
+        this._dfTcy := tcy
+        tKey := tcy * cmW + tcx
+        NumPut("UInt", 1, this._dfDist.Ptr, tKey * 4)  ; cost 0 stored as 1
+        this._dfHeap := [[0, tKey]]
+        this._dfPops := 0
+        this._dfActive := true
+        return true
+    }
+
+    DFieldActive => this._dfActive
+    DFieldPops   => this._dfPops
+
+    ; True when the active field was built for fine-grid target (tgx, tgy).
+    DFieldMatches(tgx, tgy) => this._dfActive && this._dfReqX = tgx && this._dfReqY = tgy
+
+    ; Expands the field for up to budgetMs toward the player's CURRENT
+    ; position. Returns:
+    ;   "cover"   — the player's cell is flooded; DFieldPathFrom will work.
+    ;   "build"   — budget exhausted, keep calling next tick.
+    ;   "unreach" — flood ran dry without ever reaching the player.
+    ;   "cap"     — expansion cap hit (degenerate huge flood) — give up.
+    ;   "none"    — no active field.
+    DFieldExpand(budgetMs, pgx, pgy)
+    {
+        if !this._dfActive
+            return "none"
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr, cPtr := this._dfClosed.Ptr
+        pcx := Max(0, Min(pgx // STEP, cmW - 1))
+        pcy := Max(0, Min(pgy // STEP, cmH - 1))
+        if this._DFieldCovered(pcx, pcy)
+            return "cover"
+        heap := this._dfHeap
+        deadline := A_TickCount + budgetMs
+        static DX := [1, -1, 0, 0, 1, 1, -1, -1]
+        static DY := [0, 0, 1, -1, 1, -1, 1, -1]
+        static DC := [10, 10, 10, 10, 14, 14, 14, 14]
+        heightsOn := this._hctx != 0
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            hAllow := 30.0 * Max(STEP, 4)
+        }
+        pops := 0
+        iters := 0
+        while (heap.Length > 0)
+        {
+            ; Deadline check on the raw iteration count — pops alone would
+            ; stall on long runs of already-closed duplicate heap entries
+            ; (they `continue` before pops++) and blow the time budget.
+            if (Mod(iters, 64) = 0 && A_TickCount >= deadline)
+            {
+                this._dfPops += pops
+                return "build"
+            }
+            iters++
+            curItem  := heap[1]
+            lastItem := heap.RemoveAt(heap.Length)
+            if heap.Length > 0
+            {
+                heap[1] := lastItem
+                this._HeapDown(heap, 1)
+            }
+            curKey := curItem[2]
+            if NumGet(cPtr, curKey, "UChar")
+                continue
+            NumPut("UChar", 1, cPtr, curKey)
+            pops++
+
+            cx := Mod(curKey, cmW)
+            cy := curKey // cmW
+            ; Chebyshev ≤ 1: the player's own cell may be unwalkable (and
+            ; thus never enqueued) — a flooded neighbor is good enough
+            ; (DFieldPathFrom scans radius 2 for its start cell anyway).
+            if (Abs(cx - pcx) <= 1 && Abs(cy - pcy) <= 1)
+            {
+                this._dfPops += pops
+                return "cover"
+            }
+            curG := NumGet(dPtr, curKey * 4, "UInt") - 1
+
+            if heightsOn
+            {
+                gx0 := cx * STEP, gy0 := cy * STEP
+                cxq := (gx0 >= hGW) ? hGW - 1 : gx0
+                cyq := (gy0 >= hRows) ? hRows - 1 : gy0
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                curH := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, gx0, gy0)
+            }
+
+            loop 8
+            {
+                ii := A_Index
+                nx := cx + DX[ii]
+                ny := cy + DY[ii]
+                if (nx < 0 || nx >= cmW || ny < 0 || ny >= cmH)
+                    continue
+                nKey := ny * cmW + nx
+                if NumGet(cPtr, nKey, "UChar")
+                    continue
+                if !this.IsWalkable(nx * STEP, ny * STEP)
+                    continue
+                if heightsOn
+                {
+                    gx1 := nx * STEP, gy1 := ny * STEP
+                    cxq := (gx1 >= hGW) ? hGW - 1 : gx1
+                    cyq := (gy1 >= hRows) ? hRows - 1 : gy1
+                    mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                    nH := NumGet(hDone, mIdx, "UChar")
+                        ? NumGet(hVal, mIdx * 4, "Float")
+                        : TerrainHeightAt(this._hctx, gx1, gy1)
+                    if (Abs(nH - curH) > hAllow)
+                        continue
+                }
+                tentG := curG + DC[ii]
+                oldG := NumGet(dPtr, nKey * 4, "UInt")
+                if (oldG = 0 || tentG + 1 < oldG)
+                {
+                    NumPut("UInt", tentG + 1, dPtr, nKey * 4)
+                    ; Chebyshev × 10 heuristic toward the player (admissible
+                    ; for the 10/14 move costs) — directs the flood so the
+                    ; first cover is near-linear in path length.
+                    h := Max(Abs(nx - pcx), Abs(ny - pcy)) * 10
+                    heap.Push([tentG + h, nKey])
+                    this._HeapUp(heap, heap.Length)
+                }
+            }
+        }
+        this._dfPops += pops
+        ; Heap dry: either the player really is cut off, or the player cell
+        ; itself isn't walkable but a neighbor cell is flooded (covered test
+        ; scans a small radius) — re-check before declaring unreachable.
+        return this._DFieldCovered(pcx, pcy) ? "cover"
+            : (this._dfPops > 400000 ? "cap" : "unreach")
+    }
+
+    ; Field cost at the player's fine-grid position, converted to ~fine
+    ; cells of travel distance. -1 while the position isn't covered.
+    DFieldDistCells(pgx, pgy)
+    {
+        start := this._DFieldFindStart(pgx, pgy)
+        if !start
+            return -1
+        g := NumGet(this._dfDist.Ptr, (start[2] * this._dfW + start[1]) * 4, "UInt") - 1
+        return (g * this._dfStep) // 10
+    }
+
+    ; Fresh path from the player's CURRENT position: walk downhill in the
+    ; field to the target. Returns smoothed fine-grid [[gx, gy], …] starting
+    ; at the player, or [] when the position isn't covered yet.
+    DFieldPathFrom(pgx, pgy, maxSteps := 800)
+    {
+        start := this._DFieldFindStart(pgx, pgy)
+        if !start
+            return []
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr
+        static DX := [1, -1, 0, 0, 1, 1, -1, -1]
+        static DY := [0, 0, 1, -1, 1, -1, 1, -1]
+        path := [[pgx, pgy]]
+        cx := start[1], cy := start[2]
+        curG := NumGet(dPtr, (cy * cmW + cx) * 4, "UInt")
+        if (cx * STEP != pgx || cy * STEP != pgy)
+            path.Push([cx * STEP, cy * STEP])
+        loop maxSteps
+        {
+            if (cx = this._dfTcx && cy = this._dfTcy)
+                break
+            bestG := curG
+            bestI := 0
+            loop 8
+            {
+                ii := A_Index
+                nx := cx + DX[ii]
+                ny := cy + DY[ii]
+                if (nx < 0 || nx >= cmW || ny < 0 || ny >= cmH)
+                    continue
+                nG := NumGet(dPtr, (ny * cmW + nx) * 4, "UInt")
+                if (nG > 0 && nG < bestG)
+                {
+                    bestG := nG
+                    bestI := ii
+                }
+            }
+            if (bestI = 0)
+                break   ; local minimum (shouldn't happen — every cell has a cheaper parent)
+            cx += DX[bestI]
+            cy += DY[bestI]
+            curG := bestG
+            path.Push([cx * STEP, cy * STEP])
+        }
+        return this._SmoothPath(path)
+    }
+
+    ; Nearest flooded coarse cell within Chebyshev radius 2 of the player's
+    ; fine position (the player regularly stands on an unflooded/unwalkable
+    ; in-between cell). Returns [cx, cy] or 0.
+    _DFieldFindStart(pgx, pgy)
+    {
+        if !this._dfActive
+            return 0
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr
+        pcx := Max(0, Min(pgx // STEP, cmW - 1))
+        pcy := Max(0, Min(pgy // STEP, cmH - 1))
+        bestG := 0
+        bestC := 0
+        dy := -2
+        while (dy <= 2)
+        {
+            dx := -2
+            while (dx <= 2)
+            {
+                cx := pcx + dx, cy := pcy + dy
+                if (cx >= 0 && cx < cmW && cy >= 0 && cy < cmH)
+                {
+                    g := NumGet(dPtr, (cy * cmW + cx) * 4, "UInt")
+                    if (g > 0 && (bestG = 0 || g < bestG))
+                    {
+                        bestG := g
+                        bestC := [cx, cy]
+                    }
+                }
+                dx++
+            }
+            dy++
+        }
+        return bestC
+    }
+
+    _DFieldCovered(pcx, pcy) => this._DFieldFindStart(pcx * this._dfStep, pcy * this._dfStep) != 0
 
     ; Computes total path length in world units from an array of [gx, gy] grid coords.
     ComputePathWorldDistance(path)

@@ -37,6 +37,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
         global g_lastSkillUseTime, g_combatRange, g_combatDisengageRange
         global g_combatSkillCooldowns
         global g_radarOverlay
+        global g_combatNoPathBlacklist
 
         ; Default: no combat path on the overlay. Each tick clears the carrier
         ; first; the LoS-blocked branch later in the function overrides it back
@@ -44,7 +45,16 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; path (idle / disengage / aiming / GCD) leaves the overlay clean
         ; instead of stranding the previous tick's polyline.
         if (g_radarOverlay)
+        {
             g_radarOverlay._combatPathCoords := []
+            g_radarOverlay._combatTargetGX := -1
+        }
+
+        ; Tracks how long the aim has been continuously "no-path" — used to
+        ; give up on unreachable enemies instead of claiming the tick forever.
+        ; Declared up here so the reset below the no-path branch can run on
+        ; every tick that reaches it.
+        static _noPathSince := 0
 
         ; ── Combat detection from entity cache ────────────────────────────
         combatInfo := _DetectCombat(radarSnap)
@@ -68,7 +78,14 @@ TryCombatAutomation(radarSnap, gameHwnd)
                 _combatPF.SetTerrain(terrain)
                 _pfTerrainSz := tsz
             }
+            ; Height-aware pathing (multi-level zones): shared context with
+            ; exploration; only active once it passed self-validation.
+            hCtx := GetTerrainHeightContext(radarSnap)
+            _combatPF.SetHeights(hCtx)
         }
+        else
+            hCtx := 0
+        hzOk := (hCtx && IsObject(hCtx) && hCtx["val"] = "ok")
 
         terrainDist := nearestDist
         if (hostileCount > 0 && _combatPF.HasTerrain()
@@ -82,18 +99,25 @@ TryCombatAutomation(radarSnap, gameHwnd)
         }
         combatInfo["terrainDist"] := terrainDist
 
-        ; State machine: idle ↔ combat (uses terrain-aware distance)
+        ; State machine: idle ↔ combat (uses terrain-aware distance).
+        ; Proximity override: an enemy within CLOSE_RANGE Euclidean MUST
+        ; engage no matter what the terrain estimate says — height noise
+        ; near walls can kill LoS / inflate path lengths for an enemy
+        ; standing right next to the character, which previously left the
+        ; bot strolling through packs in explore mode.
+        static CLOSE_RANGE := 300
         prevState := g_combatState
         if (g_combatState = "idle")
         {
-            if (hostileCount > 0 && terrainDist <= g_combatRange)
+            if (hostileCount > 0 && (nearestDist <= CLOSE_RANGE || terrainDist <= g_combatRange))
             {
                 g_combatState := "combat"
             }
         }
         else if (g_combatState = "combat")
         {
-            if (hostileCount = 0 || terrainDist > g_combatDisengageRange)
+            if (hostileCount = 0
+                || (terrainDist > g_combatDisengageRange && nearestDist > CLOSE_RANGE))
             {
                 g_combatState := "idle"
                 g_combatLastReason := "disengage(dist=" Round(terrainDist) " n=" hostileCount ")"
@@ -103,16 +127,50 @@ TryCombatAutomation(radarSnap, gameHwnd)
 
         if (g_combatState != "combat")
         {
-            g_combatLastReason := "idle(n=" hostileCount " d=" Round(terrainDist) ")"
+            ; No enemy in range — terrainDist is the 999999 sentinel, which
+            ; reads like a bug in the overlay. Show "d=-" when there is
+            ; nothing to measure distance to.
+            distStr := (hostileCount > 0) ? Round(terrainDist) : "-"
+            g_combatLastReason := "idle(n=" hostileCount " d=" distStr ")"
             return false
+        }
+
+        ; Publish the engaged enemy as the combat target marker on the radar
+        ; (red ring + crosshair, drawn next to the red combat path polyline).
+        if (g_radarOverlay && combatInfo["nearestWorldX"] != 0)
+        {
+            g_radarOverlay._combatTargetGX := Round(combatInfo["nearestWorldX"] / TerrainPathfinder.WORLD_TO_GRID_RATIO)
+            g_radarOverlay._combatTargetGY := Round(combatInfo["nearestWorldY"] / TerrainPathfinder.WORLD_TO_GRID_RATIO)
+        }
+
+        ; ── Camera anchor (shared projection sanity gate, see ClickNav) ───
+        ; The player's own projection anchors the w-sign convention AND must
+        ; land near the screen centre. Without it a far waypoint/enemy that
+        ; sits behind the camera plane gets point-MIRRORED by the divide and
+        ; the move-click walks the character in exactly the wrong direction
+        ; (the "runs away from the enemy in stutter steps" bug).
+        navRect := NavClientRect(gameHwnd)
+        camAnchor := 0
+        mat0 := combatInfo["w2sMatrix"]
+        if (navRect && mat0 && Type(mat0) = "Array" && mat0.Length = 16
+            && combatInfo["playerWorldX"] != 0)
+        {
+            camAnchor := NavAnchor(combatInfo["playerWorldX"], combatInfo["playerWorldY"]
+                , combatInfo["playerWorldZ"], mat0, navRect)
+            if !camAnchor["ok"]
+            {
+                g_combatLastReason := "cam-bad(" camAnchor["why"] ")"
+                return true   ; engaged — skip the tick rather than click blind
+            }
         }
 
         ; ── Aim selection (LoS-aware) ──────────────────────────────────────
         ; Three possible aim modes:
         ;   "direct" — straight LoS from player to enemy. Cursor lands on the
         ;              enemy; we wait for isTargetedByPlayer and fire skills.
-        ;   "walk"   — LoS blocked. Cursor lands on the farthest waypoint we
-        ;              DO have LoS to; we issue an LMB (move command) only —
+        ;   "walk"   — LoS blocked. Cursor lands a short way along the fresh
+        ;              A* path (recomputed from the current player position
+        ;              every tick); we issue an LMB (move command) only —
         ;              NO skill keys. The character walks until LoS opens,
         ;              then a later tick flips into "direct".
         ;   "no-path"— LoS blocked AND no traversable A* path. Nothing safe
@@ -130,7 +188,12 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; lingers on a stale path from a previous tick.
         combatPath := []
 
-        if (_combatPF.HasTerrain()
+        ; CLOSE_RANGE enemies are aimed at directly without any LoS/path
+        ; gating — they are visibly next to the character; terrain-height
+        ; noise must not talk us out of fighting them.
+        enemyHd := 0
+        if (nearestDist > CLOSE_RANGE
+            && _combatPF.HasTerrain()
             && combatInfo["playerWorldX"] != 0 && combatInfo["nearestWorldX"] != 0)
         {
             pGX := Round(combatInfo["playerWorldX"] / WORLD_TO_GRID)
@@ -138,58 +201,65 @@ TryCombatAutomation(radarSnap, gameHwnd)
             eGX := Round(combatInfo["nearestWorldX"] / WORLD_TO_GRID)
             eGY := Round(combatInfo["nearestWorldY"] / WORLD_TO_GRID)
 
-            if !_combatPF.HasLineOfSight(pGX, pGY, eGX, eGY)
+            ; Enemy height delta vs the player. Cross-floor enemies are
+            ; unreachable by click-to-move — blacklist immediately instead of
+            ; burning the 4 s no-path timer (mirrors the exploration floor
+            ; gate that finally made scouting work on multi-level zones).
+            enemyHd := hzOk ? Round(TerrainHeightAt(hCtx, eGX, eGY) - combatInfo["playerWorldZ"]) : 0
+            if (hzOk && Abs(enemyHd) > 200)
             {
-                ; LoS blocked — find a path and aim at the farthest reachable hop.
+                blAddr := combatInfo["nearestEntityAddr"]
+                if (blAddr && IsSet(g_combatNoPathBlacklist))
+                    g_combatNoPathBlacklist[blAddr] := A_TickCount + 15000
+                g_combatState := "idle"
+                g_combatLastReason := "off-floor(hd=" enemyHd " d=" Round(terrainDist) ")"
+                return false
+            }
+
+            if (!_combatPF.HasLineOfSight(pGX, pGY, eGX, eGY)
+                && !(hzOk && _combatPF.HasLineOfSight(pGX, pGY, eGX, eGY, true)))
+            {
+                ; Truly wall-blocked (the second test ignores the height rule:
+                ; a height-consistent enemy whose LoS only failed on height
+                ; NOISE is aimed at directly instead of dropping to no-path —
+                ; that noise was why combat "never found a path" to enemies
+                ; standing on the same floor).
+                ; Find a path and aim a short way along it. FindPath runs
+                ; fresh from the CURRENT player position every tick, so the
+                ; direction can never be stale. The aim point sits ~25 cells
+                ; ahead (a click-to-move command — the game handles corners
+                ; itself) and is projected with the PLAYER's Z: the old code
+                ; aimed at the farthest LoS waypoint with the ENEMY's Z, and
+                ; far waypoints behind the camera plane mirrored the click to
+                ; the opposite screen edge (bot walked AWAY from the enemy).
                 path := _combatPF.FindPath(pGX, pGY, eGX, eGY)
                 if (path && Type(path) = "Array" && path.Length >= 2)
                 {
-                    ; The smoothed path guarantees LoS between adjacent waypoints
-                    ; but NOT from the start to an arbitrary one further along.
-                    ; Walk forward; keep the last waypoint that still has LoS
-                    ; from the player. That's the most aggressive aim we can
-                    ; commit to without crossing into a wall.
-                    bestWp := 0
-                    idx := 1
-                    while (idx <= path.Length)
+                    aimPt := NavPointAlongPath(path, 25)
+                    if (aimPt)
                     {
-                        wp := path[idx]
-                        if !(wp && Type(wp) = "Array" && wp.Length >= 2)
-                        {
-                            idx += 1
-                            continue
-                        }
-                        if _combatPF.HasLineOfSight(pGX, pGY, wp[1], wp[2])
-                            bestWp := wp     ; keep advancing as long as LoS holds
-                        else
-                            break             ; first break = limit of straight reach
-                        idx += 1
-                    }
-                    if (bestWp)
-                    {
-                        aimWorldX := bestWp[1] * WORLD_TO_GRID
-                        aimWorldY := bestWp[2] * WORLD_TO_GRID
-                        ; Z usually doesn't matter much for cursor projection on
-                        ; mostly-planar zones; reuse the enemy's Z as a reasonable
-                        ; stand-in. The matrix projection cares far more about
-                        ; XY than Z here.
+                        aimWorldX := aimPt[1] * WORLD_TO_GRID
+                        aimWorldY := aimPt[2] * WORLD_TO_GRID
+                        aimWorldZ := combatInfo["playerWorldZ"]
                         aimMode := "walk"
                         aimTag  := "walk(" path.Length "wp)"
                     }
                     else
                     {
                         aimMode := "no-path"
-                        aimTag  := "path-no-los"
+                        aimTag  := "path-degenerate"
                     }
                     ; Expose the full path for the radar overlay regardless of
-                    ; which waypoint we ended up aiming at — the user wants to
+                    ; which point we ended up aiming at — the user wants to
                     ; see the route the bot considered, not just the next hop.
                     combatPath := path
                 }
                 else
                 {
+                    ; Distinguish "search space exhausted" (genuinely cut off)
+                    ; from "A* budget timeout" (far/expensive) in the status.
                     aimMode := "no-path"
-                    aimTag  := "no-path"
+                    aimTag  := "no-path:" (_combatPF.LastFailExhausted ? "exh" : "tmo")
                 }
             }
         }
@@ -203,14 +273,31 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; ── No-path branch ───────────────────────────────────────────────
         ; Enemy detected but no traversable route exists. Don't move the
         ; cursor (would just spam an unreachable corner) and don't fire
-        ; skills (no LoS = wasted cooldown). Stay in "combat" state so
-        ; AutoPilot doesn't fall through to exploration this tick — let the
-        ; enemy come to us or a future tick re-find the path.
+        ; skills (no LoS = wasted cooldown). Stay in "combat" state briefly —
+        ; the enemy may come to us or a future tick may re-find the path.
+        ; BUT: a genuinely unreachable enemy (across a chasm, behind sealed
+        ; geometry) used to freeze the whole AutoPilot here forever. After
+        ; 4 s of continuous no-path we blacklist that entity for 15 s and
+        ; disengage so loot/exploration can continue.
         if (aimMode = "no-path")
         {
-            g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount ")"
+            if (_noPathSince = 0)
+                _noPathSince := A_TickCount
+            else if ((A_TickCount - _noPathSince) > 4000)
+            {
+                blAddr := combatInfo["nearestEntityAddr"]
+                if (blAddr && IsSet(g_combatNoPathBlacklist))
+                    g_combatNoPathBlacklist[blAddr] := A_TickCount + 15000
+                g_combatState := "idle"
+                _noPathSince := 0
+                g_combatLastReason := "no-path-giveup(d=" Round(terrainDist) " n=" hostileCount " hd=" enemyHd ")"
+                return false
+            }
+            g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount
+                . " hd=" enemyHd " " aimTag ")"
             return true
         }
+        _noPathSince := 0   ; any reachable aim resets the give-up timer
 
         ; ── Move mouse toward aim point ────────────────────────────────────
         ; Build a thin info Map carrying just the projection-relevant fields so
@@ -224,7 +311,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
             "playerWorldX",  combatInfo["playerWorldX"],
             "playerWorldY",  combatInfo["playerWorldY"]
         )
-        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd)
+        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd, camAnchor)
         if !targetScreenPos
         {
             g_combatLastReason := "no-screen-pos"
@@ -369,6 +456,37 @@ TryCombatAutomation(radarSnap, gameHwnd)
         }
         else if (selResult["outOfRange"])
         {
+            ; Direct LoS but every ready skill is out of range. Previously
+            ; this branch only set a status ("approaching") without ever
+            ; moving — the bot parked the cursor on the enemy and stood
+            ; still until the mob happened to walk over. Now we issue a
+            ; throttled move-click at a point ~60% toward the enemy so the
+            ; character actually closes the gap; skills fire on a later
+            ; tick once the distance drops below the slot range.
+            static _approachClickTick := 0
+            if ((now - _approachClickTick) > 300)
+            {
+                apX := combatInfo["playerWorldX"] + (combatInfo["nearestWorldX"] - combatInfo["playerWorldX"]) * 0.6
+                apY := combatInfo["playerWorldY"] + (combatInfo["nearestWorldY"] - combatInfo["playerWorldY"]) * 0.6
+                apInfo := Map(
+                    "nearestWorldX", apX,
+                    "nearestWorldY", apY,
+                    "nearestWorldZ", combatInfo["nearestWorldZ"],
+                    "w2sMatrix",     combatInfo["w2sMatrix"],
+                    "playerWorldX",  combatInfo["playerWorldX"],
+                    "playerWorldY",  combatInfo["playerWorldY"]
+                )
+                apPos := _WorldToScreen(apInfo, gameHwnd, camAnchor)
+                if (apPos && !IsPointInAvoidZone(apPos["x"], apPos["y"], avoidRects))
+                {
+                    DllCall("SetCursorPos", "int", apPos["x"], "int", apPos["y"])
+                    Sleep(20)
+                    DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LDOWN
+                    Sleep(20)
+                    DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; LUP
+                    _approachClickTick := now
+                }
+            }
             g_combatLastReason := "approaching(d=" Round(nearestDist) ")"
         }
         else
@@ -381,7 +499,12 @@ TryCombatAutomation(radarSnap, gameHwnd)
     }
     catch as ex
     {
+        ; Surface the crash in the debug overlay — a swallowed exception
+        ; leaves g_combatLastReason frozen on its last (stale) value while
+        ; g_combatState may still be "combat", which silently pauses
+        ; exploration ("combat-pause" with an idle-looking combat line).
         LogError("TryCombatAutomation", ex)
+        try g_combatLastReason := "error(" ex.Message " @" ex.Line ")"
         return false
     }
     finally
@@ -418,12 +541,16 @@ UpdateCombatPresence(radarSnap)
 
 _DetectCombat(radarSnap)
 {
-    global g_combatRange, g_reader
+    global g_combatRange, g_reader, g_combatNoPathBlacklist
 
     result := Map("hostileCount", 0, "nearestDist", 999999, "nearestPath", ""
         , "nearestWorldX", 0, "nearestWorldY", 0, "nearestWorldZ", 0
         , "playerWorldX", 0, "playerWorldY", 0, "playerWorldZ", 0
-        , "nearestTargetableAddr", 0, "w2sMatrix", [])
+        , "nearestTargetableAddr", 0, "nearestEntityAddr", 0, "w2sMatrix", [])
+
+    ; Unreachable-enemy blacklist (filled by the no-path give-up in
+    ; TryCombatAutomation). Expired entries are pruned lazily on lookup.
+    blacklist := IsSet(g_combatNoPathBlacklist) ? g_combatNoPathBlacklist : 0
 
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
     area := (inGs && IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
@@ -464,6 +591,16 @@ _DetectCombat(radarSnap)
         ; Only monsters/characters (not player, not attachments)
         if !g_reader.IsNpcLikeEntityPath(path)
             continue
+
+        ; Skip enemies we recently gave up on (no traversable path) so the
+        ; idle→combat state machine doesn't immediately re-engage them.
+        entityAddr := entity.Has("address") ? entity["address"] : 0
+        if (blacklist && entityAddr && blacklist.Has(entityAddr))
+        {
+            if (A_TickCount < blacklist[entityAddr])
+                continue
+            blacklist.Delete(entityAddr)
+        }
 
         ; Check decoded components for alive + targetable + hostile
         decoded := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
@@ -525,6 +662,7 @@ _DetectCombat(radarSnap)
         {
             nearestDist := dist
             result["nearestPath"] := path
+            result["nearestEntityAddr"] := entityAddr
 
             ; Store Targetable component address for live isTargetedByPlayer check
             if (comps && Type(comps) = "Array")
@@ -594,20 +732,26 @@ _SelectNextSkill(skills, combatInfo)
         if (skillName != "")
         {
             skillReady := false
+            nameMatched := false
             for _, skill in skills
             {
                 sName := skill.Has("name") ? skill["name"] : ""
                 sDisplay := skill.Has("displayName") ? skill["displayName"] : ""
                 if (sName = skillName || sDisplay = skillName)
                 {
+                    nameMatched := true
                     canUse := skill.Has("canUse") ? skill["canUse"] : true
                     if canUse
                         skillReady := true
                     break
                 }
             }
-            ; If we have a skill name match and it's on cooldown, skip
-            if (skillName != "" && !skillReady)
+            ; Skip only when the name actually matched a skill AND that skill
+            ; is on cooldown. A configured name that matches nothing in
+            ; memory (typo, display-name vs internal-name mismatch, renamed
+            ; gem) used to silently disable the slot forever — fire it by
+            ; key instead and let the per-slot cooldown throttle it.
+            if (nameMatched && !skillReady)
                 continue
         }
 
@@ -740,8 +884,11 @@ _CachedTerrainDistance(pf, playerWX, playerWY, enemyWX, enemyWY)
 ; Uses the game's own 4x4 WorldToScreen matrix (read from camera structure)
 ; for pixel-perfect projection. Falls back to isometric approximation if
 ; the matrix is unavailable.
+; anchor: camera anchor from NavAnchor() — supplies the w-sign convention
+; (behind-camera points are REJECTED instead of mirrored) and the player's
+; projection for direction-true edge clamping.
 ; Returns: Map("x", screenX, "y", screenY) or 0 on failure.
-_WorldToScreen(combatInfo, gameHwnd)
+_WorldToScreen(combatInfo, gameHwnd, anchor := 0)
 {
     global g_combatW2SScale
 
@@ -760,56 +907,18 @@ _WorldToScreen(combatInfo, gameHwnd)
     if (winW < 100 || winH < 100)
         return 0
 
-    ; ── Try proper matrix projection ──────────────────────────────────
+    ; ── Try proper matrix projection (shared ClickNav toolkit) ────────
     mat := combatInfo["w2sMatrix"]
     if (mat && Type(mat) = "Array" && mat.Length = 16)
     {
-        ; Get client area (rendering region, excluding title bar/borders)
-        clientRect := Buffer(16, 0)
-        clientPt := Buffer(8, 0)
-        DllCall("GetClientRect", "Ptr", gameHwnd, "Ptr", clientRect)
-        DllCall("ClientToScreen", "Ptr", gameHwnd, "Ptr", clientPt)
-        cX := NumGet(clientPt, 0, "Int")
-        cY := NumGet(clientPt, 4, "Int")
-        cW := NumGet(clientRect, 8, "Int")
-        cH := NumGet(clientRect, 12, "Int")
-        ; Matrix4x4 multiplication: result = mat × [ex, ey, ez, 1.0]
-        ; C# Matrix4x4 is row-major: M[row,col] with FieldOffset layout
-        ;   mat[1]=M11, mat[2]=M12, mat[3]=M13, mat[4]=M14
-        ;   mat[5]=M21, mat[6]=M22, mat[7]=M23, mat[8]=M24
-        ;   mat[9]=M31, mat[10]=M32, mat[11]=M33, mat[12]=M34
-        ;   mat[13]=M41, mat[14]=M42, mat[15]=M43, mat[16]=M44
-        ; GameHelper2 iterates: tmpResult[i] += mat[j,i] * input[j]
-        ;   i.e. result = transpose(mat) × input  (column-major multiply)
-        input := [ex, ey, ez, 1.0]
-        r := [0.0, 0.0, 0.0, 0.0]
-        Loop 4
-        {
-            i := A_Index
-            Loop 4
-            {
-                j := A_Index
-                ; mat[j, i] in row-major = mat[(j-1)*4 + i]
-                r[i] := r[i] + mat[(j - 1) * 4 + i] * input[j]
-            }
-        }
-
-        ; Perspective divide
-        if (r[4] = 0)
+        rect := NavClientRect(gameHwnd)
+        if !rect
             return 0
-        Loop 4
-            r[A_Index] := r[A_Index] / r[4]
-
-        ; NDC to screen coordinates (client area → absolute screen)
-        screenX := Round(cX + (r[1] + 1.0) * (cW / 2.0))
-        screenY := Round(cY + (1.0 - r[2]) * (cH / 2.0))
-
-        ; Clamp to client area bounds (with margin to avoid edge UI)
-        margin := 50
-        screenX := Max(cX + margin, Min(screenX, cX + cW - margin))
-        screenY := Max(cY + margin, Min(screenY, cY + cH - margin))
-
-        return Map("x", screenX, "y", screenY)
+        visSign := (anchor && anchor["ok"]) ? anchor["visSign"] : 0
+        sp := NavProject(ex, ey, ez, mat, rect, visSign)
+        if !sp
+            return 0
+        return NavRayClamp(sp, (anchor && anchor["ok"]) ? anchor["sp"] : 0, rect, 50)
     }
 
     ; ── Fallback: isometric approximation ─────────────────────────────
@@ -897,7 +1006,7 @@ LoadCombatAutoConfig()
 {
     global g_combatAutoEnabled, g_combatRange, g_combatDisengageRange
     global g_combatGlobalCooldownMs, g_combatSkillSlots, g_combatToggleHotkey
-    global g_combatW2SScale
+    global g_combatW2SScale, g_combatNoPathBlacklist
 
     cfgPath := A_ScriptDir "\poeformance_config.ini"
 
@@ -907,6 +1016,9 @@ LoadCombatAutoConfig()
     g_combatGlobalCooldownMs := 120
     g_combatToggleHotkey := "F10"
     g_combatW2SScale := 0.20
+    ; entityAddr → expiry tick for enemies the no-path give-up disengaged
+    ; from (seeded here unconditionally — module-init gotcha, see CLAUDE.md)
+    g_combatNoPathBlacklist := Map()
 
     try g_combatAutoEnabled := IniRead(cfgPath, "CombatAutomation", "enabled", "0") = "1"
     try g_combatRange := Integer(IniRead(cfgPath, "CombatAutomation", "combatRange", "1500"))

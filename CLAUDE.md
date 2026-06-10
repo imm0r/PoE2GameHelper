@@ -1,7 +1,7 @@
 # Project conventions for Claude
 
 Path of Exile 2 memory-reading / overlay assistant. AutoHotkey v2 + a WebView2 UI.
-Reimplementation of the original C# project (see Reference). Version `0.45.11.6`.
+Reimplementation of the original C# project (see Reference). Version `0.45.12.2`.
 
 ## Language
 
@@ -39,6 +39,7 @@ inline when authoring commit messages, PR bodies, etc.
 - **Always end a reply that committed & pushed with the exact pull command** so the
   user can grab it locally, e.g. `git pull origin <current-dev-branch>`. Every time a
   change is pushed — no exceptions.
+  **Never add the current AI Session to the end of the commit message** — Skip the entire line (e.g. "https://claude.ai/code/session_123456789abcdef")
 
 ### Completion-summary format (lean, GitHub-ready)
 When wrapping up a task, output the summary as ONE copyable raw GitHub-flavored
@@ -49,11 +50,8 @@ show only the sections that have content — never pad with empty headings:
 
 - **Summary** — one sentence on what was achieved.
 - **Changes** — bullet list, `path/file.ext:line — what & why`.
-- **Verify in-game** — concrete click/hotkey steps + expected result (the user
-  usually cannot runtime-test). Write "None needed" when nothing applies.
-
-Add **Verification** (static checks: brace balance, `node --check`, minimal diff)
-or **Open / Next steps** only when actually relevant. Any prose outside the block
+- **Advices** — everything the needs to know about how the changes work.
+- **Open / Next steps** only when actually relevant. Any prose outside the block
 (chat commentary) may stay German.
 
 ## Project structure & conventions
@@ -63,6 +61,9 @@ or **Open / Next steps** only when actually relevant. Any prose outside the bloc
 - **UI:** `ui/index.html` — one self-contained file with a single inline `<script>`,
   rendered in a WebView2 control.
 - **Sounds:** alert `.wav` files live in the root **`wav/`** folder.
+- **Logs:** `.log` files live in the root **`Logs/`** folder.
+- **Data:** `.tsv` files needed for translating internal strings by using a dictionary live in the root **`Data/`** folder.
+- **Tools:** `.py` files needed for building the dictionaries live in the root **`Tools/`** folder.
 
 ### Include conventions
 - `InGameStateMonitor.ahk` includes with the `ahk/` prefix, e.g. `#Include ahk/RadarOverlay.ahk`.
@@ -178,6 +179,38 @@ both halves.
   `OnMessage` fires for the hidden Gui, request/response round-trips, and that the
   config toggle starts/stops the server. The listener only starts at app launch,
   so toggling on requires a restart.
+
+## AutoPilot navigation (v0.45.12.0) — distance-field architecture
+
+Modeled on `myrahz/Radar` (`PathFinder.cs`): never follow a stored path.
+
+- **`Lib/TerrainPathfinder.ahk` — `DField*` methods:** per target, a
+  Dijkstra/A* cost field is flooded FROM the target (time-sliced,
+  `DFieldExpand(budgetMs, pgx, pgy)`, Chebyshev heuristic toward the player,
+  same walkable + height rules as `FindPath`). Every click tick reads a
+  FRESH path from the CURRENT player position by walking downhill
+  (`DFieldPathFrom`) — stale paths / index stalls / backward clicks are
+  impossible by construction. `DFieldDistCells` = live remaining distance
+  (arrival check + watchdog metric).
+- **`ahk/ClickNav.ahk` (new, stateless):** shared projection/click toolkit
+  for exploration AND combat. `NavAnchor` — the player must project near
+  the screen centre (else the matrix is stale → no clicks at all,
+  reason `cam-bad`) and its w sign defines "in front of the camera".
+  `NavProject` (unclamped, visSign rejection), `NavRayClamp`
+  (direction-true edge clamping along the player ray — never per-axis),
+  `NavValidateClick` (avoid-zone kinds + HUD rescue + near veto),
+  `NavPickClickPoint` (~35 cells along the fresh path, backing off toward
+  the player), `NavClickAt`.
+- **CombatAutomation:** anchor gate per tick; walk-engage aims ~25 cells
+  along the per-tick A* path with the PLAYER's Z. (The old farthest-LoS
+  waypoint used the enemy's Z and no w-sign check — waypoints behind the
+  camera plane projected point-MIRRORED and the bot walked away from
+  enemies in stutter steps.)
+- **ExplorationModule:** plan/frontier/sticky-target/floor-gate/region kept;
+  the whole stored-path block (snap-forward, LOOKAHEAD scans, near-skip
+  gate, direct-click fallback) is gone. New reasons: `routing(…)` while the
+  field floods (stuck detection paused then), `cam-bad(…)`,
+  `ui-blocked(… d=N prj/hud/map/ent/near)`, `click(… d=N ahead=M)`.
 
 ## Open / pending (needs the game running)
 

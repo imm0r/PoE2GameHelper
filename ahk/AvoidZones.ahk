@@ -7,7 +7,8 @@
 ;
 ; Both must avoid clicking on:
 ;   1. HUD elements (life globe, skill bar, flask bar, quest tracker, area banner)
-;   2. Minimap + large map overlays
+;   2. The small corner minimap (NOT the large Tab map — that is click-through
+;      for movement and its rect would cover the whole screen)
 ;   3. World entities whose left-click triggers something other than movement:
 ;        * AreaTransition  → enters another zone (interrupts everything)
 ;        * Waypoint        → opens travel UI (panel-open guard then kills automation)
@@ -71,6 +72,20 @@ IsPointInAvoidZone(sx, sy, rects)
     return false
 }
 
+; Returns the kind tag ("hud" | "map" | "ent") of the first avoid rect that
+; contains (sx, sy), or "" when the point is clear. Same hit test as
+; IsPointInAvoidZone but exposes WHICH category blocked — feeds the
+; exploration "ui-blocked" cause breakdown in the debug overlay.
+AvoidZoneHitKind(sx, sy, rects)
+{
+    for _, r in rects
+    {
+        if (sx >= r[1] && sx < r[1] + r[3] && sy >= r[2] && sy < r[2] + r[4])
+            return (r.Length >= 5) ? r[5] : "?"
+    }
+    return ""
+}
+
 ; ── HUD rects (fixed-anchor PoE2 UI) ─────────────────────────────────────
 ; PoE2 anchors these to fixed corners/edges and scales them linearly with
 ; resolution. Proportions are conservative (slightly oversized) — better to
@@ -79,20 +94,28 @@ IsPointInAvoidZone(sx, sy, rects)
 _AppendHudRects(rects, cX, cY, cW, cH)
 {
     ; Bottom skill bar + center flask bar (middle 50% horizontal, bottom 14%)
-    rects.Push([cX + cW * 0.25, cY + cH * 0.86, cW * 0.50, cH * 0.14])
+    rects.Push([cX + cW * 0.25, cY + cH * 0.86, cW * 0.50, cH * 0.14, "hud"])
     ; Bottom-left life globe + left flask bar
-    rects.Push([cX,             cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    rects.Push([cX,             cY + cH * 0.78, cW * 0.13, cH * 0.22, "hud"])
     ; Bottom-right mana globe + right flask bar
-    rects.Push([cX + cW * 0.87, cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    rects.Push([cX + cW * 0.87, cY + cH * 0.78, cW * 0.13, cH * 0.22, "hud"])
     ; Top-right quest tracker / area info
-    rects.Push([cX + cW * 0.78, cY,             cW * 0.22, cH * 0.12])
+    rects.Push([cX + cW * 0.78, cY,             cW * 0.22, cH * 0.12, "hud"])
     ; Top-left area-name banner (the minimap sits just below)
-    rects.Push([cX,             cY,             cW * 0.22, cH * 0.06])
+    rects.Push([cX,             cY,             cW * 0.22, cH * 0.06, "hud"])
 }
 
-; ── Map overlay rects (minimap + large map) ──────────────────────────────
+; ── Map overlay rects (minimap only) ────────────────────────────────────
 ; Exact rects derived from importantUiElements when visible — same UI-scale
 ; math the radar overlay uses (scaleIdx + localMult).
+;
+; ONLY the small corner minimap is treated as an avoid zone. The large map
+; (Tab overlay) is deliberately EXCLUDED: it is click-through for movement
+; in PoE2 (click-to-move works straight through it), and its rect covers
+; most/all of the screen — including it blocked every movement click while
+; the map was open, leaving the bot stuck on "ui-blocked" with no clicks at
+; all (only stray behind-camera edge clicks outside the rect ever got
+; through, which looked like "clicking the wrong place").
 _AppendMapRects(rects, radarSnap, cX, cY, cW, cH)
 {
     inGs    := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -101,7 +124,7 @@ _AppendMapRects(rects, radarSnap, cX, cY, cW, cH)
         return
 
     sfX := cW / 2560.0, sfY := cH / 1600.0
-    for _, mapKey in ["miniMapData", "largeMapData"]
+    for _, mapKey in ["miniMapData"]
     {
         md := (uiElems && IsObject(uiElems) && uiElems.Has(mapKey)) ? uiElems[mapKey] : 0
         if !(md && IsObject(md) && md.Has("isVisible") && md["isVisible"])
@@ -120,16 +143,9 @@ _AppendMapRects(rects, radarSnap, cX, cY, cW, cH)
         rh := md["sizeH"] * uiSY
         rx := md["unscaledPosX"] * uiSX
         ry := md["unscaledPosY"] * uiSY
-        ; LargeMap stores center coords, MiniMap stores top-left — match how the
-        ; radar overlay handles this so the bounding rect matches what the user
-        ; actually sees on screen.
-        if (mapKey = "largeMapData")
-        {
-            rx -= rw / 2
-            ry -= rh / 2
-        }
+        ; MiniMap stores top-left already — no center adjustment needed.
         if (rw > 20 && rh > 20)
-            rects.Push([cX + rx, cY + ry, rw, rh])
+            rects.Push([cX + rx, cY + ry, rw, rh, "map"])
     }
 }
 
@@ -191,7 +207,7 @@ _AppendInteractableRects(rects, radarSnap, gameHwnd, cX, cY, cW, cH)
             continue
 
         half := AVOID_BOX_PX / 2
-        rects.Push([sp["x"] - half, sp["y"] - half, AVOID_BOX_PX, AVOID_BOX_PX])
+        rects.Push([sp["x"] - half, sp["y"] - half, AVOID_BOX_PX, AVOID_BOX_PX, "ent"])
     }
 }
 

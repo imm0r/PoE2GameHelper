@@ -26,6 +26,7 @@ SetWorkingDir(A_ScriptDir)
 #Include ahk/RadarOverlay.ahk
 #Include ahk/VitalsOverlay.ahk
 #Include ahk/NotificationOverlay.ahk
+#Include ahk/DebugOverlay.ahk
 #Include ahk/FocusOverlay.ahk
 #Include ahk/OverlayContext.ahk
 #Include ahk/PlayOverlayPolicy.ahk
@@ -45,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.11.6"
+POEFORMANCE_VERSION := "0.45.12.2"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -257,6 +258,7 @@ g_skillBuffBlacklist := []
 ; Zone navigation toggle
 g_zoneNavEnabled := true
 g_mapHackEnabled := true
+g_walkGridEnabled := false   ; walkable-grid fill overlay (diagnostic, off by default)
 ; Maphack source: "memory" = render an overlay on top of the unexplored
 ; minimap cells (requires PoE2 attached + the radar reading working);
 ; "ggpk" = patch the visibility shader so the game itself draws every
@@ -931,6 +933,8 @@ OnTreeTabChanged(*)
 
 #Include ahk/AutoFlask.ahk
 #Include ahk/AvoidZones.ahk
+#Include ahk/TerrainHeights.ahk
+#Include ahk/ClickNav.ahk
 #Include ahk/CombatAutomation.ahk
 #Include ahk/ItemSizeRegistry.ahk
 #Include ahk/LootPickup.ahk

@@ -4665,11 +4665,11 @@
               </div>
               <div class="cfg-help">Renders a compact life / mana / energy-shield readout near your character so you can see numbers without squinting at the corner bars.</div>
 
-              <div class="cfg-row"><span class="cfg-label">Status Text on Overlay</span>
+              <div class="cfg-row"><span class="cfg-label">Debug Overlay</span>
                 <label class="toggle"><input type="checkbox" id="tog-overlay-status" onchange="ahkCall('ToggleOverlayStatusText')"
                     checked><span class="toggle-slider"></span></label>
               </div>
-              <div class="cfg-help">Shows the AutoPilot / AutoFlask "reason" lines as small text on the overlay (e.g. "engaging rare", "flask on cooldown"). Useful for debugging, distracting in normal play.</div>
+              <div class="cfg-help">Standalone debug panel docked to the right edge of the game window: AutoPilot / combat / loot / explore state, pathfinding diagnostics (hz/rg), current navigation target with distance, AutoFlask reason and the running version. Useful for debugging, distracting in normal play.</div>
 
               <div class="cfg-row" style="margin-top:6px"><span class="cfg-label">Entity Markers</span></div>
               <div class="cfg-help">Which monster categories the radar draws on the minimap and on-screen overlay. Off = invisible to the radar, even if the entity is in range.</div>
@@ -4766,6 +4766,12 @@
                     checked><span class="toggle-slider"></span></label>
               </div>
               <div class="cfg-help">Reveals the entire minimap. Two implementations — pick whichever fits your workflow.</div>
+
+              <div class="cfg-row"><span class="cfg-label">Walkable Grid (debug)</span>
+                <label class="toggle"><input type="checkbox" id="tog-walkgrid" onchange="ahkCall('ToggleWalkGrid')"
+                    ><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-help">Diagnostic: shades every walkable cell of the memory terrain grid on the large map (blue, 50% stippled so the map shows through). Use it to compare the grid the bot pathfinds on against what the game actually allows — mismatches explain a stuck AutoPilot. Large map only.</div>
 
               <!-- Source picker. "Memory" = legacy on-the-fly overlay,
                    "GGPK" = persistent shader patch (apply/revert below). -->
@@ -7371,6 +7377,7 @@
 
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+      setChk('tog-walkgrid', d.walkGrid !== undefined ? d.walkGrid : false);
       // Maphack source — radio sync + GGPK action row visibility.
       // The actual "PoE2 is closed → buttons enabled" gating runs on
       // every header push (PoE state is in d.isConnected / d.poeRunning).
