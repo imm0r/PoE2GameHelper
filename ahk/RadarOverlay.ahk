@@ -548,6 +548,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_combatState, g_combatLastReason
         global g_lootLastReason, g_lootCache
         global g_exploreCurrentPercent, g_exploreLastReason, g_exploreHeightDiag
+        global g_exploreRegionDiag
         global g_autoFlaskEnabled, g_autoFlaskLastReason
         global POEFORMANCE_VERSION
 
@@ -606,7 +607,9 @@ class RadarOverlay extends GdiOverlayBase
                     ? (" · " g_exploreLastReason) : ""
                 hz := (IsSet(g_exploreHeightDiag) && g_exploreHeightDiag != "")
                     ? (" · hz:" g_exploreHeightDiag) : ""
-                lines.Push(["  explore: " pctTxt rsn hz, COL_IVORY])
+                rg := (IsSet(g_exploreRegionDiag) && g_exploreRegionDiag != "")
+                    ? (" · rg:" g_exploreRegionDiag) : ""
+                lines.Push(["  explore: " pctTxt rsn hz rg, COL_IVORY])
             }
         }
 

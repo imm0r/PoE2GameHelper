@@ -66,7 +66,12 @@ GetTerrainHeightContext(radarSnap)
 }
 
 ; ── Public: height lookup (world-unit Z) at fine grid cell (gx, gy) ──────
-; Lazy + memoized at 4×4-cell resolution. Returns 0.0 outside the tile area.
+; Lazy + memoized at 4×4-cell resolution. The block height is computed at
+; the BLOCK CENTER, not at the queried corner: corner samples regularly
+; land on wall tops / ledge lips and produced ±120-unit noise between
+; neighboring blocks, which made A*/LoS reject perfectly flat routes (and
+; combat refuse to engage adjacent enemies). Returns 0.0 outside the tile
+; area.
 TerrainHeightAt(ctx, gx, gy)
 {
     gw := ctx["gridW"]
@@ -77,7 +82,7 @@ TerrainHeightAt(ctx, gx, gy)
     done := ctx["memoDone"]
     if NumGet(done.Ptr, mIdx, "UChar")
         return NumGet(ctx["memoVal"].Ptr, mIdx * 4, "Float")
-    h := _THComputeCellHeight(ctx, gx, gy)
+    h := _THComputeCellHeight(ctx, (gx & -4) + 2, (gy & -4) + 2)
     NumPut("Float", h, ctx["memoVal"].Ptr, mIdx * 4)
     NumPut("UChar", 1, done.Ptr, mIdx)
     return h
