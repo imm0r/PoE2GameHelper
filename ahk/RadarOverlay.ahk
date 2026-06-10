@@ -593,6 +593,7 @@ class RadarOverlay extends GdiOverlayBase
     _RenderMapLayer(mapData, playerWorldX, playerWorldY, playerTerrainHeight,
                     areaInstance, gameWindowWidth, gameWindowHeight, isLargeMap)
     {
+        global Profiler
         ; ── Compute UI scaling (per GameWindowScale.cs) ──────────────────────────────────
         ; The game uses 2560×1600 as the design reference resolution for all UI positions.
         ; scaleFactorX/Y convert unscaled UI coordinates into real pixel coordinates.
@@ -686,11 +687,19 @@ class RadarOverlay extends GdiOverlayBase
         ; ── Maphack / walkable-grid overlays (large map only, before entities) ──
         ; Walkable fill goes first so the wall-border outline draws on top.
         if (isLargeMap && this._walkGridEnabled && this._mapWalkColorDC && this._mapWalkMask)
+        {
+            Profiler.Begin("radar.mask.walk")
             this._BlitMaskLayer(this._mapWalkColorDC, this._mapWalkMask,
                 mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
+            Profiler.End("radar.mask.walk")
+        }
         if (isLargeMap && this._mapHackEnabled && this._mapHackDC && this._mapHackMask)
+        {
+            Profiler.Begin("radar.mask.hack")
             this._BlitMaskLayer(this._mapHackDC, this._mapHackMask,
                 mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
+            Profiler.End("radar.mask.hack")
+        }
 
         ; Player dot at the map center
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
