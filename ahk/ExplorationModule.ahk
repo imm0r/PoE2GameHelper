@@ -617,21 +617,42 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
-    ; Advance waypoint if player is close enough
+    ; Advance along the path: snap _pathIdx to the closest of the next few
+    ; waypoints. The game's own pathing cuts corners, so the character
+    ; regularly passes a waypoint outside the old strict 15-cell gate — the
+    ; index (and with it the look-ahead anchor) then stalled, leaving the
+    ; bot clicking a spot it had already reached: walk – 3 s stall – replan,
+    ; over and over.
     if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
     {
-        wp := _pathCoords[_pathIdx]
-        wpDist := Abs(pGX - wp[1]) + Abs(pGY - wp[2])
-        if (wpDist < 15)
+        bestIdx := _pathIdx
+        bestD := 999999
+        scanEnd := Min(_pathIdx + 6, _pathCoords.Length)
+        i := _pathIdx
+        while (i <= scanEnd)
         {
-            _pathIdx++
-            ; Advancing along the path is real progress even when the
-            ; straight-line distance to the target stalls (detour routes) —
-            ; keep the progress watchdog from firing on legitimate detours.
+            wp := _pathCoords[i]
+            d := Abs(pGX - wp[1]) + Abs(pGY - wp[2])
+            if (d < bestD)
+            {
+                bestD := d
+                bestIdx := i
+            }
+            i++
+        }
+        if (bestIdx > _pathIdx)
+        {
+            _pathIdx := bestIdx
+            _wdBestTick := now   ; passing waypoints is watchdog progress
+        }
+        if (bestD < 15)
+        {
+            ; Standing on the closest waypoint — aim past it.
+            _pathIdx := bestIdx + 1
             _wdBestTick := now
             if (_pathIdx > _pathCoords.Length)
             {
-                ; Reached end of path — find new frontier next tick
+                ; Reached end of path — find new target next tick
                 _targetCX := -1
                 g_exploreLastReason := "wp-done(" g_exploreCurrentPercent "%)"
                 return
