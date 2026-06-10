@@ -4767,6 +4767,12 @@
               </div>
               <div class="cfg-help">Reveals the entire minimap. Two implementations — pick whichever fits your workflow.</div>
 
+              <div class="cfg-row"><span class="cfg-label">Walkable Grid (debug)</span>
+                <label class="toggle"><input type="checkbox" id="tog-walkgrid" onchange="ahkCall('ToggleWalkGrid')"
+                    ><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-help">Diagnostic: shades every walkable cell of the memory terrain grid on the large map (blue, 50% stippled so the map shows through). Use it to compare the grid the bot pathfinds on against what the game actually allows — mismatches explain a stuck AutoPilot. Large map only.</div>
+
               <!-- Source picker. "Memory" = legacy on-the-fly overlay,
                    "GGPK" = persistent shader patch (apply/revert below). -->
               <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
@@ -7371,6 +7377,7 @@
 
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
+      setChk('tog-walkgrid', d.walkGrid !== undefined ? d.walkGrid : false);
       // Maphack source — radio sync + GGPK action row visibility.
       // The actual "PoE2 is closed → buttons enabled" gating runs on
       // every header push (PoE state is in d.isConnected / d.poeRunning).

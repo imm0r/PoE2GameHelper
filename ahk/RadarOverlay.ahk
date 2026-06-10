@@ -62,6 +62,7 @@ class RadarOverlay extends GdiOverlayBase
     static COLOR_AREATRANSITION := 0x00BFFF   ; deep sky blue
     static COLOR_CHECKPOINT     := 0x7FFF00   ; chartreuse
     static COLOR_MAPHACK        := 0x909090   ; neutral gray (BGR) — matches game map outlines
+    static COLOR_WALKABLE       := 0xFF8030   ; blue (BGR) — walkable-grid fill diagnostic overlay
 
     ; Creates the transparent, click-through overlay GUI window and initialises all GDI state fields.
     __New()
@@ -142,6 +143,16 @@ class RadarOverlay extends GdiOverlayBase
         this._mapHackTerrainSz    := 0     ; terrain data size — only updated on successful generate
         this._mapHackRetryTick    := 0     ; tick of last regenerate attempt (for retry throttle)
 
+        ; Walkable-grid fill overlay (diagnostic): same pre-rendered bitmap
+        ; pass as the border maphack, but the mask carries 1-bits for ALL
+        ; walkable cells (50% stippled so the game map shows through) and is
+        ; blitted in a distinct fill colour. Lets you compare our memory
+        ; walkable grid against what the game actually shows.
+        this._walkGridEnabled     := false ; toggle from config (off by default — diagnostic)
+        this._mapWalkColorDC      := 0     ; memory DC holding the solid fill-colour source bitmap
+        this._mapWalkColorBmp     := 0     ; source bitmap handle (solid walkable fill colour)
+        this._mapWalkMask         := 0     ; monochrome mask bitmap (1=walkable cell, stippled)
+
         ; Debug lines — collected each Render() when DebugMode is on, pushed to WebView
         ; (Debug tab) instead of being drawn on the overlay so they're copyable.
         this._debugLines := Map()
@@ -168,7 +179,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss
         global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
         global g_debugMode, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
-        global g_radarAlpha, g_highlightedEntityPath
+        global g_radarAlpha, g_highlightedEntityPath, g_walkGridEnabled
 
         this.ShowEnemyNormal := g_radarShowEnemyNormal
         this.ShowEnemyRare   := g_radarShowEnemyRare
@@ -179,6 +190,7 @@ class RadarOverlay extends GdiOverlayBase
         this.DebugMode       := g_debugMode
         this._navEnabled     := g_zoneNavEnabled
         this._mapHackEnabled := g_mapHackEnabled
+        this._walkGridEnabled := IsSet(g_walkGridEnabled) ? g_walkGridEnabled : false
         this._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
         if (IsSet(g_radarAlpha) && this._alpha != g_radarAlpha)
             this.SetAlpha(g_radarAlpha)
@@ -644,10 +656,14 @@ class RadarOverlay extends GdiOverlayBase
         projectionCos := mapDiagonal * RadarOverlay.CAMERA_COS / baseMapScale
         projectionSin := mapDiagonal * RadarOverlay.CAMERA_SIN / baseMapScale
 
-        ; ── Maphack: draw walkable terrain border overlay (large map only, before entities) ──
-        if (isLargeMap && this._mapHackEnabled)
-            this._RenderMapHack(mapCenterX, mapCenterY, playerWorldX, playerWorldY,
-                projectionCos, projectionSin)
+        ; ── Maphack / walkable-grid overlays (large map only, before entities) ──
+        ; Walkable fill goes first so the wall-border outline draws on top.
+        if (isLargeMap && this._walkGridEnabled && this._mapWalkColorDC && this._mapWalkMask)
+            this._BlitMaskLayer(this._mapWalkColorDC, this._mapWalkMask,
+                mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
+        if (isLargeMap && this._mapHackEnabled && this._mapHackDC && this._mapHackMask)
+            this._BlitMaskLayer(this._mapHackDC, this._mapHackMask,
+                mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
 
         ; Player dot at the map center
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
@@ -1493,6 +1509,14 @@ class RadarOverlay extends GdiOverlayBase
         blackBrush := DllCall("GetStockObject", "Int", 4, "Ptr")  ; BLACK_BRUSH
         DllCall("FillRect", "Ptr", maskDC, "Ptr", rct, "Ptr", blackBrush)
 
+        ; ── Walkable-fill mask (1-bit) — 1 wherever the 2×2 block has ANY
+        ; walkable cell, 50% stippled so the game map shows through. Built in
+        ; the same scan as the border mask below. ──
+        hWalkMask := DllCall("CreateBitmap", "Int", bmpW, "Int", bmpH, "UInt", 1, "UInt", 1, "Ptr", 0, "Ptr")
+        walkMaskDC := DllCall("CreateCompatibleDC", "Ptr", 0, "Ptr")
+        oldWalkBmp := DllCall("SelectObject", "Ptr", walkMaskDC, "Ptr", hWalkMask, "Ptr")
+        DllCall("FillRect", "Ptr", walkMaskDC, "Ptr", rct, "Ptr", blackBrush)
+
         ; Skip outer margin to avoid drawing the terrain boundary rectangle.
         MARGIN := 6
 
@@ -1529,6 +1553,9 @@ class RadarOverlay extends GdiOverlayBase
                     this._DestroyMapHackBitmap()
                     DllCall("SelectObject", "Ptr", maskDC, "Ptr", oldMaskBmp)
                     DllCall("DeleteDC", "Ptr", maskDC)
+                    DllCall("SelectObject", "Ptr", walkMaskDC, "Ptr", oldWalkBmp)
+                    DllCall("DeleteDC", "Ptr", walkMaskDC)
+                    DllCall("DeleteObject", "Ptr", hWalkMask)
                     return
                 }
             }
@@ -1552,6 +1579,11 @@ class RadarOverlay extends GdiOverlayBase
 
                 b1 := NumGet(buf, i1, "UChar")
                 b2 := NumGet(buf, i2, "UChar")
+
+                ; Walkable-fill mask: any walkable cell in the 2×2 block, 50%
+                ; checkerboard stipple so the underlying game map stays visible.
+                if ((b1 != 0 || b2 != 0) && ((bx + by) & 1) = 0)
+                    DllCall("SetPixelV", "Ptr", walkMaskDC, "Int", bx, "Int", by, "UInt", 0xFFFFFF)
 
                 if (   (b1 & 0x0F) != 0 && (b1 & 0xF0) != 0
                     && (b2 & 0x0F) != 0 && (b2 & 0xF0) != 0)
@@ -1620,10 +1652,26 @@ class RadarOverlay extends GdiOverlayBase
 
         DllCall("SelectObject", "Ptr", maskDC, "Ptr", oldMaskBmp)
         DllCall("DeleteDC", "Ptr", maskDC)
+        DllCall("SelectObject", "Ptr", walkMaskDC, "Ptr", oldWalkBmp)
+        DllCall("DeleteDC", "Ptr", walkMaskDC)
+
+        ; ── Walkable fill colour source bitmap (solid COLOR_WALKABLE) ──
+        ; PlgBlt takes the drawn colour from this source through hWalkMask.
+        screenDC2 := DllCall("GetDC", "Ptr", 0, "Ptr")
+        hWalkBmp  := DllCall("CreateCompatibleBitmap", "Ptr", screenDC2, "Int", bmpW, "Int", bmpH, "Ptr")
+        walkColorDC := DllCall("CreateCompatibleDC", "Ptr", screenDC2, "Ptr")
+        DllCall("ReleaseDC", "Ptr", 0, "Ptr", screenDC2)
+        DllCall("SelectObject", "Ptr", walkColorDC, "Ptr", hWalkBmp)
+        wbrush := DllCall("CreateSolidBrush", "UInt", RadarOverlay.COLOR_WALKABLE, "Ptr")
+        DllCall("FillRect", "Ptr", walkColorDC, "Ptr", rct, "Ptr", wbrush)
+        DllCall("DeleteObject", "Ptr", wbrush)
 
         this._mapHackDC    := hDC
         this._mapHackBmp   := hBmp
         this._mapHackMask  := hMask
+        this._mapWalkColorDC  := walkColorDC
+        this._mapWalkColorBmp := hWalkBmp
+        this._mapWalkMask     := hWalkMask
         this._mapHackW     := bmpW
         this._mapHackH     := bmpH
         this._mapHackStep  := STEP
@@ -1631,7 +1679,7 @@ class RadarOverlay extends GdiOverlayBase
         this._mapHackGridH := bmpH * STEP
     }
 
-    ; Frees all GDI resources used by the maphack bitmap.
+    ; Frees all GDI resources used by the maphack + walkable-grid bitmaps.
     _DestroyMapHackBitmap()
     {
         if this._mapHackMask {
@@ -1649,14 +1697,32 @@ class RadarOverlay extends GdiOverlayBase
             DllCall("DeleteDC", "Ptr", this._mapHackDC)
             this._mapHackDC := 0
         }
+        ; Walkable-grid fill layer
+        if this._mapWalkMask {
+            DllCall("DeleteObject", "Ptr", this._mapWalkMask)
+            this._mapWalkMask := 0
+        }
+        if this._mapWalkColorBmp {
+            stockBmp2 := DllCall("GetStockObject", "Int", 0, "Ptr")
+            if this._mapWalkColorDC
+                DllCall("SelectObject", "Ptr", this._mapWalkColorDC, "Ptr", stockBmp2)
+            DllCall("DeleteObject", "Ptr", this._mapWalkColorBmp)
+            this._mapWalkColorBmp := 0
+        }
+        if this._mapWalkColorDC {
+            DllCall("DeleteDC", "Ptr", this._mapWalkColorDC)
+            this._mapWalkColorDC := 0
+        }
     }
 
-    ; Renders the maphack bitmap onto the back-buffer using PlgBlt with isometric projection.
-    ; Only border pixels (from the mask) are drawn; everything else is untouched.
-    _RenderMapHack(mapCenterX, mapCenterY, playerWorldX, playerWorldY,
+    ; Blits one pre-rendered terrain layer (srcDC's colour through mask's
+    ; 1-bits) onto the back-buffer via PlgBlt with the isometric projection.
+    ; Shared by the wall-border maphack and the walkable-grid fill overlay —
+    ; both bitmaps are generated together so they share W/H/grid dimensions.
+    _BlitMaskLayer(srcDC, mask, mapCenterX, mapCenterY, playerWorldX, playerWorldY,
                    projectionCos, projectionSin)
     {
-        if (!this._mapHackDC || !this._mapHackMask)
+        if (!srcDC || !mask)
             return
 
         playerGX := playerWorldX / RadarOverlay.WORLD_TO_GRID_RATIO
@@ -1693,11 +1759,11 @@ class RadarOverlay extends GdiOverlayBase
         DllCall("PlgBlt",
             "Ptr", this.memDC,
             "Ptr", pts,
-            "Ptr", this._mapHackDC,
+            "Ptr", srcDC,
             "Int", 0, "Int", 0,
             "Int", this._mapHackW,
             "Int", this._mapHackH,
-            "Ptr", this._mapHackMask,
+            "Ptr", mask,
             "Int", 0, "Int", 0)
     }
 
