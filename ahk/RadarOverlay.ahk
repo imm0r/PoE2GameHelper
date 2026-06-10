@@ -121,6 +121,15 @@ class RadarOverlay extends GdiOverlayBase
         ; the user sees the route the bot has chosen around obstacles. Empty
         ; when combat is idle OR when direct LoS is available.
         this._combatPathCoords    := []
+
+        ; Exploration overlay: written by ExplorationModule each AutoPilot
+        ; tick. _explorePathCoords is the A* route (Array of [gx, gy]) to the
+        ; current scouting target; _exploreTargetGX/GY is that target cell
+        ; (grid coords, -1 = none). Rendered as a cyan polyline + ring so the
+        ; user can see exactly where the bot is heading and along which path.
+        this._explorePathCoords   := []
+        this._exploreTargetGX     := -1
+        this._exploreTargetGY     := -1
         this._navLastComputeTick  := 0
         this._navAreaHash         := 0xFFFFFFFF
         this._navEnabled          := true  ; toggle from config
@@ -1020,6 +1029,51 @@ class RadarOverlay extends GdiOverlayBase
             oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
             DllCall("Polyline", "Ptr", this.memDC, "Ptr", combatPts, "Int", cn)
             DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+        }
+
+        ; ── Exploration path + target (AutoPilot scouting) ────────────────
+        ; Same projection as the nav/combat paths. Cyan polyline for the A*
+        ; route the explorer is following, plus a hollow ring at the current
+        ; target cell. Gated on the explore state so a stale route is never
+        ; drawn while combat/loot owns the tick; coordinates are written by
+        ; ExplorationModule each tick (empty/-1 clears them).
+        global g_autoPilotState
+        if (IsSet(g_autoPilotState) && g_autoPilotState = "explore")
+        {
+            exploreColor := 0xFFC000   ; light blue (BGR)
+            playerGX     := playerWorldX / RadarOverlay.WORLD_TO_GRID_RATIO
+            playerGY     := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
+
+            exploreCoords := this._explorePathCoords
+            if (exploreCoords.Length >= 2)
+            {
+                en        := exploreCoords.Length
+                explorePts := Buffer(en * 8, 0)
+                for i, pt in exploreCoords
+                {
+                    dGX := pt[1] - playerGX
+                    dGY := pt[2] - playerGY
+                    NumPut("Int", Round(mapCenterX + (dGX - dGY) * projectionCos), explorePts, (i-1)*8)
+                    NumPut("Int", Round(mapCenterY + (0-dGX-dGY) * projectionSin), explorePts, (i-1)*8+4)
+                }
+                pen    := this._GetPen(exploreColor, isLargeMap ? 3 : 2)
+                oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+                DllCall("Polyline", "Ptr", this.memDC, "Ptr", explorePts, "Int", en)
+                DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+            }
+
+            ; Target cell — hollow ring + crosshair so it stands out from dots.
+            if (this._exploreTargetGX >= 0)
+            {
+                dGX := this._exploreTargetGX - playerGX
+                dGY := this._exploreTargetGY - playerGY
+                etX := Round(mapCenterX + (dGX - dGY) * projectionCos)
+                etY := Round(mapCenterY + (0-dGX-dGY) * projectionSin)
+                r   := isLargeMap ? 8 : 5
+                this._DrawRectOutline(etX - r, etY - r, r * 2, r * 2, exploreColor, 2)
+                this._DrawLine(etX - r - 3, etY, etX + r + 3, etY, exploreColor, 1)
+                this._DrawLine(etX, etY - r - 3, etX, etY + r + 3, exploreColor, 1)
+            }
         }
 
         ; Debug entity-filter stats — collected for the WebView debug tab.

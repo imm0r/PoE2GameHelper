@@ -45,7 +45,7 @@ _RunExploration(radarSnap, gameHwnd)
     global g_exploreLastReason, g_reader
     global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
     global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
-    global g_exploreMoveDelta
+    global g_exploreMoveDelta, g_radarOverlay
 
     ; ── Extract terrain + player position ─────────────────────────────
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -634,6 +634,16 @@ _RunExploration(radarSnap, gameHwnd)
         g_exploreTargetDist := Round(tgtChebyshev * ratio)
         g_exploreTargetHD   := hzOk ? Round(tgtHD) : ""
 
+        ; Feed the radar overlay so it can draw the route + target ring.
+        ; _pathCoords are fine-grid [gx,gy]; target is the coarse cell scaled
+        ; to fine grid. Reference-shared (read-only on the radar side).
+        if IsObject(g_radarOverlay)
+        {
+            g_radarOverlay._explorePathCoords := _pathCoords
+            g_radarOverlay._exploreTargetGX   := _targetCX * _STEP
+            g_radarOverlay._exploreTargetGY   := _targetCY * _STEP
+        }
+
         ; ── Floor gate ───────────────────────────────────────────────────
         ; Debug data proved the region still leaks across storey seams
         ; (rg:on yet a target at hΔ=314 — a different floor the game won't
@@ -681,6 +691,11 @@ _RunExploration(radarSnap, gameHwnd)
     else
     {
         g_exploreTargetDist := -1
+        if IsObject(g_radarOverlay)
+        {
+            g_radarOverlay._explorePathCoords := []
+            g_radarOverlay._exploreTargetGX   := -1
+        }
     }
 
     ; ── Follow path: click toward next waypoint ──────────────────────
