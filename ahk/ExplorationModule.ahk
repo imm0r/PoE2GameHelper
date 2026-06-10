@@ -601,6 +601,20 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
+    ; Reject clicks that land on the character itself — clicking your own
+    ; feet is a no-op. This is exactly what a 2D path that dives off a ledge
+    ; produces: the next waypoint sits one storey below at almost the same
+    ; XY, so (without height data) it projects within a few pixels of the
+    ; character — the reported "cursor parks just under the char and clicks
+    ; in place" loop. Skipping the click leaves the character standing, so
+    ; the 3 s stuck check marks the doomed target visited and moves on.
+    pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
+    if (pSp && Abs(screenPos["x"] - pSp["x"]) < 40 && Abs(screenPos["y"] - pSp["y"]) < 40)
+    {
+        g_exploreLastReason := "self-click-skip(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
+        return
+    }
+
     ; Move mouse and click
     DllCall("SetCursorPos", "int", screenPos["x"], "int", screenPos["y"])
     Sleep(30)

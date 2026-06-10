@@ -13,7 +13,12 @@ class PoE2StaticOffsetsPatterns
             ; Terrain Rotator Helper resolves the larger terrain-rotation array.
             Map("name", "Terrain Rotator Helper", "pattern", "48 83 EC 38 41 0F B6 C0 4C 8B D1 4C 8B CA 48 8D 0D ?? ?? ?? ?? 44 0F B6 04 08 B8 08 00 00 00 8B 0A 44 3B C0 89 4C 24 24 BA 16 00 00 00 44 0F 47 C0 48 8D 05 ^ ?? ?? ?? ??"),
             ; Terrain Rotation Selector resolves the rotation lookup table (e.g. 00 03 02 01 04 05 06 07 08).
-            Map("name", "Terrain Rotation Selector", "pattern", "48 83 EC 38 41 0F B6 C0 4C 8B D1 4C 8B CA 48 8D 0D ^ ?? ?? ?? ??"),
+            ; Same function as the Rotator Helper, ^ on the FIRST lea operand. Upstream
+            ; (GameHelper2) uses only the 17-byte prologue prefix here — that short form
+            ; matches other functions with the same prologue too, and our scanner discards
+            ; ambiguous patterns entirely (upstream takes the first hit). Extending the
+            ; pattern with the same tail bytes as the Helper makes it exactly as unique.
+            Map("name", "Terrain Rotation Selector", "pattern", "48 83 EC 38 41 0F B6 C0 4C 8B D1 4C 8B CA 48 8D 0D ^ ?? ?? ?? ?? 44 0F B6 04 08 B8 08 00 00 00 8B 0A 44 3B C0 89 4C 24 24 BA 16 00 00 00 44 0F 47 C0 48 8D 05 ?? ?? ?? ??"),
             Map("name", "GameCullSize", "pattern", "2B 0D ?? ?? ?? ?? 8B 05 ?? ?? ?? ?? 2B 05 ^ ?? ?? ?? ?? 0F 57 FF")
         ]
     }
