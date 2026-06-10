@@ -28,6 +28,7 @@
 ;         gameHwnd  - resolved PoE2 window handle (must be valid + active)
 TryExploration(radarSnap, gameHwnd)
 {
+    global g_exploreLastReason
     static _running := false
     if _running
         return
@@ -35,7 +36,13 @@ TryExploration(radarSnap, gameHwnd)
     try
         _RunExploration(radarSnap, gameHwnd)
     catch as ex
+    {
+        ; Surface the crash in the debug overlay — a swallowed exception
+        ; otherwise freezes the status line on its last (stale) reason,
+        ; which reads like a logic bug instead of a crash.
         LogError("TryExploration", ex)
+        try g_exploreLastReason := "error(" ex.Message " @" ex.Line ")"
+    }
     finally
         _running := false
 }

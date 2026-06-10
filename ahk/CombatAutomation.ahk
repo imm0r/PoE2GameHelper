@@ -127,7 +127,11 @@ TryCombatAutomation(radarSnap, gameHwnd)
 
         if (g_combatState != "combat")
         {
-            g_combatLastReason := "idle(n=" hostileCount " d=" Round(terrainDist) ")"
+            ; No enemy in range — terrainDist is the 999999 sentinel, which
+            ; reads like a bug in the overlay. Show "d=-" when there is
+            ; nothing to measure distance to.
+            distStr := (hostileCount > 0) ? Round(terrainDist) : "-"
+            g_combatLastReason := "idle(n=" hostileCount " d=" distStr ")"
             return false
         }
 
@@ -495,7 +499,12 @@ TryCombatAutomation(radarSnap, gameHwnd)
     }
     catch as ex
     {
+        ; Surface the crash in the debug overlay — a swallowed exception
+        ; leaves g_combatLastReason frozen on its last (stale) value while
+        ; g_combatState may still be "combat", which silently pauses
+        ; exploration ("combat-pause" with an idle-looking combat line).
         LogError("TryCombatAutomation", ex)
+        try g_combatLastReason := "error(" ex.Message " @" ex.Line ")"
         return false
     }
     finally
