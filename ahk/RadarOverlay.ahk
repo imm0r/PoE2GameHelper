@@ -243,6 +243,7 @@ class RadarOverlay extends GdiOverlayBase
     ; gameWindowX/Y/Width/Height mirror the rect for the unchanged body below.
     Draw(ctx, rect)
     {
+        global Profiler
         this._SyncConfig(ctx.snapshot)
         snapshot         := ctx.snapshot
         gameWindowX      := rect["x"]
@@ -305,7 +306,9 @@ class RadarOverlay extends GdiOverlayBase
                 ; for 1–2 s — acceptable because no maphack is on screen during
                 ; that window thanks to the destroy from tick 1.
                 this._mapHackRetryTick := A_TickCount
+                Profiler.Begin("radar.maphackGen")
                 this._GenerateMapHackBitmap()
+                Profiler.End("radar.maphackGen")
                 ; Re-commit size only on success — failed generates leave the
                 ; retry primed for the next throttle window.
                 if (this._mapHackDC && this._mapHackMask)
@@ -401,18 +404,22 @@ class RadarOverlay extends GdiOverlayBase
 
         if (miniMapData && miniMapData["isVisible"])
         {
+            Profiler.Begin("radar.mini")
             try this._RenderMapLayer(miniMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, false)
             catch
                 this._DrawDot(40, 8, 0x00FF00, 4)   ; green dot = MiniMap error
+            Profiler.End("radar.mini")
         }
 
         if (largeMapData && largeMapData["isVisible"])
         {
+            Profiler.Begin("radar.large")
             try this._RenderMapLayer(largeMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, true)
             catch
                 this._DrawDot(56, 8, 0x00FFFF, 4)   ; cyan dot = large-map error
+            Profiler.End("radar.large")
         }
 
         ; ── Path recompute (A*) when highlighted entity changes or player/entity moves ──
@@ -557,10 +564,15 @@ class RadarOverlay extends GdiOverlayBase
     ; so this no longer blits itself — it is the single flush point per frame.
     _FinishFrame(gameWindowWidth, gameWindowHeight)
     {
+        global Profiler
         ; Atlas overlay (dormant until g_atlasRender is populated by the reader).
+        Profiler.Begin("radar.atlas")
         this._RenderAtlas()
+        Profiler.End("radar.atlas")
         ; Flush all queued draw operations before the optional highlight rect.
+        Profiler.Begin("radar.flush")
         this._FlushBatch()
+        Profiler.End("radar.flush")
 
         global g_uiBrowserHighlight
         if IsObject(g_uiBrowserHighlight)

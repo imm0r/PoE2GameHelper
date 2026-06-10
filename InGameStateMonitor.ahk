@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.3"
+POEFORMANCE_VERSION := "0.45.12.4"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -323,6 +323,7 @@ LoadEntityGroups()
 LoadEntityAlertsConfig()
 LoadLocalApiConfig()      ; local HTTP API (MCP backend) settings + Winsock constants
 LoadOverlaySystem()       ; build the OverlayManager + all overlays; wire legacy globals
+InitProfiler()            ; QPC profiler singleton (disabled until Shift+F3 enables it)
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
 
@@ -923,6 +924,7 @@ OnTreeTabChanged(*)
 #Include ahk/JsonParser.ahk
 #Include ahk/JsonFull.ahk
 #Include ahk/ErrorLogger.ahk
+#Include ahk/Profiler.ahk
 #Include ahk/ConfigManager.ahk
 #Include ahk/SnapshotSerializers.ahk
 #Include ahk/WebViewBridge.ahk
@@ -956,3 +958,7 @@ OnTreeTabChanged(*)
 
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
 F3:: OnF3DebugDump()
+
+; Shift+F3: toggle the per-tick QPC profiler. 1st press enables + resets, 2nd press
+; dumps the timing table to logs\profiler_<ts>.txt (and a tooltip) and disables it.
++F3:: ProfilerToggleDump()

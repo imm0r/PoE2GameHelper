@@ -57,6 +57,7 @@ class GdiOverlayBase
 
     Update(ctx)
     {
+        global Profiler
         if (!this.Enabled || !this.ShouldShow(ctx))
         {
             this._RequestHide()
@@ -72,8 +73,12 @@ class GdiOverlayBase
         if !this._EnsureShown(rect["x"], rect["y"], rect["w"], rect["h"])
             return
         this._ClearBackBuffer(rect["w"], rect["h"])
+        Profiler.Begin("ov." this.Name ".draw")
         this.Draw(ctx, rect)
+        Profiler.End("ov." this.Name ".draw")
+        Profiler.Begin("ov." this.Name ".blit")
         this._Blit(rect["w"], rect["h"])
+        Profiler.End("ov." this.Name ".blit")
     }
 
     ; Debounced hide: keeps the last drawn frame on screen for up to
