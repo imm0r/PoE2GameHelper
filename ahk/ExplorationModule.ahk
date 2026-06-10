@@ -225,6 +225,10 @@ _RunExploration(radarSnap, gameHwnd)
     static _areaResetDone := 0
     static _doorClickTick := 0
     static _doorClickCounts := Map()  ; entityAddr → clickCount
+    ; Per-target progress watchdog (see check below the target selection)
+    static _wdTgtCX := -1, _wdTgtCY := -1
+    static _wdBestDist := 999999
+    static _wdBestTick := 0
 
     ; Precomputed exploration plan — built once per area from the (already
     ; fully-known) walkable terrain grid. ~50-80 sample waypoints in a
@@ -249,6 +253,10 @@ _RunExploration(radarSnap, gameHwnd)
         _stuckPGY := 0
         _doorClickTick := 0
         _doorClickCounts := Map()
+        _wdTgtCX := -1
+        _wdTgtCY := -1
+        _wdBestDist := 999999
+        _wdBestTick := 0
         _plan := []
         _planIdx := 1
         _planBuilt := false
@@ -446,6 +454,45 @@ _RunExploration(radarSnap, gameHwnd)
         }
     }
 
+    ; ── Per-target progress watchdog ──────────────────────────────────
+    ; The classic failure on multi-level zones (e.g. The Spires of Deshar):
+    ; the walkable grid is 2D, several floors overlap in XY, and A* happily
+    ; routes across a seam the character can't physically cross. The game's
+    ; click-to-move then shuffles the character back and forth near the
+    ; ledge — it keeps MOVING, so the stand-still stuck check never fires.
+    ; Track the closest the player has come to the CURRENT target; if that
+    ; best distance hasn't improved for 6 s, the target is unreachable in
+    ; practice — mark it visited and move on to the next waypoint.
+    if (_targetCX >= 0)
+    {
+        if (_targetCX != _wdTgtCX || _targetCY != _wdTgtCY)
+        {
+            ; New target — re-arm the watchdog.
+            _wdTgtCX := _targetCX
+            _wdTgtCY := _targetCY
+            _wdBestDist := 999999
+            _wdBestTick := now
+        }
+        wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
+        if (wdDist < _wdBestDist - 4)
+        {
+            _wdBestDist := wdDist
+            _wdBestTick := now
+        }
+        else if ((now - _wdBestTick) > 6000)
+        {
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+            if (_planIdx <= _plan.Length)
+                _planIdx++
+            _targetCX := -1
+            _pathCoords := []
+            _wdTgtCX := -1
+            g_exploreLastReason := "no-progress-skip(" g_exploreCurrentPercent "%)"
+            return
+        }
+    }
+
     ; ── Follow path: click toward next waypoint ──────────────────────
     ; Throttle clicks to every 400ms
     if ((now - _lastClickTick) < 400)
@@ -466,6 +513,10 @@ _RunExploration(radarSnap, gameHwnd)
         if (wpDist < 15)
         {
             _pathIdx++
+            ; Advancing along the path is real progress even when the
+            ; straight-line distance to the target stalls (detour routes) —
+            ; keep the progress watchdog from firing on legitimate detours.
+            _wdBestTick := now
             if (_pathIdx > _pathCoords.Length)
             {
                 ; Reached end of path — find new frontier next tick
