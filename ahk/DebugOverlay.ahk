@@ -108,7 +108,7 @@ class DebugOverlay extends GdiOverlayBase
         global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
         global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
         global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
-        global g_explorePlayerSX, g_explorePlayerSY
+        global g_explorePlayerSX, g_explorePlayerSY, g_exploreMoveDelta
         global g_autoFlaskEnabled, g_autoFlaskLastReason
         global POEFORMANCE_VERSION
 
@@ -182,8 +182,13 @@ class DebugOverlay extends GdiOverlayBase
                     {
                         clkD := Abs(g_exploreClickX - g_explorePlayerSX)
                               + Abs(g_exploreClickY - g_explorePlayerSY)
+                        mv := IsSet(g_exploreMoveDelta) ? g_exploreMoveDelta : 0
+                        ; mv = world units moved last tick. With cur==click and
+                        ; clkD>100, a near-zero mv means the character is blocked
+                        ; on geometry; a healthy mv means it is just travelling.
                         lines.Push(["    plr@ " g_explorePlayerSX "," g_explorePlayerSY
-                            . "  clkD=" clkD, DebugOverlay.COL_DIM])
+                            . "  clkD=" clkD "  mv=" mv
+                            , (mv < 10) ? DebugOverlay.COL_BLOOD : DebugOverlay.COL_DIM])
                     }
                 }
             }
