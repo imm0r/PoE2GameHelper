@@ -5,8 +5,9 @@
 ; Architecture:
 ;   - Called from UpdateRadarFast() after combat automation
 ;   - Uses terrain walkable grid for visited-cell tracking
-;   - Uses TerrainPathfinder for A* pathfinding to unexplored frontier
-;   - Uses W2S matrix for screen-coordinate projection + click-to-move
+;   - Uses the TerrainPathfinder distance field (flooded from the target,
+;     fresh downhill path from the player every tick) for navigation
+;   - Uses the shared ClickNav toolkit for projection + click-to-move
 ;   - Pauses navigation when combat automation is active (enemies nearby)
 ;
 ; Included by InGameStateMonitor.ahk
@@ -266,11 +267,13 @@ _RunExploration(radarSnap, gameHwnd)
     }
 
     ; ── Navigation: precomputed plan + click-to-move ──────────────────
+    ; Path following uses the pathfinder's distance field (DField*): the
+    ; field is flooded from the target, and a FRESH path from the current
+    ; player position is read every tick — no stored path, no waypoint
+    ; index, nothing that can go stale (myrahz/Radar architecture).
     static _targetCX := -1, _targetCY := -1
-    static _pathCoords := []
-    static _pathIdx := 0
     static _lastClickTick := 0
-    static _lastTargetTick := 0   ; was _lastFrontierTick — generalised
+    static _lastFieldSt := ""
     static _stuckCheckTick := 0
     static _stuckPGX := 0, _stuckPGY := 0
     static _areaResetDone := 0
@@ -295,10 +298,8 @@ _RunExploration(radarSnap, gameHwnd)
     {
         _targetCX := -1
         _targetCY := -1
-        _pathCoords := []
-        _pathIdx := 0
         _lastClickTick := 0
-        _lastTargetTick := 0
+        _lastFieldSt := ""
         _stuckCheckTick := 0
         _stuckPGX := 0
         _stuckPGY := 0
@@ -404,15 +405,30 @@ _RunExploration(radarSnap, gameHwnd)
     global g_exploreRegionDiag
     g_exploreRegionDiag := _regionDone ? (regionFilter ? "on" : "off") : "build"
 
+    ; ── Camera anchor (shared projection sanity gate) ─────────────────
+    ; The player must project near the screen centre (PoE keeps the camera
+    ; on the player). A failing anchor means the W2S matrix is stale or
+    ; garbage this tick — every click would land in a random direction, so
+    ; door clicks AND movement clicks are both gated on it.
+    navRect := NavClientRect(gameHwnd)
+    navAnchor := navRect
+        ? NavAnchor(playerWX, playerWY, playerWZ, w2sMat, navRect)
+        : Map("ok", false, "why", "no-rect", "sp", 0, "visSign", 0)
+
     ; ── Proactive door/switch opening (AutoOpen-style) ────────────────
     ; Scan every 300ms for closed doors & unswitched switches within range
-    if ((now - _doorClickTick) > 300)
+    if (navAnchor["ok"] && (now - _doorClickTick) > 300)
     {
         doorResult := _FindNearbyInteractable(radarSnap, playerWX, playerWY, playerWZ, _doorClickCounts)
         if (doorResult)
         {
-            doorScreen := _ExploreWorldToScreen(doorResult["x"], doorResult["y"], doorResult["z"], w2sMat, gameHwnd)
-            if (doorScreen)
+            doorScreen := NavProject(doorResult["x"], doorResult["y"], doorResult["z"]
+                , w2sMat, navRect, navAnchor["visSign"])
+            ; A door is close by — its projection must be genuinely on
+            ; screen (no clamping rescue for interaction clicks).
+            if (doorScreen
+                && doorScreen["x"] >= navRect["x"] + 20 && doorScreen["x"] <= navRect["x"] + navRect["w"] - 20
+                && doorScreen["y"] >= navRect["y"] + 20 && doorScreen["y"] <= navRect["y"] + navRect["h"] - 20)
             {
                 ; Save current mouse position
                 prevPt := Buffer(8, 0)
@@ -456,12 +472,14 @@ _RunExploration(radarSnap, gameHwnd)
     ; where every click near an AreaTransition lands in its avoid box.
     if (_stuckCheckTick = 0 || (now - _stuckCheckTick) > 3000)
     {
-        if (Abs(pGX - _stuckPGX) < 5 && Abs(pGY - _stuckPGY) < 5 && _targetCX >= 0)
+        ; While the distance field is still flooding ("build") the bot
+        ; intentionally stands still — that must not count as stuck.
+        if (Abs(pGX - _stuckPGX) < 5 && Abs(pGY - _stuckPGY) < 5 && _targetCX >= 0
+            && _lastFieldSt != "build")
         {
             _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
                 , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
             _targetCX := -1
-            _pathCoords := []
             _planBuilt := false   ; rebuild plan from current position
         }
         _stuckPGX := pGX
@@ -480,7 +498,7 @@ _RunExploration(radarSnap, gameHwnd)
             , _totalWalkable * _STEP * _STEP, regionFilter, _coarseW, _STEP)
         _planIdx := 1
         _planBuilt := true
-        _targetCX := -1   ; force fresh A* on first plan waypoint
+        _targetCX := -1   ; force a fresh target (and field) on the first plan waypoint
     }
 
     ; Skip plan waypoints whose coarse cell has already been marked visited
@@ -498,7 +516,7 @@ _RunExploration(radarSnap, gameHwnd)
         }
         if (NumGet(_visited.Ptr, wcY * _coarseW + wcX, "UChar") = 1)
         {
-            _targetCX := -1   ; force fresh path on next waypoint
+            _targetCX := -1   ; force a fresh target on the next waypoint
             _planIdx++
             continue
         }
@@ -508,43 +526,11 @@ _RunExploration(radarSnap, gameHwnd)
     ; Pick the target: next plan waypoint, or frontier search as a fallback
     ; when the plan is exhausted (catches any leftover unvisited corners
     ; that the sparse sampling missed).
-    ;
-    ; retryPath: A* previously gave up on its time/iteration budget for the
-    ; current target (NOT unreachable — see LastFailExhausted below). While
-    ; the path is missing, the direct-click fallback further down keeps the
-    ; character moving toward the target; re-attempt A* every 1.5 s — a
-    ; closer start usually lets it finish within budget.
-    retryPath := (_targetCX >= 0 && _pathCoords.Length = 0 && (now - _lastTargetTick) > 1500)
-    if (_planIdx <= _plan.Length && (_targetCX < 0 || retryPath))
+    if (_planIdx <= _plan.Length && _targetCX < 0)
     {
         wp := _plan[_planIdx]
-        tGX := wp[1]
-        tGY := wp[2]
-        _targetCX := tGX // _STEP
-        _targetCY := tGY // _STEP
-        _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
-        _pathIdx := 1
-        _lastTargetTick := now
-        if (_pathCoords.Length = 0)
-        {
-            if (_pf.LastFailExhausted)
-            {
-                ; A* explored its whole search area without reaching the
-                ; waypoint — genuinely unreachable (walkable "island"
-                ; disconnected from the player's region). Mark its cell
-                ; visited and skip it instead of falling through to the
-                ; blind "click directly toward target" branch, which would
-                ; click into a wall every 400 ms forever.
-                _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
-                    , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
-                _targetCX := -1
-                _planIdx++
-                g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% wp=" _planIdx "/" _plan.Length ")"
-                return
-            }
-            ; Budget timeout (far target on a huge map) — keep the target and
-            ; fall through: the direct-click fallback walks us closer.
-        }
+        _targetCX := wp[1] // _STEP
+        _targetCY := wp[2] // _STEP
     }
     else if (_planIdx > _plan.Length)
     {
@@ -556,53 +542,46 @@ _RunExploration(radarSnap, gameHwnd)
         if (_targetCX >= 0 && _targetCY >= 0 && _targetCX < _coarseW && _targetCY < _coarseH
             && NumGet(_visited.Ptr, _targetCY * _coarseW + _targetCX, "UChar") = 1)
             _targetCX := -1
-        if (_targetCX < 0 || retryPath)
+        if (_targetCX < 0)
         {
-            if (_targetCX < 0)
+            frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
+                                              buf, _bpr, _rows, dsz, _STEP, regionFilter)
+            if (!frontier)
             {
-                frontier := _FindNearestFrontier(pcX, pcY, _visited, _coarseW, _coarseH,
-                                                  buf, _bpr, _rows, dsz, _STEP, regionFilter)
-                if (!frontier)
-                {
-                    g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
-                    return
-                }
-                _targetCX := frontier[1]
-                _targetCY := frontier[2]
+                g_exploreLastReason := "no-frontier-done(" g_exploreCurrentPercent "%)"
+                return
             }
-            tGX := _targetCX * _STEP
-            tGY := _targetCY * _STEP
-            _pathCoords := _pf.FindPath(pGX, pGY, tGX, tGY)
-            _pathIdx := 1
-            _lastTargetTick := now
-            if (_pathCoords.Length = 0)
-            {
-                if (_pf.LastFailExhausted)
-                {
-                    ; Unreachable frontier (island) — mark it visited so the
-                    ; spiral search returns the next-nearest frontier on the
-                    ; following tick instead of this one again.
-                    _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
-                        , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
-                    _targetCX := -1
-                    g_exploreLastReason := "frontier-unreachable(" g_exploreCurrentPercent "%)"
-                    return
-                }
-                ; Budget timeout — keep the sticky target; direct-click
-                ; fallback below moves us closer until A* succeeds.
-            }
+            _targetCX := frontier[1]
+            _targetCY := frontier[2]
+        }
+    }
+
+    ; (Re)start the distance field whenever the target changed. The field
+    ; replaces per-target A*: it is flooded from the target (time-sliced in
+    ; the navigation section below) and yields a fresh player-anchored path
+    ; every tick. Start only fails when no walkable cell exists anywhere
+    ; near the target — genuinely unreachable.
+    if (_targetCX >= 0 && !_pf.DFieldMatches(_targetCX * _STEP, _targetCY * _STEP))
+    {
+        if !_pf.DFieldStart(_targetCX * _STEP, _targetCY * _STEP, pGX, pGY)
+        {
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+            if (_planIdx <= _plan.Length)
+                _planIdx++
+            _targetCX := -1
+            g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% nudge)"
+            return
         }
     }
 
     ; ── Per-target progress watchdog ──────────────────────────────────
-    ; PATH-RELATIVE progress: measure approach to the NEXT path waypoint,
-    ; not straight-line distance to the final target. A* routes around gaps,
-    ; so a valid path often leads AWAY from the target first (debug video:
-    ; target in +Y, path runs -Y around a chasm) - a target-distance
-    ; watchdog then sees the straight-line worsen and wrongly abandons a
-    ; good path after 6 s. Approaching the next hop (or advancing _pathIdx
-    ; in the follow block below) counts as progress; only genuine
-    ; no-movement for 6 s skips the target.
+    ; Progress metric: the distance-field cost at the player's position —
+    ; the true remaining travel distance along the route. It decreases
+    ; monotonically while the character makes ANY progress toward the
+    ; target, even on detours that first lead away from it (straight-line
+    ; metrics wrongly abandoned those). Only a genuine 6 s standstill
+    ; skips the target.
     if (_targetCX >= 0)
     {
         if (_targetCX != _wdTgtCX || _targetCY != _wdTgtCY)
@@ -613,16 +592,9 @@ _RunExploration(radarSnap, gameHwnd)
             _wdBestDist := 999999
             _wdBestTick := now
         }
-        ; Progress metric: distance to the immediate next path hop when a
-        ; path exists, else straight-line to the target (no path = direct
-        ; click, straight-line is then the only signal we have).
-        if (_pathCoords.Length > 0 && _pathIdx >= 1 && _pathIdx <= _pathCoords.Length)
-        {
-            hop := _pathCoords[_pathIdx]
-            wdDist := Abs(pGX - hop[1]) + Abs(pGY - hop[2])
-        }
-        else
-            wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
+        fieldCells := _pf.DFieldDistCells(pGX, pGY)
+        wdDist := (fieldCells >= 0) ? fieldCells
+            : Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
 
         ; Debug overlay: target world coordinates, straight-line distance to
         ; the final target, and the height delta target-vs-player.
@@ -634,12 +606,10 @@ _RunExploration(radarSnap, gameHwnd)
         g_exploreTargetDist := Round(tgtChebyshev * ratio)
         g_exploreTargetHD   := hzOk ? Round(tgtHD) : ""
 
-        ; Feed the radar overlay so it can draw the route + target ring.
-        ; _pathCoords are fine-grid [gx,gy]; target is the coarse cell scaled
-        ; to fine grid. Reference-shared (read-only on the radar side).
+        ; Feed the radar overlay the target marker; the route polyline is
+        ; published from the navigation section below (fresh per tick).
         if IsObject(g_radarOverlay)
         {
-            g_radarOverlay._explorePathCoords := _pathCoords
             g_radarOverlay._exploreTargetGX   := _targetCX * _STEP
             g_radarOverlay._exploreTargetGY   := _targetCY * _STEP
         }
@@ -662,7 +632,6 @@ _RunExploration(radarSnap, gameHwnd)
             if (_planIdx <= _plan.Length)
                 _planIdx++
             _targetCX := -1
-            _pathCoords := []
             _wdTgtCX := -1
             g_exploreTargetDist := -1
             g_exploreLastReason := "off-floor-skip(" g_exploreCurrentPercent "% hd=" Round(tgtHD) ")"
@@ -681,7 +650,6 @@ _RunExploration(radarSnap, gameHwnd)
             if (_planIdx <= _plan.Length)
                 _planIdx++
             _targetCX := -1
-            _pathCoords := []
             _wdTgtCX := -1
             g_exploreTargetDist := -1
             g_exploreLastReason := "no-progress-skip(" g_exploreCurrentPercent "%)"
@@ -691,7 +659,6 @@ _RunExploration(radarSnap, gameHwnd)
     else
     {
         g_exploreTargetDist := -1
-        tgtChebyshev := 999999   ; no target — keep the near-skip gate closed
         if IsObject(g_radarOverlay)
         {
             g_radarOverlay._explorePathCoords := []
@@ -699,8 +666,60 @@ _RunExploration(radarSnap, gameHwnd)
         }
     }
 
-    ; ── Follow path: click toward next waypoint ──────────────────────
-    ; Throttle clicks to every 400ms
+    ; ── Distance-field navigation ─────────────────────────────────────
+    ; Expand the field (time-sliced), then read a FRESH path from the
+    ; CURRENT player position and click a point ~35 cells along it. There
+    ; is no stored path and no waypoint index — the route is re-derived
+    ; from the field every tick, so it can never go stale, never points
+    ; backward and "arrived" falls out of the field cost at the player
+    ; (myrahz/Radar architecture: flood from the target, walk downhill).
+    if (_targetCX < 0)
+        return
+
+    fieldSt := _pf.DFieldExpand(12, pGX, pGY)
+    _lastFieldSt := fieldSt
+    if (fieldSt = "unreach" || fieldSt = "cap")
+    {
+        ; The flood ran dry without reaching the player (walkable island /
+        ; cut-off floor) — genuinely unreachable. Mark + skip.
+        _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+            , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+        if (_planIdx <= _plan.Length)
+            _planIdx++
+        _targetCX := -1
+        _wdTgtCX := -1
+        g_exploreLastReason := "wp-unreachable(" g_exploreCurrentPercent "% " fieldSt ")"
+        return
+    }
+    if (fieldSt = "build")
+    {
+        ; Field still flooding toward the player — typically a few hundred
+        ; ms after a target switch. No click yet: the old "blind direct
+        ; click" fallback used to walk the character into walls.
+        if IsObject(g_radarOverlay)
+            g_radarOverlay._explorePathCoords := []
+        g_exploreLastReason := "routing(" g_exploreCurrentPercent "% pops=" _pf.DFieldPops ")"
+        return
+    }
+
+    ; Arrived? The field cost at the player IS the remaining travel
+    ; distance — no screen-space proximity guessing.
+    fieldCells := _pf.DFieldDistCells(pGX, pGY)
+    if (fieldCells >= 0 && fieldCells <= 8)
+    {
+        _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+            , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+        if (_planIdx <= _plan.Length)
+            _planIdx++
+        _targetCX := -1
+        _wdTgtCX := -1
+        g_exploreLastReason := "wp-done(" g_exploreCurrentPercent "%)"
+        return
+    }
+
+    ; Throttle clicks to every 400 ms. The fresh-path read below (downhill
+    ; descent + LoS smoothing) is deliberately behind this throttle too —
+    ; ~2.5×/s is plenty for clicking and keeps the per-frame hot path cheap.
     if ((now - _lastClickTick) < 400)
     {
         planTag := (_planIdx <= _plan.Length)
@@ -711,255 +730,76 @@ _RunExploration(radarSnap, gameHwnd)
         return
     }
 
-    ; Advance along the path: snap _pathIdx to the closest of the next few
-    ; waypoints. The game's own pathing cuts corners, so the character
-    ; regularly passes a waypoint outside the old strict 15-cell gate — the
-    ; index (and with it the look-ahead anchor) then stalled, leaving the
-    ; bot clicking a spot it had already reached: walk – 3 s stall – replan,
-    ; over and over.
-    if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
+    ; Fresh player-anchored path (also drawn by the radar overlay).
+    freshPath := _pf.DFieldPathFrom(pGX, pGY)
+    if IsObject(g_radarOverlay)
+        g_radarOverlay._explorePathCoords := freshPath
+    if (freshPath.Length = 0)
     {
-        bestIdx := _pathIdx
-        bestD := 999999
-        scanEnd := Min(_pathIdx + 6, _pathCoords.Length)
-        i := _pathIdx
-        while (i <= scanEnd)
-        {
-            wp := _pathCoords[i]
-            d := Abs(pGX - wp[1]) + Abs(pGY - wp[2])
-            if (d < bestD)
-            {
-                bestD := d
-                bestIdx := i
-            }
-            i++
-        }
-        if (bestIdx > _pathIdx)
-        {
-            ; Advancing a hop is progress — re-baseline the watchdog onto the
-            ; new hop (reset best distance, not just the timer) so a longer
-            ; following segment can't trip the 6 s no-progress skip.
-            _pathIdx := bestIdx
-            _wdBestDist := 999999
-            _wdBestTick := now
-        }
-        if (bestD < 15)
-        {
-            ; Standing on the closest waypoint — aim past it.
-            _pathIdx := bestIdx + 1
-            _wdBestDist := 999999
-            _wdBestTick := now
-            if (_pathIdx > _pathCoords.Length)
-            {
-                ; Reached end of path — find new target next tick
-                _targetCX := -1
-                g_exploreLastReason := "wp-done(" g_exploreCurrentPercent "%)"
-                return
-            }
-        }
+        ; Player wandered off the flooded area — the next DFieldExpand call
+        ; grows the field from its frontier toward the new position.
+        g_exploreLastReason := "routing(" g_exploreCurrentPercent "% re-cover)"
+        return
     }
 
-    ; Pick the waypoint to click toward.
-    ; Default look-ahead is +3 from current waypoint for smoother movement. If the
-    ; projected screen position lands on a UI element (minimap, life globe, skill bar,
-    ; flask bar, etc.) the click would be consumed by the UI instead of moving the
-    ; character — so we walk *back* through the path toward the player to find a
-    ; waypoint whose projection clears all known UI rects. Falling back to a closer
-    ; waypoint keeps the same movement direction; a forward LA would push the click
-    ; even deeper into the same UI element.
+    ; Camera sanity gate: a failing anchor means the W2S matrix is stale or
+    ; garbage this tick — any click would walk in a random direction.
+    if !navAnchor["ok"]
+    {
+        g_exploreLastReason := "cam-bad(" navAnchor["why"] " " g_exploreCurrentPercent "%)"
+        return
+    }
+
+    ; Click point ~35 cells along the fresh path, backing off toward the
+    ; player when candidates project off-camera or land on UI/entities.
     ; Shared avoid-zone list: HUD elements, minimap/large map AND world
-    ; interactables (AreaTransition, Waypoint, Portal, NPC, Checkpoint). The
-    ; world-entity rects are what stops the exploration loop from accidentally
-    ; clicking the next zone's entrance and ending the exploration session.
+    ; interactables (AreaTransition, Waypoint, Portal, NPC, Checkpoint) —
+    ; the entity rects keep exploration from clicking the next zone's
+    ; entrance and ending the session.
     avoidRects := GetAvoidZones(radarSnap, gameHwnd)
-    clickWX   := 0
-    clickWY   := 0
-    screenPos := 0
-    chosenLA  := 0
-
-    ; Player's own projected position. Candidates landing within SELF_PX of
-    ; it are useless — clicking your own feet doesn't move the character
-    ; (that's what a 2D path diving off a ledge produces: the next waypoint
-    ; sits one storey below at almost the same XY). Previously this was a
-    ; post-hoc veto on the single chosen candidate, which deadlocked on
-    ; short paths where EVERY nearby waypoint projects onto the character;
-    ; now it is part of candidate selection, so a farther waypoint wins.
-    SELF_PX := 40
-    pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
-    ; Visibility sign anchor: the sign of the PLAYER's projection w defines
-    ; what "in front of the camera" means under this matrix convention.
-    ; Candidates are validated against it (see _ExploreWorldToScreen).
-    playerProjW := _ExploreProjW(playerWX, playerWY, playerWZ, w2sMat)
-    visSign := (playerProjW > 0) ? 1 : (playerProjW < 0 ? -1 : 0)
-    ; Per-cause rejection counters — surfaced in the "ui-blocked" reason so
-    ; the debug overlay shows WHY no candidate was clickable this tick
-    ; (prj = projection failed/behind camera, hud/map/ent = avoid-zone
-    ; category, near = on the character).
-    rejCounts := Map("proj", 0, "hud", 0, "map", 0, "ent", 0, "near", 0)
-
-    ; Look-ahead window. Clicking only +3 waypoints ahead made the character
-    ; inch in short hops (debug video: ~127 units/s while clicks landed only
-    ; ~130 px away). Clicking much farther ahead — the FARTHEST waypoint in
-    ; the window that still projects on-screen, clears UI and isn't on the
-    ; character — turns the click-to-move into a continuous run in the path
-    ; direction (PoE2 paths around minor obstacles itself). The backward scan
-    ; from the far end naturally falls back to a closer hop when the far ones
-    ; are UI-blocked.
-    LOOKAHEAD := 14
-    if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
+    pick := NavPickClickPoint(freshPath, navAnchor, w2sMat, navRect, playerWZ, avoidRects, 35, 8)
+    if !pick["ok"]
     {
-        startLA := Min(_pathIdx + LOOKAHEAD, _pathCoords.Length)
-        la := startLA
-        while (la >= _pathIdx)
+        if (pick["why"] = "arrived")
         {
-            wp  := _pathCoords[la]
-            cwx := wp[1] * ratio
-            cwy := wp[2] * ratio
-            ; Click Z is ALWAYS the player's render Z. Targets are floor-gated
-            ; to within 200 units of the player anyway, and grid heights are
-            ; unreliable on some zones (bogus cell values flipped the
-            ; projection w sign and rejected every candidate as
-            ; behind-camera — the persistent prj=N ui-blocked).
-            cwz := playerWZ
-            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
-            if !sp
-            {
-                rejCounts["proj"] += 1
-                la--
-                continue
-            }
-            v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
-            if !v["ok"]
-            {
-                rejCounts[v["cause"]] += 1
-                la--
-                continue
-            }
-            clickWX   := cwx
-            clickWY   := cwy
-            screenPos := v["sp"]
-            chosenLA  := la
-            break
-        }
-
-        ; Every candidate from +3 down to the current waypoint is blocked —
-        ; typical right after a zone entrance, where the spawn sits between
-        ; a Waypoint and a Checkpoint whose world-anchored avoid boxes cover
-        ; every nearby click (the bot then stood still forever cycling
-        ; "ui-blocked"). Walking FORWARD along the path exits those boxes,
-        ; so extend the look-ahead until a waypoint projects clear of them.
-        if (!screenPos)
-        {
-            la := Min(_pathIdx + LOOKAHEAD + 1, _pathCoords.Length)
-            while (la <= _pathCoords.Length)
-            {
-                wp  := _pathCoords[la]
-                cwx := wp[1] * ratio
-                cwy := wp[2] * ratio
-                cwz := playerWZ   ; player Z — see comment in the backward scan
-                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
-                if !sp
-                {
-                    rejCounts["proj"] += 1
-                    la++
-                    continue
-                }
-                v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
-                if !v["ok"]
-                {
-                    rejCounts[v["cause"]] += 1
-                    la++
-                    continue
-                }
-                clickWX   := cwx
-                clickWY   := cwy
-                screenPos := v["sp"]
-                chosenLA  := la
-                break
-            }
-        }
-    }
-    else
-    {
-        ; No path — click directly toward target. Same UI-safety check, but with
-        ; only one candidate there's no fallback besides skipping this tick.
-        clickWX := _targetCX * _STEP * ratio
-        clickWY := _targetCY * _STEP * ratio
-        clickWZ := playerWZ   ; player Z — see comment in the backward scan
-        sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd, visSign)
-        if !sp
-        {
-            rejCounts["proj"] += 1
-        }
-        else
-        {
-            v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
-            if v["ok"]
-                screenPos := v["sp"]
-            else
-                rejCounts[v["cause"]] += 1
-        }
-    }
-
-    if (!screenPos)
-    {
-        ; "Effectively standing on the target" is only plausible when the
-        ; target really IS close (<= 60 cells ~ 650 world units). A far
-        ; target whose candidates all collapse onto the player is a
-        ; projection artefact — skipping it made the target marker hop
-        ; wildly across the map (near-skip churn, frozen character).
-        if (rejCounts["near"] > 0 && tgtChebyshev <= 60)
-        {
-            ; Even the farthest usable waypoint projects onto the character —
-            ; we are effectively standing at the target. Treat it as reached:
-            ; mark the cell visited, advance the plan, pick a new target next
-            ; tick. Without this the old post-hoc veto skipped the click
-            ; forever and the character froze in place.
+            ; Path shorter than the minimum click distance — same outcome
+            ; as the field-cost arrival above (kept as a safety net).
             _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
                 , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
             if (_planIdx <= _plan.Length)
                 _planIdx++
             _targetCX := -1
-            _pathCoords := []
-            g_exploreLastReason := "target-near-skip(" g_exploreCurrentPercent "%)"
+            _wdTgtCX := -1
+            g_exploreLastReason := "wp-done(" g_exploreCurrentPercent "% short)"
             return
         }
-        ; Every candidate was rejected — surface the per-cause counters so the
-        ; debug overlay tells exactly what blocked this tick (prj = projection
-        ; failed / behind camera, hud/map/ent = avoid-zone category, near = on
-        ; the character). Stuck-detection at 3 s upstream resets the target if
-        ; we end up persistently blocked.
-        g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length
-            . " prj=" rejCounts["proj"] " hud=" rejCounts["hud"] " map=" rejCounts["map"]
-            . " ent=" rejCounts["ent"] " near=" rejCounts["near"] ")"
+        ; Every candidate was rejected — surface the per-cause counters so
+        ; the debug overlay tells exactly what blocked this tick (prj =
+        ; behind camera, hud/map/ent = avoid-zone category, near = on the
+        ; character). Stuck-detection upstream resets the target if we end
+        ; up persistently blocked.
+        rej := pick["rej"]
+        g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% d=" fieldCells
+            . " prj=" rej["proj"] " hud=" rej["hud"] " map=" rej["map"]
+            . " ent=" rej["ent"] " near=" rej["near"] ")"
         return
     }
 
-    ; Move mouse and click.
-    ; Read the cursor back after SetCursorPos: if the OS clamps/blocks the
-    ; move (cursor clipping, UIPI against an elevated game, DPI remap) then
-    ; mouse_event fires at the OLD position and the character walks toward
-    ; the wrong spot — a failure invisible from the click coordinates alone.
-    ; Both the intended click point and the actual cursor land in the debug
-    ; overlay so a mismatch is obvious on screen.
+    ; Move mouse and click. NavClickAt reads the cursor back after
+    ; SetCursorPos: if the OS clamps/blocks the move (cursor clipping, UIPI
+    ; against an elevated game, DPI remap) the click fires at the OLD
+    ; position — both points land in the debug overlay so a mismatch is
+    ; obvious on screen.
     global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
     global g_explorePlayerSX, g_explorePlayerSY
-    DllCall("SetCursorPos", "int", screenPos["x"], "int", screenPos["y"])
-    Sleep(30)
-    curPt := Buffer(8, 0)
-    DllCall("GetCursorPos", "Ptr", curPt)
-    g_exploreClickX := screenPos["x"], g_exploreClickY := screenPos["y"]
-    g_exploreCurX   := NumGet(curPt, 0, "Int"), g_exploreCurY := NumGet(curPt, 4, "Int")
-    g_explorePlayerSX := (pSp ? pSp["x"] : 0), g_explorePlayerSY := (pSp ? pSp["y"] : 0)
-    ; Left mouse down+up via mouse_event (uses the current cursor position).
-    DllCall("mouse_event", "uint", 0x0002, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTDOWN
-    Sleep(30)
-    DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTUP
+    sp := pick["sp"]
+    cur := NavClickAt(sp["x"], sp["y"])
     _lastClickTick := now
-
-    laTag := (chosenLA > 0 && chosenLA != Min(_pathIdx + LOOKAHEAD, _pathCoords.Length))
-        ? " la=" chosenLA : ""
-    g_exploreLastReason := "click(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length laTag ")"
+    g_exploreClickX := sp["x"], g_exploreClickY := sp["y"]
+    g_exploreCurX := cur["curX"], g_exploreCurY := cur["curY"]
+    pSp := navAnchor["sp"]
+    g_explorePlayerSX := pSp["x"], g_explorePlayerSY := pSp["y"]
+    g_exploreLastReason := "click(" g_exploreCurrentPercent "% d=" fieldCells " ahead=" pick["ahead"] ")"
 }
 
 ; ── Mark a coarse visited-grid cell as handled ────────────────────────────
@@ -1085,119 +925,6 @@ _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, re
 }
 
 ; ── World-to-Screen for exploration clicks ───────────────────────────────
-; Simplified W2S that reuses the camera matrix from radar snapshot.
-; Validates one click candidate against the avoid zones and the on-character
-; veto. HUD-band hits get a rescue: edge-clamped points regularly land in the
-; screen-anchored HUD strips (bottom skill bar, globes, quest tracker) — the
-; point is pulled toward the player's screen position (~screen centre) in
-; quarter steps and the first clear spot wins, keeping the travel direction
-; instead of dropping the candidate. Returns Map("ok", true, "sp", point) or
-; Map("ok", false, "cause", "hud"|"map"|"ent"|"near").
-_ExploreValidateClickPoint(sp, pSp, avoidRects, selfPx)
-{
-    kind := AvoidZoneHitKind(sp["x"], sp["y"], avoidRects)
-    if (kind = "hud" && pSp)
-    {
-        step := 1
-        while (step <= 3)
-        {
-            t := step / 4.0
-            nx := Round(sp["x"] + (pSp["x"] - sp["x"]) * t)
-            ny := Round(sp["y"] + (pSp["y"] - sp["y"]) * t)
-            if (AvoidZoneHitKind(nx, ny, avoidRects) = "")
-            {
-                sp := Map("x", nx, "y", ny)
-                kind := ""
-                break
-            }
-            step++
-        }
-    }
-    if (kind != "")
-        return Map("ok", false, "cause", kind)
-    if (pSp && Abs(sp["x"] - pSp["x"]) < selfPx && Abs(sp["y"] - pSp["y"]) < selfPx)
-        return Map("ok", false, "cause", "near")
-    return Map("ok", true, "sp", sp)
-}
-
-; Returns the projection w (4th homogeneous component) of a world position
-; under the W2S matrix, or 0 when the matrix is unavailable. The PLAYER's w
-; serves as the per-tick visibility sign anchor: its sign is what "in front
-; of the camera" looks like under this engine's matrix convention.
-_ExploreProjW(worldX, worldY, worldZ, w2sMat)
-{
-    if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
-        return 0
-    w := 0.0
-    loop 4
-    {
-        j := A_Index
-        w += w2sMat[(j-1)*4 + 4] * (j = 1 ? worldX : j = 2 ? worldY : j = 3 ? worldZ : 1.0)
-    }
-    return w
-}
-
-; World-to-screen for click-to-move. Behind-camera points must be rejected
-; (dividing by their w mirrors the projection to a bogus, often
-; opposite-edge position — the original "clicks somewhere the target can
-; never be reached" bug). BUT the sign that means "in front of the camera"
-; depends on the matrix convention — a hardcoded w>0 check rejected nearly
-; every valid candidate on this game build (debug overlay: prj=7 of 7).
-; visSign carries the sign of the PLAYER's own projection w (the player is
-; always on screen): candidates whose w sign differs are behind the camera.
-; In-front but off-screen points are clamped toward the viewport edge so
-; the click keeps pointing in the correct travel direction.
-_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd, visSign := 0)
-{
-    if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
-        return 0
-
-    ; Get client area
-    clientRect := Buffer(16, 0)
-    clientPt := Buffer(8, 0)
-    DllCall("GetClientRect", "Ptr", gameHwnd, "Ptr", clientRect)
-    DllCall("ClientToScreen", "Ptr", gameHwnd, "Ptr", clientPt)
-    cX := NumGet(clientPt, 0, "Int")
-    cY := NumGet(clientPt, 4, "Int")
-    cW := NumGet(clientRect, 8, "Int")
-    cH := NumGet(clientRect, 12, "Int")
-
-    if (cW < 100 || cH < 100)
-        return 0
-
-    ; Matrix multiply (transpose, matching GameHelper2 C#)
-    input := [worldX, worldY, worldZ, 1.0]
-    r := [0.0, 0.0, 0.0, 0.0]
-    loop 4
-    {
-        i := A_Index
-        loop 4
-        {
-            j := A_Index
-            r[i] += w2sMat[(j-1)*4 + i] * input[j]
-        }
-    }
-
-    ; Degenerate w → cannot project.
-    if (Abs(r[4]) < 0.0001)
-        return 0
-    ; Behind-camera test relative to the player's w sign (convention-proof).
-    if (visSign != 0 && r[4] * visSign < 0)
-        return 0
-    loop 3
-        r[A_Index] /= r[4]
-
-    ; NDC to screen, then clamp to the client area with margin. Clamping an
-    ; off-screen but in-front point yields an edge position pointing the
-    ; correct way toward it.
-    screenX := Round(cX + (r[1] + 1) * cW / 2)
-    screenY := Round(cY + (1 - r[2]) * cH / 2)
-    margin := 80
-    screenX := Max(cX + margin, Min(screenX, cX + cW - margin))
-    screenY := Max(cY + margin, Min(screenY, cY + cH - margin))
-    return Map("x", screenX, "y", screenY)
-}
-
 ; ── Find nearby interactable (doors/switches) — AutoOpen-style ────────────
 ; Scans entities for:
 ;   - Doors: TriggerableBlockage.isBlocked + path contains "door"

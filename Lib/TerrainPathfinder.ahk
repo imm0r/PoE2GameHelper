@@ -25,6 +25,11 @@ class TerrainPathfinder
         this._lastDebug := ""
         this._lastFailExhausted := false
         this._hctx := 0
+        this._dfActive := false
+        this._dfDist := 0
+        this._dfClosed := 0
+        this._dfHeap := []
+        this._dfPops := 0
     }
 
     ; Stores terrain data from ReadTerrainData() result.
@@ -373,6 +378,276 @@ class TerrainPathfinder
 
         return this._SmoothPath(path)
     }
+
+    ; ── Distance field (myrahz/Radar PathFinder.cs architecture) ─────
+    ; Instead of computing one path and following it with an index (which
+    ; goes stale the moment the player leaves it), a Dijkstra/A* cost field
+    ; is flooded FROM THE TARGET outward, time-sliced across ticks. A fresh
+    ; path from the CURRENT player position is then read every tick by
+    ; walking downhill in the field (each flooded cell was reached via a
+    ; strictly-cheaper parent, so min-cost descent always terminates at the
+    ; target). The field stays valid no matter where the player wanders.
+
+    ; Starts a new field toward fine-grid target (tgx, tgy). pgx/pgy is the
+    ; player position — used only to pick the coarse STEP and as the
+    ; first expansion heuristic. Returns false when no walkable cell exists
+    ; near the target (treat as unreachable).
+    DFieldStart(tgx, tgy, pgx, pgy)
+    {
+        this._dfActive := false
+        if !this._buf
+            return false
+        nudge := this.NudgeToWalkable(tgx, tgy)
+        if !nudge
+            return false
+        ; Same coarse-step heuristics as FindPath: far targets use a coarser
+        ; grid so the flood stays cheap.
+        rawDist := Max(Abs(pgx - tgx), Abs(pgy - tgy))
+        STEP := (rawDist > 500) ? 8 : (rawDist > 200) ? 4 : 2
+        cmW := this._maxW // STEP + 1
+        cmH := this._rows // STEP + 1
+        this._dfStep   := STEP
+        this._dfW      := cmW
+        this._dfH      := cmH
+        this._dfDist   := Buffer(cmW * cmH * 4, 0)   ; UInt cost+1 per cell, 0 = unset
+        this._dfClosed := Buffer(cmW * cmH, 0)
+        this._dfReqX   := tgx                         ; identity for DFieldMatches
+        this._dfReqY   := tgy
+        tcx := nudge[1] // STEP
+        tcy := nudge[2] // STEP
+        this._dfTcx := tcx
+        this._dfTcy := tcy
+        tKey := tcy * cmW + tcx
+        NumPut("UInt", 1, this._dfDist.Ptr, tKey * 4)  ; cost 0 stored as 1
+        this._dfHeap := [[0, tKey]]
+        this._dfPops := 0
+        this._dfActive := true
+        return true
+    }
+
+    DFieldActive => this._dfActive
+    DFieldPops   => this._dfPops
+
+    ; True when the active field was built for fine-grid target (tgx, tgy).
+    DFieldMatches(tgx, tgy) => this._dfActive && this._dfReqX = tgx && this._dfReqY = tgy
+
+    ; Expands the field for up to budgetMs toward the player's CURRENT
+    ; position. Returns:
+    ;   "cover"   — the player's cell is flooded; DFieldPathFrom will work.
+    ;   "build"   — budget exhausted, keep calling next tick.
+    ;   "unreach" — flood ran dry without ever reaching the player.
+    ;   "cap"     — expansion cap hit (degenerate huge flood) — give up.
+    ;   "none"    — no active field.
+    DFieldExpand(budgetMs, pgx, pgy)
+    {
+        if !this._dfActive
+            return "none"
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr, cPtr := this._dfClosed.Ptr
+        pcx := Max(0, Min(pgx // STEP, cmW - 1))
+        pcy := Max(0, Min(pgy // STEP, cmH - 1))
+        if this._DFieldCovered(pcx, pcy)
+            return "cover"
+        heap := this._dfHeap
+        deadline := A_TickCount + budgetMs
+        static DX := [1, -1, 0, 0, 1, 1, -1, -1]
+        static DY := [0, 0, 1, -1, 1, -1, 1, -1]
+        static DC := [10, 10, 10, 10, 14, 14, 14, 14]
+        heightsOn := this._hctx != 0
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            hAllow := 30.0 * Max(STEP, 4)
+        }
+        pops := 0
+        while (heap.Length > 0)
+        {
+            if (Mod(pops, 64) = 0 && A_TickCount >= deadline)
+            {
+                this._dfPops += pops
+                return "build"
+            }
+            curItem  := heap[1]
+            lastItem := heap.RemoveAt(heap.Length)
+            if heap.Length > 0
+            {
+                heap[1] := lastItem
+                this._HeapDown(heap, 1)
+            }
+            curKey := curItem[2]
+            if NumGet(cPtr, curKey, "UChar")
+                continue
+            NumPut("UChar", 1, cPtr, curKey)
+            pops++
+
+            cx := Mod(curKey, cmW)
+            cy := curKey // cmW
+            ; Chebyshev ≤ 1: the player's own cell may be unwalkable (and
+            ; thus never enqueued) — a flooded neighbor is good enough
+            ; (DFieldPathFrom scans radius 2 for its start cell anyway).
+            if (Abs(cx - pcx) <= 1 && Abs(cy - pcy) <= 1)
+            {
+                this._dfPops += pops
+                return "cover"
+            }
+            curG := NumGet(dPtr, curKey * 4, "UInt") - 1
+
+            if heightsOn
+            {
+                gx0 := cx * STEP, gy0 := cy * STEP
+                cxq := (gx0 >= hGW) ? hGW - 1 : gx0
+                cyq := (gy0 >= hRows) ? hRows - 1 : gy0
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                curH := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, gx0, gy0)
+            }
+
+            loop 8
+            {
+                ii := A_Index
+                nx := cx + DX[ii]
+                ny := cy + DY[ii]
+                if (nx < 0 || nx >= cmW || ny < 0 || ny >= cmH)
+                    continue
+                nKey := ny * cmW + nx
+                if NumGet(cPtr, nKey, "UChar")
+                    continue
+                if !this.IsWalkable(nx * STEP, ny * STEP)
+                    continue
+                if heightsOn
+                {
+                    gx1 := nx * STEP, gy1 := ny * STEP
+                    cxq := (gx1 >= hGW) ? hGW - 1 : gx1
+                    cyq := (gy1 >= hRows) ? hRows - 1 : gy1
+                    mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                    nH := NumGet(hDone, mIdx, "UChar")
+                        ? NumGet(hVal, mIdx * 4, "Float")
+                        : TerrainHeightAt(this._hctx, gx1, gy1)
+                    if (Abs(nH - curH) > hAllow)
+                        continue
+                }
+                tentG := curG + DC[ii]
+                oldG := NumGet(dPtr, nKey * 4, "UInt")
+                if (oldG = 0 || tentG + 1 < oldG)
+                {
+                    NumPut("UInt", tentG + 1, dPtr, nKey * 4)
+                    ; Chebyshev × 10 heuristic toward the player (admissible
+                    ; for the 10/14 move costs) — directs the flood so the
+                    ; first cover is near-linear in path length.
+                    h := Max(Abs(nx - pcx), Abs(ny - pcy)) * 10
+                    heap.Push([tentG + h, nKey])
+                    this._HeapUp(heap, heap.Length)
+                }
+            }
+        }
+        this._dfPops += pops
+        ; Heap dry: either the player really is cut off, or the player cell
+        ; itself isn't walkable but a neighbor cell is flooded (covered test
+        ; scans a small radius) — re-check before declaring unreachable.
+        return this._DFieldCovered(pcx, pcy) ? "cover"
+            : (this._dfPops > 400000 ? "cap" : "unreach")
+    }
+
+    ; Field cost at the player's fine-grid position, converted to ~fine
+    ; cells of travel distance. -1 while the position isn't covered.
+    DFieldDistCells(pgx, pgy)
+    {
+        start := this._DFieldFindStart(pgx, pgy)
+        if !start
+            return -1
+        g := NumGet(this._dfDist.Ptr, (start[2] * this._dfW + start[1]) * 4, "UInt") - 1
+        return (g * this._dfStep) // 10
+    }
+
+    ; Fresh path from the player's CURRENT position: walk downhill in the
+    ; field to the target. Returns smoothed fine-grid [[gx, gy], …] starting
+    ; at the player, or [] when the position isn't covered yet.
+    DFieldPathFrom(pgx, pgy, maxSteps := 800)
+    {
+        start := this._DFieldFindStart(pgx, pgy)
+        if !start
+            return []
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr
+        static DX := [1, -1, 0, 0, 1, 1, -1, -1]
+        static DY := [0, 0, 1, -1, 1, -1, 1, -1]
+        path := [[pgx, pgy]]
+        cx := start[1], cy := start[2]
+        curG := NumGet(dPtr, (cy * cmW + cx) * 4, "UInt")
+        if (cx * STEP != pgx || cy * STEP != pgy)
+            path.Push([cx * STEP, cy * STEP])
+        loop maxSteps
+        {
+            if (cx = this._dfTcx && cy = this._dfTcy)
+                break
+            bestG := curG
+            bestI := 0
+            loop 8
+            {
+                ii := A_Index
+                nx := cx + DX[ii]
+                ny := cy + DY[ii]
+                if (nx < 0 || nx >= cmW || ny < 0 || ny >= cmH)
+                    continue
+                nG := NumGet(dPtr, (ny * cmW + nx) * 4, "UInt")
+                if (nG > 0 && nG < bestG)
+                {
+                    bestG := nG
+                    bestI := ii
+                }
+            }
+            if (bestI = 0)
+                break   ; local minimum (shouldn't happen — every cell has a cheaper parent)
+            cx += DX[bestI]
+            cy += DY[bestI]
+            curG := bestG
+            path.Push([cx * STEP, cy * STEP])
+        }
+        return this._SmoothPath(path)
+    }
+
+    ; Nearest flooded coarse cell within Chebyshev radius 2 of the player's
+    ; fine position (the player regularly stands on an unflooded/unwalkable
+    ; in-between cell). Returns [cx, cy] or 0.
+    _DFieldFindStart(pgx, pgy)
+    {
+        if !this._dfActive
+            return 0
+        STEP := this._dfStep
+        cmW := this._dfW, cmH := this._dfH
+        dPtr := this._dfDist.Ptr
+        pcx := Max(0, Min(pgx // STEP, cmW - 1))
+        pcy := Max(0, Min(pgy // STEP, cmH - 1))
+        bestG := 0
+        bestC := 0
+        dy := -2
+        while (dy <= 2)
+        {
+            dx := -2
+            while (dx <= 2)
+            {
+                cx := pcx + dx, cy := pcy + dy
+                if (cx >= 0 && cx < cmW && cy >= 0 && cy < cmH)
+                {
+                    g := NumGet(dPtr, (cy * cmW + cx) * 4, "UInt")
+                    if (g > 0 && (bestG = 0 || g < bestG))
+                    {
+                        bestG := g
+                        bestC := [cx, cy]
+                    }
+                }
+                dx++
+            }
+            dy++
+        }
+        return bestC
+    }
+
+    _DFieldCovered(pcx, pcy) => this._DFieldFindStart(pcx * this._dfStep, pcy * this._dfStep) != 0
 
     ; Computes total path length in world units from an array of [gx, gy] grid coords.
     ComputePathWorldDistance(path)

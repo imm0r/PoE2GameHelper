@@ -139,12 +139,34 @@ TryCombatAutomation(radarSnap, gameHwnd)
             g_radarOverlay._combatTargetGY := Round(combatInfo["nearestWorldY"] / TerrainPathfinder.WORLD_TO_GRID_RATIO)
         }
 
+        ; ── Camera anchor (shared projection sanity gate, see ClickNav) ───
+        ; The player's own projection anchors the w-sign convention AND must
+        ; land near the screen centre. Without it a far waypoint/enemy that
+        ; sits behind the camera plane gets point-MIRRORED by the divide and
+        ; the move-click walks the character in exactly the wrong direction
+        ; (the "runs away from the enemy in stutter steps" bug).
+        navRect := NavClientRect(gameHwnd)
+        navAnchor := 0
+        mat0 := combatInfo["w2sMatrix"]
+        if (navRect && mat0 && Type(mat0) = "Array" && mat0.Length = 16
+            && combatInfo["playerWorldX"] != 0)
+        {
+            navAnchor := NavAnchor(combatInfo["playerWorldX"], combatInfo["playerWorldY"]
+                , combatInfo["playerWorldZ"], mat0, navRect)
+            if !navAnchor["ok"]
+            {
+                g_combatLastReason := "cam-bad(" navAnchor["why"] ")"
+                return true   ; engaged — skip the tick rather than click blind
+            }
+        }
+
         ; ── Aim selection (LoS-aware) ──────────────────────────────────────
         ; Three possible aim modes:
         ;   "direct" — straight LoS from player to enemy. Cursor lands on the
         ;              enemy; we wait for isTargetedByPlayer and fire skills.
-        ;   "walk"   — LoS blocked. Cursor lands on the farthest waypoint we
-        ;              DO have LoS to; we issue an LMB (move command) only —
+        ;   "walk"   — LoS blocked. Cursor lands a short way along the fresh
+        ;              A* path (recomputed from the current player position
+        ;              every tick); we issue an LMB (move command) only —
         ;              NO skill keys. The character walks until LoS opens,
         ;              then a later tick flips into "direct".
         ;   "no-path"— LoS blocked AND no traversable A* path. Nothing safe
@@ -198,49 +220,33 @@ TryCombatAutomation(radarSnap, gameHwnd)
                 ; NOISE is aimed at directly instead of dropping to no-path —
                 ; that noise was why combat "never found a path" to enemies
                 ; standing on the same floor).
-                ; Find a path and aim at the farthest reachable hop.
+                ; Find a path and aim a short way along it. FindPath runs
+                ; fresh from the CURRENT player position every tick, so the
+                ; direction can never be stale. The aim point sits ~25 cells
+                ; ahead (a click-to-move command — the game handles corners
+                ; itself) and is projected with the PLAYER's Z: the old code
+                ; aimed at the farthest LoS waypoint with the ENEMY's Z, and
+                ; far waypoints behind the camera plane mirrored the click to
+                ; the opposite screen edge (bot walked AWAY from the enemy).
                 path := _combatPF.FindPath(pGX, pGY, eGX, eGY)
                 if (path && Type(path) = "Array" && path.Length >= 2)
                 {
-                    ; The smoothed path guarantees LoS between adjacent waypoints
-                    ; but NOT from the start to an arbitrary one further along.
-                    ; Walk forward; keep the last waypoint that still has LoS
-                    ; from the player. That's the most aggressive aim we can
-                    ; commit to without crossing into a wall.
-                    bestWp := 0
-                    idx := 1
-                    while (idx <= path.Length)
+                    aimPt := NavPointAlongPath(path, 25)
+                    if (aimPt)
                     {
-                        wp := path[idx]
-                        if !(wp && Type(wp) = "Array" && wp.Length >= 2)
-                        {
-                            idx += 1
-                            continue
-                        }
-                        if _combatPF.HasLineOfSight(pGX, pGY, wp[1], wp[2])
-                            bestWp := wp     ; keep advancing as long as LoS holds
-                        else
-                            break             ; first break = limit of straight reach
-                        idx += 1
-                    }
-                    if (bestWp)
-                    {
-                        aimWorldX := bestWp[1] * WORLD_TO_GRID
-                        aimWorldY := bestWp[2] * WORLD_TO_GRID
-                        ; Z usually doesn't matter much for cursor projection on
-                        ; mostly-planar zones; reuse the enemy's Z as a reasonable
-                        ; stand-in. The matrix projection cares far more about
-                        ; XY than Z here.
+                        aimWorldX := aimPt[1] * WORLD_TO_GRID
+                        aimWorldY := aimPt[2] * WORLD_TO_GRID
+                        aimWorldZ := combatInfo["playerWorldZ"]
                         aimMode := "walk"
                         aimTag  := "walk(" path.Length "wp)"
                     }
                     else
                     {
                         aimMode := "no-path"
-                        aimTag  := "path-no-los"
+                        aimTag  := "path-degenerate"
                     }
                     ; Expose the full path for the radar overlay regardless of
-                    ; which waypoint we ended up aiming at — the user wants to
+                    ; which point we ended up aiming at — the user wants to
                     ; see the route the bot considered, not just the next hop.
                     combatPath := path
                 }
@@ -301,7 +307,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
             "playerWorldX",  combatInfo["playerWorldX"],
             "playerWorldY",  combatInfo["playerWorldY"]
         )
-        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd)
+        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd, navAnchor)
         if !targetScreenPos
         {
             g_combatLastReason := "no-screen-pos"
@@ -466,7 +472,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
                     "playerWorldX",  combatInfo["playerWorldX"],
                     "playerWorldY",  combatInfo["playerWorldY"]
                 )
-                apPos := _WorldToScreen(apInfo, gameHwnd)
+                apPos := _WorldToScreen(apInfo, gameHwnd, navAnchor)
                 if (apPos && !IsPointInAvoidZone(apPos["x"], apPos["y"], avoidRects))
                 {
                     DllCall("SetCursorPos", "int", apPos["x"], "int", apPos["y"])
@@ -869,8 +875,11 @@ _CachedTerrainDistance(pf, playerWX, playerWY, enemyWX, enemyWY)
 ; Uses the game's own 4x4 WorldToScreen matrix (read from camera structure)
 ; for pixel-perfect projection. Falls back to isometric approximation if
 ; the matrix is unavailable.
+; anchor: camera anchor from NavAnchor() — supplies the w-sign convention
+; (behind-camera points are REJECTED instead of mirrored) and the player's
+; projection for direction-true edge clamping.
 ; Returns: Map("x", screenX, "y", screenY) or 0 on failure.
-_WorldToScreen(combatInfo, gameHwnd)
+_WorldToScreen(combatInfo, gameHwnd, anchor := 0)
 {
     global g_combatW2SScale
 
@@ -889,56 +898,18 @@ _WorldToScreen(combatInfo, gameHwnd)
     if (winW < 100 || winH < 100)
         return 0
 
-    ; ── Try proper matrix projection ──────────────────────────────────
+    ; ── Try proper matrix projection (shared ClickNav toolkit) ────────
     mat := combatInfo["w2sMatrix"]
     if (mat && Type(mat) = "Array" && mat.Length = 16)
     {
-        ; Get client area (rendering region, excluding title bar/borders)
-        clientRect := Buffer(16, 0)
-        clientPt := Buffer(8, 0)
-        DllCall("GetClientRect", "Ptr", gameHwnd, "Ptr", clientRect)
-        DllCall("ClientToScreen", "Ptr", gameHwnd, "Ptr", clientPt)
-        cX := NumGet(clientPt, 0, "Int")
-        cY := NumGet(clientPt, 4, "Int")
-        cW := NumGet(clientRect, 8, "Int")
-        cH := NumGet(clientRect, 12, "Int")
-        ; Matrix4x4 multiplication: result = mat × [ex, ey, ez, 1.0]
-        ; C# Matrix4x4 is row-major: M[row,col] with FieldOffset layout
-        ;   mat[1]=M11, mat[2]=M12, mat[3]=M13, mat[4]=M14
-        ;   mat[5]=M21, mat[6]=M22, mat[7]=M23, mat[8]=M24
-        ;   mat[9]=M31, mat[10]=M32, mat[11]=M33, mat[12]=M34
-        ;   mat[13]=M41, mat[14]=M42, mat[15]=M43, mat[16]=M44
-        ; GameHelper2 iterates: tmpResult[i] += mat[j,i] * input[j]
-        ;   i.e. result = transpose(mat) × input  (column-major multiply)
-        input := [ex, ey, ez, 1.0]
-        r := [0.0, 0.0, 0.0, 0.0]
-        Loop 4
-        {
-            i := A_Index
-            Loop 4
-            {
-                j := A_Index
-                ; mat[j, i] in row-major = mat[(j-1)*4 + i]
-                r[i] := r[i] + mat[(j - 1) * 4 + i] * input[j]
-            }
-        }
-
-        ; Perspective divide
-        if (r[4] = 0)
+        rect := NavClientRect(gameHwnd)
+        if !rect
             return 0
-        Loop 4
-            r[A_Index] := r[A_Index] / r[4]
-
-        ; NDC to screen coordinates (client area → absolute screen)
-        screenX := Round(cX + (r[1] + 1.0) * (cW / 2.0))
-        screenY := Round(cY + (1.0 - r[2]) * (cH / 2.0))
-
-        ; Clamp to client area bounds (with margin to avoid edge UI)
-        margin := 50
-        screenX := Max(cX + margin, Min(screenX, cX + cW - margin))
-        screenY := Max(cY + margin, Min(screenY, cY + cH - margin))
-
-        return Map("x", screenX, "y", screenY)
+        visSign := (anchor && anchor["ok"]) ? anchor["visSign"] : 0
+        sp := NavProject(ex, ey, ez, mat, rect, visSign)
+        if !sp
+            return 0
+        return NavRayClamp(sp, (anchor && anchor["ok"]) ? anchor["sp"] : 0, rect, 50)
     }
 
     ; ── Fallback: isometric approximation ─────────────────────────────
