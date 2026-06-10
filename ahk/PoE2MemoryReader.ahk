@@ -196,12 +196,22 @@ class PoE2GameStateReader extends PoE2InventoryReader
         if (!strictPatterns)
         {
             this.GameStatesAddress := this.ResolveGameStatesAddressFromStaticPattern()
-            if (this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
-                return true
+            if !(this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
+                this.GameStatesAddress := this.ResolveGameStatesAddressFallback()
 
-            this.GameStatesAddress := this.ResolveGameStatesAddressFallback()
             if (this.GameStatesAddress && this.ValidateGameStatesAddress(this.GameStatesAddress))
+            {
+                ; Fast path resolved the critical GameStates anchor — but the
+                ; OTHER static patterns (terrain rotation tables, file root,
+                ; cull size) still need resolving. This branch used to return
+                ; early WITHOUT ever running the full scan, leaving
+                ; StaticAddresses empty — the terrain-height feature then
+                ; reported "no-pattern" forever even though its patterns were
+                ; perfectly fine. With the INI pattern cache the full scan
+                ; costs ~0 ms on every start after the first per game patch.
+                this.StaticAddresses := this.FindStaticAddresses()
                 return true
+            }
         }
 
         this.StaticAddresses := this.FindStaticAddresses()
