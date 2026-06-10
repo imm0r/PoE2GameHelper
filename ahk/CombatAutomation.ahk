@@ -150,16 +150,16 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; the move-click walks the character in exactly the wrong direction
         ; (the "runs away from the enemy in stutter steps" bug).
         navRect := NavClientRect(gameHwnd)
-        navAnchor := 0
+        camAnchor := 0
         mat0 := combatInfo["w2sMatrix"]
         if (navRect && mat0 && Type(mat0) = "Array" && mat0.Length = 16
             && combatInfo["playerWorldX"] != 0)
         {
-            navAnchor := NavAnchor(combatInfo["playerWorldX"], combatInfo["playerWorldY"]
+            camAnchor := NavAnchor(combatInfo["playerWorldX"], combatInfo["playerWorldY"]
                 , combatInfo["playerWorldZ"], mat0, navRect)
-            if !navAnchor["ok"]
+            if !camAnchor["ok"]
             {
-                g_combatLastReason := "cam-bad(" navAnchor["why"] ")"
+                g_combatLastReason := "cam-bad(" camAnchor["why"] ")"
                 return true   ; engaged — skip the tick rather than click blind
             }
         }
@@ -311,7 +311,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
             "playerWorldX",  combatInfo["playerWorldX"],
             "playerWorldY",  combatInfo["playerWorldY"]
         )
-        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd, navAnchor)
+        targetScreenPos := _WorldToScreen(aimInfo, gameHwnd, camAnchor)
         if !targetScreenPos
         {
             g_combatLastReason := "no-screen-pos"
@@ -476,7 +476,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
                     "playerWorldX",  combatInfo["playerWorldX"],
                     "playerWorldY",  combatInfo["playerWorldY"]
                 )
-                apPos := _WorldToScreen(apInfo, gameHwnd, navAnchor)
+                apPos := _WorldToScreen(apInfo, gameHwnd, camAnchor)
                 if (apPos && !IsPointInAvoidZone(apPos["x"], apPos["y"], avoidRects))
                 {
                     DllCall("SetCursorPos", "int", apPos["x"], "int", apPos["y"])

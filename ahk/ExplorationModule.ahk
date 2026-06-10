@@ -418,19 +418,19 @@ _RunExploration(radarSnap, gameHwnd)
     ; garbage this tick — every click would land in a random direction, so
     ; door clicks AND movement clicks are both gated on it.
     navRect := NavClientRect(gameHwnd)
-    navAnchor := navRect
+    camAnchor := navRect
         ? NavAnchor(playerWX, playerWY, playerWZ, w2sMat, navRect)
         : Map("ok", false, "why", "no-rect", "sp", 0, "visSign", 0)
 
     ; ── Proactive door/switch opening (AutoOpen-style) ────────────────
     ; Scan every 300ms for closed doors & unswitched switches within range
-    if (navAnchor["ok"] && (now - _doorClickTick) > 300)
+    if (camAnchor["ok"] && (now - _doorClickTick) > 300)
     {
         doorResult := _FindNearbyInteractable(radarSnap, playerWX, playerWY, playerWZ, _doorClickCounts)
         if (doorResult)
         {
             doorScreen := NavProject(doorResult["x"], doorResult["y"], doorResult["z"]
-                , w2sMat, navRect, navAnchor["visSign"])
+                , w2sMat, navRect, camAnchor["visSign"])
             ; A door is close by — its projection must be genuinely on
             ; screen (no clamping rescue for interaction clicks).
             if (doorScreen
@@ -751,9 +751,9 @@ _RunExploration(radarSnap, gameHwnd)
 
     ; Camera sanity gate: a failing anchor means the W2S matrix is stale or
     ; garbage this tick — any click would walk in a random direction.
-    if !navAnchor["ok"]
+    if !camAnchor["ok"]
     {
-        g_exploreLastReason := "cam-bad(" navAnchor["why"] " " g_exploreCurrentPercent "%)"
+        g_exploreLastReason := "cam-bad(" camAnchor["why"] " " g_exploreCurrentPercent "%)"
         return
     }
 
@@ -764,7 +764,7 @@ _RunExploration(radarSnap, gameHwnd)
     ; the entity rects keep exploration from clicking the next zone's
     ; entrance and ending the session.
     avoidRects := GetAvoidZones(radarSnap, gameHwnd)
-    pick := NavPickClickPoint(freshPath, navAnchor, w2sMat, navRect, playerWZ, avoidRects, 35, 8)
+    pick := NavPickClickPoint(freshPath, camAnchor, w2sMat, navRect, playerWZ, avoidRects, 35, 8)
     if !pick["ok"]
     {
         if (pick["why"] = "arrived")
@@ -804,7 +804,7 @@ _RunExploration(radarSnap, gameHwnd)
     _lastClickTick := now
     g_exploreClickX := sp["x"], g_exploreClickY := sp["y"]
     g_exploreCurX := cur["curX"], g_exploreCurY := cur["curY"]
-    pSp := navAnchor["sp"]
+    pSp := camAnchor["sp"]
     g_explorePlayerSX := pSp["x"], g_explorePlayerSY := pSp["y"]
     g_exploreLastReason := "click(" g_exploreCurrentPercent "% d=" fieldCells " ahead=" pick["ahead"] ")"
 }
