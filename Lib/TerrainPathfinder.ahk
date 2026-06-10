@@ -24,6 +24,7 @@ class TerrainPathfinder
         this._maxW := 0
         this._lastDebug := ""
         this._lastFailExhausted := false
+        this._hctx := 0
     }
 
     ; Stores terrain data from ReadTerrainData() result.
@@ -43,6 +44,33 @@ class TerrainPathfinder
     }
 
     HasTerrain() => this._buf != 0
+
+    ; Attaches (or detaches with 0) a terrain-height context from
+    ; GetTerrainHeightContext(). Only a context that passed self-validation
+    ; ("ok") activates the height-aware checks; "pending"/"bad"/0 keep the
+    ; pathfinder in plain 2D mode. Hot fields are cached as properties so
+    ; the A*/LoS loops can do memo lookups without per-step Map access.
+    ;
+    ; Slope threshold: 30 world units per fine cell of distance (stairs and
+    ; ramps stay well below it; cross-floor seams on multi-level zones are
+    ; hundreds of units). Heights are memoized at 4-cell resolution, so the
+    ; effective minimum span is 4 cells.
+    SetHeights(ctx)
+    {
+        if (ctx && IsObject(ctx) && ctx["val"] = "ok")
+        {
+            this._hctx     := ctx
+            this._hMemoVal := ctx["memoVal"].Ptr
+            this._hMemoDone:= ctx["memoDone"].Ptr
+            this._hMemoW   := ctx["memoW"]
+            this._hGridW   := ctx["gridW"]
+            this._hRows    := ctx["rows"]
+        }
+        else
+            this._hctx := 0
+    }
+
+    HeightsEnabled => this._hctx != 0
 
     ; The last debug/reason string from FindPath().
     LastDebug => this._lastDebug
@@ -67,8 +95,25 @@ class TerrainPathfinder
     }
 
     ; Bresenham line-of-sight: true iff all cells on the line are walkable.
+    ; With a validated height context the line must also stay on one level —
+    ; otherwise path smoothing would happily cut across a floor seam that
+    ; the height-aware A* just routed around. The memo-hit path is inlined
+    ; (raw NumGets on cached pointers); only uncached cells fall back to
+    ; TerrainHeightAt, which computes and memoizes them.
     HasLineOfSight(x0, y0, x1, y1)
     {
+        heightsOn := this._hctx != 0
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            cxq := (x0 < 0) ? 0 : (x0 >= hGW ? hGW - 1 : x0)
+            cyq := (y0 < 0) ? 0 : (y0 >= hRows ? hRows - 1 : y0)
+            mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+            lastH := NumGet(hDone, mIdx, "UChar")
+                ? NumGet(hVal, mIdx * 4, "Float")
+                : TerrainHeightAt(this._hctx, x0, y0)
+        }
         dx := Abs(x1 - x0), dy := Abs(y1 - y0)
         sx := (x0 < x1) ? 1 : -1
         sy := (y0 < y1) ? 1 : -1
@@ -78,6 +123,19 @@ class TerrainPathfinder
         {
             if !this.IsWalkable(x, y)
                 return false
+            if (heightsOn)
+            {
+                cxq := (x < 0) ? 0 : (x >= hGW ? hGW - 1 : x)
+                cyq := (y < 0) ? 0 : (y >= hRows ? hRows - 1 : y)
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                h := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, x, y)
+                ; 120 = 30 units/cell × the 4-cell memo resolution
+                if (Abs(h - lastH) > 120)
+                    return false
+                lastH := h
+            }
             if (x = x1 && y = y1)
                 return true
             e2 := err * 2
@@ -184,6 +242,15 @@ class TerrainPathfinder
         iter     := 0
         found    := false
         deadline := A_TickCount + ((rawDist > 400) ? 500 : 200)
+        heightsOn := this._hctx != 0
+        if heightsOn
+        {
+            hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
+            hGW := this._hGridW,    hRows := this._hRows
+            ; Max height delta per STEP-hop: 30 units/cell × hop length
+            ; (4-cell floor because heights are memoized at 1/4 resolution).
+            hAllow := 30.0 * Max(STEP, 4)
+        }
 
         while (heap.Length > 0 && iter < MAX_ITER && A_TickCount < deadline)
         {
@@ -212,6 +279,19 @@ class TerrainPathfinder
             cy := (curKey - cx) // STRIDE
             curG := gScore[curKey]
 
+            ; Height of the node being expanded — once per node, inlined
+            ; memo-hit path (raw NumGets), miss falls back to TerrainHeightAt.
+            if heightsOn
+            {
+                gx0 := cx * STEP, gy0 := cy * STEP
+                cxq := (gx0 >= hGW) ? hGW - 1 : gx0
+                cyq := (gy0 >= hRows) ? hRows - 1 : gy0
+                mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                curH := NumGet(hDone, mIdx, "UChar")
+                    ? NumGet(hVal, mIdx * 4, "Float")
+                    : TerrainHeightAt(this._hctx, gx0, gy0)
+            }
+
             loop 8
             {
                 ii := A_Index
@@ -223,6 +303,20 @@ class TerrainPathfinder
                 ; Check walkability at actual grid coordinates.
                 if !this.IsWalkable(nx * STEP, ny * STEP)
                     continue
+                ; Reject cross-floor seams (multi-level zones) when heights
+                ; are available — same walkable nibble, different storey.
+                if heightsOn
+                {
+                    gx1 := nx * STEP, gy1 := ny * STEP
+                    cxq := (gx1 >= hGW) ? hGW - 1 : gx1
+                    cyq := (gy1 >= hRows) ? hRows - 1 : gy1
+                    mIdx := (cyq >> 2) * hMW + (cxq >> 2)
+                    nH := NumGet(hDone, mIdx, "UChar")
+                        ? NumGet(hVal, mIdx * 4, "Float")
+                        : TerrainHeightAt(this._hctx, gx1, gy1)
+                    if (Abs(nH - curH) > hAllow)
+                        continue
+                }
 
                 nKey := ny * STRIDE + nx
                 if closed.Has(nKey)

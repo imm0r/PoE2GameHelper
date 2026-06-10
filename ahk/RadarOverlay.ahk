@@ -547,7 +547,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
         global g_combatState, g_combatLastReason
         global g_lootLastReason, g_lootCache
-        global g_exploreCurrentPercent, g_exploreLastReason
+        global g_exploreCurrentPercent, g_exploreLastReason, g_exploreHeightDiag
         global g_autoFlaskEnabled, g_autoFlaskLastReason
 
         if !g_overlayStatusTextEnabled
@@ -603,7 +603,9 @@ class RadarOverlay extends GdiOverlayBase
                 pctTxt := Format("{:.0f}%", g_exploreCurrentPercent)
                 rsn := (g_exploreLastReason != "" && g_exploreLastReason != "idle")
                     ? (" · " g_exploreLastReason) : ""
-                lines.Push(["  explore: " pctTxt rsn, COL_IVORY])
+                hz := (IsSet(g_exploreHeightDiag) && g_exploreHeightDiag != "")
+                    ? (" · hz:" g_exploreHeightDiag) : ""
+                lines.Push(["  explore: " pctTxt rsn hz, COL_IVORY])
             }
         }
 

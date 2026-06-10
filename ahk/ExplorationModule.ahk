@@ -134,6 +134,14 @@ _RunExploration(radarSnap, gameHwnd)
         _areaResetDone := 0
     }
 
+    ; Terrain-height context — refresh every tick: cheap when cached, and
+    ; while validation is pending the getter keeps sampling the player's Z
+    ; until it can decide. A validated context makes A*/LoS reject
+    ; cross-floor seams and gives clicks the target floor's real Z.
+    heightCtx := GetTerrainHeightContext(radarSnap)
+    _pf.SetHeights(heightCtx)
+    hzOk := (heightCtx && IsObject(heightCtx) && heightCtx["val"] = "ok")
+
     if (_totalWalkable = 0)
     {
         g_exploreLastReason := "no-walkable"
@@ -554,7 +562,11 @@ _RunExploration(radarSnap, gameHwnd)
             wp  := _pathCoords[la]
             cwx := wp[1] * ratio
             cwy := wp[2] * ratio
-            sp  := _ExploreWorldToScreen(cwx, cwy, playerWZ, w2sMat, gameHwnd)
+            ; Project with the waypoint's own floor height when available —
+            ; using the player's Z on a multi-level zone lands the click on
+            ; the wrong storey's screen position.
+            cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
+            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
             if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
             {
                 clickWX   := cwx
@@ -572,7 +584,8 @@ _RunExploration(radarSnap, gameHwnd)
         ; only one candidate there's no fallback besides skipping this tick.
         clickWX := _targetCX * _STEP * ratio
         clickWY := _targetCY * _STEP * ratio
-        sp      := _ExploreWorldToScreen(clickWX, clickWY, playerWZ, w2sMat, gameHwnd)
+        clickWZ := hzOk ? TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) : playerWZ
+        sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd)
         if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
             screenPos := sp
     }
@@ -1232,10 +1245,14 @@ _GreedyTspOrder(points, start, kind)
 
 LoadExplorationConfig()
 {
-    global g_exploreEnabled, g_exploreTargetPercent
+    global g_exploreEnabled, g_exploreTargetPercent, g_exploreHeightDiag
 
     iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "Exploration"
+
+    ; Terrain-height diagnostic for the status overlay — seeded here
+    ; unconditionally (module-init gotcha, see CLAUDE.md)
+    g_exploreHeightDiag := ""
 
     g_exploreEnabled       := IniRead(iniFile, section, "Enabled", "0") = "1"
     g_exploreTargetPercent := Integer(IniRead(iniFile, section, "TargetPercent", "80"))
