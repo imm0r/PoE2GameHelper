@@ -97,12 +97,15 @@ class TerrainPathfinder
     ; Bresenham line-of-sight: true iff all cells on the line are walkable.
     ; With a validated height context the line must also stay on one level —
     ; otherwise path smoothing would happily cut across a floor seam that
-    ; the height-aware A* just routed around. The memo-hit path is inlined
-    ; (raw NumGets on cached pointers); only uncached cells fall back to
-    ; TerrainHeightAt, which computes and memoizes them.
-    HasLineOfSight(x0, y0, x1, y1)
+    ; the height-aware A* just routed around. ignoreHeights=true skips the
+    ; height rule (plain 2D walkability test) — callers use it to tell
+    ; "blocked by a wall" apart from "blocked by height noise".
+    ; The memo-hit path is inlined (raw NumGets on cached pointers); only
+    ; uncached cells fall back to TerrainHeightAt, which computes and
+    ; memoizes them.
+    HasLineOfSight(x0, y0, x1, y1, ignoreHeights := false)
     {
-        heightsOn := this._hctx != 0
+        heightsOn := (this._hctx != 0) && !ignoreHeights
         if heightsOn
         {
             hVal := this._hMemoVal, hDone := this._hMemoDone, hMW := this._hMemoW
