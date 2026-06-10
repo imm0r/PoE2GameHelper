@@ -44,6 +44,7 @@ _RunExploration(radarSnap, gameHwnd)
     global g_exploreTargetPercent, g_exploreCurrentPercent
     global g_exploreLastReason, g_reader
     global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
+    global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
 
     ; ── Extract terrain + player position ─────────────────────────────
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -178,6 +179,11 @@ _RunExploration(radarSnap, gameHwnd)
     pcX := pGX // _STEP
     pcY := pGY // _STEP
     vr := VISION_RADIUS // _STEP
+
+    ; Export player position (+ render Z) for the debug overlay.
+    g_explorePosWX := Round(playerWX)
+    g_explorePosWY := Round(playerWY)
+    g_explorePosH  := Round(playerWZ)
 
     buf := terrain["data"]
     dsz := terrain["dataSize"]
@@ -592,11 +598,15 @@ _RunExploration(radarSnap, gameHwnd)
             _wdBestTick := now
         }
         wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
-        ; Export the current target for the debug overlay: world coordinates
-        ; + straight-line distance in world units.
+        ; Export the current target for the debug overlay: world coordinates,
+        ; straight-line distance, and the height delta target-vs-player (the
+        ; decisive cross-floor indicator: a few hundred units = other storey,
+        ; i.e. the reachability region leaked across a seam somewhere).
         g_exploreTargetWX   := _targetCX * _STEP * ratio
         g_exploreTargetWY   := _targetCY * _STEP * ratio
         g_exploreTargetDist := Round(wdDist * ratio)
+        g_exploreTargetHD   := hzOk
+            ? Round(TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) - playerWZ) : ""
         if (wdDist < _wdBestDist - 4)
         {
             _wdBestDist := wdDist
