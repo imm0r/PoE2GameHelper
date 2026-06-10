@@ -809,7 +809,7 @@ _RunExploration(radarSnap, gameHwnd)
             ; using the player's Z on a multi-level zone lands the click on
             ; the wrong storey's screen position.
             cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, true)
+            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
             if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
             {
                 if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
@@ -842,7 +842,7 @@ _RunExploration(radarSnap, gameHwnd)
                 cwx := wp[1] * ratio
                 cwy := wp[2] * ratio
                 cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, true)
+                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
                 if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
                 {
                     if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
@@ -1056,14 +1056,14 @@ _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, re
 
 ; ── World-to-Screen for exploration clicks ───────────────────────────────
 ; Simplified W2S that reuses the camera matrix from radar snapshot.
-; World-to-screen for click-to-move. requireOnScreen=true makes it return 0
-; for points that are behind the camera OR whose projection falls outside the
-; viewport (instead of clamping them to the edge): the look-ahead uses this so
-; it only ever clicks a waypoint that is genuinely visible and in the correct
-; direction. The previous always-clamp behaviour turned a far/off-screen
-; look-ahead waypoint into an edge click pointing the wrong way — the bot then
-; walked away from a target the map clearly showed as reachable.
-_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd, requireOnScreen := false)
+; World-to-screen for click-to-move. The decisive fix here is rejecting
+; points on/behind the camera plane (w <= 0): dividing by a non-positive w
+; mirrors the projection to a bogus, often opposite-edge screen position —
+; that was the "cursor clicks somewhere the target can never be reached"
+; bug. Points in FRONT of the camera but off-screen are still clamped toward
+; the viewport edge, so the click stays in the correct travel direction (the
+; character runs toward a far waypoint).
+_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd)
 {
     if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
         return 0
@@ -1094,31 +1094,21 @@ _ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd, requireOnScreen 
         }
     }
 
-    ; Perspective divide. r[4] <= 0 means the point is on/behind the camera
-    ; plane — dividing by it mirrors the projection to a bogus screen spot, so
-    ; reject it outright (previously only |r[4]|<epsilon was caught, letting
+    ; Perspective divide. r[4] <= 0 → point is on/behind the camera plane;
+    ; dividing by it mirrors the projection to a wrong screen spot, so reject
+    ; outright (previously only |r[4]| < epsilon was caught, letting
     ; behind-camera points through as wrong-direction edge clicks).
     if (r[4] < 0.0001)
         return 0
     loop 3
         r[A_Index] /= r[4]
 
-    ; NDC to screen (unclamped)
+    ; NDC to screen, then clamp to the client area with margin. Clamping an
+    ; off-screen but in-front point yields an edge position pointing the
+    ; correct way toward it.
     screenX := Round(cX + (r[1] + 1) * cW / 2)
     screenY := Round(cY + (1 - r[2]) * cH / 2)
-
     margin := 80
-    if (requireOnScreen)
-    {
-        ; Reject anything that isn't truly inside the viewport — the caller
-        ; will fall back to a nearer waypoint that is.
-        if (screenX < cX + margin || screenX > cX + cW - margin
-         || screenY < cY + margin || screenY > cY + cH - margin)
-            return 0
-        return Map("x", screenX, "y", screenY)
-    }
-
-    ; Legacy callers: clamp to the client area with margin.
     screenX := Max(cX + margin, Min(screenX, cX + cW - margin))
     screenY := Max(cY + margin, Min(screenY, cY + cH - margin))
     return Map("x", screenX, "y", screenY)
