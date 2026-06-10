@@ -39,6 +39,7 @@ inline when authoring commit messages, PR bodies, etc.
 - **Always end a reply that committed & pushed with the exact pull command** so the
   user can grab it locally, e.g. `git pull origin <current-dev-branch>`. Every time a
   change is pushed — no exceptions.
+  **Never add the current AI Session to the end of the commit message** — Skip the entire line (e.g. "https://claude.ai/code/session_123456789abcdef")
 
 ### Completion-summary format (lean, GitHub-ready)
 When wrapping up a task, output the summary as ONE copyable raw GitHub-flavored
@@ -49,11 +50,8 @@ show only the sections that have content — never pad with empty headings:
 
 - **Summary** — one sentence on what was achieved.
 - **Changes** — bullet list, `path/file.ext:line — what & why`.
-- **Verify in-game** — concrete click/hotkey steps + expected result (the user
-  usually cannot runtime-test). Write "None needed" when nothing applies.
-
-Add **Verification** (static checks: brace balance, `node --check`, minimal diff)
-or **Open / Next steps** only when actually relevant. Any prose outside the block
+- **Advices** — everything the needs to know about how the changes work.
+- **Open / Next steps** only when actually relevant. Any prose outside the block
 (chat commentary) may stay German.
 
 ## Project structure & conventions
@@ -63,6 +61,9 @@ or **Open / Next steps** only when actually relevant. Any prose outside the bloc
 - **UI:** `ui/index.html` — one self-contained file with a single inline `<script>`,
   rendered in a WebView2 control.
 - **Sounds:** alert `.wav` files live in the root **`wav/`** folder.
+- **Logs:** `.log` files live in the root **`Logs/`** folder.
+- **Data:** `.tsv` files needed for translating internal strings by using a dictionary live in the root **`Data/`** folder.
+- **Tools:** `.py` files needed for building the dictionaries live in the root **`Tools/`** folder.
 
 ### Include conventions
 - `InGameStateMonitor.ahk` includes with the `ahk/` prefix, e.g. `#Include ahk/RadarOverlay.ahk`.
