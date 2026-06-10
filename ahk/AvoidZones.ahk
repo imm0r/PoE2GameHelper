@@ -72,6 +72,20 @@ IsPointInAvoidZone(sx, sy, rects)
     return false
 }
 
+; Returns the kind tag ("hud" | "map" | "ent") of the first avoid rect that
+; contains (sx, sy), or "" when the point is clear. Same hit test as
+; IsPointInAvoidZone but exposes WHICH category blocked — feeds the
+; exploration "ui-blocked" cause breakdown in the debug overlay.
+AvoidZoneHitKind(sx, sy, rects)
+{
+    for _, r in rects
+    {
+        if (sx >= r[1] && sx < r[1] + r[3] && sy >= r[2] && sy < r[2] + r[4])
+            return (r.Length >= 5) ? r[5] : "?"
+    }
+    return ""
+}
+
 ; ── HUD rects (fixed-anchor PoE2 UI) ─────────────────────────────────────
 ; PoE2 anchors these to fixed corners/edges and scales them linearly with
 ; resolution. Proportions are conservative (slightly oversized) — better to
@@ -80,15 +94,15 @@ IsPointInAvoidZone(sx, sy, rects)
 _AppendHudRects(rects, cX, cY, cW, cH)
 {
     ; Bottom skill bar + center flask bar (middle 50% horizontal, bottom 14%)
-    rects.Push([cX + cW * 0.25, cY + cH * 0.86, cW * 0.50, cH * 0.14])
+    rects.Push([cX + cW * 0.25, cY + cH * 0.86, cW * 0.50, cH * 0.14, "hud"])
     ; Bottom-left life globe + left flask bar
-    rects.Push([cX,             cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    rects.Push([cX,             cY + cH * 0.78, cW * 0.13, cH * 0.22, "hud"])
     ; Bottom-right mana globe + right flask bar
-    rects.Push([cX + cW * 0.87, cY + cH * 0.78, cW * 0.13, cH * 0.22])
+    rects.Push([cX + cW * 0.87, cY + cH * 0.78, cW * 0.13, cH * 0.22, "hud"])
     ; Top-right quest tracker / area info
-    rects.Push([cX + cW * 0.78, cY,             cW * 0.22, cH * 0.12])
+    rects.Push([cX + cW * 0.78, cY,             cW * 0.22, cH * 0.12, "hud"])
     ; Top-left area-name banner (the minimap sits just below)
-    rects.Push([cX,             cY,             cW * 0.22, cH * 0.06])
+    rects.Push([cX,             cY,             cW * 0.22, cH * 0.06, "hud"])
 }
 
 ; ── Map overlay rects (minimap only) ────────────────────────────────────
@@ -131,7 +145,7 @@ _AppendMapRects(rects, radarSnap, cX, cY, cW, cH)
         ry := md["unscaledPosY"] * uiSY
         ; MiniMap stores top-left already — no center adjustment needed.
         if (rw > 20 && rh > 20)
-            rects.Push([cX + rx, cY + ry, rw, rh])
+            rects.Push([cX + rx, cY + ry, rw, rh, "map"])
     }
 }
 
@@ -193,7 +207,7 @@ _AppendInteractableRects(rects, radarSnap, gameHwnd, cX, cY, cW, cH)
             continue
 
         half := AVOID_BOX_PX / 2
-        rects.Push([sp["x"] - half, sp["y"] - half, AVOID_BOX_PX, AVOID_BOX_PX])
+        rects.Push([sp["x"] - half, sp["y"] - half, AVOID_BOX_PX, AVOID_BOX_PX, "ent"])
     }
 }
 

@@ -785,7 +785,11 @@ _RunExploration(radarSnap, gameHwnd)
     ; now it is part of candidate selection, so a farther waypoint wins.
     SELF_PX := 40
     pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
-    nearRejects := 0
+    ; Per-cause rejection counters — surfaced in the "ui-blocked" reason so
+    ; the debug overlay shows WHY no candidate was clickable this tick
+    ; (prj = projection failed/behind camera, hud/map/ent = avoid-zone
+    ; category, near = on the character).
+    rejCounts := Map("proj", 0, "hud", 0, "map", 0, "ent", 0, "near", 0)
 
     ; Look-ahead window. Clicking only +3 waypoints ahead made the character
     ; inch in short hops (debug video: ~127 units/s while clicks landed only
@@ -810,21 +814,24 @@ _RunExploration(radarSnap, gameHwnd)
             ; the wrong storey's screen position.
             cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
             sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
-            if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
+            if !sp
             {
-                if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
-                {
-                    nearRejects++
-                    la--
-                    continue
-                }
-                clickWX   := cwx
-                clickWY   := cwy
-                screenPos := sp
-                chosenLA  := la
-                break
+                rejCounts["proj"] += 1
+                la--
+                continue
             }
-            la--
+            v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
+            if !v["ok"]
+            {
+                rejCounts[v["cause"]] += 1
+                la--
+                continue
+            }
+            clickWX   := cwx
+            clickWY   := cwy
+            screenPos := v["sp"]
+            chosenLA  := la
+            break
         }
 
         ; Every candidate from +3 down to the current waypoint is blocked —
@@ -843,21 +850,24 @@ _RunExploration(radarSnap, gameHwnd)
                 cwy := wp[2] * ratio
                 cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
                 sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
-                if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
+                if !sp
                 {
-                    if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
-                    {
-                        nearRejects++
-                        la++
-                        continue
-                    }
-                    clickWX   := cwx
-                    clickWY   := cwy
-                    screenPos := sp
-                    chosenLA  := la
-                    break
+                    rejCounts["proj"] += 1
+                    la++
+                    continue
                 }
-                la++
+                v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
+                if !v["ok"]
+                {
+                    rejCounts[v["cause"]] += 1
+                    la++
+                    continue
+                }
+                clickWX   := cwx
+                clickWY   := cwy
+                screenPos := v["sp"]
+                chosenLA  := la
+                break
             }
         }
     }
@@ -869,18 +879,23 @@ _RunExploration(radarSnap, gameHwnd)
         clickWY := _targetCY * _STEP * ratio
         clickWZ := hzOk ? TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) : playerWZ
         sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd)
-        if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
+        if !sp
         {
-            if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
-                nearRejects++
+            rejCounts["proj"] += 1
+        }
+        else
+        {
+            v := _ExploreValidateClickPoint(sp, pSp, avoidRects, SELF_PX)
+            if v["ok"]
+                screenPos := v["sp"]
             else
-                screenPos := sp
+                rejCounts[v["cause"]] += 1
         }
     }
 
     if (!screenPos)
     {
-        if (nearRejects > 0)
+        if (rejCounts["near"] > 0)
         {
             ; Even the farthest usable waypoint projects onto the character —
             ; we are effectively standing at the target. Treat it as reached:
@@ -896,12 +911,14 @@ _RunExploration(radarSnap, gameHwnd)
             g_exploreLastReason := "target-near-skip(" g_exploreCurrentPercent "%)"
             return
         }
-        ; Either W2S projection failed, or every candidate waypoint projects onto a
-        ; UI element. Skip the click — character keeps walking from the previous
-        ; click for a moment; next tick has a fresh player position and the
-        ; projection geometry usually shifts off the UI element. Stuck-detection at
-        ; 3 s upstream will reset the target if we end up persistently blocked.
-        g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
+        ; Every candidate was rejected — surface the per-cause counters so the
+        ; debug overlay tells exactly what blocked this tick (prj = projection
+        ; failed / behind camera, hud/map/ent = avoid-zone category, near = on
+        ; the character). Stuck-detection at 3 s upstream resets the target if
+        ; we end up persistently blocked.
+        g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length
+            . " prj=" rejCounts["proj"] " hud=" rejCounts["hud"] " map=" rejCounts["map"]
+            . " ent=" rejCounts["ent"] " near=" rejCounts["near"] ")"
         return
     }
 
@@ -1056,6 +1073,40 @@ _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, re
 
 ; ── World-to-Screen for exploration clicks ───────────────────────────────
 ; Simplified W2S that reuses the camera matrix from radar snapshot.
+; Validates one click candidate against the avoid zones and the on-character
+; veto. HUD-band hits get a rescue: edge-clamped points regularly land in the
+; screen-anchored HUD strips (bottom skill bar, globes, quest tracker) — the
+; point is pulled toward the player's screen position (~screen centre) in
+; quarter steps and the first clear spot wins, keeping the travel direction
+; instead of dropping the candidate. Returns Map("ok", true, "sp", point) or
+; Map("ok", false, "cause", "hud"|"map"|"ent"|"near").
+_ExploreValidateClickPoint(sp, pSp, avoidRects, selfPx)
+{
+    kind := AvoidZoneHitKind(sp["x"], sp["y"], avoidRects)
+    if (kind = "hud" && pSp)
+    {
+        step := 1
+        while (step <= 3)
+        {
+            t := step / 4.0
+            nx := Round(sp["x"] + (pSp["x"] - sp["x"]) * t)
+            ny := Round(sp["y"] + (pSp["y"] - sp["y"]) * t)
+            if (AvoidZoneHitKind(nx, ny, avoidRects) = "")
+            {
+                sp := Map("x", nx, "y", ny)
+                kind := ""
+                break
+            }
+            step++
+        }
+    }
+    if (kind != "")
+        return Map("ok", false, "cause", kind)
+    if (pSp && Abs(sp["x"] - pSp["x"]) < selfPx && Abs(sp["y"] - pSp["y"]) < selfPx)
+        return Map("ok", false, "cause", "near")
+    return Map("ok", true, "sp", sp)
+}
+
 ; World-to-screen for click-to-move. The decisive fix here is rejecting
 ; points on/behind the camera plane (w <= 0): dividing by a non-positive w
 ; mirrors the projection to a bogus, often opposite-edge screen position —
