@@ -691,9 +691,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
         return codePtr
     }
 
-    FindPatternAddressesInBuffer(buffer, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
+    ; NOTE: the haystack parameter must NOT be named "buffer" — AHK v2 names
+    ; are case-insensitive, so it would shadow the global Buffer class and
+    ; break the Buffer(...) constructor calls below.
+    FindPatternAddressesInBuffer(hayBuf, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
     {
-        if (!buffer || bufferSize <= 0)
+        if (!hayBuf || bufferSize <= 0)
             return []
 
         patternData := parsedPattern["data"]
@@ -719,7 +722,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             cap := (maxMatches > 0) ? maxMatches : 16
             outBuf := Buffer(cap * 8, 0)
             n := DllCall(scanner
-                , "Ptr", buffer.Ptr, "Int64", bufferSize
+                , "Ptr", hayBuf.Ptr, "Int64", bufferSize
                 , "Ptr", patBuf.Ptr, "Ptr", maskBuf.Ptr, "Int64", patternLen
                 , "Ptr", outBuf.Ptr, "Int64", cap, "Int64")
             loop n
@@ -729,7 +732,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         ; ── Interpreted fallback (only when VirtualAlloc failed) ──────────
         lastStart := bufferSize - patternLen
-        ptr := buffer.Ptr
+        ptr := hayBuf.Ptr
         anchorByte := patternData[anchorIndex + 1]
         i := 0
         while (i <= lastStart)
