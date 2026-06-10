@@ -325,7 +325,7 @@ _RunExploration(radarSnap, gameHwnd)
                 }
             }
         }
-        budgetEnd := A_TickCount + 10
+        budgetEnd := A_TickCount + 20
         while (_regionQHead <= _regionQ.Length)
         {
             if (Mod(_regionQHead, 128) = 0 && A_TickCount >= budgetEnd)
@@ -375,6 +375,11 @@ _RunExploration(radarSnap, gameHwnd)
     ; Region filter handle for plan building / frontier search — only used
     ; once the fill completed with a non-degenerate result.
     regionFilter := (_regionDone && _regionMap && _regionWalkable > 0) ? _regionMap : 0
+
+    ; Surface the region state in the status overlay (rg:build → still
+    ; flood-filling, behavior unfiltered; rg:on → filters active).
+    global g_exploreRegionDiag
+    g_exploreRegionDiag := _regionDone ? (regionFilter ? "on" : "off") : "build"
 
     ; ── Proactive door/switch opening (AutoOpen-style) ────────────────
     ; Scan every 300ms for closed doors & unswitched switches within range
@@ -1472,13 +1477,15 @@ _GreedyTspOrder(points, start, kind)
 LoadExplorationConfig()
 {
     global g_exploreEnabled, g_exploreTargetPercent, g_exploreHeightDiag
+    global g_exploreRegionDiag
 
     iniFile := A_ScriptDir "\poeformance_config.ini"
     section := "Exploration"
 
-    ; Terrain-height diagnostic for the status overlay — seeded here
-    ; unconditionally (module-init gotcha, see CLAUDE.md)
+    ; Status-overlay diagnostics — seeded here unconditionally
+    ; (module-init gotcha, see CLAUDE.md)
     g_exploreHeightDiag := ""
+    g_exploreRegionDiag := ""
 
     g_exploreEnabled       := IniRead(iniFile, section, "Enabled", "0") = "1"
     g_exploreTargetPercent := Integer(IniRead(iniFile, section, "TargetPercent", "80"))
