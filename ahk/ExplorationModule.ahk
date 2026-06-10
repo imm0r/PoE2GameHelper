@@ -691,6 +691,7 @@ _RunExploration(radarSnap, gameHwnd)
     else
     {
         g_exploreTargetDist := -1
+        tgtChebyshev := 999999   ; no target — keep the near-skip gate closed
         if IsObject(g_radarOverlay)
         {
             g_radarOverlay._explorePathCoords := []
@@ -902,7 +903,12 @@ _RunExploration(radarSnap, gameHwnd)
 
     if (!screenPos)
     {
-        if (rejCounts["near"] > 0)
+        ; "Effectively standing on the target" is only plausible when the
+        ; target really IS close (<= 60 cells ~ 650 world units). A far
+        ; target whose candidates all collapse onto the player is a
+        ; projection artefact — skipping it made the target marker hop
+        ; wildly across the map (near-skip churn, frozen character).
+        if (rejCounts["near"] > 0 && tgtChebyshev <= 60)
         {
             ; Even the farthest usable waypoint projects onto the character —
             ; we are effectively standing at the target. Treat it as reached:
