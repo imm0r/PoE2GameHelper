@@ -785,6 +785,11 @@ _RunExploration(radarSnap, gameHwnd)
     ; now it is part of candidate selection, so a farther waypoint wins.
     SELF_PX := 40
     pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
+    ; Visibility sign anchor: the sign of the PLAYER's projection w defines
+    ; what "in front of the camera" means under this matrix convention.
+    ; Candidates are validated against it (see _ExploreWorldToScreen).
+    playerProjW := _ExploreProjW(playerWX, playerWY, playerWZ, w2sMat)
+    visSign := (playerProjW > 0) ? 1 : (playerProjW < 0 ? -1 : 0)
     ; Per-cause rejection counters — surfaced in the "ui-blocked" reason so
     ; the debug overlay shows WHY no candidate was clickable this tick
     ; (prj = projection failed/behind camera, hud/map/ent = avoid-zone
@@ -813,7 +818,7 @@ _RunExploration(radarSnap, gameHwnd)
             ; using the player's Z on a multi-level zone lands the click on
             ; the wrong storey's screen position.
             cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
+            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
             if !sp
             {
                 rejCounts["proj"] += 1
@@ -849,7 +854,7 @@ _RunExploration(radarSnap, gameHwnd)
                 cwx := wp[1] * ratio
                 cwy := wp[2] * ratio
                 cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
+                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
                 if !sp
                 {
                     rejCounts["proj"] += 1
@@ -878,7 +883,7 @@ _RunExploration(radarSnap, gameHwnd)
         clickWX := _targetCX * _STEP * ratio
         clickWY := _targetCY * _STEP * ratio
         clickWZ := hzOk ? TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) : playerWZ
-        sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd)
+        sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd, visSign)
         if !sp
         {
             rejCounts["proj"] += 1
@@ -1107,14 +1112,34 @@ _ExploreValidateClickPoint(sp, pSp, avoidRects, selfPx)
     return Map("ok", true, "sp", sp)
 }
 
-; World-to-screen for click-to-move. The decisive fix here is rejecting
-; points on/behind the camera plane (w <= 0): dividing by a non-positive w
-; mirrors the projection to a bogus, often opposite-edge screen position —
-; that was the "cursor clicks somewhere the target can never be reached"
-; bug. Points in FRONT of the camera but off-screen are still clamped toward
-; the viewport edge, so the click stays in the correct travel direction (the
-; character runs toward a far waypoint).
-_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd)
+; Returns the projection w (4th homogeneous component) of a world position
+; under the W2S matrix, or 0 when the matrix is unavailable. The PLAYER's w
+; serves as the per-tick visibility sign anchor: its sign is what "in front
+; of the camera" looks like under this engine's matrix convention.
+_ExploreProjW(worldX, worldY, worldZ, w2sMat)
+{
+    if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
+        return 0
+    w := 0.0
+    loop 4
+    {
+        j := A_Index
+        w += w2sMat[(j-1)*4 + 4] * (j = 1 ? worldX : j = 2 ? worldY : j = 3 ? worldZ : 1.0)
+    }
+    return w
+}
+
+; World-to-screen for click-to-move. Behind-camera points must be rejected
+; (dividing by their w mirrors the projection to a bogus, often
+; opposite-edge position — the original "clicks somewhere the target can
+; never be reached" bug). BUT the sign that means "in front of the camera"
+; depends on the matrix convention — a hardcoded w>0 check rejected nearly
+; every valid candidate on this game build (debug overlay: prj=7 of 7).
+; visSign carries the sign of the PLAYER's own projection w (the player is
+; always on screen): candidates whose w sign differs are behind the camera.
+; In-front but off-screen points are clamped toward the viewport edge so
+; the click keeps pointing in the correct travel direction.
+_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd, visSign := 0)
 {
     if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
         return 0
@@ -1145,11 +1170,11 @@ _ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd)
         }
     }
 
-    ; Perspective divide. r[4] <= 0 → point is on/behind the camera plane;
-    ; dividing by it mirrors the projection to a wrong screen spot, so reject
-    ; outright (previously only |r[4]| < epsilon was caught, letting
-    ; behind-camera points through as wrong-direction edge clicks).
-    if (r[4] < 0.0001)
+    ; Degenerate w → cannot project.
+    if (Abs(r[4]) < 0.0001)
+        return 0
+    ; Behind-camera test relative to the player's w sign (convention-proof).
+    if (visSign != 0 && r[4] * visSign < 0)
         return 0
     loop 3
         r[A_Index] /= r[4]
