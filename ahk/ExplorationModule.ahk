@@ -355,7 +355,11 @@ _RunExploration(radarSnap, gameHwnd)
                     continue
                 if !_IsGridCellWalkable(nx * _STEP, ny * _STEP, buf, dsz, _bpr, gridW, _rows)
                     continue
-                if (hzOk && Abs(TerrainHeightAt(heightCtx, nx * _STEP, ny * _STEP) - curH) > 120)
+                ; 80 = ~20 units per cell over the 4-cell hop. Honest floors
+                ; (incl. real ramps) hop well under this; storey seams jump
+                ; hundreds. Was 120 — too loose, it leaked across a seam
+                ; (debug video: rg:on yet a hΔ=314 target was in-region).
+                if (hzOk && Abs(TerrainHeightAt(heightCtx, nx * _STEP, ny * _STEP) - curH) > 80)
                     continue
                 NumPut("UChar", 1, _regionMap.Ptr, nIdx)
                 _regionQ.Push(nIdx)
@@ -611,11 +615,37 @@ _RunExploration(radarSnap, gameHwnd)
         ; Debug overlay: target world coordinates, straight-line distance to
         ; the final target, and the height delta target-vs-player.
         tgtChebyshev := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
+        tgtHD := hzOk
+            ? (TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) - playerWZ) : 0
         g_exploreTargetWX   := _targetCX * _STEP * ratio
         g_exploreTargetWY   := _targetCY * _STEP * ratio
         g_exploreTargetDist := Round(tgtChebyshev * ratio)
-        g_exploreTargetHD   := hzOk
-            ? Round(TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) - playerWZ) : ""
+        g_exploreTargetHD   := hzOk ? Round(tgtHD) : ""
+
+        ; ── Floor gate ───────────────────────────────────────────────────
+        ; Debug data proved the region still leaks across storey seams
+        ; (rg:on yet a target at hΔ=314 — a different floor the game won't
+        ; click-to-move to, so the character froze). Reject any target whose
+        ; height differs from the player's by more than MAX_FLOOR_DELTA. The
+        ; height noise floor is ~88 (hz:ok(d88)), so 200 sits safely above
+        ; noise / real ramps yet well below a storey gap. As the player
+        ; ascends a ramp the player's own Z rises, shrinking hΔ to higher
+        ; cells until they become eligible — so exploration sequences floor
+        ; by floor instead of beelining to an unreachable upper level.
+        MAX_FLOOR_DELTA := 200
+        if (hzOk && Abs(tgtHD) > MAX_FLOOR_DELTA)
+        {
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+            if (_planIdx <= _plan.Length)
+                _planIdx++
+            _targetCX := -1
+            _pathCoords := []
+            _wdTgtCX := -1
+            g_exploreTargetDist := -1
+            g_exploreLastReason := "off-floor-skip(" g_exploreCurrentPercent "% hd=" Round(tgtHD) ")"
+            return
+        }
 
         if (wdDist < _wdBestDist - 4)
         {
