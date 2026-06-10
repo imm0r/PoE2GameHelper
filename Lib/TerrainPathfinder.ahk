@@ -462,13 +462,18 @@ class TerrainPathfinder
             hAllow := 30.0 * Max(STEP, 4)
         }
         pops := 0
+        iters := 0
         while (heap.Length > 0)
         {
-            if (Mod(pops, 64) = 0 && A_TickCount >= deadline)
+            ; Deadline check on the raw iteration count — pops alone would
+            ; stall on long runs of already-closed duplicate heap entries
+            ; (they `continue` before pops++) and blow the time budget.
+            if (Mod(iters, 64) = 0 && A_TickCount >= deadline)
             {
                 this._dfPops += pops
                 return "build"
             }
+            iters++
             curItem  := heap[1]
             lastItem := heap.RemoveAt(heap.Length)
             if heap.Length > 0

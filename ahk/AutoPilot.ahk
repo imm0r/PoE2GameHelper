@@ -37,6 +37,7 @@
 ; ── Entry point (called from AutoFlask UpdateRadarFast tick) ──────────────
 TryAutoPilot(radarSnap)
 {
+    global g_autoPilotReason
     static _running := false
     if _running
         return
@@ -44,7 +45,12 @@ TryAutoPilot(radarSnap)
     try
         _RunAutoPilot(radarSnap)
     catch as ex
+    {
+        ; Surface the crash in the debug overlay instead of freezing the
+        ; status line on its last (stale) reason.
         LogError("TryAutoPilot", ex)
+        try g_autoPilotReason := "error(" ex.Message " @" ex.Line ")"
+    }
     finally
         _running := false
 }
