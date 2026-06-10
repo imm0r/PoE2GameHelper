@@ -43,6 +43,7 @@ SaveConfig()
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
+    global g_walkGridEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_maphackOutlineHex, g_maphackBackgroundHex
@@ -71,6 +72,7 @@ SaveConfig()
     IniWrite(g_radarShowChests       ? "1" : "0",  f, "Radar",         "showChests")
     IniWrite(g_zoneNavEnabled        ? "1" : "0",  f, "Radar",         "zoneNav")
     IniWrite(g_mapHackEnabled        ? "1" : "0",  f, "Radar",         "mapHack")
+    IniWrite(g_walkGridEnabled       ? "1" : "0",  f, "Radar",         "walkGrid")
     IniWrite(g_maphackSource,                      f, "Radar",         "maphackSource")
     ; Shader-color overrides for the GGPK maphack. 8-char RRGGBBAA hex,
     ; passed verbatim to PoePatcher.exe via --minimap-outline /
@@ -126,6 +128,7 @@ LoadConfig()
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_skillBuffBlacklist, g_zoneNavEnabled, g_mapHackEnabled, g_maphackSource, g_rangeCirclesEnabled
+    global g_walkGridEnabled
     global g_panelDetectionEnabled, g_autoPilotEnabled, g_inventoryChainDumpEnabled
     global g_overlayStatusTextEnabled
     global g_maphackOutlineHex, g_maphackBackgroundHex
@@ -161,6 +164,7 @@ LoadConfig()
     g_radarShowChests          := _B("Radar",         "showChests",      true)
     g_zoneNavEnabled           := _B("Radar",         "zoneNav",         true)
     g_mapHackEnabled           := _B("Radar",         "mapHack",         true)
+    g_walkGridEnabled          := _B("Radar",         "walkGrid",        false)
     ; Default "memory" — the legacy behaviour. "ggpk" requires the user
     ; to have built ggpk-tools/PoePatcher.exe + oo2core.dll, so we don't
     ; flip it on without their explicit choice.

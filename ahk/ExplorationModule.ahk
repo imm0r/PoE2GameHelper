@@ -45,6 +45,7 @@ _RunExploration(radarSnap, gameHwnd)
     global g_exploreLastReason, g_reader
     global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
     global g_exploreTargetHD, g_explorePosWX, g_explorePosWY, g_explorePosH
+    global g_exploreMoveDelta, g_radarOverlay
 
     ; ── Extract terrain + player position ─────────────────────────────
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -181,6 +182,17 @@ _RunExploration(radarSnap, gameHwnd)
     vr := VISION_RADIUS // _STEP
 
     ; Export player position (+ render Z) for the debug overlay.
+    ; Also track world-space movement since the last tick (mv): with valid
+    ; clicks landing well away from the player (cur==click, clkD>100) a tiny
+    ; mv means the character is blocked / sliding on geometry our grid
+    ; thinks is walkable; a healthy mv means it is just a far target.
+    static _lastPosWX := 0, _lastPosWY := 0
+    if (_lastPosWX != 0 || _lastPosWY != 0)
+        g_exploreMoveDelta := Round(Sqrt((playerWX - _lastPosWX)**2 + (playerWY - _lastPosWY)**2))
+    else
+        g_exploreMoveDelta := 0
+    _lastPosWX := playerWX
+    _lastPosWY := playerWY
     g_explorePosWX := Round(playerWX)
     g_explorePosWY := Round(playerWY)
     g_explorePosH  := Round(playerWZ)
@@ -622,6 +634,16 @@ _RunExploration(radarSnap, gameHwnd)
         g_exploreTargetDist := Round(tgtChebyshev * ratio)
         g_exploreTargetHD   := hzOk ? Round(tgtHD) : ""
 
+        ; Feed the radar overlay so it can draw the route + target ring.
+        ; _pathCoords are fine-grid [gx,gy]; target is the coarse cell scaled
+        ; to fine grid. Reference-shared (read-only on the radar side).
+        if IsObject(g_radarOverlay)
+        {
+            g_radarOverlay._explorePathCoords := _pathCoords
+            g_radarOverlay._exploreTargetGX   := _targetCX * _STEP
+            g_radarOverlay._exploreTargetGY   := _targetCY * _STEP
+        }
+
         ; ── Floor gate ───────────────────────────────────────────────────
         ; Debug data proved the region still leaks across storey seams
         ; (rg:on yet a target at hΔ=314 — a different floor the game won't
@@ -669,6 +691,11 @@ _RunExploration(radarSnap, gameHwnd)
     else
     {
         g_exploreTargetDist := -1
+        if IsObject(g_radarOverlay)
+        {
+            g_radarOverlay._explorePathCoords := []
+            g_radarOverlay._exploreTargetGX   := -1
+        }
     }
 
     ; ── Follow path: click toward next waypoint ──────────────────────
@@ -760,9 +787,18 @@ _RunExploration(radarSnap, gameHwnd)
     pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
     nearRejects := 0
 
+    ; Look-ahead window. Clicking only +3 waypoints ahead made the character
+    ; inch in short hops (debug video: ~127 units/s while clicks landed only
+    ; ~130 px away). Clicking much farther ahead — the FARTHEST waypoint in
+    ; the window that still projects on-screen, clears UI and isn't on the
+    ; character — turns the click-to-move into a continuous run in the path
+    ; direction (PoE2 paths around minor obstacles itself). The backward scan
+    ; from the far end naturally falls back to a closer hop when the far ones
+    ; are UI-blocked.
+    LOOKAHEAD := 14
     if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
     {
-        startLA := Min(_pathIdx + 3, _pathCoords.Length)
+        startLA := Min(_pathIdx + LOOKAHEAD, _pathCoords.Length)
         la := startLA
         while (la >= _pathIdx)
         {
@@ -799,7 +835,7 @@ _RunExploration(radarSnap, gameHwnd)
         ; so extend the look-ahead until a waypoint projects clear of them.
         if (!screenPos)
         {
-            la := Min(_pathIdx + 4, _pathCoords.Length)
+            la := Min(_pathIdx + LOOKAHEAD + 1, _pathCoords.Length)
             while (la <= _pathCoords.Length)
             {
                 wp  := _pathCoords[la]
@@ -891,7 +927,7 @@ _RunExploration(radarSnap, gameHwnd)
     DllCall("mouse_event", "uint", 0x0004, "int", 0, "int", 0, "uint", 0, "uptr", 0) ; MOUSEEVENTF_LEFTUP
     _lastClickTick := now
 
-    laTag := (chosenLA > 0 && chosenLA != Min(_pathIdx + 3, _pathCoords.Length))
+    laTag := (chosenLA > 0 && chosenLA != Min(_pathIdx + LOOKAHEAD, _pathCoords.Length))
         ? " la=" chosenLA : ""
     g_exploreLastReason := "click(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length laTag ")"
 }

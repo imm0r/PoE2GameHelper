@@ -156,6 +156,13 @@ _DispatchBridgeCall(method, args)
             ; RadarOverlay reads g_mapHackEnabled itself each frame (_SyncConfig).
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
+        case "ToggleWalkGrid":
+            ; Walkable-grid fill diagnostic overlay (large map). RadarOverlay
+            ; reads g_walkGridEnabled each frame (_SyncConfig).
+            global g_walkGridEnabled
+            g_walkGridEnabled := !g_walkGridEnabled
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "SetMaphackSource":
             ; args[1] = "memory" | "ggpk". Anything else falls back to memory.
             global g_maphackSource, g_radarOverlay, g_mapHackEnabled
