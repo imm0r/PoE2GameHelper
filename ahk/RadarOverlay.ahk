@@ -130,6 +130,12 @@ class RadarOverlay extends GdiOverlayBase
         this._explorePathCoords   := []
         this._exploreTargetGX     := -1
         this._exploreTargetGY     := -1
+
+        ; Combat target marker: written by CombatAutomation each tick while
+        ; engaged ([gx, gy] grid coords of the current enemy, -1 = none).
+        ; Rendered as a red ring + crosshair next to the red combat path.
+        this._combatTargetGX      := -1
+        this._combatTargetGY      := -1
         this._navLastComputeTick  := 0
         this._navAreaHash         := 0xFFFFFFFF
         this._navEnabled          := true  ; toggle from config
@@ -1029,6 +1035,27 @@ class RadarOverlay extends GdiOverlayBase
             oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
             DllCall("Polyline", "Ptr", this.memDC, "Ptr", combatPts, "Int", cn)
             DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+        }
+
+        ; ── Combat target marker (current enemy) ──────────────────────────
+        ; Red ring + crosshair at the enemy the bot is engaging — same style
+        ; as the exploration target so the user can always see where the bot
+        ; wants to go/attack. Gated on the combat state; coordinates are
+        ; written by CombatAutomation each tick (-1 clears). g_autoPilotState
+        ; is declared global in the exploration block above.
+        if (IsSet(g_autoPilotState) && g_autoPilotState = "combat" && this._combatTargetGX >= 0)
+        {
+            ctColor  := 0x3030FF   ; red (BGR)
+            playerGX := playerWorldX / RadarOverlay.WORLD_TO_GRID_RATIO
+            playerGY := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
+            dGX := this._combatTargetGX - playerGX
+            dGY := this._combatTargetGY - playerGY
+            ctX := Round(mapCenterX + (dGX - dGY) * projectionCos)
+            ctY := Round(mapCenterY + (0-dGX-dGY) * projectionSin)
+            r   := isLargeMap ? 8 : 5
+            this._DrawRectOutline(ctX - r, ctY - r, r * 2, r * 2, ctColor, 2)
+            this._DrawLine(ctX - r - 3, ctY, ctX + r + 3, ctY, ctColor, 1)
+            this._DrawLine(ctX, ctY - r - 3, ctX, ctY + r + 3, ctColor, 1)
         }
 
         ; ── Exploration path + target (AutoPilot scouting) ────────────────

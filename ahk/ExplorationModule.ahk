@@ -814,10 +814,12 @@ _RunExploration(radarSnap, gameHwnd)
             wp  := _pathCoords[la]
             cwx := wp[1] * ratio
             cwy := wp[2] * ratio
-            ; Project with the waypoint's own floor height when available —
-            ; using the player's Z on a multi-level zone lands the click on
-            ; the wrong storey's screen position.
-            cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
+            ; Click Z is ALWAYS the player's render Z. Targets are floor-gated
+            ; to within 200 units of the player anyway, and grid heights are
+            ; unreliable on some zones (bogus cell values flipped the
+            ; projection w sign and rejected every candidate as
+            ; behind-camera — the persistent prj=N ui-blocked).
+            cwz := playerWZ
             sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
             if !sp
             {
@@ -853,7 +855,7 @@ _RunExploration(radarSnap, gameHwnd)
                 wp  := _pathCoords[la]
                 cwx := wp[1] * ratio
                 cwy := wp[2] * ratio
-                cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
+                cwz := playerWZ   ; player Z — see comment in the backward scan
                 sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, visSign)
                 if !sp
                 {
@@ -882,7 +884,7 @@ _RunExploration(radarSnap, gameHwnd)
         ; only one candidate there's no fallback besides skipping this tick.
         clickWX := _targetCX * _STEP * ratio
         clickWY := _targetCY * _STEP * ratio
-        clickWZ := hzOk ? TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) : playerWZ
+        clickWZ := playerWZ   ; player Z — see comment in the backward scan
         sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd, visSign)
         if !sp
         {

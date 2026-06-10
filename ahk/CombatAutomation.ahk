@@ -45,7 +45,10 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; path (idle / disengage / aiming / GCD) leaves the overlay clean
         ; instead of stranding the previous tick's polyline.
         if (g_radarOverlay)
+        {
             g_radarOverlay._combatPathCoords := []
+            g_radarOverlay._combatTargetGX := -1
+        }
 
         ; Tracks how long the aim has been continuously "no-path" — used to
         ; give up on unreachable enemies instead of claiming the tick forever.
@@ -126,6 +129,14 @@ TryCombatAutomation(radarSnap, gameHwnd)
         {
             g_combatLastReason := "idle(n=" hostileCount " d=" Round(terrainDist) ")"
             return false
+        }
+
+        ; Publish the engaged enemy as the combat target marker on the radar
+        ; (red ring + crosshair, drawn next to the red combat path polyline).
+        if (g_radarOverlay && combatInfo["nearestWorldX"] != 0)
+        {
+            g_radarOverlay._combatTargetGX := Round(combatInfo["nearestWorldX"] / TerrainPathfinder.WORLD_TO_GRID_RATIO)
+            g_radarOverlay._combatTargetGY := Round(combatInfo["nearestWorldY"] / TerrainPathfinder.WORLD_TO_GRID_RATIO)
         }
 
         ; ── Aim selection (LoS-aware) ──────────────────────────────────────
