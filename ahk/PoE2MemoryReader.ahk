@@ -17,6 +17,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
         this.GameStatesAddress := 0
         this.StaticAddresses := Map()
         this.MemChrMode := -1
+        this._lastPreAttachScanTick := -1000000
         this.PatternScanReport := Map(
             "missingCritical", [],
             "missingOptional", [],
@@ -214,6 +215,14 @@ class PoE2GameStateReader extends PoE2InventoryReader
             }
         }
 
+        ; Pre-attach full scan (fast path could not resolve GameStates —
+        ; the game is usually still loading). EnsureConnected retries every
+        ; 2 s; throttle so a not-yet-readable module isn't rescanned in a
+        ; tight loop. Strict callers always scan.
+        if (!strictPatterns && (A_TickCount - this._lastPreAttachScanTick) < 15000)
+            return false
+        this._lastPreAttachScanTick := A_TickCount
+
         this.StaticAddresses := this.FindStaticAddresses()
 
         if (strictPatterns && this.HasPatternScanCriticalIssues())
@@ -332,11 +341,19 @@ class PoE2GameStateReader extends PoE2InventoryReader
         ; Scan results depend only on the game binary; as long as the module
         ; size is identical the resolved offsets are too. Skips the multi-
         ; second startup scan on every run until the next game patch.
-        cachedResult := this._LoadPatternCache(patterns, moduleSize, moduleBase)
-        if cachedResult
+        cached := this._LoadPatternCache(patterns, moduleSize, moduleBase)
+        if cached
         {
+            cachedResult := cached["result"]
             for name, addr in cachedResult
                 found.Push(name)
+            for _, nm in cached["missing"]
+            {
+                if optionalNames.Has(nm)
+                    missingOptional.Push(nm)
+                else
+                    missingCritical.Push(nm)
+            }
             this.PatternScanReport := Map(
                 "missingCritical", missingCritical,
                 "missingOptional", missingOptional,
@@ -347,6 +364,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 "fromCache", true
             )
             try LogError("PatternScan | cache=hit | found=" found.Length "/" patterns.Length
+                . " | miss=" this._JoinNames(missingCritical)
                 . " | modSize=" moduleSize)
             return cachedResult
         }
@@ -441,10 +459,14 @@ class PoE2GameStateReader extends PoE2InventoryReader
             . " | dup=" this._JoinNames(duplicateCritical)
             . " | skip=" this._JoinNames(skippedScan))
 
-        ; Persist only complete scans — a partial cache would permanently
-        ; mask patterns that merely timed out on this run.
-        if (found.Length = patterns.Length && moduleSize > 0 && moduleBase)
-            this._SavePatternCache(result, moduleSize, moduleBase)
+        ; Persist complete scan verdicts — including "miss" markers, so
+        ; genuinely absent patterns don't force a full rescan on every
+        ; start. Two guards: no deadline-skipped patterns (their verdicts
+        ; are unknown), and Game States must have been found (a half-loaded
+        ; module reads as zero-filled chunks — caching THAT verdict would
+        ; poison the cache until the next game patch).
+        if (skippedScan.Length = 0 && result.Has("Game States") && moduleSize > 0 && moduleBase)
+            this._SavePatternCache(result, patterns, moduleSize, moduleBase)
 
         return result
     }
@@ -458,10 +480,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
         return (out = "") ? "-" : out
     }
 
-    ; Loads cached pattern addresses from the INI when the game binary is
-    ; unchanged (same module size). Addresses are stored as offsets from the
-    ; module base because ASLR moves the base every run. Returns a Map of
-    ; name → absolute address, or 0 when the cache is stale/incomplete.
+    ; Loads cached pattern verdicts from the INI when the game binary is
+    ; unchanged (same module size). Found patterns are stored as offsets
+    ; from the module base (ASLR moves the base every run); genuinely
+    ; absent ones as the literal "miss". Returns Map("result", Map of
+    ; name → absolute address, "missing", [names]), or 0 when the cache is
+    ; stale/incomplete.
     _LoadPatternCache(patterns, moduleSize, moduleBase)
     {
         if (!moduleSize || !moduleBase)
@@ -471,32 +495,45 @@ class PoE2GameStateReader extends PoE2InventoryReader
         try cachedSize := Integer(IniRead(ini, "PatternCache", "ModuleSize", "0"))
         if (cachedSize = 0 || cachedSize != moduleSize)
             return 0
-        result := Map()
+        resultMap := Map()
+        missing := []
         for patternInfo in patterns
         {
-            off := ""
-            try off := IniRead(ini, "PatternCache", patternInfo["name"], "")
-            if (off = "")
+            val := ""
+            try val := IniRead(ini, "PatternCache", patternInfo["name"], "")
+            if (val = "")
                 return 0   ; pattern set changed since the cache was written
+            if (val = "miss")
+            {
+                missing.Push(patternInfo["name"])
+                continue
+            }
             addr := 0
-            try addr := moduleBase + Integer(off)
+            try addr := moduleBase + Integer(val)
             if (!addr || !this.IsProbablyValidPointer(addr))
                 return 0
-            result[patternInfo["name"]] := addr
+            resultMap[patternInfo["name"]] := addr
         }
-        return result
+        return Map("result", resultMap, "missing", missing)
     }
 
-    ; Writes the resolved pattern offsets + module size to the INI.
-    _SavePatternCache(result, moduleSize, moduleBase)
+    ; Writes the full scan verdict (offsets or "miss" per pattern) + module
+    ; size to the INI.
+    _SavePatternCache(result, patterns, moduleSize, moduleBase)
     {
         ini := A_ScriptDir "\poeformance_config.ini"
         try
         {
             try IniDelete(ini, "PatternCache")
             IniWrite(moduleSize, ini, "PatternCache", "ModuleSize")
-            for name, addr in result
-                IniWrite(addr - moduleBase, ini, "PatternCache", name)
+            for patternInfo in patterns
+            {
+                name := patternInfo["name"]
+                if result.Has(name)
+                    IniWrite(result[name] - moduleBase, ini, "PatternCache", name)
+                else
+                    IniWrite("miss", ini, "PatternCache", name)
+            }
         }
     }
 
@@ -623,6 +660,37 @@ class PoE2GameStateReader extends PoE2InventoryReader
     ; Searches buffer for all occurrences of parsedPattern, returning up to maxMatches results.
     ; Uses MemChr on the anchor byte as a fast pre-filter before running the full mask comparison.
     ; Returns: array of absolute addresses (baseAddress + buffer offset of each match).
+    ; Returns the executable address of the native masked-pattern scanner
+    ; (compiled from tools/pattern_scan.c, embedded as machine code), or 0
+    ; when allocation fails. The interpreted scan loop below pays one
+    ; DllCall per anchor candidate — minutes for a ~45 MB module; the
+    ; native scan finishes in ~100 ms.
+    ; Signature (Win64): pattern_scan(buf, bufLen, pat, mask, patLen, out, maxMatches) → count
+    _GetNativeScanner()
+    {
+        static codePtr := 0
+        if codePtr
+            return codePtr
+        static hex := "415641554154555756534c8b5424604c8b6c24684c8b6424704d85d20f9ec04939d2"
+            . "4889ce0f9fc108c80f85800000004d85e47e7b31c0eb100f1f80000000004883c001"
+            . "4939c27e6741803c010074f04c29d2498d3c0031c931ed488d1c06eb100f1f800000"
+            . "00004883c1014839ca7c410fb60738040b75ef31c04c8d1c0e9041803c0100740b45"
+            . "0fb634004538340375d64883c0014939c27fe5488d450149894ced004889c54939c4"
+            . "7fbceb04669031ed4889e85b5e5f5d415c415d415ec3"
+        len := StrLen(hex) // 2
+        ; MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE
+        p := DllCall("VirtualAlloc", "Ptr", 0, "UPtr", len, "UInt", 0x3000, "UInt", 0x40, "Ptr")
+        if !p
+            return 0
+        loop len
+            NumPut("UChar", Integer("0x" SubStr(hex, A_Index * 2 - 1, 2)), p, A_Index - 1)
+        ; W^X hygiene: execute-read once the bytes are written
+        old := 0
+        DllCall("VirtualProtect", "Ptr", p, "UPtr", len, "UInt", 0x20, "UInt*", &old)
+        codePtr := p
+        return codePtr
+    }
+
     FindPatternAddressesInBuffer(buffer, bufferSize, baseAddress, parsedPattern, maxMatches := 1, deadlineTick := 0)
     {
         if (!buffer || bufferSize <= 0)
@@ -637,6 +705,29 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         matches := []
 
+        ; ── Native fast path ──────────────────────────────────────────────
+        scanner := this._GetNativeScanner()
+        if scanner
+        {
+            patBuf := Buffer(patternLen)
+            maskBuf := Buffer(patternLen)
+            loop patternLen
+            {
+                NumPut("UChar", patternData[A_Index], patBuf, A_Index - 1)
+                NumPut("UChar", patternMask[A_Index] ? 1 : 0, maskBuf, A_Index - 1)
+            }
+            cap := (maxMatches > 0) ? maxMatches : 16
+            outBuf := Buffer(cap * 8, 0)
+            n := DllCall(scanner
+                , "Ptr", buffer.Ptr, "Int64", bufferSize
+                , "Ptr", patBuf.Ptr, "Ptr", maskBuf.Ptr, "Int64", patternLen
+                , "Ptr", outBuf.Ptr, "Int64", cap, "Int64")
+            loop n
+                matches.Push(baseAddress + NumGet(outBuf, (A_Index - 1) * 8, "Int64"))
+            return matches
+        }
+
+        ; ── Interpreted fallback (only when VirtualAlloc failed) ──────────
         lastStart := bufferSize - patternLen
         ptr := buffer.Ptr
         anchorByte := patternData[anchorIndex + 1]
