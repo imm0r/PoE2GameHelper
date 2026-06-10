@@ -577,6 +577,34 @@ _RunExploration(radarSnap, gameHwnd)
             }
             la--
         }
+
+        ; Every candidate from +3 down to the current waypoint is blocked —
+        ; typical right after a zone entrance, where the spawn sits between
+        ; a Waypoint and a Checkpoint whose world-anchored avoid boxes cover
+        ; every nearby click (the bot then stood still forever cycling
+        ; "ui-blocked"). Walking FORWARD along the path exits those boxes,
+        ; so extend the look-ahead until a waypoint projects clear of them.
+        if (!screenPos)
+        {
+            la := Min(_pathIdx + 4, _pathCoords.Length)
+            while (la <= _pathCoords.Length)
+            {
+                wp  := _pathCoords[la]
+                cwx := wp[1] * ratio
+                cwy := wp[2] * ratio
+                cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
+                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
+                if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
+                {
+                    clickWX   := cwx
+                    clickWY   := cwy
+                    screenPos := sp
+                    chosenLA  := la
+                    break
+                }
+                la++
+            }
+        }
     }
     else
     {
