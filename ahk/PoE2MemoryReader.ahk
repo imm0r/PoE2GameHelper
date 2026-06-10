@@ -295,7 +295,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         duplicateOptional := []
         skippedScan := []
         found := []
-        scanDeadline := A_TickCount + 60000
+        scanStart := A_TickCount
+        scanDeadline := scanStart + 60000
 
         moduleBytes := this.Mem.GetModuleSnapshot(true)
         moduleSize := moduleBytes ? moduleBytes.Size : 0
@@ -319,6 +320,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
                 "found", found,
                 "fromCache", true
             )
+            try LogError("PatternScan | cache=hit | found=" found.Length "/" patterns.Length
+                . " | modSize=" moduleSize)
             return cachedResult
         }
 
@@ -403,12 +406,30 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "fromCache", false
         )
 
+        ; One summary line per scan in the error log — makes "which pattern
+        ; failed how" diagnosable from a log paste instead of guesswork.
+        try LogError("PatternScan | cache=miss | took=" (A_TickCount - scanStart) "ms"
+            . " | modSize=" moduleSize
+            . " | found=" this._JoinNames(found)
+            . " | miss=" this._JoinNames(missingCritical)
+            . " | dup=" this._JoinNames(duplicateCritical)
+            . " | skip=" this._JoinNames(skippedScan))
+
         ; Persist only complete scans — a partial cache would permanently
         ; mask patterns that merely timed out on this run.
         if (found.Length = patterns.Length && moduleSize > 0 && moduleBase)
             this._SavePatternCache(result, moduleSize, moduleBase)
 
         return result
+    }
+
+    ; Joins an array of pattern names into "a, b, c" (or "-" when empty).
+    _JoinNames(arr)
+    {
+        out := ""
+        for _, nm in arr
+            out .= (out = "" ? "" : ", ") nm
+        return (out = "") ? "-" : out
     }
 
     ; Loads cached pattern addresses from the INI when the game binary is
