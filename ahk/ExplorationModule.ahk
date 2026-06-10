@@ -553,6 +553,17 @@ _RunExploration(radarSnap, gameHwnd)
     screenPos := 0
     chosenLA  := 0
 
+    ; Player's own projected position. Candidates landing within SELF_PX of
+    ; it are useless — clicking your own feet doesn't move the character
+    ; (that's what a 2D path diving off a ledge produces: the next waypoint
+    ; sits one storey below at almost the same XY). Previously this was a
+    ; post-hoc veto on the single chosen candidate, which deadlocked on
+    ; short paths where EVERY nearby waypoint projects onto the character;
+    ; now it is part of candidate selection, so a farther waypoint wins.
+    SELF_PX := 40
+    pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
+    nearRejects := 0
+
     if (_pathCoords.Length > 0 && _pathIdx <= _pathCoords.Length)
     {
         startLA := Min(_pathIdx + 3, _pathCoords.Length)
@@ -569,6 +580,12 @@ _RunExploration(radarSnap, gameHwnd)
             sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
             if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
             {
+                if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
+                {
+                    nearRejects++
+                    la--
+                    continue
+                }
                 clickWX   := cwx
                 clickWY   := cwy
                 screenPos := sp
@@ -596,6 +613,12 @@ _RunExploration(radarSnap, gameHwnd)
                 sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
                 if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
                 {
+                    if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
+                    {
+                        nearRejects++
+                        la++
+                        continue
+                    }
                     clickWX   := cwx
                     clickWY   := cwy
                     screenPos := sp
@@ -615,31 +638,38 @@ _RunExploration(radarSnap, gameHwnd)
         clickWZ := hzOk ? TerrainHeightAt(heightCtx, _targetCX * _STEP, _targetCY * _STEP) : playerWZ
         sp      := _ExploreWorldToScreen(clickWX, clickWY, clickWZ, w2sMat, gameHwnd)
         if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
-            screenPos := sp
+        {
+            if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
+                nearRejects++
+            else
+                screenPos := sp
+        }
     }
 
     if (!screenPos)
     {
+        if (nearRejects > 0)
+        {
+            ; Even the farthest usable waypoint projects onto the character —
+            ; we are effectively standing at the target. Treat it as reached:
+            ; mark the cell visited, advance the plan, pick a new target next
+            ; tick. Without this the old post-hoc veto skipped the click
+            ; forever and the character froze in place.
+            _visitedWalkable += _ExploreMarkCoarseVisited(_visited, _targetCX, _targetCY
+                , _coarseW, _coarseH, _STEP, buf, dsz, _bpr, gridW, _rows)
+            if (_planIdx <= _plan.Length)
+                _planIdx++
+            _targetCX := -1
+            _pathCoords := []
+            g_exploreLastReason := "target-near-skip(" g_exploreCurrentPercent "%)"
+            return
+        }
         ; Either W2S projection failed, or every candidate waypoint projects onto a
         ; UI element. Skip the click — character keeps walking from the previous
         ; click for a moment; next tick has a fresh player position and the
         ; projection geometry usually shifts off the UI element. Stuck-detection at
         ; 3 s upstream will reset the target if we end up persistently blocked.
         g_exploreLastReason := "ui-blocked(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
-        return
-    }
-
-    ; Reject clicks that land on the character itself — clicking your own
-    ; feet is a no-op. This is exactly what a 2D path that dives off a ledge
-    ; produces: the next waypoint sits one storey below at almost the same
-    ; XY, so (without height data) it projects within a few pixels of the
-    ; character — the reported "cursor parks just under the char and clicks
-    ; in place" loop. Skipping the click leaves the character standing, so
-    ; the 3 s stuck check marks the doomed target visited and moves on.
-    pSp := _ExploreWorldToScreen(playerWX, playerWY, playerWZ, w2sMat, gameHwnd)
-    if (pSp && Abs(screenPos["x"] - pSp["x"]) < 40 && Abs(screenPos["y"] - pSp["y"]) < 40)
-    {
-        g_exploreLastReason := "self-click-skip(" g_exploreCurrentPercent "% wp=" _pathIdx "/" _pathCoords.Length ")"
         return
     }
 
