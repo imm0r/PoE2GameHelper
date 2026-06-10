@@ -549,6 +549,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_lootLastReason, g_lootCache
         global g_exploreCurrentPercent, g_exploreLastReason, g_exploreHeightDiag
         global g_autoFlaskEnabled, g_autoFlaskLastReason
+        global POEFORMANCE_VERSION
 
         if !g_overlayStatusTextEnabled
             return
@@ -611,6 +612,10 @@ class RadarOverlay extends GdiOverlayBase
 
         if (g_autoFlaskEnabled && g_autoFlaskLastReason != "" && g_autoFlaskLastReason != "idle")
             lines.Push(["FLASK  " g_autoFlaskLastReason, COL_GOLD])
+
+        ; Build identifier — lets a screenshot/video of the overlay prove
+        ; which version is actually running (pull-without-restart happens).
+        lines.Push(["v" POEFORMANCE_VERSION, COL_DIM])
 
         ; Queue the text lines into the existing batch — flushes in
         ; _FlushBatch (called from _FinishFrame) so the lines land
