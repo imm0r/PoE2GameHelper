@@ -43,6 +43,7 @@ _RunExploration(radarSnap, gameHwnd)
 {
     global g_exploreTargetPercent, g_exploreCurrentPercent
     global g_exploreLastReason, g_reader
+    global g_exploreTargetWX, g_exploreTargetWY, g_exploreTargetDist
 
     ; ── Extract terrain + player position ─────────────────────────────
     inGs := radarSnap.Has("inGameState") ? radarSnap["inGameState"] : 0
@@ -591,6 +592,11 @@ _RunExploration(radarSnap, gameHwnd)
             _wdBestTick := now
         }
         wdDist := Max(Abs(pGX - _targetCX * _STEP), Abs(pGY - _targetCY * _STEP))
+        ; Export the current target for the debug overlay: world coordinates
+        ; + straight-line distance in world units.
+        g_exploreTargetWX   := _targetCX * _STEP * ratio
+        g_exploreTargetWY   := _targetCY * _STEP * ratio
+        g_exploreTargetDist := Round(wdDist * ratio)
         if (wdDist < _wdBestDist - 4)
         {
             _wdBestDist := wdDist
@@ -605,9 +611,14 @@ _RunExploration(radarSnap, gameHwnd)
             _targetCX := -1
             _pathCoords := []
             _wdTgtCX := -1
+            g_exploreTargetDist := -1
             g_exploreLastReason := "no-progress-skip(" g_exploreCurrentPercent "%)"
             return
         }
+    }
+    else
+    {
+        g_exploreTargetDist := -1
     }
 
     ; ── Follow path: click toward next waypoint ──────────────────────
