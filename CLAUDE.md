@@ -1,7 +1,7 @@
 # Project conventions for Claude
 
 Path of Exile 2 memory-reading / overlay assistant. AutoHotkey v2 + a WebView2 UI.
-Reimplementation of the original C# project (see Reference). Version `0.45.11.27`.
+Reimplementation of the original C# project (see Reference). Version `0.45.12.0`.
 
 ## Language
 
@@ -178,6 +178,38 @@ both halves.
   `OnMessage` fires for the hidden Gui, request/response round-trips, and that the
   config toggle starts/stops the server. The listener only starts at app launch,
   so toggling on requires a restart.
+
+## AutoPilot navigation (v0.45.12.0) — distance-field architecture
+
+Modeled on `myrahz/Radar` (`PathFinder.cs`): never follow a stored path.
+
+- **`Lib/TerrainPathfinder.ahk` — `DField*` methods:** per target, a
+  Dijkstra/A* cost field is flooded FROM the target (time-sliced,
+  `DFieldExpand(budgetMs, pgx, pgy)`, Chebyshev heuristic toward the player,
+  same walkable + height rules as `FindPath`). Every click tick reads a
+  FRESH path from the CURRENT player position by walking downhill
+  (`DFieldPathFrom`) — stale paths / index stalls / backward clicks are
+  impossible by construction. `DFieldDistCells` = live remaining distance
+  (arrival check + watchdog metric).
+- **`ahk/ClickNav.ahk` (new, stateless):** shared projection/click toolkit
+  for exploration AND combat. `NavAnchor` — the player must project near
+  the screen centre (else the matrix is stale → no clicks at all,
+  reason `cam-bad`) and its w sign defines "in front of the camera".
+  `NavProject` (unclamped, visSign rejection), `NavRayClamp`
+  (direction-true edge clamping along the player ray — never per-axis),
+  `NavValidateClick` (avoid-zone kinds + HUD rescue + near veto),
+  `NavPickClickPoint` (~35 cells along the fresh path, backing off toward
+  the player), `NavClickAt`.
+- **CombatAutomation:** anchor gate per tick; walk-engage aims ~25 cells
+  along the per-tick A* path with the PLAYER's Z. (The old farthest-LoS
+  waypoint used the enemy's Z and no w-sign check — waypoints behind the
+  camera plane projected point-MIRRORED and the bot walked away from
+  enemies in stutter steps.)
+- **ExplorationModule:** plan/frontier/sticky-target/floor-gate/region kept;
+  the whole stored-path block (snap-forward, LOOKAHEAD scans, near-skip
+  gate, direct-click fallback) is gone. New reasons: `routing(…)` while the
+  field floods (stuck detection paused then), `cam-bad(…)`,
+  `ui-blocked(… d=N prj/hud/map/ent/near)`, `click(… d=N ahead=M)`.
 
 ## Open / pending (needs the game running)
 
