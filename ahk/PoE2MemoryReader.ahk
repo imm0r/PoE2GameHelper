@@ -293,16 +293,27 @@ class PoE2GameStateReader extends PoE2InventoryReader
         missingOptional := []
         duplicateCritical := []
         duplicateOptional := []
+        skippedScan := []
         found := []
         scanDeadline := A_TickCount + 30000
 
         moduleBytes := this.Mem.GetModuleSnapshot(true)
         moduleSize := moduleBytes ? moduleBytes.Size : 0
 
-        for patternInfo in patterns
+        for patternIdx, patternInfo in patterns
         {
             if (A_TickCount > scanDeadline)
+            {
+                ; Budget exhausted before these patterns were scanned — track
+                ; them separately from "missing" so consumers can tell
+                ; "pattern not in this game build" from "scan never ran".
+                while (patternIdx <= patterns.Length)
+                {
+                    skippedScan.Push(patterns[patternIdx]["name"])
+                    patternIdx += 1
+                }
                 break
+            }
 
             parsed := this.ParsePattern(patternInfo["pattern"])
             matchAddresses := []
@@ -361,6 +372,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "missingOptional", missingOptional,
             "duplicateCritical", duplicateCritical,
             "duplicateOptional", duplicateOptional,
+            "skippedScan", skippedScan,
             "found", found
         )
 
@@ -432,6 +444,29 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
         if (anchorIndex < 0)
             anchorIndex := 0
+
+        ; Anchor upgrade: the scan memchr()s for the anchor byte and pays one
+        ; DllCall per candidate, so anchor rarity dominates scan time. All our
+        ; patterns start with REX prefixes / common opcodes (0x48, 0x8B, …)
+        ; that occur every ~15 bytes of x64 code — anchored there, a single
+        ; pattern took seconds and the 30 s budget ran out before the later
+        ; patterns (the terrain-rotation pair) were ever scanned. Prefer the
+        ; first literal byte that is NOT in the common-x64-bytes set.
+        static COMMON_X64 := Map(
+            0x00,1, 0x01,1, 0x04,1, 0x05,1, 0x0F,1, 0x24,1, 0x33,1,
+            0x40,1, 0x41,1, 0x44,1, 0x45,1, 0x48,1, 0x49,1, 0x4C,1, 0x4D,1,
+            0x74,1, 0x75,1, 0x83,1, 0x84,1, 0x85,1, 0x89,1, 0x8B,1, 0x8D,1,
+            0x90,1, 0xB9,1, 0xC0,1, 0xC3,1, 0xCC,1, 0xE8,1, 0xFF,1)
+        idx := 0
+        while (idx < data.Length)
+        {
+            if (mask[idx + 1] && !COMMON_X64.Has(data[idx + 1]))
+            {
+                anchorIndex := idx
+                break
+            }
+            idx += 1
+        }
 
         return Map(
             "data", data,

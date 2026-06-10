@@ -95,15 +95,20 @@ _THBuildContext(reader, areaAddr, terrain)
     sa := reader.StaticAddresses
     if !(IsObject(sa) && sa.Has("Terrain Rotation Selector") && sa.Has("Terrain Rotator Helper"))
     {
-        ; Surface WHY the pattern is unavailable (missing vs ambiguous) so a
-        ; status-overlay screenshot is enough to diagnose scanner problems.
+        ; Surface WHY the pattern is unavailable (ambiguous / not found /
+        ; scan never reached it) so a status-overlay screenshot is enough
+        ; to diagnose scanner problems.
         parts := ""
-        try
+        rep := (reader.HasOwnProp("PatternScanReport") && IsObject(reader.PatternScanReport))
+            ? reader.PatternScanReport : 0
+        if rep
         {
-            rep := reader.PatternScanReport
-            for _, grp in [["dup", rep["duplicateCritical"]], ["miss", rep["missingCritical"]]]
+            groups := [["dup", "duplicateCritical"], ["miss", "missingCritical"], ["skip", "skippedScan"]]
+            for _, grp in groups
             {
-                for _, nm in grp[2]
+                if !rep.Has(grp[2])
+                    continue
+                for _, nm in rep[grp[2]]
                 {
                     if !InStr(nm, "Terrain")
                         continue
