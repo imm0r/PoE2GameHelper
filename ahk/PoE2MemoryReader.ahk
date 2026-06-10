@@ -296,6 +296,22 @@ class PoE2GameStateReader extends PoE2InventoryReader
     ; Returns: Map of pattern name → resolved address for every uniquely matched pattern.
     FindStaticAddresses()
     {
+        ; Block timer interruptions for the duration of the scan. AHK timers
+        ; preempt running code — the ~100 ms radar tick otherwise interleaves
+        ; with the scan and consumes nearly all wall time, so the per-pattern
+        ; and global budgets (which measure wall time) expire after only a
+        ; couple of patterns and the rest land in skippedScan. The freeze is
+        ; one-time per game patch; afterwards the INI cache resolves
+        ; instantly.
+        prevCrit := Critical("On")
+        try
+            return this._FindStaticAddressesScan()
+        finally
+            Critical(prevCrit)
+    }
+
+    _FindStaticAddressesScan()
+    {
         result := Map()
         patterns := this.GetStaticPatterns()
         optionalNames := PoE2StaticOffsetsPatterns.GetOptionalNames()
