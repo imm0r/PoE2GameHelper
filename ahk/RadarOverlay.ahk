@@ -1831,42 +1831,86 @@ class RadarOverlay extends GdiOverlayBase
         playerGY := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
         gridW := this._mapHackGridW
         gridH := this._mapHackGridH
+        bmpW  := this._mapHackW
+        bmpH  := this._mapHackH
+        if (bmpW < 1 || bmpH < 1)
+            return
 
-        ; Compute 3 parallelogram destination points for PlgBlt.
-        ; These map the bitmap's top-left, top-right, bottom-left to screen positions.
-        ; Grid (gx,gy) → screen: sX = mcX + (dGX-dGY)*pCos, sY = mcY + (-dGX-dGY)*pSin
-
-        ; Point 0: Grid (0, 0)
+        ; Forward affine — source pixel (bx,by) → screen — built from the same 3 grid
+        ; corners the entity dots use. Grid (gx,gy) → screen:
+        ;   sX = mcX + ((gx-pGX)-(gy-pGY))*pCos,  sY = mcY + (-(gx-pGX)-(gy-pGY))*pSin
+        ; Source (0,0)=grid(0,0), (bmpW,0)=grid(gridW,0), (0,bmpH)=grid(0,gridH).
         dGX0 := -playerGX
         dGY0 := -playerGY
-        p0x := Round(mapCenterX + (dGX0 - dGY0) * projectionCos)
-        p0y := Round(mapCenterY + (-dGX0 - dGY0) * projectionSin)
+        p0x := mapCenterX + (dGX0 - dGY0) * projectionCos
+        p0y := mapCenterY + (-dGX0 - dGY0) * projectionSin
+        p1x := mapCenterX + ((gridW - playerGX) - dGY0) * projectionCos
+        p1y := mapCenterY + (-(gridW - playerGX) - dGY0) * projectionSin
+        p2x := mapCenterX + (dGX0 - (gridH - playerGY)) * projectionCos
+        p2y := mapCenterY + (-dGX0 - (gridH - playerGY)) * projectionSin
 
-        ; Point 1: Grid (gridW, 0)
-        dGX1 := gridW - playerGX
-        p1x := Round(mapCenterX + (dGX1 - dGY0) * projectionCos)
-        p1y := Round(mapCenterY + (-dGX1 - dGY0) * projectionSin)
+        ; Per-source-pixel screen-space basis vectors (along source X and Y).
+        ux := (p1x - p0x) / bmpW, uy := (p1y - p0y) / bmpW
+        vx := (p2x - p0x) / bmpH, vy := (p2y - p0y) / bmpH
+        det := ux * vy - uy * vx
 
-        ; Point 2: Grid (0, gridH)
-        dGY2 := gridH - playerGY
-        p2x := Round(mapCenterX + (dGX0 - dGY2) * projectionCos)
-        p2y := Round(mapCenterY + (-dGX0 - dGY2) * projectionSin)
+        ; ── Source-rect clipping ──────────────────────────────────────────────────────
+        ; The full bitmap maps to a parallelogram whose bounding box dwarfs the window,
+        ; so PlgBlt otherwise iterates millions of off-screen pixels. Inverse-map the 4
+        ; window corners into source space, take their bounding box (a superset → no
+        ; outline pixels lost), pad it, and blit only that sub-rectangle. Pixel-identical
+        ; to the full blit; just skips the invisible majority. Degenerate det → full blit.
+        bx0 := 0, by0 := 0, bx1 := bmpW, by1 := bmpH
+        if (Abs(det) > 1.0e-9)
+        {
+            W := this.bufW, H := this.bufH
+            minBx := "", minBy := "", maxBx := "", maxBy := ""
+            for _, c in [[0, 0], [W, 0], [0, H], [W, H]]
+            {
+                sx := c[1] - p0x, sy := c[2] - p0y
+                bx := (sx * vy - sy * vx) / det
+                by := (ux * sy - uy * sx) / det
+                if (minBx = "" || bx < minBx)
+                    minBx := bx
+                if (maxBx = "" || bx > maxBx)
+                    maxBx := bx
+                if (minBy = "" || by < minBy)
+                    minBy := by
+                if (maxBy = "" || by > maxBy)
+                    maxBy := by
+            }
+            pad := 2
+            bx0 := Max(0,    Floor(minBx) - pad)
+            by0 := Max(0,    Floor(minBy) - pad)
+            bx1 := Min(bmpW, Ceil(maxBx)  + pad)
+            by1 := Min(bmpH, Ceil(maxBy)  + pad)
+            if (bx1 <= bx0 || by1 <= by0)
+                return   ; whole map off-screen this frame → nothing to draw
+        }
+
+        subW := bx1 - bx0
+        subH := by1 - by0
+
+        ; Destination parallelogram for the clipped sub-rect (source corners → screen).
+        np0x := Round(p0x + bx0 * ux + by0 * vx), np0y := Round(p0y + bx0 * uy + by0 * vy)
+        np1x := Round(p0x + bx1 * ux + by0 * vx), np1y := Round(p0y + bx1 * uy + by0 * vy)
+        np2x := Round(p0x + bx0 * ux + by1 * vx), np2y := Round(p0y + bx0 * uy + by1 * vy)
 
         ; POINT array: 3 × (x, y) = 24 bytes
         pts := Buffer(24, 0)
-        NumPut("Int", p0x, pts, 0),  NumPut("Int", p0y, pts, 4)
-        NumPut("Int", p1x, pts, 8),  NumPut("Int", p1y, pts, 12)
-        NumPut("Int", p2x, pts, 16), NumPut("Int", p2y, pts, 20)
+        NumPut("Int", np0x, pts, 0),  NumPut("Int", np0y, pts, 4)
+        NumPut("Int", np1x, pts, 8),  NumPut("Int", np1y, pts, 12)
+        NumPut("Int", np2x, pts, 16), NumPut("Int", np2y, pts, 20)
 
         DllCall("PlgBlt",
             "Ptr", this.memDC,
             "Ptr", pts,
             "Ptr", srcDC,
-            "Int", 0, "Int", 0,
-            "Int", this._mapHackW,
-            "Int", this._mapHackH,
+            "Int", bx0, "Int", by0,
+            "Int", subW,
+            "Int", subH,
             "Ptr", mask,
-            "Int", 0, "Int", 0)
+            "Int", bx0, "Int", by0)
     }
 
     ; Hide() and SetAlpha() are inherited from GdiOverlayBase.
