@@ -70,15 +70,18 @@ class ProfilerClass
         if (this._labels.Count = 0)
             return "(no profiler data)"
         NL  := "`n"
-        hdr := Format("{:-28s}  {:>6s}  {:>8s}  {:>8s}  {:>8s}  {:>8s}",
-                      "Label", "Calls", "Last µs", "Avg µs", "Min µs", "Max µs")
+        ; AHK's Format() is printf-style: right-align is the default (no flag),
+        ; left-align is "-". Python-style ">" is NOT understood and would be
+        ; emitted literally, so widths are given as bare numbers here.
+        hdr := Format("{:-28s}  {:6s}  {:8s}  {:8s}  {:8s}  {:8s}",
+                      "Label", "Calls", "Last us", "Avg us", "Min us", "Max us")
         sep := "-----------------------------  ------  --------  --------  --------  --------"
         out := hdr . NL . sep . NL
         for label, e in this._labels
         {
             avgUs := (e.count > 0) ? Round(e.totalUs / e.count) : 0
             minUs := (e.minUs = 9999999999) ? 0 : e.minUs
-            out .= Format("{:-28s}  {:>6d}  {:>8d}  {:>8d}  {:>8d}  {:>8d}",
+            out .= Format("{:-28s}  {:6d}  {:8d}  {:8d}  {:8d}  {:8d}",
                           label, e.count, e.lastUs, avgUs, minUs, e.maxUs) . NL
         }
         return out
