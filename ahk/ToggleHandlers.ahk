@@ -77,6 +77,17 @@ TogglePlayerHud()
     PushHeaderToWebView()
 }
 
+; Toggles whether play overlays are restricted to the PoE2 window only.
+; When on, the overlays hide while our own tool window is focused and show
+; exclusively when PoE2 itself is the foreground window. No return value.
+ToggleOverlayPoeOnly()
+{
+    global g_overlayPoeOnly
+    g_overlayPoeOnly := !g_overlayPoeOnly
+    SaveConfig()
+    PushHeaderToWebView()
+}
+
 ; Applies a single entity type filter change and persists it.
 ; Params: etype - entity type key (player/minion/enemy/npc/chest/worlditem/other)
 ;         bval  - boolean visibility state

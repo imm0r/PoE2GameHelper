@@ -59,12 +59,15 @@ class OverlayManager
     ; the play-overlay gate (radar + HUD share it via ShouldShow => ctx.gate).
     _EvaluateGate(ctx)
     {
-        global g_uiBrowserHighlight
+        global g_uiBrowserHighlight, g_overlayPoeOnly
         ; Keep the overlay visible while the game isn't focused ONLY when our own
         ; PoEformance UI is focused (so range circles etc. preview while you tweak
         ; settings). Alt-tabbing to any other window hides it, even with range
         ; circles enabled.
-        ctx.keepWhenBackground := ctx.toolFocused
+        ; When g_overlayPoeOnly is on, the overlays are restricted to the PoE2
+        ; window only: tool focus no longer keeps them visible, so they show
+        ; exclusively while PoE2 itself is the foreground window.
+        ctx.keepWhenBackground := ctx.toolFocused && !(IsSet(g_overlayPoeOnly) && g_overlayPoeOnly)
         ctx.inspectOverride    := IsSet(g_uiBrowserHighlight) && IsObject(g_uiBrowserHighlight)
         ctx.gate := this._policy.Evaluate(ctx)
     }

@@ -1,7 +1,7 @@
 # Project conventions for Claude
 
 Path of Exile 2 memory-reading / overlay assistant. AutoHotkey v2 + a WebView2 UI.
-Reimplementation of the original C# project (see Reference). Version `0.45.12.2`.
+Reimplementation of the original C# project (see Reference). Version `0.45.12.3`.
 
 ## Language
 
@@ -36,9 +36,19 @@ inline when authoring commit messages, PR bodies, etc.
 - Variable names follow the existing camelCase / snake_case style of surrounding code.
 - The user often cannot runtime-test (the game is ~140 GB). When a change can only be
   verified in-game, say so and list exactly what to check.
+- **Bump the version after every change.** Increment the last segment of the version
+  number on each adjustment — in **all three** of `InGameStateMonitor.ahk`
+  (`POEFORMANCE_VERSION := "x.y.z.N"`), `CLAUDE.md` (the `Version` line above), and
+  `README.md` (the `version-vX.Y.Z.N` badge), e.g. `0.45.12.2` → `0.45.12.3`. Keep all
+  three in sync. **The dev branch owns the version** — it is the single source of truth.
+  Always count up from the dev branch's own latest value; never reset it to match
+  `master`. `master` is not bumped independently, so on merge the dev-branch version
+  always wins (resolve any version-line conflict by taking the dev-branch value).
 - **Always end a reply that committed & pushed with the exact pull command** so the
   user can grab it locally, e.g. `git pull origin <current-dev-branch>`. Every time a
-  change is pushed — no exceptions.
+  change is pushed — no exceptions. The user merges the dev branch onto `master`
+  themselves later, so only ever hand them the dev-branch pull — never merge to
+  `master` or push there yourself.
   **Never add the current AI Session to the end of the commit message** — Skip the entire line (e.g. "https://claude.ai/code/session_123456789abcdef")
 
 ### Completion-summary format (lean, GitHub-ready)
