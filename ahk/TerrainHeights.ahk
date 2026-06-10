@@ -95,7 +95,24 @@ _THBuildContext(reader, areaAddr, terrain)
     sa := reader.StaticAddresses
     if !(IsObject(sa) && sa.Has("Terrain Rotation Selector") && sa.Has("Terrain Rotator Helper"))
     {
-        g_exploreHeightDiag := "no-pattern"
+        ; Surface WHY the pattern is unavailable (missing vs ambiguous) so a
+        ; status-overlay screenshot is enough to diagnose scanner problems.
+        parts := ""
+        try
+        {
+            rep := reader.PatternScanReport
+            for _, grp in [["dup", rep["duplicateCritical"]], ["miss", rep["missingCritical"]]]
+            {
+                for _, nm in grp[2]
+                {
+                    if !InStr(nm, "Terrain")
+                        continue
+                    short := InStr(nm, "Selector") ? "sel" : "rot"
+                    parts .= (parts = "" ? "" : ",") grp[1] ":" short
+                }
+            }
+        }
+        g_exploreHeightDiag := (parts = "") ? "no-pattern" : "no-pat(" parts ")"
         return 0
     }
     rotSel  := reader.Mem.ReadBytes(sa["Terrain Rotation Selector"], 9)
