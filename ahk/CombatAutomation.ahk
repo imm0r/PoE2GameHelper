@@ -92,18 +92,25 @@ TryCombatAutomation(radarSnap, gameHwnd)
         }
         combatInfo["terrainDist"] := terrainDist
 
-        ; State machine: idle ↔ combat (uses terrain-aware distance)
+        ; State machine: idle ↔ combat (uses terrain-aware distance).
+        ; Proximity override: an enemy within CLOSE_RANGE Euclidean MUST
+        ; engage no matter what the terrain estimate says — height noise
+        ; near walls can kill LoS / inflate path lengths for an enemy
+        ; standing right next to the character, which previously left the
+        ; bot strolling through packs in explore mode.
+        static CLOSE_RANGE := 300
         prevState := g_combatState
         if (g_combatState = "idle")
         {
-            if (hostileCount > 0 && terrainDist <= g_combatRange)
+            if (hostileCount > 0 && (nearestDist <= CLOSE_RANGE || terrainDist <= g_combatRange))
             {
                 g_combatState := "combat"
             }
         }
         else if (g_combatState = "combat")
         {
-            if (hostileCount = 0 || terrainDist > g_combatDisengageRange)
+            if (hostileCount = 0
+                || (terrainDist > g_combatDisengageRange && nearestDist > CLOSE_RANGE))
             {
                 g_combatState := "idle"
                 g_combatLastReason := "disengage(dist=" Round(terrainDist) " n=" hostileCount ")"
@@ -140,7 +147,11 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; lingers on a stale path from a previous tick.
         combatPath := []
 
-        if (_combatPF.HasTerrain()
+        ; CLOSE_RANGE enemies are aimed at directly without any LoS/path
+        ; gating — they are visibly next to the character; terrain-height
+        ; noise must not talk us out of fighting them.
+        if (nearestDist > CLOSE_RANGE
+            && _combatPF.HasTerrain()
             && combatInfo["playerWorldX"] != 0 && combatInfo["nearestWorldX"] != 0)
         {
             pGX := Round(combatInfo["playerWorldX"] / WORLD_TO_GRID)
