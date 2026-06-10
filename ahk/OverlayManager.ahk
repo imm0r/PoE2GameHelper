@@ -23,6 +23,7 @@ class OverlayManager
         this.Register(VitalsOverlay())
         this.Register(NotificationOverlay())
         this.Register(FocusOverlay())
+        this.Register(DebugOverlay())
     }
 
     ; Registers an overlay instance and indexes it by its Name.
