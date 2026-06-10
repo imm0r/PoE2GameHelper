@@ -295,10 +295,32 @@ class PoE2GameStateReader extends PoE2InventoryReader
         duplicateOptional := []
         skippedScan := []
         found := []
-        scanDeadline := A_TickCount + 30000
+        scanDeadline := A_TickCount + 60000
 
         moduleBytes := this.Mem.GetModuleSnapshot(true)
         moduleSize := moduleBytes ? moduleBytes.Size : 0
+        moduleBase := moduleBytes ? this.Mem.ModuleSnapshotBase : 0
+
+        ; ── Cache fast-path ───────────────────────────────────────────────
+        ; Scan results depend only on the game binary; as long as the module
+        ; size is identical the resolved offsets are too. Skips the multi-
+        ; second startup scan on every run until the next game patch.
+        cachedResult := this._LoadPatternCache(patterns, moduleSize, moduleBase)
+        if cachedResult
+        {
+            for name, addr in cachedResult
+                found.Push(name)
+            this.PatternScanReport := Map(
+                "missingCritical", missingCritical,
+                "missingOptional", missingOptional,
+                "duplicateCritical", duplicateCritical,
+                "duplicateOptional", duplicateOptional,
+                "skippedScan", skippedScan,
+                "found", found,
+                "fromCache", true
+            )
+            return cachedResult
+        }
 
         for patternIdx, patternInfo in patterns
         {
@@ -317,8 +339,12 @@ class PoE2GameStateReader extends PoE2InventoryReader
 
             parsed := this.ParsePattern(patternInfo["pattern"])
             matchAddresses := []
+            ; Per-pattern slice of the budget — one slow pattern must not
+            ; starve the patterns scheduled after it (the terrain-rotation
+            ; pair sat at the end of the list and never got scanned).
+            patternDeadline := Min(scanDeadline, A_TickCount + 10000)
             if (moduleBytes)
-                matchAddresses := this.FindPatternAddressesInBuffer(moduleBytes, moduleSize, this.Mem.ModuleSnapshotBase, parsed, 2, scanDeadline)
+                matchAddresses := this.FindPatternAddressesInBuffer(moduleBytes, moduleSize, this.Mem.ModuleSnapshotBase, parsed, 2, patternDeadline)
 
             if (matchAddresses.Length = 0)
             {
@@ -373,10 +399,58 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "duplicateCritical", duplicateCritical,
             "duplicateOptional", duplicateOptional,
             "skippedScan", skippedScan,
-            "found", found
+            "found", found,
+            "fromCache", false
         )
 
+        ; Persist only complete scans — a partial cache would permanently
+        ; mask patterns that merely timed out on this run.
+        if (found.Length = patterns.Length && moduleSize > 0 && moduleBase)
+            this._SavePatternCache(result, moduleSize, moduleBase)
+
         return result
+    }
+
+    ; Loads cached pattern addresses from the INI when the game binary is
+    ; unchanged (same module size). Addresses are stored as offsets from the
+    ; module base because ASLR moves the base every run. Returns a Map of
+    ; name → absolute address, or 0 when the cache is stale/incomplete.
+    _LoadPatternCache(patterns, moduleSize, moduleBase)
+    {
+        if (!moduleSize || !moduleBase)
+            return 0
+        ini := A_ScriptDir "\poeformance_config.ini"
+        cachedSize := 0
+        try cachedSize := Integer(IniRead(ini, "PatternCache", "ModuleSize", "0"))
+        if (cachedSize = 0 || cachedSize != moduleSize)
+            return 0
+        result := Map()
+        for patternInfo in patterns
+        {
+            off := ""
+            try off := IniRead(ini, "PatternCache", patternInfo["name"], "")
+            if (off = "")
+                return 0   ; pattern set changed since the cache was written
+            addr := 0
+            try addr := moduleBase + Integer(off)
+            if (!addr || !this.IsProbablyValidPointer(addr))
+                return 0
+            result[patternInfo["name"]] := addr
+        }
+        return result
+    }
+
+    ; Writes the resolved pattern offsets + module size to the INI.
+    _SavePatternCache(result, moduleSize, moduleBase)
+    {
+        ini := A_ScriptDir "\poeformance_config.ini"
+        try
+        {
+            try IniDelete(ini, "PatternCache")
+            IniWrite(moduleSize, ini, "PatternCache", "ModuleSize")
+            for name, addr in result
+                IniWrite(addr - moduleBase, ini, "PatternCache", name)
+        }
     }
 
     ; Returns true if any critical pattern had zero matches or more than one match after scanning.
