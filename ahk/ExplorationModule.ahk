@@ -809,7 +809,7 @@ _RunExploration(radarSnap, gameHwnd)
             ; using the player's Z on a multi-level zone lands the click on
             ; the wrong storey's screen position.
             cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
+            sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, true)
             if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
             {
                 if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
@@ -842,7 +842,7 @@ _RunExploration(radarSnap, gameHwnd)
                 cwx := wp[1] * ratio
                 cwy := wp[2] * ratio
                 cwz := hzOk ? TerrainHeightAt(heightCtx, wp[1], wp[2]) : playerWZ
-                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd)
+                sp  := _ExploreWorldToScreen(cwx, cwy, cwz, w2sMat, gameHwnd, true)
                 if (sp && !IsPointInAvoidZone(sp["x"], sp["y"], avoidRects))
                 {
                     if (pSp && Abs(sp["x"] - pSp["x"]) < SELF_PX && Abs(sp["y"] - pSp["y"]) < SELF_PX)
@@ -1056,7 +1056,14 @@ _CheckFrontierCell(cx, cy, visited, cW, cH, buf, bpr, rows, dsz, gridW, STEP, re
 
 ; ── World-to-Screen for exploration clicks ───────────────────────────────
 ; Simplified W2S that reuses the camera matrix from radar snapshot.
-_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd)
+; World-to-screen for click-to-move. requireOnScreen=true makes it return 0
+; for points that are behind the camera OR whose projection falls outside the
+; viewport (instead of clamping them to the edge): the look-ahead uses this so
+; it only ever clicks a waypoint that is genuinely visible and in the correct
+; direction. The previous always-clamp behaviour turned a far/off-screen
+; look-ahead waypoint into an edge click pointing the wrong way — the bot then
+; walked away from a target the map clearly showed as reachable.
+_ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd, requireOnScreen := false)
 {
     if !(w2sMat && Type(w2sMat) = "Array" && w2sMat.Length = 16)
         return 0
@@ -1087,21 +1094,33 @@ _ExploreWorldToScreen(worldX, worldY, worldZ, w2sMat, gameHwnd)
         }
     }
 
-    ; Perspective divide
-    if (Abs(r[4]) < 0.0001)
+    ; Perspective divide. r[4] <= 0 means the point is on/behind the camera
+    ; plane — dividing by it mirrors the projection to a bogus screen spot, so
+    ; reject it outright (previously only |r[4]|<epsilon was caught, letting
+    ; behind-camera points through as wrong-direction edge clicks).
+    if (r[4] < 0.0001)
         return 0
     loop 3
         r[A_Index] /= r[4]
 
-    ; NDC to screen
+    ; NDC to screen (unclamped)
     screenX := Round(cX + (r[1] + 1) * cW / 2)
     screenY := Round(cY + (1 - r[2]) * cH / 2)
 
-    ; Clamp to client area with margin
     margin := 80
+    if (requireOnScreen)
+    {
+        ; Reject anything that isn't truly inside the viewport — the caller
+        ; will fall back to a nearer waypoint that is.
+        if (screenX < cX + margin || screenX > cX + cW - margin
+         || screenY < cY + margin || screenY > cY + cH - margin)
+            return 0
+        return Map("x", screenX, "y", screenY)
+    }
+
+    ; Legacy callers: clamp to the client area with margin.
     screenX := Max(cX + margin, Min(screenX, cX + cW - margin))
     screenY := Max(cY + margin, Min(screenY, cY + cH - margin))
-
     return Map("x", screenX, "y", screenY)
 }
 
