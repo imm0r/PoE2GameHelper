@@ -77,8 +77,12 @@ TryCombatAutomation(radarSnap, gameHwnd)
             }
             ; Height-aware pathing (multi-level zones): shared context with
             ; exploration; only active once it passed self-validation.
-            _combatPF.SetHeights(GetTerrainHeightContext(radarSnap))
+            hCtx := GetTerrainHeightContext(radarSnap)
+            _combatPF.SetHeights(hCtx)
         }
+        else
+            hCtx := 0
+        hzOk := (hCtx && IsObject(hCtx) && hCtx["val"] = "ok")
 
         terrainDist := nearestDist
         if (hostileCount > 0 && _combatPF.HasTerrain()
@@ -150,6 +154,7 @@ TryCombatAutomation(radarSnap, gameHwnd)
         ; CLOSE_RANGE enemies are aimed at directly without any LoS/path
         ; gating — they are visibly next to the character; terrain-height
         ; noise must not talk us out of fighting them.
+        enemyHd := 0
         if (nearestDist > CLOSE_RANGE
             && _combatPF.HasTerrain()
             && combatInfo["playerWorldX"] != 0 && combatInfo["nearestWorldX"] != 0)
@@ -159,9 +164,30 @@ TryCombatAutomation(radarSnap, gameHwnd)
             eGX := Round(combatInfo["nearestWorldX"] / WORLD_TO_GRID)
             eGY := Round(combatInfo["nearestWorldY"] / WORLD_TO_GRID)
 
-            if !_combatPF.HasLineOfSight(pGX, pGY, eGX, eGY)
+            ; Enemy height delta vs the player. Cross-floor enemies are
+            ; unreachable by click-to-move — blacklist immediately instead of
+            ; burning the 4 s no-path timer (mirrors the exploration floor
+            ; gate that finally made scouting work on multi-level zones).
+            enemyHd := hzOk ? Round(TerrainHeightAt(hCtx, eGX, eGY) - combatInfo["playerWorldZ"]) : 0
+            if (hzOk && Abs(enemyHd) > 200)
             {
-                ; LoS blocked — find a path and aim at the farthest reachable hop.
+                blAddr := combatInfo["nearestEntityAddr"]
+                if (blAddr && IsSet(g_combatNoPathBlacklist))
+                    g_combatNoPathBlacklist[blAddr] := A_TickCount + 15000
+                g_combatState := "idle"
+                g_combatLastReason := "off-floor(hd=" enemyHd " d=" Round(terrainDist) ")"
+                return false
+            }
+
+            if (!_combatPF.HasLineOfSight(pGX, pGY, eGX, eGY)
+                && !(hzOk && _combatPF.HasLineOfSight(pGX, pGY, eGX, eGY, true)))
+            {
+                ; Truly wall-blocked (the second test ignores the height rule:
+                ; a height-consistent enemy whose LoS only failed on height
+                ; NOISE is aimed at directly instead of dropping to no-path —
+                ; that noise was why combat "never found a path" to enemies
+                ; standing on the same floor).
+                ; Find a path and aim at the farthest reachable hop.
                 path := _combatPF.FindPath(pGX, pGY, eGX, eGY)
                 if (path && Type(path) = "Array" && path.Length >= 2)
                 {
@@ -209,8 +235,10 @@ TryCombatAutomation(radarSnap, gameHwnd)
                 }
                 else
                 {
+                    ; Distinguish "search space exhausted" (genuinely cut off)
+                    ; from "A* budget timeout" (far/expensive) in the status.
                     aimMode := "no-path"
-                    aimTag  := "no-path"
+                    aimTag  := "no-path:" (_combatPF.LastFailExhausted ? "exh" : "tmo")
                 }
             }
         }
@@ -241,10 +269,11 @@ TryCombatAutomation(radarSnap, gameHwnd)
                     g_combatNoPathBlacklist[blAddr] := A_TickCount + 15000
                 g_combatState := "idle"
                 _noPathSince := 0
-                g_combatLastReason := "no-path-giveup(d=" Round(terrainDist) " n=" hostileCount ")"
+                g_combatLastReason := "no-path-giveup(d=" Round(terrainDist) " n=" hostileCount " hd=" enemyHd ")"
                 return false
             }
-            g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount ")"
+            g_combatLastReason := "no-path(d=" Round(terrainDist) " n=" hostileCount
+                . " hd=" enemyHd " " aimTag ")"
             return true
         }
         _noPathSince := 0   ; any reachable aim resets the give-up timer
