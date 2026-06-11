@@ -541,6 +541,19 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             rec["counts"] := counts
             rec["lines"].Push("@range(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
         }
+        else if (mode = "worldCursor")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            cwp := _HotkeysCursorWorldPos(snap)   ; ground ring around the cursor's world point
+            if (cwp)
+            {
+                rec["circleCursorWorld"] := wr
+                rec["cursorWx"] := cwp["x"], rec["cursorWy"] := cwp["y"], rec["cursorWz"] := cwp["z"]
+            }
+            counts := _HotkeysCountByRarity(snap, wr, "worldCursor")
+            rec["counts"] := counts
+            rec["lines"].Push("@cursorRange(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
         else
         {
             px := a.Has("radius") ? (a["radius"] + 0) : 120
@@ -618,17 +631,24 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     return rec
 }
 
-; Counts hostile entities by rarity within a radius. mode "world" uses the
-; per-entity world distance; "cursor"/"player" project to screen and measure
-; pixels from the cursor / the player's on-screen position. Returns
-; Map("normal","magic","rare","unique","total").
+; Counts hostile entities by rarity within a radius. mode "world" uses the per-entity
+; world distance to the player; "worldCursor" uses the world distance to the cursor's
+; unprojected ground point (experimental); "cursor"/"player" project to screen and
+; measure pixels from the cursor / the player. Returns Map("normal".."unique","total").
 _HotkeysCountByRarity(snap, radius, mode)
 {
     out := Map("normal", 0, "magic", 0, "rare", 0, "unique", 0, "total", 0)
     if !snap
         return out
     octx := 0
-    if (mode != "world")
+    cwp := 0
+    if (mode = "worldCursor")
+    {
+        cwp := _HotkeysCursorWorldPos(snap)
+        if !cwp
+            return out          ; cursor can't be unprojected this frame → count 0
+    }
+    else if (mode != "world")
     {
         octx := _HotkeysPxOrigin(snap, mode)
         if !octx
@@ -647,6 +667,17 @@ _HotkeysCountByRarity(snap, radius, mode)
         {
             dist := entry.Has("distance") ? entry["distance"] : -1
             if (dist < 0 || dist > radius)
+                continue
+        }
+        else if (mode = "worldCursor")
+        {
+            render := dc.Has("render") ? dc["render"] : 0
+            wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
+            if !(wp && wp is Map)
+                continue
+            ddx := (wp.Has("x") ? wp["x"] : 0) - cwp["x"]
+            ddy := (wp.Has("y") ? wp["y"] : 0) - cwp["y"]
+            if (Sqrt(ddx * ddx + ddy * ddy) > radius)
                 continue
         }
         else
@@ -668,6 +699,50 @@ _HotkeysCountByRarity(snap, radius, mode)
         out["total"] += 1
     }
     return out
+}
+
+; Unprojects the current mouse cursor to a world position on the ground plane at the
+; player's Z — a flat-ground approximation (exact on level terrain, off on slopes).
+; Solves M·(wx,wy,pz,1) for (wx,wy) so it projects back to the cursor's NDC (inverse of
+; NavProject with z fixed). Params: snap (radar snapshot, for the W2S matrix + player Z).
+; Returns Map("x","y","z") or 0 when matrix/window/player are unavailable or degenerate.
+_HotkeysCursorWorldPos(snap)
+{
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+    if !(mat is Array && mat.Length = 16)
+        return 0
+    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+    pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+    if !(pwp && pwp is Map)
+        return 0
+    pz := pwp.Has("z") ? pwp["z"] : 0
+    gameHwnd := ResolvePoEWindow()
+    if !gameHwnd
+        return 0
+    rect := NavClientRect(gameHwnd)
+    if !rect
+        return 0
+    cx := 0, cy := 0
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&cx, &cy)
+    ; cursor screen → NDC (inverse of NavProject's NDC→pixel mapping)
+    ndcX := (cx - rect["x"]) * 2.0 / rect["w"] - 1.0
+    ndcY := 1.0 - (cy - rect["y"]) * 2.0 / rect["h"]
+    ; r1=ndcX·r4, r2=ndcY·r4 with z=pz fixed → a 2×2 linear system in (wx,wy).
+    K1 := mat[9]  * pz + mat[13]
+    K2 := mat[10] * pz + mat[14]
+    K4 := mat[12] * pz + mat[16]
+    A11 := mat[1] - ndcX * mat[4], A12 := mat[5] - ndcX * mat[8]
+    A21 := mat[2] - ndcY * mat[4], A22 := mat[6] - ndcY * mat[8]
+    B1  := ndcX * K4 - K1,         B2  := ndcY * K4 - K2
+    det := A11 * A22 - A12 * A21
+    if (Abs(det) < 0.0000001)
+        return 0
+    return Map("x", (B1 * A22 - A12 * B2) / det
+             , "y", (A11 * B2 - B1 * A21) / det
+             , "z", pz)
 }
 
 ; Returns the runtime-state Map for a hotkey id, creating it on first use.
@@ -1035,7 +1110,7 @@ _HotkeysCheckMonsterCount(a, snap)
     if !snap
         return false
     mode := a.Has("radiusMode") ? a["radiusMode"] : "player"
-    radiusVal := (mode = "world")
+    radiusVal := (mode = "world" || mode = "worldCursor")
         ? (a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000)
         : (a.Has("radius") ? (a["radius"] + 0) : 120)
     counts := _HotkeysCountByRarity(snap, radiusVal, mode)

@@ -6410,13 +6410,14 @@
           // Counts targetable monsters within a radius. cursor/player measure a
           // screen-pixel radius; "around player (range)" measures a zoom-independent
           // world-unit radius around the player (field swaps px ↔ range accordingly).
-          const mcWorld = (a.radiusMode || 'player') === 'world';
+          const mcMode = a.radiusMode || 'player';
+          const mcWorld = (mcMode === 'world' || mcMode === 'worldCursor');
           const mcRadiusField = mcWorld
-            ? `Range ${hkNum(a, 'worldRadius', 1000, gi, hi, ai, 'Radius in world units around the player (zoom-independent — matches the actual game distance)')} `
+            ? `Range ${hkNum(a, 'worldRadius', 1000, gi, hi, ai, 'Radius in world units (zoom-independent — matches the actual game distance)')} `
             : `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `;
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only count monsters of this rarity (Any = all)')} `
                + mcRadiusField
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)']], gi, hi, ai, 'Pixel radius around the cursor / player, or a world-unit range around the player')} `
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)'], ['worldCursor', 'around cursor (range) ⚠ experimental']], gi, hi, ai, 'Pixel radius (cursor/player), world-unit range around the player, or — experimental — a world-unit range around the cursor (unprojected onto the ground at player height; inaccurate on slopes)')} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai, 'Comparison operator for the monster count')} `
                + `${hkNum(a, 'value', 1, gi, hi, ai, 'Monster-count threshold to compare against')}`;
           break;

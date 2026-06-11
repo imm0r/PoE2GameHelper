@@ -274,7 +274,8 @@ class RadarOverlay extends GdiOverlayBase
                 continue
             if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
                 || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
-                || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0))
+                || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
+                || (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0))
                 return true
         }
         return false
@@ -1527,18 +1528,44 @@ class RadarOverlay extends GdiOverlayBase
                     this._DrawCircleLabel(pcx, pcy, r, rec)
                 }
             }
-            ; Player WORLD-radius ground ring (zoom-independent) — an isometric ring of
-            ; world points around the player, projected to screen.
+            ; World-radius ground rings (zoom-independent) — isometric rings of world
+            ; points projected to screen. "circlePlayerWorld" is centred on the player;
+            ; "circleCursorWorld" on the cursor's unprojected world point (experimental).
             if (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
-                this._DrawWorldRing(rec["circlePlayerWorld"], COL_CUR, rec)
+            {
+                pw := this._SnapPlayerWorld()
+                if (pw)
+                    this._DrawWorldRing(pw["x"], pw["y"], pw["z"], rec["circlePlayerWorld"], COL_CUR, rec)
+            }
+            if (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0)
+                this._DrawWorldRing(rec["cursorWx"], rec["cursorWy"], rec["cursorWz"],
+                    rec["circleCursorWorld"], COL_CUR, rec)
         }
     }
 
-    ; Draws an isometric ground ring of world-radius <worldR> around the player by
-    ; projecting ~48 world points (at the player's Z) through the live W2S matrix, then
-    ; labels it at the lower-right of its screen footprint. Used for monsterCount's
-    ; "around player (range)" mode, where the radius is in world units, not pixels.
-    _DrawWorldRing(worldR, colorBGR, rec)
+    ; Returns the player's world position Map("x","y","z") from the cached radar snapshot,
+    ; or 0 if unavailable. Centre of the "around player (range)" world ring.
+    _SnapPlayerWorld()
+    {
+        global g_radarLastSnap
+        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+        if !snap
+            return 0
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        if !(pwp && pwp is Map)
+            return 0
+        return Map("x", pwp.Has("x") ? pwp["x"] : 0, "y", pwp.Has("y") ? pwp["y"] : 0
+                 , "z", pwp.Has("z") ? pwp["z"] : 0)
+    }
+
+    ; Draws an isometric ground ring of world-radius <worldR> around the world point
+    ; (cx,cy,cz) by projecting ~48 ring points through the live W2S matrix, then labels it
+    ; at the lower-right of its screen footprint. Used by the monsterCount "range" modes
+    ; (centre = player, or the cursor's world point for the experimental cursor variant).
+    _DrawWorldRing(cx, cy, cz, worldR, colorBGR, rec)
     {
         global g_radarLastSnap
         snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
@@ -1549,17 +1576,11 @@ class RadarOverlay extends GdiOverlayBase
             return
         inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
         mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-        prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-        if !(mat is Array && mat.Length = 16 && pwp && pwp is Map)
+        if !(mat is Array && mat.Length = 16)
             return          ; world ring needs the real projection matrix
         rect := NavClientRect(gameHwnd)
         if !rect
             return
-        px := pwp.Has("x") ? pwp["x"] : 0
-        py := pwp.Has("y") ? pwp["y"] : 0
-        pz := pwp.Has("z") ? pwp["z"] : 0
         segs := 48
         pts := Buffer((segs + 1) * 8, 0)
         cnt := 0
@@ -1567,7 +1588,7 @@ class RadarOverlay extends GdiOverlayBase
         Loop (segs + 1)
         {
             ang := (A_Index - 1) * 6.2831853 / segs
-            sp := NavProject(px + worldR * Cos(ang), py + worldR * Sin(ang), pz, mat, rect, 0)
+            sp := NavProject(cx + worldR * Cos(ang), cy + worldR * Sin(ang), cz, mat, rect, 0)
             if !sp
                 continue
             sx := sp["x"] - this._lastX, sy := sp["y"] - this._lastY
