@@ -110,6 +110,7 @@ class DebugOverlay extends GdiOverlayBase
         global g_exploreClickX, g_exploreClickY, g_exploreCurX, g_exploreCurY
         global g_explorePlayerSX, g_explorePlayerSY, g_exploreMoveDelta
         global g_autoFlaskEnabled, g_autoFlaskLastReason
+        global g_hkDebugItems
         global POEFORMANCE_VERSION
 
         lines := []
@@ -196,6 +197,24 @@ class DebugOverlay extends GdiOverlayBase
 
         if (g_autoFlaskEnabled && g_autoFlaskLastReason != "" && g_autoFlaskLastReason != "idle")
             lines.Push(["FLASK  " g_autoFlaskLastReason, DebugOverlay.COL_GOLD])
+
+        ; ── Hotkeys ──────────────────────────────────────────────────────────
+        ; Per-action debug records (label + condition values + fired key) for every
+        ; hotkey action whose debug flag is on, built each tick by the hotkey engine
+        ; (g_hkDebugItems). This block is where the radar's old hotkey text moved to.
+        if (IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
+        {
+            lines.Push(["HOTKEYS", DebugOverlay.COL_GOLD_HI])
+            for _, rec in g_hkDebugItems
+            {
+                if !(rec is Map)
+                    continue
+                lines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
+                if (rec.Has("lines") && rec["lines"] is Array)
+                    for _, ln in rec["lines"]
+                        lines.Push(["    " ln, DebugOverlay.COL_IVORY])
+            }
+        }
 
         lines.Push(["v" POEFORMANCE_VERSION, DebugOverlay.COL_DIM])
         return lines

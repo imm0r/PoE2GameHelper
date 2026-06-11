@@ -46,7 +46,7 @@ PushHeaderToWebView()
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
     global g_zoneNavEnabled
     global g_radarAlpha, g_mapHackEnabled, g_maphackSource, g_isConnected, g_rangeCirclesEnabled, g_panelDetectionEnabled
-    global g_walkGridEnabled
+    global g_walkGridEnabled, g_maphackMaskDebug
     global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
     global g_inventoryChainDumpEnabled, g_overlayStatusTextEnabled, g_alwaysOnTop, g_localApiEnabled, g_localApiPort
     global g_overlayPoeOnly
@@ -107,6 +107,7 @@ PushHeaderToWebView()
         . '"zoneNav":' (g_zoneNavEnabled ? "true" : "false") ","
         . '"mapHack":' (g_mapHackEnabled ? "true" : "false") ","
         . '"walkGrid":' ((IsSet(g_walkGridEnabled) && g_walkGridEnabled) ? "true" : "false") ","
+        . '"maskDebug":' ((IsSet(g_maphackMaskDebug) && g_maphackMaskDebug) ? "true" : "false") ","
         . '"maphackSource":' _JsStr(IsSet(g_maphackSource) ? g_maphackSource : "memory") ","
         . '"maphackOutlineHex":' _JsStr(IsSet(g_maphackOutlineHex) ? g_maphackOutlineHex : "8080FFCC") ","
         . '"maphackBackgroundHex":' _JsStr(IsSet(g_maphackBackgroundHex) ? g_maphackBackgroundHex : "66FF6619") ","

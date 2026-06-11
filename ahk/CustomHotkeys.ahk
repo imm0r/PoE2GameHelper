@@ -426,6 +426,11 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         "lines", []
     )
 
+    ; The output key this hotkey fires — always shown in the debug readout.
+    key := _HotkeysResolveKey(hk)
+    rec["key"] := key
+    rec["lines"].Push("key: " (key != "" ? key : "(unbound)"))
+
     if (t = "monsterCount" || t = "monsterCountCursor")
     {
         px := a.Has("radius") ? (a["radius"] + 0) : 120
@@ -463,7 +468,27 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     }
     else if (t = "vitals")
     {
-        rec["lines"].Push("vitals " (a.Has("resource") ? a["resource"] : "hp") " " (a.Has("op") ? a["op"] : "<=") " " (a.Has("value") ? a["value"] : 0) "%")
+        ; Live resource readout matching the condition: current / max, percent,
+        ; the configured threshold, and whether it passes right now.
+        res := a.Has("resource") ? a["resource"] : "hp"
+        op  := a.Has("op") ? a["op"] : "<="
+        thr := a.Has("value") ? (a["value"] + 0) : 0
+        pv  := (snap && snap.Has("playerVitals")) ? snap["playerVitals"] : 0
+        st  := (pv && pv is Map && pv.Has("stats")) ? pv["stats"] : 0
+        if (st)
+        {
+            switch res
+            {
+                case "es":   cur := st.Has("esCurrent")   ? st["esCurrent"]   : 0, max := st.Has("esMax")   ? st["esMax"]   : 0
+                case "mana": cur := st.Has("manaCurrent") ? st["manaCurrent"] : 0, max := st.Has("manaMax") ? st["manaMax"] : 0
+                default:     cur := st.Has("lifeCurrent") ? st["lifeCurrent"] : 0, max := st.Has("lifeMax") ? st["lifeMax"] : 0
+            }
+            pct  := (max > 0) ? (cur * 100.0 / max) : 0
+            pass := (max > 0) && _HotkeysCompare(pct, op, thr)
+            rec["lines"].Push(res " " Round(cur) "/" Round(max) " " Round(pct, 1) "% " op " " thr "% -> " (pass ? "PASS" : "fail"))
+        }
+        else
+            rec["lines"].Push("vitals " res " " op " " thr "% (no data)")
     }
 
     ; Output skill cooldown / readiness (applies to any debugged action).
@@ -672,9 +697,14 @@ _HotkeysPassesGuards(hk)
 
 ; Runs the ordered action list. Condition actions gate the sequence (a failed
 ; condition aborts the remaining actions); effect actions perform their effect.
+; If every condition passes but the hotkey has NO effect action that sends a key,
+; the output key is pressed once at the end — so the intuitive "bind output +
+; one condition" setup (e.g. flask 2 + mana < 50%) fires on its own, without
+; needing a redundant "Key press" action.
 _HotkeysRunActions(hk, context, depth)
 {
     snap := _HotkeysSnap()
+    hadEffect := false
     for a in hk["actions"]
     {
         t := a.Has("type") ? a["type"] : ""
@@ -697,18 +727,27 @@ _HotkeysRunActions(hk, context, depth)
                     return
             case "key":
                 _HotkeysDoKey(hk, a)
+                hadEffect := true
             case "press":
                 _HotkeysSendKey(_HotkeysResolveKey(hk))
+                hadEffect := true
             case "repeat":
                 _HotkeysDoRepeat(hk, a)
+                hadEffect := true
             case "hold":
                 _HotkeysDoHold(hk, a)
+                hadEffect := true
             case "chain":
                 _HotkeysDoChain(a, context, depth)
+                hadEffect := true
             case "aim":
                 _HotkeysDoAim(hk, a, snap)
+                hadEffect := true
         }
     }
+    ; Conditions-only hotkey: no effect action ran, so fire the bound output once.
+    if !hadEffect
+        _HotkeysSendKey(_HotkeysResolveKey(hk))
 }
 
 ; ── Condition evaluators ───────────────────────────────────────────────────

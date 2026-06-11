@@ -165,6 +165,14 @@ _DispatchBridgeCall(method, args)
             g_walkGridEnabled := !g_walkGridEnabled
             SetTimer(SaveConfig, -100)
             SetTimer(PushHeaderToWebView, -50)
+        case "ToggleMaskDebug":
+            ; Debug: draw red outlines of the HUD clip masks on the large map so
+            ; the user can see where the maphack is clipped. RadarOverlay reads
+            ; g_maphackMaskDebug each frame (_SyncConfig).
+            global g_maphackMaskDebug
+            g_maphackMaskDebug := !g_maphackMaskDebug
+            SetTimer(SaveConfig, -100)
+            SetTimer(PushHeaderToWebView, -50)
         case "SetMaphackSource":
             ; args[1] = "memory" | "ggpk". Anything else falls back to memory.
             global g_maphackSource, g_radarOverlay, g_mapHackEnabled

@@ -4780,6 +4780,12 @@
               </div>
               <div class="cfg-help">Diagnostic: shades every walkable cell of the memory terrain grid on the large map (blue, 50% stippled so the map shows through). Use it to compare the grid the bot pathfinds on against what the game actually allows — mismatches explain a stuck AutoPilot. Large map only.</div>
 
+              <div class="cfg-row"><span class="cfg-label">Mask Outlines (debug)</span>
+                <label class="toggle"><input type="checkbox" id="tog-maskdebug" onchange="ahkCall('ToggleMaskDebug')"
+                    ><span class="toggle-slider"></span></label>
+              </div>
+              <div class="cfg-help">Diagnostic: draws red rectangles where the large-map overlay is clipped away from the game HUD (orbs, skill/flask/XP bars, area & quest panel). Shows the current mask boundaries so you can see exactly what's hidden while tuning them. Large map only.</div>
+
               <!-- Source picker. "Memory" = legacy on-the-fly overlay,
                    "GGPK" = persistent shader patch (apply/revert below). -->
               <div class="cfg-row cfg-sub-row" id="row-maphack-source" style="padding-left:18px">
@@ -7397,6 +7403,7 @@
       setChk('tog-zonenav', d.zoneNav !== undefined ? d.zoneNav : true);
       setChk('tog-maphack', d.mapHack !== undefined ? d.mapHack : true);
       setChk('tog-walkgrid', d.walkGrid !== undefined ? d.walkGrid : false);
+      setChk('tog-maskdebug', d.maskDebug !== undefined ? d.maskDebug : false);
       // Maphack source — radio sync + GGPK action row visibility.
       // The actual "PoE2 is closed → buttons enabled" gating runs on
       // every header push (PoE state is in d.isConnected / d.poeRunning).

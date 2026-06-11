@@ -40,6 +40,7 @@ class GdiOverlayBase
         this.Name        := "overlay"  ; subclasses override with a stable id
         this.Enabled     := true       ; master on/off toggle (manager hides when false)
         this._hideSince  := 0          ; A_TickCount when ShouldShow first went false (hide debounce)
+        this._lastTopmostTick := 0     ; A_TickCount of the last periodic topmost re-assert
     }
 
     ; ── Overlay contract ─────────────────────────────────────────────────────
@@ -57,6 +58,7 @@ class GdiOverlayBase
 
     Update(ctx)
     {
+        global Profiler
         if (!this.Enabled || !this.ShouldShow(ctx))
         {
             this._RequestHide()
@@ -72,8 +74,12 @@ class GdiOverlayBase
         if !this._EnsureShown(rect["x"], rect["y"], rect["w"], rect["h"])
             return
         this._ClearBackBuffer(rect["w"], rect["h"])
+        Profiler.Begin("ov." this.Name ".draw")
         this.Draw(ctx, rect)
+        Profiler.End("ov." this.Name ".draw")
+        Profiler.Begin("ov." this.Name ".blit")
         this._Blit(rect["w"], rect["h"])
+        Profiler.End("ov." this.Name ".blit")
     }
 
     ; Debounced hide: keeps the last drawn frame on screen for up to
@@ -186,30 +192,63 @@ class GdiOverlayBase
         this.bufH := h
     }
 
-    ; Ensures the window is shown at x,y sized w x h, styled (transparent + click-through) once,
+    ; How often to re-assert the topmost z-order while visible. Returning focus to a
+    ; fullscreen game can leave the game window ABOVE the overlay in the topmost band
+    ; without any event we could observe — a cheap periodic SetWindowPos heals that.
+    static TOPMOST_REASSERT_MS := 2000
+
+    ; Ensures the window is shown at x,y sized w x h, styled (transparent + click-through),
     ; and that the back-buffer matches w x h. Returns true when memDC is ready to draw.
     _EnsureShown(x, y, w, h)
     {
+        ; Trust the OS, not just our flag: fullscreen/display transitions (e.g. a long
+        ; alt-tab away and back) can hide the window WITHOUT our Hide() running. The
+        ; stale isVisible=true would then skip Show() forever while every blit lands in
+        ; an invisible window — gate says YES, render runs, nothing on screen.
+        if (this.isVisible && !DllCall("IsWindowVisible", "Ptr", this.hwnd))
+            this.isVisible := false
+
         if !this.isVisible
         {
             this.overlayGui.Show("x" x " y" y " w" w " h" h " NoActivate")
             this.isVisible := true
             this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
+            ; Re-apply the layered colour-key on EVERY show — a display-mode/DWM change
+            ; while hidden can drop the layered attributes; without them the window
+            ; would come back as an opaque near-black sheet (or not render at all).
+            WinSetTransColor("010101 " this._alpha, this.hwnd)
             if !this._styled
             {
-                WinSetTransColor("010101 " this._alpha, this.hwnd)
                 WinSetExStyle("+0x20", this.hwnd)   ; WS_EX_TRANSPARENT -> click-through
                 this._styled := true
             }
+            this._AssertTopmost()
         }
         else if (x != this._lastX || y != this._lastY || w != this._lastW || h != this._lastH)
         {
             WinMove(x, y, w, h, this.hwnd)
             this._lastX := x, this._lastY := y, this._lastW := w, this._lastH := h
         }
+        else if ((A_TickCount - this._lastTopmostTick) >= GdiOverlayBase.TOPMOST_REASSERT_MS)
+        {
+            ; Periodic heal while visible: keeps the overlay above the game even when
+            ; the game got promoted within the topmost band (no hide/show transition).
+            this._AssertTopmost()
+        }
         if (this.bufW != w || this.bufH != h)
             this._InitBuffers(w, h)
         return this.memDC ? true : false
+    }
+
+    ; Re-asserts HWND_TOPMOST without moving, resizing or activating the window.
+    ; Registration order in OverlayManager is preserved as the relative z-order,
+    ; because every overlay re-asserts in draw order within the same tick window.
+    _AssertTopmost()
+    {
+        ; SetWindowPos(hwnd, HWND_TOPMOST=-1, 0,0,0,0, SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE)
+        DllCall("SetWindowPos", "Ptr", this.hwnd, "Ptr", -1
+            , "Int", 0, "Int", 0, "Int", 0, "Int", 0, "UInt", 0x13)
+        this._lastTopmostTick := A_TickCount
     }
 
     ; Copies the back-buffer to the window's screen DC (SRCCOPY).

@@ -4,7 +4,10 @@
 
 class ProfilerClass
 {
-    Enabled := true
+    ; Disabled by default so the per-tick Begin/End markers cost a single
+    ; property read + early return (zero measurable overhead). A debug hotkey
+    ; (Shift+F3 -> ProfilerToggleDump) flips it on for a measurement window.
+    Enabled := false
     _freq   := 0
     _labels := Map()
 
@@ -67,15 +70,18 @@ class ProfilerClass
         if (this._labels.Count = 0)
             return "(no profiler data)"
         NL  := "`n"
-        hdr := Format("{:-28s}  {:>6s}  {:>8s}  {:>8s}  {:>8s}  {:>8s}",
-                      "Label", "Calls", "Last µs", "Avg µs", "Min µs", "Max µs")
+        ; AHK's Format() is printf-style: right-align is the default (no flag),
+        ; left-align is "-". Python-style ">" is NOT understood and would be
+        ; emitted literally, so widths are given as bare numbers here.
+        hdr := Format("{:-28s}  {:6s}  {:8s}  {:8s}  {:8s}  {:8s}",
+                      "Label", "Calls", "Last us", "Avg us", "Min us", "Max us")
         sep := "-----------------------------  ------  --------  --------  --------  --------"
         out := hdr . NL . sep . NL
         for label, e in this._labels
         {
             avgUs := (e.count > 0) ? Round(e.totalUs / e.count) : 0
             minUs := (e.minUs = 9999999999) ? 0 : e.minUs
-            out .= Format("{:-28s}  {:>6d}  {:>8d}  {:>8d}  {:>8d}  {:>8d}",
+            out .= Format("{:-28s}  {:6d}  {:8d}  {:8d}  {:8d}  {:8d}",
                           label, e.count, e.lastUs, avgUs, minUs, e.maxUs) . NL
         }
         return out
@@ -87,4 +93,47 @@ class ProfilerClass
     }
 }
 
-global Profiler := ProfilerClass()
+; Constructs the global Profiler singleton, disabled by default. Called once from
+; the main auto-execute section. The top-level `global Profiler := ...` pattern is
+; intentionally avoided here: this module is #Include'd after the main script's
+; auto-execute return, so such an initializer would never run (AHK v2 init gotcha,
+; see CLAUDE.md). Every marker site declares `global Profiler` to reach it.
+InitProfiler()
+{
+    global Profiler := ProfilerClass()
+    Profiler.Enabled := false
+}
+
+; Shift+F3 handler. Two-press measurement flow so the profiler only runs during the
+; window you care about (no always-on cost):
+;   1st press -> reset + enable; reproduce the stutter.
+;   2nd press -> snapshot the table to logs\profiler_<ts>.txt, show it as a tooltip,
+;                then disable again.
+ProfilerToggleDump()
+{
+    global Profiler
+    if (!IsSet(Profiler) || !IsObject(Profiler))
+        return
+
+    if !Profiler.Enabled
+    {
+        Profiler.Reset()
+        Profiler.Enabled := true
+        ToolTip("Profiler: ON - reproduce the lag, then press Shift+F3 again to dump.")
+        SetTimer(() => ToolTip(), -4000)
+        return
+    }
+
+    ; Second press: stop measuring, then persist + show the collected table.
+    Profiler.Enabled := false
+    summary := Profiler.Summary()
+    ts      := FormatTime(A_Now, "yyyy-MM-dd_HH-mm-ss")
+    outPath := A_ScriptDir "\logs\profiler_" ts ".txt"
+    try
+    {
+        DirCreate(A_ScriptDir "\logs")
+        FileAppend(summary "`n", outPath, "UTF-8")
+    }
+    ToolTip("Profiler: OFF - saved to`n" outPath "`n`n" summary)
+    SetTimer(() => ToolTip(), -10000)
+}

@@ -24,7 +24,7 @@ UpdateRadarFast()
     try
     {
         global g_reader, g_overlayManager, g_radarLastSnap, g_updatesPaused, g_radarReadMs, g_radarRenderMs
-        global g_autoPilotEnabled, g_vitalsNeedsCombat
+        global g_autoPilotEnabled, g_vitalsNeedsCombat, Profiler
         if g_updatesPaused
         {
             if IsObject(g_overlayManager)
@@ -35,7 +35,9 @@ UpdateRadarFast()
             return
 
         radarReadStart := A_TickCount
+        Profiler.Begin("tick.read")
         radarSnap := g_reader.ReadRadarSnapshot()
+        Profiler.End("tick.read")
         g_radarReadMs := A_TickCount - radarReadStart
 
         ; Grace period: tolerate brief GC-related read failures instead of
@@ -73,7 +75,9 @@ UpdateRadarFast()
         HotkeyBindingsOnAreaChange(radarSnap)
 
         ; ── AutoPilot (state machine: combat → explore, owns shared guards) ──
+        Profiler.Begin("tick.autopilot")
         TryAutoPilot(radarSnap)
+        Profiler.End("tick.autopilot")
 
         ; ── Standalone combat presence ──────────────────────────────────────
         ; The AutoPilot loop only maintains g_combatState while it is enabled.
@@ -84,7 +88,9 @@ UpdateRadarFast()
             UpdateCombatPresence(radarSnap)
 
         ; ── Entity alerts + banner — every tick, outside the claim chain, map-independent ──
+        Profiler.Begin("tick.alerts")
         TryEntityAlerts(radarSnap)
+        Profiler.End("tick.alerts")
         if !IsObject(g_overlayManager)
             return
 
@@ -117,7 +123,9 @@ UpdateRadarFast()
         }
 
         radarRenderStart := A_TickCount
+        Profiler.Begin("tick.overlays")
         g_overlayManager.Tick(ctx)
+        Profiler.End("tick.overlays")
         g_radarRenderMs := A_TickCount - radarRenderStart
 
         ; ── Debug panel push (every 500 ms), using the resolved gate ─────────

@@ -2856,6 +2856,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             return 0
 
         t0 := A_TickCount
+        global Profiler
+        Profiler.Begin("read.state")
 
         ; Re-resolve InGameState address every 800ms — the 12-state loop is expensive at 100ms.
         nowTick := A_TickCount
@@ -2900,6 +2902,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarInGameStateTick := nowTick
         }
         t1 := A_TickCount  ; after state resolution
+        Profiler.End("read.state")
+        Profiler.Begin("read.world")
         inGameStateAddress := this._radarInGameStateCache
 
         areaInstanceData := this.Mem.ReadPtr(inGameStateAddress + PoE2Offsets.InGameState["AreaInstanceData"])
@@ -3009,6 +3013,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             this._radarPlayerVitalsTick := nowTick
         }
         t2 := A_TickCount  ; after player read
+        Profiler.End("read.world")
+        Profiler.Begin("read.ui")
 
         ; ── UI pointer resolution (once per tick) ──────────────────────────────────
         ; uiRootStructPtr and activeGameUiPtr are read ONCE and shared by both
@@ -3105,6 +3111,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
         }
 
         t3 := A_TickCount  ; after UI cache
+        Profiler.End("read.ui")
+        Profiler.Begin("read.entities")
 
         ; ── Persistent entity cache (mirrors C# AreaInstance.UpdateEntities) ──────────────
         ; Instead of sampling a small subset of entities per tick, we:
@@ -3420,6 +3428,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             "sampleCount", awakeSample.Length
         )
         t4 := A_TickCount  ; after entity cache update
+        Profiler.End("read.entities")
+        Profiler.Begin("read.sleep")
 
         ; Sleeping entities — skip during zone loading to preserve RPM budget for awake decodes.
         ; Once the cache is >90% full (steady state), scan sleeping entities with a small limit.
@@ -3445,6 +3455,8 @@ class PoE2GameStateReader extends PoE2InventoryReader
             }
         }
         t5 := A_TickCount  ; after sleeping entity read
+        Profiler.End("read.sleep")
+        Profiler.Begin("read.filter")
 
         ; Continuous accumulation: harvest important entities from awake + sleeping samples.
         ; As the player moves, new entities enter the network bubble and get captured.
@@ -3562,6 +3574,7 @@ class PoE2GameStateReader extends PoE2InventoryReader
             cache.Delete(pid)
 
         t6 := A_TickCount  ; after filter
+        Profiler.End("read.filter")
 
         ; Extract filter stats for status bar
         filterPre := 0

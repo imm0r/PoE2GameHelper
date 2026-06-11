@@ -42,6 +42,27 @@ class RadarOverlay extends GdiOverlayBase
     ; Conversion factor WorldPosition → GridPosition (from Radar.cs: ratio = 10.86957)
     static WORLD_TO_GRID_RATIO := 10.86957
 
+    ; HUD clip masks (design px @ the 2560×1600 UI reference). The game draws its corner HUD
+    ; (orbs, skill/flask bars, XP bar, area & quest panel) on top of its own map; our
+    ; always-on-top overlay would otherwise paint the maphack outline / dots over it. The
+    ; large-map layer is clipped to EXCLUDE every rectangle below, so the visible map area
+    ; becomes a rectangle minus these corners. Dimensions scale UNIFORMLY by
+    ; gameWindowHeight/1600 at render time (PoE2 HUD scales with height, so corner masks keep
+    ; their size on ultrawide instead of stretching). Tune each entry in-game; empty the array
+    ; to disable all masking.
+    ;   "anchor": "bottom" = full-width strip along the bottom edge (its "w" is ignored)
+    ;             "bl"/"br"/"tr"/"tl" = pinned to that corner, extending inward by w×h design px
+    ; Multiple entries may share an anchor — their union is excluded, so each bottom corner
+    ; is an L-shape: a tall narrow rect over the orb plus a lower wider rect over the flask /
+    ; skill bar that extends further toward the screen centre.
+    static MAP_HUD_MASKS := [
+        Map("anchor", "bottom", "w",   0, "h",  30),   ; XP bar (spans the full window width)
+        Map("anchor", "bl",     "w", 600, "h", 410),   ; life orb (tall corner)
+        Map("anchor", "bl",     "w", 950, "h", 270),   ; flask / utility bar (lower, reaches inward)
+        Map("anchor", "br",     "w", 600, "h", 410),   ; mana / spirit orb (tall corner)
+        Map("anchor", "br",     "w", 950, "h", 270),   ; skill gem bar (lower, reaches inward)
+        Map("anchor", "tr",     "w", 400, "h", 500)]   ; area info + quest tracker
+
     ; Dot colors (GDI expects BGR, not RGB)
     static COLOR_ENEMY_NORMAL := 0x0000FF   ; red    (normal enemies)
     static COLOR_ENEMY_RARE   := 0xFF00FF   ; magenta (rare enemies)
@@ -164,6 +185,7 @@ class RadarOverlay extends GdiOverlayBase
         ; blitted in a distinct fill colour. Lets you compare our memory
         ; walkable grid against what the game actually shows.
         this._walkGridEnabled     := false ; toggle from config (off by default — diagnostic)
+        this._mapHackMaskDebug    := false ; red outlines of the HUD clip masks (off — debug)
         this._mapWalkColorDC      := 0     ; memory DC holding the solid fill-colour source bitmap
         this._mapWalkColorBmp     := 0     ; source bitmap handle (solid walkable fill colour)
         this._mapWalkMask         := 0     ; monochrome mask bitmap (1=walkable cell, stippled)
@@ -194,7 +216,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss
         global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
         global g_debugMode, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
-        global g_radarAlpha, g_highlightedEntityPath, g_walkGridEnabled
+        global g_radarAlpha, g_highlightedEntityPath, g_walkGridEnabled, g_maphackMaskDebug
 
         this.ShowEnemyNormal := g_radarShowEnemyNormal
         this.ShowEnemyRare   := g_radarShowEnemyRare
@@ -206,6 +228,7 @@ class RadarOverlay extends GdiOverlayBase
         this._navEnabled     := g_zoneNavEnabled
         this._mapHackEnabled := g_mapHackEnabled
         this._walkGridEnabled := IsSet(g_walkGridEnabled) ? g_walkGridEnabled : false
+        this._mapHackMaskDebug := IsSet(g_maphackMaskDebug) ? g_maphackMaskDebug : false
         this._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
         if (IsSet(g_radarAlpha) && this._alpha != g_radarAlpha)
             this.SetAlpha(g_radarAlpha)
@@ -243,6 +266,7 @@ class RadarOverlay extends GdiOverlayBase
     ; gameWindowX/Y/Width/Height mirror the rect for the unchanged body below.
     Draw(ctx, rect)
     {
+        global Profiler
         this._SyncConfig(ctx.snapshot)
         snapshot         := ctx.snapshot
         gameWindowX      := rect["x"]
@@ -305,7 +329,9 @@ class RadarOverlay extends GdiOverlayBase
                 ; for 1–2 s — acceptable because no maphack is on screen during
                 ; that window thanks to the destroy from tick 1.
                 this._mapHackRetryTick := A_TickCount
+                Profiler.Begin("radar.maphackGen")
                 this._GenerateMapHackBitmap()
+                Profiler.End("radar.maphackGen")
                 ; Re-commit size only on success — failed generates leave the
                 ; retry primed for the next throttle window.
                 if (this._mapHackDC && this._mapHackMask)
@@ -401,18 +427,22 @@ class RadarOverlay extends GdiOverlayBase
 
         if (miniMapData && miniMapData["isVisible"])
         {
+            Profiler.Begin("radar.mini")
             try this._RenderMapLayer(miniMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, false)
             catch
                 this._DrawDot(40, 8, 0x00FF00, 4)   ; green dot = MiniMap error
+            Profiler.End("radar.mini")
         }
 
         if (largeMapData && largeMapData["isVisible"])
         {
+            Profiler.Begin("radar.large")
             try this._RenderMapLayer(largeMapData, playerWorldX, playerWorldY, playerTerrainHeight,
                                      areaInstance, gameWindowWidth, gameWindowHeight, true)
             catch
                 this._DrawDot(56, 8, 0x00FFFF, 4)   ; cyan dot = large-map error
+            Profiler.End("radar.large")
         }
 
         ; ── Path recompute (A*) when highlighted entity changes or player/entity moves ──
@@ -557,10 +587,15 @@ class RadarOverlay extends GdiOverlayBase
     ; so this no longer blits itself — it is the single flush point per frame.
     _FinishFrame(gameWindowWidth, gameWindowHeight)
     {
+        global Profiler
         ; Atlas overlay (dormant until g_atlasRender is populated by the reader).
+        Profiler.Begin("radar.atlas")
         this._RenderAtlas()
+        Profiler.End("radar.atlas")
         ; Flush all queued draw operations before the optional highlight rect.
+        Profiler.Begin("radar.flush")
         this._FlushBatch()
+        Profiler.End("radar.flush")
 
         global g_uiBrowserHighlight
         if IsObject(g_uiBrowserHighlight)
@@ -581,6 +616,7 @@ class RadarOverlay extends GdiOverlayBase
     _RenderMapLayer(mapData, playerWorldX, playerWorldY, playerTerrainHeight,
                     areaInstance, gameWindowWidth, gameWindowHeight, isLargeMap)
     {
+        global Profiler
         ; ── Compute UI scaling (per GameWindowScale.cs) ──────────────────────────────────
         ; The game uses 2560×1600 as the design reference resolution for all UI positions.
         ; scaleFactorX/Y convert unscaled UI coordinates into real pixel coordinates.
@@ -671,14 +707,40 @@ class RadarOverlay extends GdiOverlayBase
         projectionCos := mapDiagonal * RadarOverlay.CAMERA_COS / baseMapScale
         projectionSin := mapDiagonal * RadarOverlay.CAMERA_SIN / baseMapScale
 
+        ; ── HUD clip masks (large map only) ──────────────────────────────────────────────
+        ; Exclude each corner/edge HUD rectangle so the maphack outline / dots never paint
+        ; over the game's orbs, skill/flask/XP bars or the area & quest panel (the game draws
+        ; that HUD on top of its map; our overlay is always-on-top). GDI clips PlgBlt and every
+        ; dot/line below to the remaining region for the rest of the method; the clip is cleared
+        ; unconditionally at the end (cannot leak a frame). Result: a non-rectangular map area.
+        if isLargeMap
+        {
+            for _, mask in RadarOverlay.MAP_HUD_MASKS
+            {
+                r := this._HudMaskRect(mask, gameWindowWidth, gameWindowHeight, scaleFactorY)
+                if !r
+                    continue
+                DllCall("ExcludeClipRect", "Ptr", this.memDC,
+                    "Int", r[1], "Int", r[2], "Int", r[1] + r[3], "Int", r[2] + r[4])
+            }
+        }
+
         ; ── Maphack / walkable-grid overlays (large map only, before entities) ──
         ; Walkable fill goes first so the wall-border outline draws on top.
         if (isLargeMap && this._walkGridEnabled && this._mapWalkColorDC && this._mapWalkMask)
+        {
+            Profiler.Begin("radar.mask.walk")
             this._BlitMaskLayer(this._mapWalkColorDC, this._mapWalkMask,
                 mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
+            Profiler.End("radar.mask.walk")
+        }
         if (isLargeMap && this._mapHackEnabled && this._mapHackDC && this._mapHackMask)
+        {
+            Profiler.Begin("radar.mask.hack")
             this._BlitMaskLayer(this._mapHackDC, this._mapHackMask,
                 mapCenterX, mapCenterY, playerWorldX, playerWorldY, projectionCos, projectionSin)
+            Profiler.End("radar.mask.hack")
+        }
 
         ; Player dot at the map center
         this._DrawDot(Round(mapCenterX), Round(mapCenterY), RadarOverlay.COLOR_PLAYER, isLargeMap ? 4 : 2)
@@ -1122,6 +1184,40 @@ class RadarOverlay extends GdiOverlayBase
                     . " pre=" preFlt " post=" postFlt
             }
         }
+
+        ; Release any clip region set above (HUD masks) so it never affects a later draw into
+        ; the back-buffer. SelectClipRgn(NULL) is a harmless no-op when none was set.
+        DllCall("SelectClipRgn", "Ptr", this.memDC, "Ptr", 0)
+
+        ; Debug: outline every HUD clip mask in red (unclipped, on top of the maphack) so the
+        ; user can see exactly where MAP_HUD_MASKS clips while tuning the values. Large map only.
+        if (isLargeMap && this._mapHackMaskDebug)
+        {
+            for _, mask in RadarOverlay.MAP_HUD_MASKS
+            {
+                r := this._HudMaskRect(mask, gameWindowWidth, gameWindowHeight, scaleFactorY)
+                if r
+                    this._DrawRectOutline(r[1], r[2], r[3], r[4], 0x0000FF, 2)   ; red (BGR)
+            }
+        }
+    }
+
+    ; Computes the on-screen rectangle for one HUD clip mask: design px scaled uniformly by
+    ; gameWindowHeight/1600 (sY) and pinned to its anchor corner/edge. Returns [x, y, w, h] in
+    ; window pixels, or 0 when the mask has no area. Shared by the clip loop and the debug outline.
+    _HudMaskRect(mask, gw, gh, sY)
+    {
+        mh := Round(mask["h"] * sY)
+        if (mh <= 0)
+            return 0
+        if (mask["anchor"] = "bottom")
+            return [0, gh - mh, gw, mh]
+        mw := Round(mask["w"] * sY)
+        if (mw <= 0)
+            return 0
+        mx := (mask["anchor"] = "br" || mask["anchor"] = "tr") ? gw - mw : 0
+        my := (mask["anchor"] = "bl" || mask["anchor"] = "br") ? gh - mh : 0
+        return [mx, my, mw, mh]
     }
 
     ; Returns cached path classification flags used by the hot render loop.
@@ -1354,20 +1450,19 @@ class RadarOverlay extends GdiOverlayBase
     }
 
     ; Renders per-action debug overlays for hotkey actions whose debug flag is on.
-    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws, per
-    ; item: a world range circle (around the player) or a cursor pixel circle,
-    ; plus a stacked text block (label + monster counts / cooldown / charges).
+    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws ONLY the
+    ; map-bound spatial overlays per item: a world range circle around the player or a
+    ; cursor/player pixel circle. The textual debug block (label + condition values +
+    ; key) moved to the standalone DebugOverlay (its "HOTKEYS" section); a circle can't
+    ; live in a text box, so the spatial parts stay here on the radar.
     _RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin, gw, gh)
     {
         global g_hkDebugItems
         if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
             return
 
-        COL := 0x55FFFF        ; debug yellow (BGR)
-        COL_CUR := 0xC0A8FF    ; cursor circle (pinkish)
-        textX := Round(gw * 0.55)
-        textY := Round(gh * 0.30)
-        pitch := 15
+        COL := 0x55FFFF        ; debug yellow (BGR) — range-circle label
+        COL_CUR := 0xC0A8FF    ; cursor / player pixel circle (pinkish)
 
         for _, rec in g_hkDebugItems
         {
@@ -1395,18 +1490,6 @@ class RadarOverlay extends GdiOverlayBase
                     this._DrawPixelCircle(ps["x"] - this._lastX, ps["y"] - this._lastY,
                         rec["circlePlayerPx"], COL_CUR)
             }
-            ; Text block.
-            this._DrawText(textX, textY, rec.Has("label") ? rec["label"] : "?", COL)
-            textY += pitch
-            if (rec.Has("lines") && rec["lines"] is Array)
-            {
-                for _, ln in rec["lines"]
-                {
-                    this._DrawText(textX + 10, textY, ln, 0xB8DCE8)
-                    textY += pitch
-                }
-            }
-            textY += 4
         }
     }
 
@@ -1810,42 +1893,86 @@ class RadarOverlay extends GdiOverlayBase
         playerGY := playerWorldY / RadarOverlay.WORLD_TO_GRID_RATIO
         gridW := this._mapHackGridW
         gridH := this._mapHackGridH
+        bmpW  := this._mapHackW
+        bmpH  := this._mapHackH
+        if (bmpW < 1 || bmpH < 1)
+            return
 
-        ; Compute 3 parallelogram destination points for PlgBlt.
-        ; These map the bitmap's top-left, top-right, bottom-left to screen positions.
-        ; Grid (gx,gy) → screen: sX = mcX + (dGX-dGY)*pCos, sY = mcY + (-dGX-dGY)*pSin
-
-        ; Point 0: Grid (0, 0)
+        ; Forward affine — source pixel (bx,by) → screen — built from the same 3 grid
+        ; corners the entity dots use. Grid (gx,gy) → screen:
+        ;   sX = mcX + ((gx-pGX)-(gy-pGY))*pCos,  sY = mcY + (-(gx-pGX)-(gy-pGY))*pSin
+        ; Source (0,0)=grid(0,0), (bmpW,0)=grid(gridW,0), (0,bmpH)=grid(0,gridH).
         dGX0 := -playerGX
         dGY0 := -playerGY
-        p0x := Round(mapCenterX + (dGX0 - dGY0) * projectionCos)
-        p0y := Round(mapCenterY + (-dGX0 - dGY0) * projectionSin)
+        p0x := mapCenterX + (dGX0 - dGY0) * projectionCos
+        p0y := mapCenterY + (-dGX0 - dGY0) * projectionSin
+        p1x := mapCenterX + ((gridW - playerGX) - dGY0) * projectionCos
+        p1y := mapCenterY + (-(gridW - playerGX) - dGY0) * projectionSin
+        p2x := mapCenterX + (dGX0 - (gridH - playerGY)) * projectionCos
+        p2y := mapCenterY + (-dGX0 - (gridH - playerGY)) * projectionSin
 
-        ; Point 1: Grid (gridW, 0)
-        dGX1 := gridW - playerGX
-        p1x := Round(mapCenterX + (dGX1 - dGY0) * projectionCos)
-        p1y := Round(mapCenterY + (-dGX1 - dGY0) * projectionSin)
+        ; Per-source-pixel screen-space basis vectors (along source X and Y).
+        ux := (p1x - p0x) / bmpW, uy := (p1y - p0y) / bmpW
+        vx := (p2x - p0x) / bmpH, vy := (p2y - p0y) / bmpH
+        det := ux * vy - uy * vx
 
-        ; Point 2: Grid (0, gridH)
-        dGY2 := gridH - playerGY
-        p2x := Round(mapCenterX + (dGX0 - dGY2) * projectionCos)
-        p2y := Round(mapCenterY + (-dGX0 - dGY2) * projectionSin)
+        ; ── Source-rect clipping ──────────────────────────────────────────────────────
+        ; The full bitmap maps to a parallelogram whose bounding box dwarfs the window,
+        ; so PlgBlt otherwise iterates millions of off-screen pixels. Inverse-map the 4
+        ; window corners into source space, take their bounding box (a superset → no
+        ; outline pixels lost), pad it, and blit only that sub-rectangle. Pixel-identical
+        ; to the full blit; just skips the invisible majority. Degenerate det → full blit.
+        bx0 := 0, by0 := 0, bx1 := bmpW, by1 := bmpH
+        if (Abs(det) > 1.0e-9)
+        {
+            W := this.bufW, H := this.bufH
+            minBx := "", minBy := "", maxBx := "", maxBy := ""
+            for _, c in [[0, 0], [W, 0], [0, H], [W, H]]
+            {
+                sx := c[1] - p0x, sy := c[2] - p0y
+                bx := (sx * vy - sy * vx) / det
+                by := (ux * sy - uy * sx) / det
+                if (minBx = "" || bx < minBx)
+                    minBx := bx
+                if (maxBx = "" || bx > maxBx)
+                    maxBx := bx
+                if (minBy = "" || by < minBy)
+                    minBy := by
+                if (maxBy = "" || by > maxBy)
+                    maxBy := by
+            }
+            pad := 2
+            bx0 := Max(0,    Floor(minBx) - pad)
+            by0 := Max(0,    Floor(minBy) - pad)
+            bx1 := Min(bmpW, Ceil(maxBx)  + pad)
+            by1 := Min(bmpH, Ceil(maxBy)  + pad)
+            if (bx1 <= bx0 || by1 <= by0)
+                return   ; whole map off-screen this frame → nothing to draw
+        }
+
+        subW := bx1 - bx0
+        subH := by1 - by0
+
+        ; Destination parallelogram for the clipped sub-rect (source corners → screen).
+        np0x := Round(p0x + bx0 * ux + by0 * vx), np0y := Round(p0y + bx0 * uy + by0 * vy)
+        np1x := Round(p0x + bx1 * ux + by0 * vx), np1y := Round(p0y + bx1 * uy + by0 * vy)
+        np2x := Round(p0x + bx0 * ux + by1 * vx), np2y := Round(p0y + bx0 * uy + by1 * vy)
 
         ; POINT array: 3 × (x, y) = 24 bytes
         pts := Buffer(24, 0)
-        NumPut("Int", p0x, pts, 0),  NumPut("Int", p0y, pts, 4)
-        NumPut("Int", p1x, pts, 8),  NumPut("Int", p1y, pts, 12)
-        NumPut("Int", p2x, pts, 16), NumPut("Int", p2y, pts, 20)
+        NumPut("Int", np0x, pts, 0),  NumPut("Int", np0y, pts, 4)
+        NumPut("Int", np1x, pts, 8),  NumPut("Int", np1y, pts, 12)
+        NumPut("Int", np2x, pts, 16), NumPut("Int", np2y, pts, 20)
 
         DllCall("PlgBlt",
             "Ptr", this.memDC,
             "Ptr", pts,
             "Ptr", srcDC,
-            "Int", 0, "Int", 0,
-            "Int", this._mapHackW,
-            "Int", this._mapHackH,
+            "Int", bx0, "Int", by0,
+            "Int", subW,
+            "Int", subH,
             "Ptr", mask,
-            "Int", 0, "Int", 0)
+            "Int", bx0, "Int", by0)
     }
 
     ; Hide() and SetAlpha() are inherited from GdiOverlayBase.
