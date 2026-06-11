@@ -91,6 +91,26 @@ class ProfilerClass
     {
         this._labels := Map()
     }
+
+    ; Returns a one-line headline naming the single most expensive marker by
+    ; average time, e.g. "read.entities 41.2ms" — shown on the status pill while
+    ; the full table lives in its hover tooltip. "(no data)" when nothing ran.
+    Headline()
+    {
+        if (this._labels.Count = 0)
+            return "(no data)"
+        bestLabel := "", bestAvg := -1.0
+        for label, e in this._labels
+        {
+            avg := (e.count > 0) ? (e.totalUs / e.count) : 0
+            if (avg > bestAvg)
+            {
+                bestAvg := avg
+                bestLabel := label
+            }
+        }
+        return bestLabel " " Round(bestAvg / 1000, 1) "ms"
+    }
 }
 
 ; Constructs the global Profiler singleton, disabled by default. Called once from
@@ -102,16 +122,35 @@ InitProfiler()
 {
     global Profiler := ProfilerClass()
     Profiler.Enabled := false
+    ; Status-pill dump state (read by _PushProfilerPill -> updateProfilerPill in the UI):
+    ;   "idle"      -> pill shows the live fps (driven by UpdateStatusBar)
+    ;   "recording" -> a measurement window is open (1st Shift+F3)
+    ;   "done"      -> headline on the pill, full table in its hover tooltip (2nd Shift+F3)
+    global g_profDumpState    := "idle"
+    global g_profDumpHeadline := ""
+    global g_profDumpTable    := ""
+}
+
+; Pushes the current profiler dump state to the status pill in the WebView. Safe to
+; call from the in-game Shift+F3 handler — WebViewExec reaches the control regardless
+; of focus; it just no-ops until the page is ready.
+_PushProfilerPill()
+{
+    global g_webViewReady, g_profDumpState, g_profDumpHeadline, g_profDumpTable
+    if !(IsSet(g_webViewReady) && g_webViewReady)
+        return
+    try WebViewExec("updateProfilerPill("
+        . _JsStr(g_profDumpState) "," _JsStr(g_profDumpHeadline) "," _JsStr(g_profDumpTable) ")")
 }
 
 ; Shift+F3 handler. Two-press measurement flow so the profiler only runs during the
 ; window you care about (no always-on cost):
-;   1st press -> reset + enable; reproduce the stutter.
-;   2nd press -> snapshot the table to logs\profiler_<ts>.txt, show it as a tooltip,
-;                then disable again.
+;   1st press -> reset + enable; the status pill shows "REC". Reproduce the stutter.
+;   2nd press -> snapshot the table to the status pill (headline + full table in its
+;                hover tooltip), then disable again. No file, no in-game tooltip.
 ProfilerToggleDump()
 {
-    global Profiler
+    global Profiler, g_profDumpState, g_profDumpHeadline, g_profDumpTable
     if (!IsSet(Profiler) || !IsObject(Profiler))
         return
 
@@ -119,21 +158,17 @@ ProfilerToggleDump()
     {
         Profiler.Reset()
         Profiler.Enabled := true
-        ToolTip("Profiler: ON - reproduce the lag, then press Shift+F3 again to dump.")
-        SetTimer(() => ToolTip(), -4000)
+        g_profDumpState    := "recording"
+        g_profDumpHeadline := "● REC"
+        g_profDumpTable    := ""
+        _PushProfilerPill()
         return
     }
 
-    ; Second press: stop measuring, then persist + show the collected table.
+    ; Second press: stop measuring, surface the collected table on the pill.
     Profiler.Enabled := false
-    summary := Profiler.Summary()
-    ts      := FormatTime(A_Now, "yyyy-MM-dd_HH-mm-ss")
-    outPath := A_ScriptDir "\logs\profiler_" ts ".txt"
-    try
-    {
-        DirCreate(A_ScriptDir "\logs")
-        FileAppend(summary "`n", outPath, "UTF-8")
-    }
-    ToolTip("Profiler: OFF - saved to`n" outPath "`n`n" summary)
-    SetTimer(() => ToolTip(), -10000)
+    g_profDumpState    := "done"
+    g_profDumpHeadline := Profiler.Headline()
+    g_profDumpTable    := Profiler.Summary()
+    _PushProfilerPill()
 }

@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.18"
+POEFORMANCE_VERSION := "0.45.12.19"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -575,10 +575,9 @@ UpdateStatusBar()
     leftText := "PoEformance v" POEFORMANCE_VERSION " for PoE2 v" (patch != "" ? patch : "—")
     rightText := "Last Updated: " now
 
-    ; Performance details for the FPS pill: total iteration ms + radar fps
-    perfText := g_profTotalLastMs "ms"
-    if (g_radarFps > 0)
-        perfText .= " | " g_radarFps " fps"
+    ; Live perf for the status pill — only applied while the Shift+F3 benchmark is
+    ; idle; during/after a benchmark run the pill is owned by updateProfilerPill().
+    perfText := (g_radarFps > 0) ? (g_radarFps " fps") : ""
 
     WebViewExec("updateStatus(" _JsStr(leftText) "," _JsStr(rightText) "," _JsStr(perfText) ")")
 }

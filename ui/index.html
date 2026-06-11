@@ -1744,6 +1744,23 @@
       line-height: 1.5;
       color: var(--codex-text)
     }
+    /* Multi-line tips (the Shift+F3 profiler table on the status pill) keep their
+       column alignment: monospace, preserved whitespace, no width clamp. */
+    .codex-tooltip-mono {
+      max-width: none;
+      white-space: pre;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: left;
+    }
+    /* Status pill while a benchmark is recording — red pulsing dot. */
+    #pill-fps.pill-rec .dot {
+      background: #d04747;
+      box-shadow: 0 0 6px #d04747;
+      animation: pillRecPulse 1s ease-in-out infinite;
+    }
+    @keyframes pillRecPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
 
     /* Disabled buttons normally drop pointer-events, which means our
        data-tip hover listener never fires — exactly the wrong moment,
@@ -3916,7 +3933,7 @@
     <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
       <div class="dot"></div><span id="snap-text">Refresh</span>
     </div>
-    <div class="pill inactive" id="pill-fps" data-icon="⏱">
+    <div class="pill inactive" id="pill-fps" data-icon="⏱" data-tip="Shift+F3 — start/stop the performance benchmark">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
     </div>
     </div><!-- /header-pills -->
@@ -7162,6 +7179,9 @@
         document.body.appendChild(_codexTipEl);
       }
       _codexTipEl.textContent = text;
+      // Multi-line tips (e.g. the Shift+F3 profiler table) render as a left-aligned
+      // monospace block so the columns line up; short tips stay normal.
+      _codexTipEl.classList.toggle('codex-tooltip-mono', text.indexOf('\n') >= 0);
       _codexTipEl.style.display = 'block';
       _codexTipPosition(ev);
     }
@@ -7198,13 +7218,41 @@
     // ═══════════════════════════════════════════════════════════════════
     //  STATUS BAR
     // ═══════════════════════════════════════════════════════════════════
+    // The rightmost status pill (#pill-fps) is shared: idle -> live fps (updateStatus),
+    // recording/done -> the Shift+F3 performance benchmark (updateProfilerPill).
+    // _profPillState gates who owns the pill text so the two don't overwrite each other.
+    let _profPillState = 'idle';
     function updateStatus(leftText, rightText, perfText) {
       const el = document.getElementById('status-left');
       if (el) el.textContent = leftText || '';
       const er = document.getElementById('status-right');
       if (er) er.textContent = rightText || '';
       const fpsPill = document.getElementById('pill-fps-text');
-      if (fpsPill && perfText) fpsPill.textContent = perfText;
+      if (fpsPill && perfText && _profPillState === 'idle') fpsPill.textContent = perfText;
+    }
+
+    // Drives the status pill from the Shift+F3 benchmark (pushed by _PushProfilerPill).
+    //   "recording" -> "● REC" + red dot
+    //   "done"       -> headline marker on the pill; full table in its hover tooltip
+    //   "idle"       -> hand the pill back to the live-fps text
+    function updateProfilerPill(state, headline, table) {
+      _profPillState = state || 'idle';
+      const txt  = document.getElementById('pill-fps-text');
+      const pill = document.getElementById('pill-fps');
+      if (!txt || !pill) return;
+      if (_profPillState === 'idle') {
+        pill.setAttribute('data-tip', 'Shift+F3 — start/stop the performance benchmark');
+        pill.classList.remove('pill-rec');
+        return;  // text is driven by updateStatus (live fps)
+      }
+      txt.textContent = headline || '';
+      if (_profPillState === 'recording') {
+        pill.setAttribute('data-tip', 'Recording… reproduce the lag, then press Shift+F3 again');
+        pill.classList.add('pill-rec');
+      } else {  // done
+        pill.setAttribute('data-tip', table || '(no profiler data)');
+        pill.classList.remove('pill-rec');
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════
