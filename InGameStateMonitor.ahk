@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.20"
+POEFORMANCE_VERSION := "0.45.12.21"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -128,10 +128,6 @@ g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entitie
 g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
 g_radarFps := 0  ; Achieved overlay frames per second
-g_profReadLastMs := 0
-g_profReadAvgMs := 0
-g_profTreeLastMs := 0
-g_profTotalLastMs := 0
 g_offsetTableRowPathByRow := Map()
 g_offsetPreviousValueByPath := Map()
 g_offsetTableSortCol := 1
@@ -566,7 +562,7 @@ EnsureConnected()
 ; Updates the status bar text and pushes it to the WebView.
 UpdateStatusBar()
 {
-    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs, g_reader
+    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_reader
     global POEFORMANCE_VERSION
 
     patch := GetLastKnownPoeVersion()
@@ -671,7 +667,7 @@ ReadAndShow(forceTreeRefresh := false)
     {
         global g_reader, g_valueTree, g_nodePaths, g_debugMode, g_updatesPaused, g_autoFlaskEnabled, g_flaskKeyLoadStatus, g_flaskKeyBySlot, g_showTreePane
         global g_lifeThresholdPercent, g_manaThresholdPercent, g_autoFlaskLastReason, autoFlaskStatusText, hotkeyLegendText, g_autoFlaskPerformanceMode, g_lastSnapshotForUi
-        global g_treeRefreshRequested, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs
+        global g_treeRefreshRequested
 
         if (g_updatesPaused && !forceTreeRefresh)
             return
@@ -739,10 +735,6 @@ ReadAndShow(forceTreeRefresh := false)
             g_treeRefreshRequested := false
         }
         _totalLastMs := A_TickCount - totalStart
-        g_profReadLastMs := _readLastMs
-        g_profReadAvgMs := readAvgMs
-        g_profTreeLastMs := _treeLastMs
-        g_profTotalLastMs := _totalLastMs
         UpdateOffsetTable(snapshot)
         ; Push the active (tree) tab plus all special-tab data to the WebView UI.
         PushActiveTreeToWebView()
