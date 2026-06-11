@@ -52,10 +52,15 @@ class RadarOverlay extends GdiOverlayBase
     ; to disable all masking.
     ;   "anchor": "bottom" = full-width strip along the bottom edge (its "w" is ignored)
     ;             "bl"/"br"/"tr"/"tl" = pinned to that corner, extending inward by w×h design px
+    ; Multiple entries may share an anchor — their union is excluded, so each bottom corner
+    ; is an L-shape: a tall narrow rect over the orb plus a lower wider rect over the flask /
+    ; skill bar that extends further toward the screen centre.
     static MAP_HUD_MASKS := [
         Map("anchor", "bottom", "w",   0, "h",  30),   ; XP bar (spans the full window width)
-        Map("anchor", "bl",     "w", 600, "h", 410),   ; life orb + flask slots
-        Map("anchor", "br",     "w", 600, "h", 410),   ; mana / spirit orb + skill bar
+        Map("anchor", "bl",     "w", 600, "h", 410),   ; life orb (tall corner)
+        Map("anchor", "bl",     "w", 950, "h", 270),   ; flask / utility bar (lower, reaches inward)
+        Map("anchor", "br",     "w", 600, "h", 410),   ; mana / spirit orb (tall corner)
+        Map("anchor", "br",     "w", 950, "h", 270),   ; skill gem bar (lower, reaches inward)
         Map("anchor", "tr",     "w", 400, "h", 500)]   ; area info + quest tracker
 
     ; Dot colors (GDI expects BGR, not RGB)
