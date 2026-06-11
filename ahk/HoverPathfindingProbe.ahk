@@ -273,3 +273,93 @@ HoverTrackerProbeRun()
     g_hoverScanPrev := cur
     _AIP_WriteProbeLog("hovertracker_probe", rpt)
 }
+
+; MouseOverEntity probe — verifies the Cheat-Engine "screenToWorldPtrMouseOverEntityPtr"
+; chain against our AOB-resolved game-state base. The CE table reads:
+;   [[[[ state_aob + 0x20 ] + 0x00 ] + 0x300 ] + 0x3F0 ] + 0xA8  ->  Entity* under cursor
+; where state_aob is the static "Game State bptr" (PathOfExile.exe+0x443C908). We do NOT
+; hardcode that static offset (it shifts every patch) — GameStatesAddress already resolves
+; the same global via the "48 39 2D ^…" RIP pattern, so we anchor the chain on it (and on
+; its first deref, and on inGameState) and print every hop. The live game then tells us
+; which anchor reproduces the CE addresses and yields a valid hovered Entity*.
+; Run via Ctrl+Alt+M WHILE hovering a monster — the final slot is null when nothing is
+; under the cursor (matches the 0x00000000 in the CE screenshot). Writes a probe log.
+MouseOverEntityProbeRun()
+{
+    global g_reader
+    if !(IsObject(g_reader) && IsObject(g_reader.Mem) && g_reader.Mem.Handle)
+    {
+        try MsgBox("MouseOverEntity probe: not attached.", "MouseOverEntity Probe", "Iconx")
+        return
+    }
+    nl := "`r`n"
+    gsa := g_reader.GameStatesAddress
+    staticPtr := g_reader.IsProbablyValidPointer(gsa) ? g_reader.Mem.ReadPtr(gsa) : 0
+    inGs := _AIP_ResolveInGameState()
+
+    rpt := "=== MouseOverEntity Probe (CE screenToWorldPtrMouseOverEntityPtr) ===" nl
+    rpt .= "Run this WHILE hovering a monster (Ctrl+Alt+M). Empty/NULL slot => nothing hovered." nl
+    rpt .= "GameStatesAddress(state_aob?)=0x" Format("{:X}", gsa)
+        . "  [GameStatesAddress]=0x" Format("{:X}", staticPtr)
+        . "  inGameState=0x" Format("{:X}", inGs) nl nl
+
+    ; CE chain: deref these offsets in order, then read the Entity* at the final +0xA8.
+    derefOffsets := [0x20, 0x00, 0x300, 0x3F0]
+    finalOff := 0xA8
+
+    ; Try several anchors for CE's "state_aob"; the live game shows which one works.
+    anchors := Map(
+        "GameStatesAddress (= state_aob?)", gsa,
+        "[GameStatesAddress] (pre-deref'd)", staticPtr,
+        "inGameState", inGs)
+
+    for label, base in anchors
+    {
+        rpt .= "-- anchor: " label " = 0x" Format("{:X}", base) " --" nl
+        if !g_reader.IsProbablyValidPointer(base)
+        {
+            rpt .= "   (invalid base, skipped)" nl nl
+            continue
+        }
+        a := base
+        ok := true
+        for _, off in derefOffsets
+        {
+            nxt := g_reader.Mem.ReadPtr(a + off)
+            rpt .= Format("   [0x{:X} + 0x{:X}] -> 0x{:X}", a, off, nxt) nl
+            if !g_reader.IsProbablyValidPointer(nxt)
+            {
+                rpt .= "   (chain broke — pointer invalid)" nl
+                ok := false
+                break
+            }
+            a := nxt
+        }
+        if (ok)
+        {
+            entAddr := a + finalOff
+            entPtr := g_reader.Mem.ReadPtr(entAddr)
+            rpt .= Format("   final: [0x{:X} + 0x{:X}] entitySlot=0x{:X} -> Entity*=0x{:X}",
+                a, finalOff, entAddr, entPtr) nl
+            if (entPtr = 0)
+                rpt .= "   => slot is NULL (nothing hovered, or wrong anchor)" nl
+            else if g_reader.IsPlausibleEntityPointer(entPtr)
+            {
+                id := _HPP_ReadEntityId(g_reader, entPtr)
+                path := "?"
+                try {
+                    e := g_reader.ReadEntityBasic(entPtr)
+                    if (IsObject(e) && e.Has("path"))
+                        path := e["path"]
+                }
+                rpt .= "   => HOVERED ENTITY  id=" id "  " path nl
+                rpt .= "   *** this anchor + CE chain WORKS ***" nl
+            }
+            else
+                rpt .= "   => not a plausible Entity* (wrong anchor / offset)" nl
+        }
+        rpt .= nl
+    }
+
+    _AIP_WriteProbeLog("mouseover_entity_probe", rpt)
+}
