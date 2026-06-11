@@ -697,9 +697,14 @@ _HotkeysPassesGuards(hk)
 
 ; Runs the ordered action list. Condition actions gate the sequence (a failed
 ; condition aborts the remaining actions); effect actions perform their effect.
+; If every condition passes but the hotkey has NO effect action that sends a key,
+; the output key is pressed once at the end — so the intuitive "bind output +
+; one condition" setup (e.g. flask 2 + mana < 50%) fires on its own, without
+; needing a redundant "Key press" action.
 _HotkeysRunActions(hk, context, depth)
 {
     snap := _HotkeysSnap()
+    hadEffect := false
     for a in hk["actions"]
     {
         t := a.Has("type") ? a["type"] : ""
@@ -722,18 +727,27 @@ _HotkeysRunActions(hk, context, depth)
                     return
             case "key":
                 _HotkeysDoKey(hk, a)
+                hadEffect := true
             case "press":
                 _HotkeysSendKey(_HotkeysResolveKey(hk))
+                hadEffect := true
             case "repeat":
                 _HotkeysDoRepeat(hk, a)
+                hadEffect := true
             case "hold":
                 _HotkeysDoHold(hk, a)
+                hadEffect := true
             case "chain":
                 _HotkeysDoChain(a, context, depth)
+                hadEffect := true
             case "aim":
                 _HotkeysDoAim(hk, a, snap)
+                hadEffect := true
         }
     }
+    ; Conditions-only hotkey: no effect action ran, so fire the bound output once.
+    if !hadEffect
+        _HotkeysSendKey(_HotkeysResolveKey(hk))
 }
 
 ; ── Condition evaluators ───────────────────────────────────────────────────

@@ -4,7 +4,7 @@
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
-![Version](https://img.shields.io/badge/version-v0.45.12.14-blue)
+![Version](https://img.shields.io/badge/version-v0.45.12.15-blue)
 ![Build](https://img.shields.io/badge/build-stable-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
