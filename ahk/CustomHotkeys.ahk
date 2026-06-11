@@ -36,6 +36,8 @@ HotkeysInit()
     global g_hkInjectGuard := Map()       ; lowercased key -> expiry tick (self-injection guard)
     global g_hkOneShotPerTick := false    ; when true, at most one hotkey auto-fires per eval tick
     global g_hkDebugItems := []           ; per-frame debug records for actions with debug on (read by the overlay)
+    global g_hkFlaskCache := 0            ; cached flask-slot Map for output readiness (charge gate)
+    global g_hkFlaskCacheTick := 0        ; A_TickCount of the last on-demand flask-slot read
 }
 
 ; ── Persistence ────────────────────────────────────────────────────────────
@@ -183,20 +185,67 @@ _HotkeysOutputReadiness(hk)
 {
     out := (hk.Has("output") && hk["output"] is Map) ? hk["output"] : 0
     if !out
-        return Map("ready", true, "cooldownMs", 0)
+        return Map("ready", true, "cooldownMs", 0, "kind", "key")
     kind := out.Has("kind") ? out["kind"] : "key"
     if (kind = "skill")
     {
         nm := out.Has("skillName") ? out["skillName"] : ""
         if (nm = "")
-            return Map("ready", true, "cooldownMs", 0)
+            return Map("ready", true, "cooldownMs", 0, "kind", "skill")
         r := HotkeysSkillReadiness(nm)
-        return Map("ready", r["found"] ? r["canUse"] : true, "cooldownMs", r["cooldownMs"])
+        return Map("ready", r["found"] ? r["canUse"] : true, "cooldownMs", r["cooldownMs"], "kind", "skill")
     }
-    ; Flask charge counts are not present in the radar snapshot (only buff
-    ; data is), so a flask readiness gate can't be evaluated reliably here —
-    ; treat flask/key bindings as always ready.
-    return Map("ready", true, "cooldownMs", 0)
+    if (kind = "flask")
+    {
+        ; Charge gate — mirrors AutoFlask's TryUseFlaskSlot: a flask may only fire
+        ; when it holds at least one full use (current >= perUse) and its own buff
+        ; isn't already active. Flask charges aren't in the radar snapshot, so the
+        ; slot data is read on demand and cached (see _HotkeysFlaskSlots).
+        slot   := out.Has("slot") ? (out["slot"] + 0) : 0
+        slots  := _HotkeysFlaskSlots()
+        if !(slots && slots is Map && slots.Has(slot))
+            return Map("ready", true, "cooldownMs", 0, "kind", "flask")   ; lenient when unreadable
+        s      := slots[slot]
+        fs     := (s && s is Map && s.Has("flaskStats")) ? s["flaskStats"] : 0
+        cur    := (fs && fs is Map && fs.Has("current")) ? (fs["current"] + 0) : 0
+        perUse := (fs && fs is Map && fs.Has("perUse"))  ? (fs["perUse"]  + 0) : 0
+        active := (s && s is Map && s.Has("activeByBuff") && s["activeByBuff"]) ? true : false
+        ready  := (perUse > 0 && cur >= perUse && !active)
+        return Map("ready", ready, "cooldownMs", 0, "kind", "flask"
+                 , "charges", cur, "perUse", perUse, "active", active)
+    }
+    ; Free "key" binding — no readiness constraint.
+    return Map("ready", true, "cooldownMs", 0, "kind", "key")
+}
+
+; Returns the flask-slot Map (slot 1-5 -> flask data with flaskStats / activeByBuff),
+; read on demand from the area instance in the cached radar snapshot and itself cached
+; for 150ms (charges change slowly, and readiness is polled every eval tick). Returns 0
+; when unavailable. Independent of AutoFlask, so a flask hotkey works on its own.
+_HotkeysFlaskSlots()
+{
+    global g_reader, g_hkFlaskCache, g_hkFlaskCacheTick
+    if ((A_TickCount - g_hkFlaskCacheTick) < 150)
+        return g_hkFlaskCache
+    g_hkFlaskCacheTick := A_TickCount
+    g_hkFlaskCache := 0
+    snap := _HotkeysSnap()
+    if !snap
+        return 0
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    area := (inGs && inGs is Map && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    addr := (area && area is Map && area.Has("address")) ? area["address"] : 0
+    if !addr
+        return 0
+    ai := 0
+    try ai := g_reader.ReadAreaInstanceAutoFlask(addr)
+    if !(ai && ai is Map && ai.Has("serverData"))
+        return 0
+    srv      := ai["serverData"]
+    flaskInv := (srv && srv is Map && srv.Has("flaskInventory")) ? srv["flaskInventory"] : 0
+    slots    := (flaskInv && flaskInv is Map && flaskInv.Has("flaskSlots")) ? flaskInv["flaskSlots"] : 0
+    g_hkFlaskCache := slots
+    return slots
 }
 
 ; Serializes g_hotkeyGroups to hotkeys.json (pretty-printed for hand-editing).
@@ -493,7 +542,11 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
 
     ; Output skill cooldown / readiness (applies to any debugged action).
     rdy := _HotkeysOutputReadiness(hk)
-    if (rdy["cooldownMs"] > 0 || !rdy["ready"])
+    rk := rdy.Has("kind") ? rdy["kind"] : ""
+    if (rk = "flask")
+        rec["lines"].Push("flask charges " rdy["charges"] "/" rdy["perUse"]
+            (rdy["active"] ? " (buff active)" : "") " -> " (rdy["ready"] ? "READY" : "NOT READY"))
+    else if (rdy["cooldownMs"] > 0 || !rdy["ready"])
         rec["lines"].Push("skill " (rdy["ready"] ? "READY" : "on CD") (rdy["cooldownMs"] > 0 ? " (" rdy["cooldownMs"] "ms)" : ""))
     return rec
 }
