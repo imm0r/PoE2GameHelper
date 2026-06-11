@@ -216,14 +216,17 @@ class DebugOverlay extends GdiOverlayBase
             if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
             {
                 lines.Push(["MOUSEOVER", DebugOverlay.COL_GOLD_HI])
-                lines.Push(["  " _FocusLeaf(mo["path"]), DebugOverlay.COL_IVORY])
+                ; Resolve the internal path to a display name (monster_name_map.tsv);
+                ; fall back to the raw leaf when the path has no mapping.
+                nm := ResolveMonsterDisplayName(mo["path"], _FocusLeaf(mo["path"]))
+                lines.Push(["  " nm, DebugOverlay.COL_IVORY])
 
                 ; Rarity/life come from the hovered entity's FRESH decode (see
                 ; _FocusResolveMouseOverEntity) — not the cached snapshot.
                 dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map")
                     ? mo["decodedComponents"] : 0
 
-                typ := ExtractMetaGroup(mo["path"])
+                typ := ExtractMetaCategory(mo["path"])
                 rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
                 info := ""
                 if (typ != "")
