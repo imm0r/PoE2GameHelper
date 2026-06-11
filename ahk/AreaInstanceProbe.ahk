@@ -1183,4 +1183,7 @@ _AIP_RegisterProbeHotkeys()
     ; Ctrl+Alt+H: HoverTracker probe — run WHILE hovering so the UI click does
     ; not drop the hover (offsets cross-referenced from Sikaka/POE2Radar).
     try Hotkey("^!h", (*) => HoverTrackerProbeRun(), "On")
+    ; Ctrl+Alt+M: MouseOverEntity probe — verify the CE state_aob -> +0xA8 hover chain
+    ; against our AOB-resolved base. Run WHILE hovering a monster.
+    try Hotkey("^!m", (*) => MouseOverEntityProbeRun(), "On")
 }
