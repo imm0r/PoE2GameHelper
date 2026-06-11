@@ -42,13 +42,21 @@ class RadarOverlay extends GdiOverlayBase
     ; Conversion factor WorldPosition → GridPosition (from Radar.cs: ratio = 10.86957)
     static WORLD_TO_GRID_RATIO := 10.86957
 
-    ; Bottom-HUD clip height in DESIGN pixels (2560×1600 reference). The game draws its
-    ; skill/flask/XP bar on top of the large map; our always-on-top overlay would otherwise
-    ; paint the maphack outline (and dots) over that HUD. The whole large-map layer is clipped
-    ; above a bottom strip of this height, scaled by gameWindowHeight/1600 at render time.
-    ; 0 disables the clip. Tune in-game: raise if a sliver still shows over the bar, lower if
-    ; it hides visible map above it. 30 ≈ the XP/skill bar's own height measured in-game.
-    static MAP_BOTTOM_HUD_DESIGN_H := 30
+    ; HUD clip masks (design px @ the 2560×1600 UI reference). The game draws its corner HUD
+    ; (orbs, skill/flask bars, XP bar, area & quest panel) on top of its own map; our
+    ; always-on-top overlay would otherwise paint the maphack outline / dots over it. The
+    ; large-map layer is clipped to EXCLUDE every rectangle below, so the visible map area
+    ; becomes a rectangle minus these corners. Dimensions scale UNIFORMLY by
+    ; gameWindowHeight/1600 at render time (PoE2 HUD scales with height, so corner masks keep
+    ; their size on ultrawide instead of stretching). Tune each entry in-game; empty the array
+    ; to disable all masking.
+    ;   "anchor": "bottom" = full-width strip along the bottom edge (its "w" is ignored)
+    ;             "bl"/"br"/"tr"/"tl" = pinned to that corner, extending inward by w×h design px
+    static MAP_HUD_MASKS := [
+        Map("anchor", "bottom", "w",   0, "h",  30),   ; XP bar (spans the full window width)
+        Map("anchor", "bl",     "w", 600, "h", 410),   ; life orb + flask slots
+        Map("anchor", "br",     "w", 600, "h", 410),   ; mana / spirit orb + skill bar
+        Map("anchor", "tr",     "w", 400, "h", 500)]   ; area info + quest tracker
 
     ; Dot colors (GDI expects BGR, not RGB)
     static COLOR_ENEMY_NORMAL := 0x0000FF   ; red    (normal enemies)
@@ -692,18 +700,34 @@ class RadarOverlay extends GdiOverlayBase
         projectionCos := mapDiagonal * RadarOverlay.CAMERA_COS / baseMapScale
         projectionSin := mapDiagonal * RadarOverlay.CAMERA_SIN / baseMapScale
 
-        ; ── Bottom-HUD clip (large map only) ─────────────────────────────────────────────
-        ; Exclude a fixed bottom strip so the maphack outline / dots never paint over the
-        ; game's skill/flask/XP bar (the game renders that HUD on top of its map; our overlay
-        ; is always-on-top). GDI clips PlgBlt and every dot/line below to this region for the
-        ; rest of the method; it is cleared unconditionally at the end (cannot leak a frame).
-        if (isLargeMap && RadarOverlay.MAP_BOTTOM_HUD_DESIGN_H > 0)
+        ; ── HUD clip masks (large map only) ──────────────────────────────────────────────
+        ; Exclude each corner/edge HUD rectangle so the maphack outline / dots never paint
+        ; over the game's orbs, skill/flask/XP bars or the area & quest panel (the game draws
+        ; that HUD on top of its map; our overlay is always-on-top). GDI clips PlgBlt and every
+        ; dot/line below to the remaining region for the rest of the method; the clip is cleared
+        ; unconditionally at the end (cannot leak a frame). Result: a non-rectangular map area.
+        if isLargeMap
         {
-            hudStripH := Round(RadarOverlay.MAP_BOTTOM_HUD_DESIGN_H * scaleFactorY)
-            if (hudStripH > 0 && hudStripH < gameWindowHeight)
+            for _, mask in RadarOverlay.MAP_HUD_MASKS
+            {
+                mh := Round(mask["h"] * scaleFactorY)
+                if (mh <= 0)
+                    continue
+                if (mask["anchor"] = "bottom")
+                {
+                    mx := 0, my := gameWindowHeight - mh, mw := gameWindowWidth
+                }
+                else
+                {
+                    mw := Round(mask["w"] * scaleFactorY)
+                    if (mw <= 0)
+                        continue
+                    mx := (mask["anchor"] = "br" || mask["anchor"] = "tr") ? gameWindowWidth - mw : 0
+                    my := (mask["anchor"] = "bl" || mask["anchor"] = "br") ? gameWindowHeight - mh : 0
+                }
                 DllCall("ExcludeClipRect", "Ptr", this.memDC,
-                    "Int", 0, "Int", gameWindowHeight - hudStripH,
-                    "Int", gameWindowWidth, "Int", gameWindowHeight)
+                    "Int", mx, "Int", my, "Int", mx + mw, "Int", my + mh)
+            }
         }
 
         ; ── Maphack / walkable-grid overlays (large map only, before entities) ──
