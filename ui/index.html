@@ -8244,7 +8244,7 @@
     // survive re-renders triggered by snapshot pushes.
     window._eiState = window._eiState || {
       items: [],
-      filters: { id: '', path: '', type: 'all', state: 'all', group: 'all' },
+      filters: { id: '', path: '', type: 'all', state: 'all', group: 'all', category: 'all' },
       expanded: new Set(),
       compExpanded: new Set(),  // keys are `<entityAddr>::<componentName>`
       // Lazy-decode cache. Keys are `<entityAddr>::<componentName>`,
@@ -8281,7 +8281,7 @@
       const el = document.getElementById('tab-entities-content');
       if (!el) return;
       const st = window._eiState;
-      const { id: fId, path: fPath, type: fType, state: fState, group: fGroup } = st.filters;
+      const { id: fId, path: fPath, type: fType, state: fState, group: fGroup, category: fCategory = 'all' } = st.filters;
       const lowId = fId.toLowerCase().trim();
       const lowPath = fPath.toLowerCase().trim();
 
@@ -8298,6 +8298,7 @@
         if (lowPath && String(e.path || '').toLowerCase().indexOf(lowPath) === -1) return false;
         if (fType !== 'all' && e.type !== fType) return false;
         if (fGroup && fGroup !== 'all' && e.group !== fGroup) return false;
+        if (fCategory && fCategory !== 'all' && e.metaCategory !== fCategory) return false;
         if (fState === 'awake' && e.sleep === true) return false;
         if (fState === 'sleeping' && e.sleep !== true) return false;
         if (fState === 'dead' && e.alive !== false) return false;
@@ -8309,6 +8310,7 @@
       // only ever offers types the user can actually see right now.
       const typesPresent = [...new Set(st.items.map(e => e.type).filter(Boolean))].sort();
       const groupsPresent = [...new Set(st.items.map(e => e.group).filter(Boolean))].sort();
+      const categoriesPresent = [...new Set(st.items.map(e => e.metaCategory).filter(Boolean))].sort();
 
       const cards = filtered.map(eiCard).join('');
       const body = cards || '<div class="ei-empty">No entities match the current filters.</div>';
@@ -8336,6 +8338,10 @@
               <div class="ei-filter"><label>Group</label><select id="ei-f-group" onchange="eiFilterChange('group', this.value)">
                 <option value="all"${fGroup === 'all' ? ' selected' : ''}>All</option>
                 ${groupsPresent.map(g => `<option value="${escAttr(g)}"${g === fGroup ? ' selected' : ''}>${escHtml(g)}</option>`).join('')}
+              </select></div>
+              <div class="ei-filter"><label>Category</label><select id="ei-f-category" onchange="eiFilterChange('category', this.value)">
+                <option value="all"${fCategory === 'all' ? ' selected' : ''}>All</option>
+                ${categoriesPresent.map(c => `<option value="${escAttr(c)}"${c === fCategory ? ' selected' : ''}>${escHtml(c)}</option>`).join('')}
               </select></div>
             </div>
           </div>
@@ -8381,6 +8387,7 @@
         ['Id',       `<span class="ei-prop-val">${e.id ?? '—'}</span>`],
         ['Path',     `<span class="ei-prop-val">${escHtml(e.path || '—')}</span>`],
         ['Type',     `<span class="ei-prop-val">${escHtml(e.type || '—')}</span>`],
+        ['Category', `<span class="ei-prop-val">${escHtml(e.metaCategory || '—')}${e.metaGroup ? ` <span class="muted">/ ${escHtml(e.metaGroup)}</span>` : ''}</span>`],
         ['State',    `<span class="ei-prop-val">${escHtml(e.state || (e.sleep ? 'Sleeping' : 'Awake'))}</span>`],
         ['Rarity',   `<span class="ei-prop-val">${escHtml(e.rarity || 'Normal')}${e.rarityId !== undefined ? ` <span class="muted">(id=${e.rarityId})</span>` : ''}</span>`],
         ['Alive',    `<span class="ei-prop-val">${e.alive === false ? 'no' : 'yes'}</span>`],
