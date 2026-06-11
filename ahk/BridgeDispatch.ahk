@@ -393,6 +393,9 @@ _DispatchBridgeCall(method, args)
             SetTimer(ForceRefreshActiveTree, -1)
         case "F3Dump":
             SetTimer(OnF3DebugDump, -1)
+        case "ProfilerToggle":
+            ; Start/stop the per-tick QPC performance benchmark (status-pill click).
+            SetTimer(ProfilerToggleDump, -1)
         case "ToggleTreePane":
             SetTimer(ToggleTreePaneVisibility, -1)
         case "StartGame":

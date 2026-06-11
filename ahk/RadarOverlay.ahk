@@ -248,7 +248,37 @@ class RadarOverlay extends GdiOverlayBase
     ShouldShow(ctx)
     {
         global g_radarEnabled
-        return ctx.gate["allowed"] && (IsSet(g_radarEnabled) ? g_radarEnabled : true)
+        radarOn := (IsSet(g_radarEnabled) ? g_radarEnabled : true)
+        if !radarOn
+            return false
+        if ctx.gate["allowed"]
+            return true
+        ; Also render on the play area (foreground only) when a debug-enabled hotkey
+        ; wants a range circle, so the combat/aim radius shows even with the large map
+        ; closed. The map layers stay gated on ctx.gate["allowed"] (see Draw), so this
+        ; only adds the circle, never the maphack/dots.
+        return (ctx.gameActive || ctx.keepWhenBackground) && this._HasHotkeyDebugCircle()
+    }
+
+    ; True if any debug-enabled hotkey action currently requests a screen-space range
+    ; circle (monsterCount / aim). Keeps the radar alive for that circle even when the
+    ; play-overlay gate (large map) is closed.
+    _HasHotkeyDebugCircle()
+    {
+        global g_hkDebugItems
+        if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array)
+            return false
+        for _, rec in g_hkDebugItems
+        {
+            if !(rec is Map)
+                continue
+            if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
+                || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
+                || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
+                || (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0))
+                return true
+        }
+        return false
     }
 
     ; Layout: the radar draws across the whole game window.
@@ -425,7 +455,12 @@ class RadarOverlay extends GdiOverlayBase
                 this._lastMiniMapDiagonal := Sqrt(mmW * mmW + mmH * mmH)
         }
 
-        if (miniMapData && miniMapData["isVisible"])
+        ; Map layers only render under the full play-overlay gate. When ShouldShow let
+        ; the radar through purely for a hotkey-debug circle (gate closed, map shut),
+        ; mapAllowed is false so we skip the maphack/dots and draw only the circle below.
+        mapAllowed := (ctx.gate is Map && ctx.gate.Has("allowed")) ? ctx.gate["allowed"] : true
+
+        if (mapAllowed && miniMapData && miniMapData["isVisible"])
         {
             Profiler.Begin("radar.mini")
             try this._RenderMapLayer(miniMapData, playerWorldX, playerWorldY, playerTerrainHeight,
@@ -435,7 +470,7 @@ class RadarOverlay extends GdiOverlayBase
             Profiler.End("radar.mini")
         }
 
-        if (largeMapData && largeMapData["isVisible"])
+        if (mapAllowed && largeMapData && largeMapData["isVisible"])
         {
             Profiler.Begin("radar.large")
             try this._RenderMapLayer(largeMapData, playerWorldX, playerWorldY, playerTerrainHeight,
@@ -579,6 +614,10 @@ class RadarOverlay extends GdiOverlayBase
         }
 
         this._FinishFrame(gameWindowWidth, gameWindowHeight)
+
+        ; Hotkey-debug range circles (monsterCount / aim) — drawn last so they sit on
+        ; top, on the play area, regardless of map state (see ShouldShow's circle gate).
+        this._RenderHotkeyCircles()
     }
 
     ; Finishes the frame on the back-buffer: atlas overlay, flush of all queued
@@ -758,9 +797,9 @@ class RadarOverlay extends GdiOverlayBase
             }
         }
 
-        ; ── Hotkey action debug (per-action debug flag in the Hotkeys tab) ──
-        this._RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin,
-            gameWindowWidth, gameWindowHeight)
+        ; (Hotkey-debug range circles are drawn once per frame from Draw() via
+        ; _RenderHotkeyCircles — independent of the map layers, so they show even
+        ; when the large map is closed.)
 
         ; ── Draw entities ────────────────────────────────────────────────────────────────
         awakeEntities   := (areaInstance && areaInstance.Has("awakeEntities"))    ? areaInstance["awakeEntities"]    : 0
@@ -1449,48 +1488,156 @@ class RadarOverlay extends GdiOverlayBase
             this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
     }
 
-    ; Renders per-action debug overlays for hotkey actions whose debug flag is on.
-    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws ONLY the
-    ; map-bound spatial overlays per item: a world range circle around the player or a
-    ; cursor/player pixel circle. The textual debug block (label + condition values +
-    ; key) moved to the standalone DebugOverlay (its "HOTKEYS" section); a circle can't
-    ; live in a text box, so the spatial parts stay here on the radar.
-    _RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin, gw, gh)
+    ; Draws the screen-space range circle(s) requested by debug-enabled hotkey actions
+    ; (monsterCount / aim): a ring at the cursor or at the player's projected screen
+    ; position, read from g_hkDebugItems. Called once per frame from Draw(), independent
+    ; of the map layers, so the combat/aim radius shows even with the large map closed.
+    ; The matching debug TEXT lives in the DebugOverlay's "HOTKEYS" section.
+    _RenderHotkeyCircles()
     {
         global g_hkDebugItems
         if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
             return
 
-        COL := 0x55FFFF        ; debug yellow (BGR) — range-circle label
-        COL_CUR := 0xC0A8FF    ; cursor / player pixel circle (pinkish)
+        COL_CUR := 0xC0A8FF    ; cursor / player range circle (pinkish, BGR)
 
         for _, rec in g_hkDebugItems
         {
             if !(rec is Map)
                 continue
-            ; World range circle around the player.
-            if (rec.Has("circleWorld") && rec["circleWorld"] > 0)
-                this._DrawRangeCircle(rec["circleWorld"], mapCenterX, mapCenterY,
-                    projectionCos, projectionSin, COL,
-                    rec.Has("label") ? rec["label"] : "")
             ; Cursor pixel circle (screen cursor → client coords).
             if (rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
             {
                 cx := 0, cy := 0
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&cx, &cy)
-                this._DrawPixelCircle(cx - this._lastX, cy - this._lastY,
-                    rec["circleCursorPx"], COL_CUR)
+                ccx := cx - this._lastX, ccy := cy - this._lastY
+                r := rec["circleCursorPx"]
+                this._DrawPixelCircle(ccx, ccy, r, COL_CUR)
+                this._DrawCircleLabel(ccx, ccy, r, rec)
             }
             ; Player pixel circle (player projected to screen → client coords).
             if (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
             {
                 ps := this._PlayerScreenPos()
                 if (ps)
-                    this._DrawPixelCircle(ps["x"] - this._lastX, ps["y"] - this._lastY,
-                        rec["circlePlayerPx"], COL_CUR)
+                {
+                    pcx := ps["x"] - this._lastX, pcy := ps["y"] - this._lastY
+                    r := rec["circlePlayerPx"]
+                    this._DrawPixelCircle(pcx, pcy, r, COL_CUR)
+                    this._DrawCircleLabel(pcx, pcy, r, rec)
+                }
+            }
+            ; World-radius ground rings (zoom-independent) — isometric rings of world
+            ; points projected to screen. "circlePlayerWorld" is centred on the player;
+            ; "circleCursorWorld" on the cursor's unprojected world point (experimental).
+            if (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
+            {
+                pw := this._SnapPlayerWorld()
+                if (pw)
+                    this._DrawWorldRing(pw["x"], pw["y"], pw["z"], rec["circlePlayerWorld"], COL_CUR, rec)
+            }
+            if (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0)
+                this._DrawWorldRing(rec["cursorWx"], rec["cursorWy"], rec["cursorWz"],
+                    rec["circleCursorWorld"], COL_CUR, rec)
+        }
+    }
+
+    ; Returns the player's world position Map("x","y","z") from the cached radar snapshot,
+    ; or 0 if unavailable. Centre of the "around player (range)" world ring.
+    _SnapPlayerWorld()
+    {
+        global g_radarLastSnap
+        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+        if !snap
+            return 0
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        if !(pwp && pwp is Map)
+            return 0
+        return Map("x", pwp.Has("x") ? pwp["x"] : 0, "y", pwp.Has("y") ? pwp["y"] : 0
+                 , "z", pwp.Has("z") ? pwp["z"] : 0)
+    }
+
+    ; Draws an isometric ground ring of world-radius <worldR> around the world point
+    ; (cx,cy,cz) by projecting ~48 ring points through the live W2S matrix, then labels it
+    ; at the lower-right of its screen footprint. Used by the monsterCount "range" modes
+    ; (centre = player, or the cursor's world point for the experimental cursor variant).
+    _DrawWorldRing(cx, cy, cz, worldR, colorBGR, rec)
+    {
+        global g_radarLastSnap
+        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+        if !snap
+            return
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+            return
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+        if !(mat is Array && mat.Length = 16)
+            return          ; world ring needs the real projection matrix
+        rect := NavClientRect(gameHwnd)
+        if !rect
+            return
+        segs := 48
+        pts := Buffer((segs + 1) * 8, 0)
+        cnt := 0
+        maxX := -2147483647, maxY := -2147483647
+        Loop (segs + 1)
+        {
+            ang := (A_Index - 1) * 6.2831853 / segs
+            sp := NavProject(cx + worldR * Cos(ang), cy + worldR * Sin(ang), cz, mat, rect, 0)
+            if !sp
+                continue
+            sx := sp["x"] - this._lastX, sy := sp["y"] - this._lastY
+            NumPut("Int", sx, pts, cnt * 8), NumPut("Int", sy, pts, cnt * 8 + 4)
+            cnt += 1
+            if (sx > maxX)
+                maxX := sx
+            if (sy > maxY)
+                maxY := sy
+        }
+        if (cnt < 3)
+            return
+        pen := this._GetPen(colorBGR, 2)
+        oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", cnt)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ring's footprint
+    }
+
+    ; Draws a range-debug record's text (label + lines, e.g. monster counts) anchored at
+    ; the lower-right of a pixel ring (~4 o'clock / 120° clockwise from the top).
+    ; cx,cy = ring centre (client coords), r = ring radius (px).
+    _DrawCircleLabel(cx, cy, r, rec)
+    {
+        this._DrawCircleLabelAt(Round(cx + r * 0.866) + 6, Round(cy + r * 0.5), rec)
+    }
+
+    ; Draws a range-debug record's text (label + lines) starting at (ax,ay) in client
+    ; coords. Shared by the pixel-ring and world-ring labels. This is the spatial
+    ; counterpart to the DebugOverlay's "HOTKEYS" panel, which skips range-based records
+    ; precisely because their text lives here at the circle.
+    _DrawCircleLabelAt(ax, ay, rec)
+    {
+        font := this._GetFont(-13, 600, "Segoe UI")
+        oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
+        pitch := 15
+        this._DrawText(ax, ay, rec.Has("label") ? rec["label"] : "?", 0x55FFFF)
+        ay += pitch
+        if (rec.Has("lines") && rec["lines"] is Array)
+        {
+            for _, ln in rec["lines"]
+            {
+                ; Lines are usually strings; tolerate [text, tag] pairs (buff/charge
+                ; lists) although those records carry no circle and never reach here.
+                this._DrawText(ax, ay, (ln is Array) ? (ln.Length >= 1 ? ln[1] : "") : ln, 0xB8DCE8)
+                ay += pitch
             }
         }
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldFont)
     }
 
     ; Draws the Atlas overlay from the global g_atlasRender snapshot (built by the

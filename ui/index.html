@@ -526,15 +526,26 @@
       50%      { box-shadow: inset 0 0 0 1px rgba(212,140,52,0.55), 0 0 18px -2px rgba(232,160,64,0.85) }
     }
 
-    /* Connected — same gold language as active, slightly cooler. */
+    /* Connected → healthy green pulse: the positive pendant to .pill.disconnected.
+       Same 2.4s ease-in-out attention rhythm, green glow instead of crimson, so a
+       live link reads at a glance the same way a lost one does. */
     .pill.connected {
-      color: var(--codex-text)
+      color: #9bd6a0;
+      border-color: rgba(56,132,72,0.85);
+      background:
+        radial-gradient(ellipse at center, rgba(56,132,72,0.18), transparent 70%),
+        linear-gradient(180deg, rgba(18,52,26,0.85), rgba(8,28,12,0.95));
+      animation: codex-pulse-connected 2.4s ease-in-out infinite
     }
     .pill.connected .dot {
-      background: #b89745;
+      background: #5ec46a;
       box-shadow:
         inset 0 0 0 1px rgba(0,0,0,0.55),
-        0 0 5px rgba(184,151,69,0.55)
+        0 0 8px rgba(94,196,106,0.85)
+    }
+    @keyframes codex-pulse-connected {
+      0%, 100% { box-shadow: inset 0 0 0 1px rgba(56,132,72,0.20), 0 0  8px -3px rgba(94,196,106,0.40) }
+      50%      { box-shadow: inset 0 0 0 1px rgba(56,132,72,0.55), 0 0 18px -2px rgba(94,196,106,0.85) }
     }
 
     /* Scanning — slow ember pulse on the dot, never on the whole pill. */
@@ -1744,6 +1755,23 @@
       line-height: 1.5;
       color: var(--codex-text)
     }
+    /* Multi-line tips (the Shift+F3 profiler table on the status pill) keep their
+       column alignment: monospace, preserved whitespace, no width clamp. */
+    .codex-tooltip-mono {
+      max-width: none;
+      white-space: pre;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: left;
+    }
+    /* Status pill while a benchmark is recording — red pulsing dot. */
+    #pill-fps.pill-rec .dot {
+      background: #d04747;
+      box-shadow: 0 0 6px #d04747;
+      animation: pillRecPulse 1s ease-in-out infinite;
+    }
+    @keyframes pillRecPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
 
     /* Disabled buttons normally drop pointer-events, which means our
        data-tip hover listener never fires — exactly the wrong moment,
@@ -3886,7 +3914,8 @@
     <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗">
+    <!-- AutoFlask retired: replaced by the default "Flasks" hotkey presets (Hotkeys tab). Pill hidden; code pending removal. -->
+    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗" style="display:none">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
@@ -3915,7 +3944,7 @@
     <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
       <div class="dot"></div><span id="snap-text">Refresh</span>
     </div>
-    <div class="pill inactive" id="pill-fps" data-icon="⏱">
+    <div class="pill inactive clickable" id="pill-fps" onclick="ahkCall('ProfilerToggle')" data-icon="⏱" data-tip="Click — start/stop the performance benchmark">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
     </div>
     </div><!-- /header-pills -->
@@ -3927,7 +3956,7 @@
   </div>
 
   <!-- ── CATEGORY BAR (top-level navigation) ── -->
-  <div id="cat-bar">
+  <div id="cat-bar" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
     <div id="cat-bar-left">
       <div class="cat active" data-cat="game" onclick="switchCategory('game')"><svg viewBox="0 0 24 24">
           <rect x="2" y="6" width="20" height="12" rx="6" />
@@ -3969,7 +3998,7 @@
   </div>
 
   <!-- ── SUB-TAB BAR (one row per category, only the active row is visible) ── -->
-  <div id="tab-bar">
+  <div id="tab-bar" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
 
     <!-- GAME — entities / skills / inventory / watchlist -->
     <div class="subtab-row active" data-cat="game">
@@ -4405,7 +4434,8 @@
         <div class="cfg-subpanel" data-cfgtab="automation">
 
         <div class="cfg-section">
-          <details id="det-autoflask" open
+          <!-- AutoFlask retired: replaced by the default "Flasks" hotkey presets (Hotkeys tab). Section hidden; code pending removal. -->
+          <details id="det-autoflask" style="display:none"
             ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
               <div class="cfg-header">Autoflask</div>
@@ -6376,15 +6406,22 @@
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
-        case 'monsterCount':
-          // Counts targetable monsters inside a screen-pixel radius measured
-          // either from the mouse cursor or from the player's on-screen position.
+        case 'monsterCount': {
+          // Counts targetable monsters within a radius. cursor/player measure a
+          // screen-pixel radius; "around player (range)" measures a zoom-independent
+          // world-unit radius around the player (field swaps px ↔ range accordingly).
+          const mcMode = a.radiusMode || 'player';
+          const mcWorld = (mcMode === 'world' || mcMode === 'worldCursor');
+          const mcRadiusField = mcWorld
+            ? `Range ${hkNum(a, 'worldRadius', 1000, gi, hi, ai, 'Radius in world units (zoom-independent — matches the actual game distance)')} `
+            : `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `;
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only count monsters of this rarity (Any = all)')} `
-               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + mcRadiusField
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)'], ['worldCursor', 'around cursor (range) ⚠ experimental']], gi, hi, ai, 'Pixel radius (cursor/player), world-unit range around the player, or — experimental — a world-unit range around the cursor (unprojected onto the ground at player height; inaccurate on slopes)')} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai, 'Comparison operator for the monster count')} `
                + `${hkNum(a, 'value', 1, gi, hi, ai, 'Monster-count threshold to compare against')}`;
           break;
+        }
         case 'aim': {
           // "Scan all" lives at the bottom of the Target dropdown as
           // "any (debug)": it ignores the target type & sub-filter and aims at
@@ -7160,6 +7197,9 @@
         document.body.appendChild(_codexTipEl);
       }
       _codexTipEl.textContent = text;
+      // Multi-line tips (e.g. the Shift+F3 profiler table) render as a left-aligned
+      // monospace block so the columns line up; short tips stay normal.
+      _codexTipEl.classList.toggle('codex-tooltip-mono', text.indexOf('\n') >= 0);
       _codexTipEl.style.display = 'block';
       _codexTipPosition(ev);
     }
@@ -7196,13 +7236,41 @@
     // ═══════════════════════════════════════════════════════════════════
     //  STATUS BAR
     // ═══════════════════════════════════════════════════════════════════
+    // The rightmost status pill (#pill-fps) is shared: idle -> live fps (updateStatus),
+    // recording/done -> the Shift+F3 performance benchmark (updateProfilerPill).
+    // _profPillState gates who owns the pill text so the two don't overwrite each other.
+    let _profPillState = 'idle';
     function updateStatus(leftText, rightText, perfText) {
       const el = document.getElementById('status-left');
       if (el) el.textContent = leftText || '';
       const er = document.getElementById('status-right');
       if (er) er.textContent = rightText || '';
       const fpsPill = document.getElementById('pill-fps-text');
-      if (fpsPill && perfText) fpsPill.textContent = perfText;
+      if (fpsPill && perfText && _profPillState === 'idle') fpsPill.textContent = perfText;
+    }
+
+    // Drives the status pill from the Shift+F3 benchmark (pushed by _PushProfilerPill).
+    //   "recording" -> "● REC" + red dot
+    //   "done"       -> headline marker on the pill; full table in its hover tooltip
+    //   "idle"       -> hand the pill back to the live-fps text
+    function updateProfilerPill(state, headline, table) {
+      _profPillState = state || 'idle';
+      const txt  = document.getElementById('pill-fps-text');
+      const pill = document.getElementById('pill-fps');
+      if (!txt || !pill) return;
+      if (_profPillState === 'idle') {
+        pill.setAttribute('data-tip', 'Click — start/stop the performance benchmark');
+        pill.classList.remove('pill-rec');
+        return;  // text is driven by updateStatus (live fps)
+      }
+      txt.textContent = headline || '';
+      if (_profPillState === 'recording') {
+        pill.setAttribute('data-tip', 'Recording… reproduce the lag, then click again to stop');
+        pill.classList.add('pill-rec');
+      } else {  // done
+        pill.setAttribute('data-tip', table || '(no profiler data)');
+        pill.classList.remove('pill-rec');
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -9269,7 +9337,7 @@
     // ═══════════════════════════════════════════════════════════════════
     function headerDragStart(e) {
       if (e.button !== 0) return;
-      if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+      if (e.target.closest('button,a,input,select,.pill,.tab,.cat,.cat-btn,.wm-btn')) return;
       // Don't start a window drag when the press lands on a scrollbar (e.g.
       // the narrow pill row's horizontal scrollbar). clientWidth/Height
       // exclude the scrollbar gutter, so an offset past them means the
@@ -9281,7 +9349,7 @@
     }
 
     function headerDblClick(e) {
-      if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+      if (e.target.closest('button,a,input,select,.pill,.tab,.cat,.cat-btn,.wm-btn')) return;
       ahkCall('WinMaximize');
     }
 

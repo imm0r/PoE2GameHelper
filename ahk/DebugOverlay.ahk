@@ -27,6 +27,7 @@ class DebugOverlay extends GdiOverlayBase
     static COL_DIM      := 0x648A9C   ; #9c8a64 — dim text for "off" / sub-info
     static COL_BLOOD    := 0x4848C5   ; #c54848 — blood red for combat
     static COL_AMBER    := 0x43A0D4   ; #d4a043 — burnished bronze for active
+    static COL_GREEN    := 0x6AC45E   ; #5ec46a — healthy green (matched buff/charge highlight)
     ; Layout
     static PAD_X        := 12
     static PAD_Y        := 10
@@ -201,18 +202,40 @@ class DebugOverlay extends GdiOverlayBase
         ; ── Hotkeys ──────────────────────────────────────────────────────────
         ; Per-action debug records (label + condition values + fired key) for every
         ; hotkey action whose debug flag is on, built each tick by the hotkey engine
-        ; (g_hkDebugItems). This block is where the radar's old hotkey text moved to.
+        ; (g_hkDebugItems). Range-based records (monsterCount / aim — those carrying a
+        ; circle) are intentionally skipped here: their text is drawn next to the range
+        ; circle on the radar (RadarOverlay._DrawCircleLabel). Only the non-spatial
+        ; conditions (vitals / buff / charges) show in this panel.
         if (IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
         {
-            lines.Push(["HOTKEYS", DebugOverlay.COL_GOLD_HI])
+            hkLines := []
             for _, rec in g_hkDebugItems
             {
                 if !(rec is Map)
                     continue
-                lines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
+                if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
+                    || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
+                    || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
+                    || (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0))
+                    continue   ; range-based → drawn at the circle/ring on the radar
+                hkLines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
                 if (rec.Has("lines") && rec["lines"] is Array)
                     for _, ln in rec["lines"]
-                        lines.Push(["    " ln, DebugOverlay.COL_IVORY])
+                    {
+                        ; A line is either a plain string (ivory) or a [text, tag] pair —
+                        ; tag "green" highlights the buff/charge the condition checks.
+                        if (ln is Array)
+                            hkLines.Push(["    " (ln.Length >= 1 ? ln[1] : "")
+                                , (ln.Length >= 2 && ln[2] = "green") ? DebugOverlay.COL_GREEN : DebugOverlay.COL_IVORY])
+                        else
+                            hkLines.Push(["    " ln, DebugOverlay.COL_IVORY])
+                    }
+            }
+            if (hkLines.Length)
+            {
+                lines.Push(["HOTKEYS", DebugOverlay.COL_GOLD_HI])
+                for _, l in hkLines
+                    lines.Push(l)
             }
         }
 

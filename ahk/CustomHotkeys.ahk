@@ -36,6 +36,8 @@ HotkeysInit()
     global g_hkInjectGuard := Map()       ; lowercased key -> expiry tick (self-injection guard)
     global g_hkOneShotPerTick := false    ; when true, at most one hotkey auto-fires per eval tick
     global g_hkDebugItems := []           ; per-frame debug records for actions with debug on (read by the overlay)
+    global g_hkFlaskCache := 0            ; cached flask-slot Map for output readiness (charge gate)
+    global g_hkFlaskCacheTick := 0        ; A_TickCount of the last on-demand flask-slot read
 }
 
 ; ── Persistence ────────────────────────────────────────────────────────────
@@ -183,20 +185,67 @@ _HotkeysOutputReadiness(hk)
 {
     out := (hk.Has("output") && hk["output"] is Map) ? hk["output"] : 0
     if !out
-        return Map("ready", true, "cooldownMs", 0)
+        return Map("ready", true, "cooldownMs", 0, "kind", "key")
     kind := out.Has("kind") ? out["kind"] : "key"
     if (kind = "skill")
     {
         nm := out.Has("skillName") ? out["skillName"] : ""
         if (nm = "")
-            return Map("ready", true, "cooldownMs", 0)
+            return Map("ready", true, "cooldownMs", 0, "kind", "skill")
         r := HotkeysSkillReadiness(nm)
-        return Map("ready", r["found"] ? r["canUse"] : true, "cooldownMs", r["cooldownMs"])
+        return Map("ready", r["found"] ? r["canUse"] : true, "cooldownMs", r["cooldownMs"], "kind", "skill")
     }
-    ; Flask charge counts are not present in the radar snapshot (only buff
-    ; data is), so a flask readiness gate can't be evaluated reliably here —
-    ; treat flask/key bindings as always ready.
-    return Map("ready", true, "cooldownMs", 0)
+    if (kind = "flask")
+    {
+        ; Charge gate — mirrors AutoFlask's TryUseFlaskSlot: a flask may only fire
+        ; when it holds at least one full use (current >= perUse) and its own buff
+        ; isn't already active. Flask charges aren't in the radar snapshot, so the
+        ; slot data is read on demand and cached (see _HotkeysFlaskSlots).
+        slot   := out.Has("slot") ? (out["slot"] + 0) : 0
+        slots  := _HotkeysFlaskSlots()
+        if !(slots && slots is Map && slots.Has(slot))
+            return Map("ready", true, "cooldownMs", 0, "kind", "flask")   ; lenient when unreadable
+        s      := slots[slot]
+        fs     := (s && s is Map && s.Has("flaskStats")) ? s["flaskStats"] : 0
+        cur    := (fs && fs is Map && fs.Has("current")) ? (fs["current"] + 0) : 0
+        perUse := (fs && fs is Map && fs.Has("perUse"))  ? (fs["perUse"]  + 0) : 0
+        active := (s && s is Map && s.Has("activeByBuff") && s["activeByBuff"]) ? true : false
+        ready  := (perUse > 0 && cur >= perUse && !active)
+        return Map("ready", ready, "cooldownMs", 0, "kind", "flask"
+                 , "charges", cur, "perUse", perUse, "active", active)
+    }
+    ; Free "key" binding — no readiness constraint.
+    return Map("ready", true, "cooldownMs", 0, "kind", "key")
+}
+
+; Returns the flask-slot Map (slot 1-5 -> flask data with flaskStats / activeByBuff),
+; read on demand from the area instance in the cached radar snapshot and itself cached
+; for 150ms (charges change slowly, and readiness is polled every eval tick). Returns 0
+; when unavailable. Independent of AutoFlask, so a flask hotkey works on its own.
+_HotkeysFlaskSlots()
+{
+    global g_reader, g_hkFlaskCache, g_hkFlaskCacheTick
+    if ((A_TickCount - g_hkFlaskCacheTick) < 150)
+        return g_hkFlaskCache
+    g_hkFlaskCacheTick := A_TickCount
+    g_hkFlaskCache := 0
+    snap := _HotkeysSnap()
+    if !snap
+        return 0
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    area := (inGs && inGs is Map && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    addr := (area && area is Map && area.Has("address")) ? area["address"] : 0
+    if !addr
+        return 0
+    ai := 0
+    try ai := g_reader.ReadAreaInstanceAutoFlask(addr)
+    if !(ai && ai is Map && ai.Has("serverData"))
+        return 0
+    srv      := ai["serverData"]
+    flaskInv := (srv && srv is Map && srv.Has("flaskInventory")) ? srv["flaskInventory"] : 0
+    slots    := (flaskInv && flaskInv is Map && flaskInv.Has("flaskSlots")) ? flaskInv["flaskSlots"] : 0
+    g_hkFlaskCache := slots
+    return slots
 }
 
 ; Serializes g_hotkeyGroups to hotkeys.json (pretty-printed for hand-editing).
@@ -214,6 +263,54 @@ HotkeysSaveConfig()
             f.Close()
         }
     }
+}
+
+; One-time seed of the default "Flasks" hotkey group that replaces the old
+; standalone AutoFlask feature:
+;   Life Flask -> flask slot 1, automated, fires at <= 55% life
+;   Mana Flask -> flask slot 2, automated, fires at <= 35% mana
+; Both are foreground-only and suppressed in town/hideout; the flask output
+; readiness charge-gates them, so an empty flask never fires. A persistent flag
+; ([Hotkeys] flaskPresetsSeeded in poeformance_config.ini) guarantees this runs
+; at most once per install — deleting the presets later never re-creates them,
+; and existing user hotkeys are appended to, never overwritten. Called once at
+; startup after HotkeysLoadConfig().
+HotkeysSeedFlaskPresets()
+{
+    global g_hotkeyGroups
+    cfgPath := A_ScriptDir "\poeformance_config.ini"
+    if (IniRead(cfgPath, "Hotkeys", "flaskPresetsSeeded", "0") = "1")
+        return
+
+    raw := [ Map(
+        "name", "Flasks",
+        "enabled", 1,
+        "hotkeys", [
+            Map(
+                "name", "Life Flask",
+                "enabled", 1,
+                "trigger", "automated",
+                "focusOnly", 1,
+                "safeZoneDisabled", 1,
+                "output", Map("kind", "flask", "slot", 1),
+                "actions", [ Map("type", "vitals", "resource", "hp", "op", "<=", "value", 55) ]
+            ),
+            Map(
+                "name", "Mana Flask",
+                "enabled", 1,
+                "trigger", "automated",
+                "focusOnly", 1,
+                "safeZoneDisabled", 1,
+                "output", Map("kind", "flask", "slot", 2),
+                "actions", [ Map("type", "vitals", "resource", "mana", "op", "<=", "value", 35) ]
+            )
+        ]
+    ) ]
+
+    for g in _HotkeysNormalizeGroups(raw)
+        g_hotkeyGroups.Push(g)
+    HotkeysSaveConfig()
+    IniWrite("1", cfgPath, "Hotkeys", "flaskPresetsSeeded")
 }
 
 ; Reads a truthy/0-1 value from a Map key with a default. Accepts 1/0, true/false.
@@ -431,15 +528,48 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     rec["key"] := key
     rec["lines"].Push("key: " (key != "" ? key : "(unbound)"))
 
+    ; When this hotkey last actually fired its key (any path), and which key.
+    rt := _HotkeysRuntime(hk["id"])
+    if (rt.Has("lastFireTick") && rt["lastFireTick"] > 0)
+        rec["lines"].Push("last fired: " (rt.Has("lastFireKey") && rt["lastFireKey"] != "" ? rt["lastFireKey"] : "?")
+            " (" Round((A_TickCount - rt["lastFireTick"]) / 1000.0, 1) "s ago)")
+    else
+        rec["lines"].Push("last fired: never")
+
     if (t = "monsterCount" || t = "monsterCountCursor")
     {
-        px := a.Has("radius") ? (a["radius"] + 0) : 120
         ; Legacy "monsterCountCursor" is always cursor-origin.
-        mode := (t = "monsterCountCursor" || (a.Has("radiusMode") && a["radiusMode"] = "cursor")) ? "cursor" : "player"
-        rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
-        counts := _HotkeysCountByRarity(snap, px, mode)
-        rec["counts"] := counts
-        rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        mode := (t = "monsterCountCursor") ? "cursor"
+            : (a.Has("radiusMode") ? a["radiusMode"] : "player")
+        if (mode = "world")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            rec["circlePlayerWorld"] := wr   ; isometric world-radius ground ring around the player
+            counts := _HotkeysCountByRarity(snap, wr, "world")
+            rec["counts"] := counts
+            rec["lines"].Push("@range(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
+        else if (mode = "worldCursor")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            cwp := _HotkeysCursorWorldPos(snap)   ; ground ring around the cursor's world point
+            if (cwp)
+            {
+                rec["circleCursorWorld"] := wr
+                rec["cursorWx"] := cwp["x"], rec["cursorWy"] := cwp["y"], rec["cursorWz"] := cwp["z"]
+            }
+            counts := _HotkeysCountByRarity(snap, wr, "worldCursor")
+            rec["counts"] := counts
+            rec["lines"].Push("@cursorRange(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
+        else
+        {
+            px := a.Has("radius") ? (a["radius"] + 0) : 120
+            rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
+            counts := _HotkeysCountByRarity(snap, px, mode)
+            rec["counts"] := counts
+            rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
     }
     else if (t = "aim")
     {
@@ -452,19 +582,20 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     {
         type := a.Has("chargeType") ? a["chargeType"] : "power"
         nameMap := Map("power", "power_charge", "frenzy", "frenzy_charge", "endurance", "endurance_charge", "charged_staff", "charged_staff_stack")
-        eff := _HotkeysFindBuff(snap, nameMap.Has(type) ? nameMap[type] : type)
-        n := (eff && eff.Has("charges")) ? (eff["charges"] + 0) : 0
-        rec["charges"] := n
-        rec["lines"].Push(type " charges: " n)
+        buffName := nameMap.Has(type) ? nameMap[type] : type
+        op  := a.Has("op") ? a["op"] : ">="
+        val := a.Has("value") ? a["value"] : 0
+        rec["lines"].Push(type " charges " op " " val " - active buffs:")
+        for _, ln in _HotkeysBuffListLines(snap, buffName)
+            rec["lines"].Push(ln)
     }
     else if (t = "buff")
     {
-        nm := a.Has("buffName") ? a["buffName"] : ""
-        eff := (nm != "") ? _HotkeysFindBuff(snap, nm) : 0
-        if (eff)
-            rec["lines"].Push("buff '" nm "' x" (eff.Has("charges") ? eff["charges"] : 0) " " (eff.Has("timeLeft") ? Round(eff["timeLeft"]) "ms" : ""))
-        else
-            rec["lines"].Push("buff '" nm "' absent")
+        nm   := a.Has("buffName") ? a["buffName"] : ""
+        mode := a.Has("mode") ? a["mode"] : "present"
+        rec["lines"].Push("buff '" nm "' (" mode ") - active buffs:")
+        for _, ln in _HotkeysBuffListLines(snap, nm)
+            rec["lines"].Push(ln)
     }
     else if (t = "vitals")
     {
@@ -491,24 +622,42 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             rec["lines"].Push("vitals " res " " op " " thr "% (no data)")
     }
 
-    ; Output skill cooldown / readiness (applies to any debugged action).
+    ; Output readiness (applies to any debugged action). Flask outputs always show
+    ; their live charge count; skills show cooldown only when not ready. Guard the
+    ; flask charge keys: the lenient "unreadable" readiness omits them.
     rdy := _HotkeysOutputReadiness(hk)
-    if (rdy["cooldownMs"] > 0 || !rdy["ready"])
+    rk := rdy.Has("kind") ? rdy["kind"] : ""
+    if (rk = "flask")
+    {
+        if (rdy.Has("charges"))
+            rec["lines"].Push("flask charges " rdy["charges"] "/" rdy["perUse"]
+                ((rdy.Has("active") && rdy["active"]) ? " (buff active)" : "") " -> " (rdy["ready"] ? "READY" : "NOT READY"))
+        else
+            rec["lines"].Push("flask charges n/a (unread) -> " (rdy["ready"] ? "READY" : "NOT READY"))
+    }
+    else if (rdy["cooldownMs"] > 0 || !rdy["ready"])
         rec["lines"].Push("skill " (rdy["ready"] ? "READY" : "on CD") (rdy["cooldownMs"] > 0 ? " (" rdy["cooldownMs"] "ms)" : ""))
     return rec
 }
 
-; Counts hostile entities by rarity within a radius. mode "world" uses the
-; per-entity world distance; "cursor"/"player" project to screen and measure
-; pixels from the cursor / the player's on-screen position. Returns
-; Map("normal","magic","rare","unique","total").
+; Counts hostile entities by rarity within a radius. mode "world" uses the per-entity
+; world distance to the player; "worldCursor" uses the world distance to the cursor's
+; unprojected ground point (experimental); "cursor"/"player" project to screen and
+; measure pixels from the cursor / the player. Returns Map("normal".."unique","total").
 _HotkeysCountByRarity(snap, radius, mode)
 {
     out := Map("normal", 0, "magic", 0, "rare", 0, "unique", 0, "total", 0)
     if !snap
         return out
     octx := 0
-    if (mode != "world")
+    cwp := 0
+    if (mode = "worldCursor")
+    {
+        cwp := _HotkeysCursorWorldPos(snap)
+        if !cwp
+            return out          ; cursor can't be unprojected this frame → count 0
+    }
+    else if (mode != "world")
     {
         octx := _HotkeysPxOrigin(snap, mode)
         if !octx
@@ -527,6 +676,17 @@ _HotkeysCountByRarity(snap, radius, mode)
         {
             dist := entry.Has("distance") ? entry["distance"] : -1
             if (dist < 0 || dist > radius)
+                continue
+        }
+        else if (mode = "worldCursor")
+        {
+            render := dc.Has("render") ? dc["render"] : 0
+            wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
+            if !(wp && wp is Map)
+                continue
+            ddx := (wp.Has("x") ? wp["x"] : 0) - cwp["x"]
+            ddy := (wp.Has("y") ? wp["y"] : 0) - cwp["y"]
+            if (Sqrt(ddx * ddx + ddy * ddy) > radius)
                 continue
         }
         else
@@ -550,12 +710,57 @@ _HotkeysCountByRarity(snap, radius, mode)
     return out
 }
 
+; Unprojects the current mouse cursor to a world position on the ground plane at the
+; player's Z — a flat-ground approximation (exact on level terrain, off on slopes).
+; Solves M·(wx,wy,pz,1) for (wx,wy) so it projects back to the cursor's NDC (inverse of
+; NavProject with z fixed). Params: snap (radar snapshot, for the W2S matrix + player Z).
+; Returns Map("x","y","z") or 0 when matrix/window/player are unavailable or degenerate.
+_HotkeysCursorWorldPos(snap)
+{
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+    if !(mat is Array && mat.Length = 16)
+        return 0
+    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+    pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+    if !(pwp && pwp is Map)
+        return 0
+    pz := pwp.Has("z") ? pwp["z"] : 0
+    gameHwnd := ResolvePoEWindow()
+    if !gameHwnd
+        return 0
+    rect := NavClientRect(gameHwnd)
+    if !rect
+        return 0
+    cx := 0, cy := 0
+    CoordMode("Mouse", "Screen")
+    MouseGetPos(&cx, &cy)
+    ; cursor screen → NDC (inverse of NavProject's NDC→pixel mapping)
+    ndcX := (cx - rect["x"]) * 2.0 / rect["w"] - 1.0
+    ndcY := 1.0 - (cy - rect["y"]) * 2.0 / rect["h"]
+    ; r1=ndcX·r4, r2=ndcY·r4 with z=pz fixed → a 2×2 linear system in (wx,wy).
+    K1 := mat[9]  * pz + mat[13]
+    K2 := mat[10] * pz + mat[14]
+    K4 := mat[12] * pz + mat[16]
+    A11 := mat[1] - ndcX * mat[4], A12 := mat[5] - ndcX * mat[8]
+    A21 := mat[2] - ndcY * mat[4], A22 := mat[6] - ndcY * mat[8]
+    B1  := ndcX * K4 - K1,         B2  := ndcY * K4 - K2
+    det := A11 * A22 - A12 * A21
+    if (Abs(det) < 0.0000001)
+        return 0
+    return Map("x", (B1 * A22 - A12 * B2) / det
+             , "y", (A11 * B2 - B1 * A21) / det
+             , "z", pz)
+}
+
 ; Returns the runtime-state Map for a hotkey id, creating it on first use.
 _HotkeysRuntime(id)
 {
     global g_hkRuntime
     if !g_hkRuntime.Has(id)
-        g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0)
+        g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0
+                             , "lastFireTick", 0, "lastFireKey", "")
     return g_hkRuntime[id]
 }
 
@@ -729,7 +934,7 @@ _HotkeysRunActions(hk, context, depth)
                 _HotkeysDoKey(hk, a)
                 hadEffect := true
             case "press":
-                _HotkeysSendKey(_HotkeysResolveKey(hk))
+                _HotkeysFireOutput(hk)
                 hadEffect := true
             case "repeat":
                 _HotkeysDoRepeat(hk, a)
@@ -747,7 +952,7 @@ _HotkeysRunActions(hk, context, depth)
     }
     ; Conditions-only hotkey: no effect action ran, so fire the bound output once.
     if !hadEffect
-        _HotkeysSendKey(_HotkeysResolveKey(hk))
+        _HotkeysFireOutput(hk)
 }
 
 ; ── Condition evaluators ───────────────────────────────────────────────────
@@ -851,6 +1056,57 @@ _HotkeysFindBuff(snap, name)
     return 0
 }
 
+; Reads the full list of active player buff effects (on demand, via the snapshot's
+; local-player pointer), or 0 when unavailable. Each effect is a Map with name /
+; charges / timeLeft. Used by the buff & charges debug readout.
+_HotkeysReadBuffs(snap)
+{
+    global g_reader
+    if !snap
+        return 0
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    lpPtr := (area && area.Has("localPlayerPtr")) ? area["localPlayerPtr"] : 0
+    if !lpPtr
+        return 0
+    buffs := 0
+    try buffs := g_reader.ReadPlayerBuffsComponent(lpPtr)
+    if !(buffs && buffs is Map && buffs.Has("effects"))
+        return 0
+    return buffs["effects"]
+}
+
+; Builds the debug lines listing every active buff (name + stacks + time-left). The
+; buff whose name contains <needle> (case-insensitive — the one the condition checks)
+; is returned as a [text, "green"] pair so the overlay highlights it; the rest are
+; plain strings. Returns an Array (with a "(no active buffs)" entry when none).
+_HotkeysBuffListLines(snap, needle)
+{
+    out := []
+    effects := _HotkeysReadBuffs(snap)
+    if !(effects && effects is Array && effects.Length)
+    {
+        out.Push("  (no active buffs)")
+        return out
+    }
+    nlow := StrLower(needle)
+    for eff in effects
+    {
+        if !(eff is Map)
+            continue
+        bn := eff.Has("name") ? eff["name"] : ""
+        if (bn = "")
+            continue
+        ch := eff.Has("charges")  ? (eff["charges"] + 0) : 0
+        tl := eff.Has("timeLeft") ? Round(eff["timeLeft"]) : 0
+        txt := "  " bn (ch > 1 ? " x" ch : "") (tl > 0 ? " " tl "ms" : "")
+        out.Push((nlow != "" && InStr(StrLower(bn), nlow)) ? [txt, "green"] : txt)
+    }
+    if (out.Length = 0)
+        out.Push("  (no active buffs)")
+    return out
+}
+
 ; Builds the screen-projection origin for a pixel-radius test. originMode
 ; "cursor" uses the mouse position; "player" uses the player's own projected
 ; screen position. Returns a Map (hwnd, w2sMatrix, player world pos, origin
@@ -902,57 +1158,27 @@ _HotkeysPxDist(octx, wx, wy, wz)
     return Sqrt(ddx * ddx + ddy * ddy)
 }
 
-; Monster-count gate: counts hostile (targetable) entities within a screen-pixel
-; radius of the chosen origin (cursor or the player's on-screen position),
-; optionally filtered by rarity, and compares to the threshold.
-; action: Map("radius", px, "radiusMode","cursor"|"player",
-;             "rarity","any"|"normal"|"magic"|"rare"|"unique", "op",">=",
-;             "value", n, "worldRadius", maxWorldDist)
-;   worldRadius pre-filters far entities before projection (default 4000).
+; Monster-count gate: counts hostile (targetable) entities, optionally filtered by
+; rarity, within the configured radius, and compares to the threshold. radiusMode
+; "cursor"/"player" use a screen-pixel radius (action "radius"); "world" uses a
+; zoom-independent world-unit radius around the player (action "worldRadius").
+; action: Map("radius", px, "worldRadius", units,
+;             "radiusMode","cursor"|"player"|"world",
+;             "rarity","any"|"normal"|"magic"|"rare"|"unique", "op",">=", "value", n)
+; Delegates the actual counting to _HotkeysCountByRarity, then picks the rarity bucket.
 _HotkeysCheckMonsterCount(a, snap)
 {
     if !snap
         return false
-    pxRadius := a.Has("radius") ? (a["radius"] + 0) : 120
-    worldRadius := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 4000
+    mode := a.Has("radiusMode") ? a["radiusMode"] : "player"
+    radiusVal := (mode = "world" || mode = "worldCursor")
+        ? (a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000)
+        : (a.Has("radius") ? (a["radius"] + 0) : 120)
+    counts := _HotkeysCountByRarity(snap, radiusVal, mode)
     rarity := a.Has("rarity") ? a["rarity"] : "any"
-    rarMap := Map("normal", 0, "magic", 1, "rare", 2, "unique", 3)
-    wantRar := rarMap.Has(rarity) ? rarMap[rarity] : -1
-    originMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
-    octx := _HotkeysPxOrigin(snap, originMode)
-    if !octx
-        return false
-
-    count := 0
-    for entry in _HotkeysAwakeSample(snap)
-    {
-        entity := entry.Has("entity") ? entry["entity"] : 0
-        if !(entity && entity is Map)
-            continue
-        dist := entry.Has("distance") ? entry["distance"] : -1
-        if (dist < 0 || dist > worldRadius)
-            continue
-        dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
-        if !(dc && dc is Map)
-            continue
-        if !_HotkeysIsTargetable(dc)
-            continue
-        if (wantRar >= 0)
-        {
-            rid := dc.Has("rarityId") ? dc["rarityId"] : -1
-            if (rid != wantRar)
-                continue
-        }
-        render := dc.Has("render") ? dc["render"] : 0
-        wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
-        if !(wp && wp is Map)
-            continue
-        d := _HotkeysPxDist(octx, wp.Has("x") ? wp["x"] : 0, wp.Has("y") ? wp["y"] : 0, wp.Has("z") ? wp["z"] : 0)
-        if (d < 0 || d > pxRadius)
-            continue
-        count += 1
-    }
-    return _HotkeysCompare(count, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
+    n := (rarity = "any") ? counts["total"]
+                          : (counts.Has(rarity) ? counts[rarity] : 0)
+    return _HotkeysCompare(n, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
 }
 
 ; Legacy alias: the old "monsterCountCursor" action is now just a monster-count
@@ -1024,6 +1250,28 @@ _HotkeysSendKey(key)
     try _SendSkillKey(key, gameHwnd)
 }
 
+; Records that hotkey <hk> just fired <key> into its runtime state
+; (lastFireTick / lastFireKey), for the debug overlay's "last fired" line.
+; Empty keys are ignored (no real trigger happened).
+_HotkeysMarkFired(hk, key)
+{
+    if (Trim(key) = "")
+        return
+    rt := _HotkeysRuntime(hk["id"])
+    rt["lastFireTick"] := A_TickCount
+    rt["lastFireKey"]  := key
+}
+
+; Resolves the hotkey's output key, sends it once, and records the fire. The single
+; "send the bound output once" path, so every site that does so also updates the
+; last-fired bookkeeping.
+_HotkeysFireOutput(hk)
+{
+    key := _HotkeysResolveKey(hk)
+    _HotkeysSendKey(key)
+    _HotkeysMarkFired(hk, key)
+}
+
 ; Merged key action: dispatches on "mode" to the press / hold / loop behaviour.
 ; action: Map("mode","press"|"hold"|"loop", ...mode-specific fields)
 _HotkeysDoKey(hk, a)
@@ -1034,7 +1282,7 @@ _HotkeysDoKey(hk, a)
     else if (mode = "loop")
         _HotkeysDoRepeat(hk, a)
     else
-        _HotkeysSendKey(_HotkeysResolveKey(hk))
+        _HotkeysFireOutput(hk)
 }
 
 ; Repeat action: presses the output key repeatedly.
@@ -1078,7 +1326,7 @@ _HotkeysSendKeyIfReady(hk)
     rdy := _HotkeysOutputReadiness(hk)
     if !rdy["ready"]
         return
-    _HotkeysSendKey(_HotkeysResolveKey(hk))
+    _HotkeysFireOutput(hk)
 }
 
 ; Schedules <count> key presses spaced <interval> ms apart via a self-cancelling
@@ -1094,7 +1342,7 @@ _HotkeysScheduleBurst(hk, count, interval)
         rdy := _HotkeysOutputReadiness(hk)
         if rdy["ready"]
         {
-            _HotkeysSendKey(_HotkeysResolveKey(hk))
+            _HotkeysFireOutput(hk)
             state["left"] -= 1
         }
         state["ticksLeft"] -= 1
@@ -1115,6 +1363,7 @@ _HotkeysDoHold(hk, a)
     dur := a.Has("durationMs") ? Max(10, a["durationMs"] + 0) : 200
     if !_HotkeysKeyDown(key)
         return
+    _HotkeysMarkFired(hk, key)
     SetTimer(() => _HotkeysKeyUp(key), -dur)
 }
 
@@ -1183,10 +1432,16 @@ _HotkeysDoAim(hk, a, snap)
         {
             key := Trim(outKey)
             if (key != "" && _HotkeysKeyDown(key))
+            {
+                _HotkeysMarkFired(hk, key)
                 SetTimer(() => _HotkeysKeyUp(key), -holdMs)
+            }
         }
         else
+        {
             _HotkeysSendKey(outKey)
+            _HotkeysMarkFired(hk, outKey)
+        }
     }
 }
 

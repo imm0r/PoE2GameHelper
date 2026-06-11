@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.15"
+POEFORMANCE_VERSION := "0.45.12.29"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -128,10 +128,6 @@ g_radarLastSnap := 0   ; last successful radar snapshot — used by Dump Entitie
 g_radarReadMs := 0  ; Last ReadRadarSnapshot() duration (ms)
 g_radarRenderMs := 0  ; Last RadarOverlay.Render() duration (ms)
 g_radarFps := 0  ; Achieved overlay frames per second
-g_profReadLastMs := 0
-g_profReadAvgMs := 0
-g_profTreeLastMs := 0
-g_profTotalLastMs := 0
 g_offsetTableRowPathByRow := Map()
 g_offsetPreviousValueByPath := Map()
 g_offsetTableSortCol := 1
@@ -332,6 +328,7 @@ AtlasData_Load()          ; Atlas biome/content lookup tables for the map overla
 HotkeysInit()
 SkillHotkeysInit()
 HotkeysLoadConfig()
+HotkeysSeedFlaskPresets()   ; one-time: create the default "Flasks" hotkey group (replaces AutoFlask)
 g_hkOneShotPerTick := (IniRead(_ConfigPath(), "Hotkeys", "oneShotPerTick", "0") = "1")
 
 ; Schedule an auto-refresh check shortly after startup. Runs on a
@@ -468,7 +465,8 @@ try
     g_valueTree.Add("Waiting for PoE2 process…")
     g_valueTree.Add("Start the game (Steam or via the Launch button below).")
 }
-SetTimer(TryAutoFlaskFast, 150)
+; AutoFlask retired — replaced by the default "Flasks" hotkey presets (HotkeysSeedFlaskPresets).
+; The TryAutoFlask* / ReadAutoFlaskSnapshot code is now dead and pending removal.
 SetTimer(UpdateRadarFast, 50)
 SetTimer(ReadAndShow, 2000)
 SetTimer(EnsureConnected, 2000)
@@ -564,7 +562,7 @@ EnsureConnected()
 ; Updates the status bar text and pushes it to the WebView.
 UpdateStatusBar()
 {
-    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs, g_reader
+    global g_radarReadMs, g_radarRenderMs, g_radarFps, g_reader
     global POEFORMANCE_VERSION
 
     patch := GetLastKnownPoeVersion()
@@ -573,10 +571,9 @@ UpdateStatusBar()
     leftText := "PoEformance v" POEFORMANCE_VERSION " for PoE2 v" (patch != "" ? patch : "—")
     rightText := "Last Updated: " now
 
-    ; Performance details for the FPS pill: total iteration ms + radar fps
-    perfText := g_profTotalLastMs "ms"
-    if (g_radarFps > 0)
-        perfText .= " | " g_radarFps " fps"
+    ; Live perf for the status pill — only applied while the Shift+F3 benchmark is
+    ; idle; during/after a benchmark run the pill is owned by updateProfilerPill().
+    perfText := (g_radarFps > 0) ? (g_radarFps " fps") : ""
 
     WebViewExec("updateStatus(" _JsStr(leftText) "," _JsStr(rightText) "," _JsStr(perfText) ")")
 }
@@ -670,7 +667,7 @@ ReadAndShow(forceTreeRefresh := false)
     {
         global g_reader, g_valueTree, g_nodePaths, g_debugMode, g_updatesPaused, g_autoFlaskEnabled, g_flaskKeyLoadStatus, g_flaskKeyBySlot, g_showTreePane
         global g_lifeThresholdPercent, g_manaThresholdPercent, g_autoFlaskLastReason, autoFlaskStatusText, hotkeyLegendText, g_autoFlaskPerformanceMode, g_lastSnapshotForUi
-        global g_treeRefreshRequested, g_profReadLastMs, g_profReadAvgMs, g_profTreeLastMs, g_profTotalLastMs
+        global g_treeRefreshRequested
 
         if (g_updatesPaused && !forceTreeRefresh)
             return
@@ -704,7 +701,6 @@ ReadAndShow(forceTreeRefresh := false)
             return
         }
 
-        TryAutoFlask(snapshot)
         g_lastSnapshotForUi := snapshot
 
         UpdateActionButtonLabels()
@@ -739,10 +735,6 @@ ReadAndShow(forceTreeRefresh := false)
             g_treeRefreshRequested := false
         }
         _totalLastMs := A_TickCount - totalStart
-        g_profReadLastMs := _readLastMs
-        g_profReadAvgMs := readAvgMs
-        g_profTreeLastMs := _treeLastMs
-        g_profTotalLastMs := _totalLastMs
         UpdateOffsetTable(snapshot)
         ; Push the active (tree) tab plus all special-tab data to the WebView UI.
         PushActiveTreeToWebView()
@@ -960,6 +952,5 @@ OnTreeTabChanged(*)
 ; F3: one-shot debug dump — TreeView content, game window screenshot, radar entity TSV.
 F3:: OnF3DebugDump()
 
-; Shift+F3: toggle the per-tick QPC profiler. 1st press enables + resets, 2nd press
-; dumps the timing table to logs\profiler_<ts>.txt (and a tooltip) and disables it.
-+F3:: ProfilerToggleDump()
+; The per-tick QPC profiler is toggled by CLICKING the ⏱ status pill in the header
+; (ProfilerToggle bridge case → ProfilerToggleDump). It no longer has a hotkey.
