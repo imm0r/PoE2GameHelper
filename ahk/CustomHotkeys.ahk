@@ -710,50 +710,66 @@ _HotkeysCountByRarity(snap, radius, mode)
     return out
 }
 
-; Unprojects the current mouse cursor to a world position on the ground plane at the
-; player's Z — a flat-ground approximation (exact on level terrain, off on slopes).
-; Solves M·(wx,wy,pz,1) for (wx,wy) so it projects back to the cursor's NDC (inverse of
-; NavProject with z fixed). Params: snap (radar snapshot, for the W2S matrix + player Z).
-; Returns Map("x","y","z") or 0 when matrix/window/player are unavailable or degenerate.
-_HotkeysCursorWorldPos(snap)
+; Shared isometric projection origin for the radar-style ground projection used BOTH by the
+; range ring (RadarOverlay._DrawWorldRing) and by monster counting, so the count always
+; matches the visible ring. Returns the player world pos, the player's on-screen position
+; (the projection centre, same as the ring's centre), the game window, and the world→screen
+; scale (sx horizontal, sy vertical squash = sin 38.7°). 0 when player/window unavailable.
+_HotkeysIsoOrigin(snap)
 {
+    global g_combatW2SScale
     if !(snap && snap is Map)
         return 0
     inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
     mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-    if !(mat is Array && mat.Length = 16)
-        return 0
     area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
     prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
     pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
     if !(pwp && pwp is Map)
         return 0
-    pz := pwp.Has("z") ? pwp["z"] : 0
+    pX := pwp.Has("x") ? pwp["x"] : 0
+    pY := pwp.Has("y") ? pwp["y"] : 0
+    pZ := pwp.Has("z") ? pwp["z"] : 0
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
         return 0
     rect := NavClientRect(gameHwnd)
     if !rect
         return 0
+    ; Player's on-screen position = the projection centre (the player projects onto the
+    ; camera centre reliably; _WorldToScreen falls back to the window centre if the matrix
+    ; is unavailable). This is the same centre the ring is drawn around (_PlayerScreenPos).
+    ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
+        "w2sMatrix", mat, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+    psp := _WorldToScreen(ci, gameHwnd)
+    if !psp
+        return 0
+    scale := (IsSet(g_combatW2SScale) && g_combatW2SScale > 0) ? g_combatW2SScale : 0.20
+    sx := scale * (rect["w"] / 1920.0)
+    sy := sx * 0.62470                       ; isometric vertical squash (sin 38.7°)
+    if (sx <= 0 || sy <= 0)
+        return 0
+    return Map("hwnd", gameHwnd, "px", pX, "py", pY, "pz", pZ,
+        "psx", psp["x"], "psy", psp["y"], "sx", sx, "sy", sy)
+}
+
+; Converts the current mouse cursor to a ground-plane world position at the player's Z via
+; the INVERSE of the radar's isometric projection (consistent with how the cursor ring is
+; drawn). The player's screen position is the projection centre; the cursor's screen offset
+; from it maps back to a world (dx,dy) delta. Returns Map("x","y","z") or 0 if unavailable.
+_HotkeysCursorWorldPos(snap)
+{
+    pori := _HotkeysIsoOrigin(snap)
+    if !pori
+        return 0
     cx := 0, cy := 0
     CoordMode("Mouse", "Screen")
     MouseGetPos(&cx, &cy)
-    ; cursor screen → NDC (inverse of NavProject's NDC→pixel mapping)
-    ndcX := (cx - rect["x"]) * 2.0 / rect["w"] - 1.0
-    ndcY := 1.0 - (cy - rect["y"]) * 2.0 / rect["h"]
-    ; r1=ndcX·r4, r2=ndcY·r4 with z=pz fixed → a 2×2 linear system in (wx,wy).
-    K1 := mat[9]  * pz + mat[13]
-    K2 := mat[10] * pz + mat[14]
-    K4 := mat[12] * pz + mat[16]
-    A11 := mat[1] - ndcX * mat[4], A12 := mat[5] - ndcX * mat[8]
-    A21 := mat[2] - ndcY * mat[4], A22 := mat[6] - ndcY * mat[8]
-    B1  := ndcX * K4 - K1,         B2  := ndcY * K4 - K2
-    det := A11 * A22 - A12 * A21
-    if (Abs(det) < 0.0000001)
-        return 0
-    return Map("x", (B1 * A22 - A12 * B2) / det
-             , "y", (A11 * B2 - B1 * A21) / det
-             , "z", pz)
+    u := (cx - pori["psx"]) / pori["sx"]      ; = dx - dy
+    v := -(cy - pori["psy"]) / pori["sy"]     ; = dx + dy
+    return Map("x", pori["px"] + (u + v) / 2
+             , "y", pori["py"] + (v - u) / 2
+             , "z", pori["pz"])
 }
 
 ; Returns the runtime-state Map for a hotkey id, creating it on first use.
@@ -1109,54 +1125,42 @@ _HotkeysBuffListLines(snap, needle)
     return out
 }
 
-; Builds the screen-projection origin for a pixel-radius test. originMode
-; "cursor" uses the mouse position; "player" uses the player's own projected
-; screen position. Returns a Map (hwnd, w2sMatrix, player world pos, origin
-; screen point ox/oy) or 0 if the game/window/projection is unavailable.
+; Builds the projection origin for a pixel-radius test. originMode "cursor" measures from the
+; mouse position; "player" from the player's own on-screen position. Reuses the shared
+; isometric origin so the distance metric matches the drawn range ring exactly. Returns the
+; origin Map (adds ox/oy = the radius centre) or 0 if the game/window/player is unavailable.
 _HotkeysPxOrigin(snap, originMode)
 {
-    gameHwnd := ResolvePoEWindow()
-    if !gameHwnd
+    pori := _HotkeysIsoOrigin(snap)
+    if !pori
         return 0
-    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-    w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-    prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-    pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-    pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
-    pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
-    pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
-    ox := 0, oy := 0
     if (originMode = "cursor")
     {
+        ox := 0, oy := 0
         CoordMode("Mouse", "Screen")
         MouseGetPos(&ox, &oy)
     }
     else
     {
-        ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
-            "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
-        sp := _WorldToScreen(ci, gameHwnd)
-        if !sp
-            return 0
-        ox := sp["x"], oy := sp["y"]
+        ox := pori["psx"], oy := pori["psy"]
     }
-    return Map("hwnd", gameHwnd, "w2sMatrix", w2sMatrix,
-        "px", pX, "py", pY, "pz", pZ, "ox", ox, "oy", oy)
+    pori["ox"] := ox, pori["oy"] := oy
+    return pori
 }
 
-; Screen-pixel distance from a px-origin (see _HotkeysPxOrigin) to a world
-; point projected via the same W2S matrix. Returns -1 if not projectable.
+; Screen-pixel distance from the px-origin (see _HotkeysPxOrigin) to a world point, using the
+; radar's isometric ground projection (so it matches the drawn ring + dots). UNCLAMPED: an
+; off-screen entity keeps its true far offset and falls outside the radius, instead of being
+; clamped to the screen edge and falsely counted (which made monsterCount fire with nothing
+; actually in range). Always >= 0.
 _HotkeysPxDist(octx, wx, wy, wz)
 {
-    ci := Map("nearestWorldX", wx, "nearestWorldY", wy, "nearestWorldZ", wz,
-        "w2sMatrix", octx["w2sMatrix"],
-        "playerWorldX", octx["px"], "playerWorldY", octx["py"], "playerWorldZ", octx["pz"])
-    sp := _WorldToScreen(ci, octx["hwnd"])
-    if !sp
-        return -1
-    ddx := sp["x"] - octx["ox"]
-    ddy := sp["y"] - octx["oy"]
+    dx := wx - octx["px"]
+    dy := wy - octx["py"]
+    ex := octx["psx"] + (dx - dy) * octx["sx"]    ; entity screen pos (isometric)
+    ey := octx["psy"] - (dx + dy) * octx["sy"]
+    ddx := ex - octx["ox"]
+    ddy := ey - octx["oy"]
     return Sqrt(ddx * ddx + ddy * ddy)
 }
 
