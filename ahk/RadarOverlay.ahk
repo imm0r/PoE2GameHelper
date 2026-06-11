@@ -1450,20 +1450,19 @@ class RadarOverlay extends GdiOverlayBase
     }
 
     ; Renders per-action debug overlays for hotkey actions whose debug flag is on.
-    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws, per
-    ; item: a world range circle (around the player) or a cursor pixel circle,
-    ; plus a stacked text block (label + monster counts / cooldown / charges).
+    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws ONLY the
+    ; map-bound spatial overlays per item: a world range circle around the player or a
+    ; cursor/player pixel circle. The textual debug block (label + condition values +
+    ; key) moved to the standalone DebugOverlay (its "HOTKEYS" section); a circle can't
+    ; live in a text box, so the spatial parts stay here on the radar.
     _RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin, gw, gh)
     {
         global g_hkDebugItems
         if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
             return
 
-        COL := 0x55FFFF        ; debug yellow (BGR)
-        COL_CUR := 0xC0A8FF    ; cursor circle (pinkish)
-        textX := Round(gw * 0.55)
-        textY := Round(gh * 0.30)
-        pitch := 15
+        COL := 0x55FFFF        ; debug yellow (BGR) — range-circle label
+        COL_CUR := 0xC0A8FF    ; cursor / player pixel circle (pinkish)
 
         for _, rec in g_hkDebugItems
         {
@@ -1491,18 +1490,6 @@ class RadarOverlay extends GdiOverlayBase
                     this._DrawPixelCircle(ps["x"] - this._lastX, ps["y"] - this._lastY,
                         rec["circlePlayerPx"], COL_CUR)
             }
-            ; Text block.
-            this._DrawText(textX, textY, rec.Has("label") ? rec["label"] : "?", COL)
-            textY += pitch
-            if (rec.Has("lines") && rec["lines"] is Array)
-            {
-                for _, ln in rec["lines"]
-                {
-                    this._DrawText(textX + 10, textY, ln, 0xB8DCE8)
-                    textY += pitch
-                }
-            }
-            textY += 4
         }
     }
 
