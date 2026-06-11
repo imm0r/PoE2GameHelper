@@ -1,7 +1,7 @@
 # Project conventions for Claude
 
 Path of Exile 2 memory-reading / overlay assistant. AutoHotkey v2 + a WebView2 UI.
-Reimplementation of the original C# project (see Reference). Version `0.45.12.37`.
+Reimplementation of the original C# project (see Reference). Version `0.45.12.38`.
 
 ## Language
 
@@ -127,7 +127,7 @@ Alerts → `alerts.ini [Alerts]`.
   hides when idle.
 
 ### Edited files
-- **SnapshotSerializers.ahk** — rarity via `ReadEntityRarityId`; emit `metaGroup` + `group` per entity.
+- **SnapshotSerializers.ahk** — rarity via `ReadEntityRarityId`; emit `metaGroup` + `metaCategory` + `group` per entity.
 - **PoE2MemoryReader.ahk** — expose `currentAreaHash` in the radar snapshot Map.
 - **AutoFlask.ahk** — `g_notifyOverlay` in the UpdateRadarFast globals; after `TryAutoPilot`,
   call `TryEntityAlerts(radarSnap)` and `g_notifyOverlay.Tick()`.
