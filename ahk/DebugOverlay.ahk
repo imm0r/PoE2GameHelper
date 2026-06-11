@@ -218,9 +218,10 @@ class DebugOverlay extends GdiOverlayBase
                 lines.Push(["MOUSEOVER", DebugOverlay.COL_GOLD_HI])
                 lines.Push(["  " _FocusLeaf(mo["path"]), DebugOverlay.COL_IVORY])
 
-                snapEnt := _FocusFindSnapEntityByPtr(snap, mo.Has("ptr") ? mo["ptr"] : 0)
-                dc := (snapEnt && Type(snapEnt) = "Map" && snapEnt.Has("decodedComponents"))
-                    ? snapEnt["decodedComponents"] : 0
+                ; Rarity/life come from the hovered entity's FRESH decode (see
+                ; _FocusResolveMouseOverEntity) — not the cached snapshot.
+                dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map")
+                    ? mo["decodedComponents"] : 0
 
                 typ := ExtractMetaGroup(mo["path"])
                 rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
