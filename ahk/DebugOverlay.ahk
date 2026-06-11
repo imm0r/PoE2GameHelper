@@ -215,36 +215,35 @@ class DebugOverlay extends GdiOverlayBase
                 try mo := _FocusResolveMouseOverEntity(reader, snap)
             if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
             {
-                lines.Push(["MOUSEOVER", DebugOverlay.COL_GOLD_HI])
-                ; Resolve the internal path to a display name (monster_name_map.tsv);
-                ; fall back to the raw leaf when the path has no mapping.
-                nm := ResolveMonsterDisplayName(mo["path"], _FocusLeaf(mo["path"]))
-                lines.Push(["  " nm, DebugOverlay.COL_IVORY])
-
+                path := mo["path"]
                 ; Rarity/life come from the hovered entity's FRESH decode (see
                 ; _FocusResolveMouseOverEntity) — not the cached snapshot.
                 dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map")
                     ? mo["decodedComponents"] : 0
 
-                typ := ExtractMetaCategory(mo["path"])
-                rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
-                info := ""
-                if (typ != "")
-                    info .= "type: " typ
-                if (rarity != "")
-                    info .= (info != "" ? "   " : "") "rarity: " rarity
-                if (info != "")
-                    lines.Push(["  " info, DebugOverlay.COL_DIM])
+                ; Fields: Name resolves via monster_name_map.tsv (fallback: raw leaf);
+                ; Type = top-level category (NPC/Monsters/Chests); Group = the family
+                ; seed (3rd path segment, original case); Level = the @NN path suffix.
+                nm := ResolveMonsterDisplayName(path, _FocusLeaf(path))
+                lvl := ExtractEntityLevel(path)
+                idStr := mo.Has("id") ? mo["id"] : "?"
+                cat := ExtractMetaCategory(path)
+                grp := RegExMatch(path, "i)metadata/[^/]+/([^/]+)", &gm) ? gm[1] : ""
 
-                life := dc ? _FocusLifeStr(dc) : ""
-                if (life != "")
-                    lines.Push(["  life: " life, DebugOverlay.COL_GOLD])
-
-                lvl := ExtractEntityLevel(mo["path"])
-                idLine := "  id: " (mo.Has("id") ? mo["id"] : "?")
-                if (lvl != "")
-                    idLine .= "   level: " lvl
-                lines.Push([idLine, DebugOverlay.COL_DIM])
+                ; Line 1: Name / Level / ID — left-justified columns keep them aligned.
+                line1 := "Name: " Format("{:-16s}", nm) "Level: " Format("{:-6s}", (lvl != "" ? lvl : "-")) "ID: " idStr
+                lines.Push([line1, DebugOverlay.COL_GOLD_HI])
+                ; Line 2: Type / Group.
+                line2 := "Type: " Format("{:-16s}", (cat != "" ? cat : "?")) "Group: " (grp != "" ? grp : "-")
+                lines.Push([line2, DebugOverlay.COL_IVORY])
+                ; Line 3: Life "cur / max (pct%)" (omitted when the entity has no Life).
+                lifeLine := MouseOverLifeLine(dc)
+                if (lifeLine != "")
+                    lines.Push(["Life: " lifeLine, DebugOverlay.COL_GOLD])
+                ; Line 4: full metadata path, "Metadata" prefix + @NN level suffix stripped.
+                metaDisp := RegExReplace(path, "i)^metadata", "")
+                metaDisp := RegExReplace(metaDisp, "@\d+\s*$", "")
+                lines.Push(["Metadata: " metaDisp, DebugOverlay.COL_DIM])
             }
         }
 
