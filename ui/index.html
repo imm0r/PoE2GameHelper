@@ -3933,7 +3933,7 @@
     <div class="pill inactive clickable" id="btn-snap-or-start" onclick="snapOrStartPoe()" data-tip="Refresh tree from live game" data-icon="↺">
       <div class="dot"></div><span id="snap-text">Refresh</span>
     </div>
-    <div class="pill inactive" id="pill-fps" data-icon="⏱" data-tip="Shift+F3 — start/stop the performance benchmark">
+    <div class="pill inactive clickable" id="pill-fps" onclick="ahkCall('ProfilerToggle')" data-icon="⏱" data-tip="Click — start/stop the performance benchmark">
       <div class="dot"></div><span id="pill-fps-text">0 fps</span>
     </div>
     </div><!-- /header-pills -->
@@ -7241,13 +7241,13 @@
       const pill = document.getElementById('pill-fps');
       if (!txt || !pill) return;
       if (_profPillState === 'idle') {
-        pill.setAttribute('data-tip', 'Shift+F3 — start/stop the performance benchmark');
+        pill.setAttribute('data-tip', 'Click — start/stop the performance benchmark');
         pill.classList.remove('pill-rec');
         return;  // text is driven by updateStatus (live fps)
       }
       txt.textContent = headline || '';
       if (_profPillState === 'recording') {
-        pill.setAttribute('data-tip', 'Recording… reproduce the lag, then press Shift+F3 again');
+        pill.setAttribute('data-tip', 'Recording… reproduce the lag, then click again to stop');
         pill.classList.add('pill-rec');
       } else {  // done
         pill.setAttribute('data-tip', table || '(no profiler data)');

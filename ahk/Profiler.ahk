@@ -143,10 +143,11 @@ _PushProfilerPill()
         . _JsStr(g_profDumpState) "," _JsStr(g_profDumpHeadline) "," _JsStr(g_profDumpTable) ")")
 }
 
-; Shift+F3 handler. Two-press measurement flow so the profiler only runs during the
-; window you care about (no always-on cost):
-;   1st press -> reset + enable; the status pill shows "REC". Reproduce the stutter.
-;   2nd press -> snapshot the table to the status pill (headline + full table in its
+; Profiler toggle — invoked by clicking the ⏱ status pill (ProfilerToggle bridge case).
+; Two-click measurement flow so the profiler only runs during the window you care about
+; (no always-on cost):
+;   1st click -> reset + enable; the status pill shows "REC". Reproduce the stutter.
+;   2nd click -> snapshot the table to the status pill (headline + full table in its
 ;                hover tooltip), then disable again. No file, no in-game tooltip.
 ProfilerToggleDump()
 {
