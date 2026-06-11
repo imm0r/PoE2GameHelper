@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.16"
+POEFORMANCE_VERSION := "0.45.12.17"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -332,6 +332,7 @@ AtlasData_Load()          ; Atlas biome/content lookup tables for the map overla
 HotkeysInit()
 SkillHotkeysInit()
 HotkeysLoadConfig()
+HotkeysSeedFlaskPresets()   ; one-time: create the default "Flasks" hotkey group (replaces AutoFlask)
 g_hkOneShotPerTick := (IniRead(_ConfigPath(), "Hotkeys", "oneShotPerTick", "0") = "1")
 
 ; Schedule an auto-refresh check shortly after startup. Runs on a
@@ -468,7 +469,8 @@ try
     g_valueTree.Add("Waiting for PoE2 process…")
     g_valueTree.Add("Start the game (Steam or via the Launch button below).")
 }
-SetTimer(TryAutoFlaskFast, 150)
+; AutoFlask retired — replaced by the default "Flasks" hotkey presets (HotkeysSeedFlaskPresets).
+; The TryAutoFlask* / ReadAutoFlaskSnapshot code is now dead and pending removal.
 SetTimer(UpdateRadarFast, 50)
 SetTimer(ReadAndShow, 2000)
 SetTimer(EnsureConnected, 2000)
@@ -704,7 +706,6 @@ ReadAndShow(forceTreeRefresh := false)
             return
         }
 
-        TryAutoFlask(snapshot)
         g_lastSnapshotForUi := snapshot
 
         UpdateActionButtonLabels()

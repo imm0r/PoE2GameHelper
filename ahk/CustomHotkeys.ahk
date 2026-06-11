@@ -265,6 +265,54 @@ HotkeysSaveConfig()
     }
 }
 
+; One-time seed of the default "Flasks" hotkey group that replaces the old
+; standalone AutoFlask feature:
+;   Life Flask -> flask slot 1, automated, fires at <= 55% life
+;   Mana Flask -> flask slot 2, automated, fires at <= 35% mana
+; Both are foreground-only and suppressed in town/hideout; the flask output
+; readiness charge-gates them, so an empty flask never fires. A persistent flag
+; ([Hotkeys] flaskPresetsSeeded in poeformance_config.ini) guarantees this runs
+; at most once per install — deleting the presets later never re-creates them,
+; and existing user hotkeys are appended to, never overwritten. Called once at
+; startup after HotkeysLoadConfig().
+HotkeysSeedFlaskPresets()
+{
+    global g_hotkeyGroups
+    cfgPath := A_ScriptDir "\poeformance_config.ini"
+    if (IniRead(cfgPath, "Hotkeys", "flaskPresetsSeeded", "0") = "1")
+        return
+
+    raw := [ Map(
+        "name", "Flasks",
+        "enabled", 1,
+        "hotkeys", [
+            Map(
+                "name", "Life Flask",
+                "enabled", 1,
+                "trigger", "automated",
+                "focusOnly", 1,
+                "safeZoneDisabled", 1,
+                "output", Map("kind", "flask", "slot", 1),
+                "actions", [ Map("type", "vitals", "resource", "hp", "op", "<=", "value", 55) ]
+            ),
+            Map(
+                "name", "Mana Flask",
+                "enabled", 1,
+                "trigger", "automated",
+                "focusOnly", 1,
+                "safeZoneDisabled", 1,
+                "output", Map("kind", "flask", "slot", 2),
+                "actions", [ Map("type", "vitals", "resource", "mana", "op", "<=", "value", 35) ]
+            )
+        ]
+    ) ]
+
+    for g in _HotkeysNormalizeGroups(raw)
+        g_hotkeyGroups.Push(g)
+    HotkeysSaveConfig()
+    IniWrite("1", cfgPath, "Hotkeys", "flaskPresetsSeeded")
+}
+
 ; Reads a truthy/0-1 value from a Map key with a default. Accepts 1/0, true/false.
 _HkBool(m, key, def)
 {

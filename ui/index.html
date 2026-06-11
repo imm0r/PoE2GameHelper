@@ -3886,7 +3886,8 @@
     <div class="pill inactive clickable" id="pill-debug" onclick="ahkCall('ToggleDebug')" data-tip="Toggle Debug" data-icon="🐞">
       <div class="dot"></div><span id="pill-debug-text">Debug OFF</span>
     </div>
-    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗">
+    <!-- AutoFlask retired: replaced by the default "Flasks" hotkey presets (Hotkeys tab). Pill hidden; code pending removal. -->
+    <div class="pill inactive clickable" id="pill-flask" onclick="ahkCall('ToggleAutoFlask')" data-tip="Toggle AutoFlask" data-icon="⚗" style="display:none">
       <div class="dot"></div><span id="pill-flask-text">AutoFlask OFF</span>
     </div>
     <div class="pill inactive clickable" id="pill-autopilot" onclick="ahkCall('ToggleAutoPilot')"
@@ -4405,7 +4406,8 @@
         <div class="cfg-subpanel" data-cfgtab="automation">
 
         <div class="cfg-section">
-          <details id="det-autoflask" open
+          <!-- AutoFlask retired: replaced by the default "Flasks" hotkey presets (Hotkeys tab). Section hidden; code pending removal. -->
+          <details id="det-autoflask" style="display:none"
             ontoggle="syncCfgSections(); if(this.open) requestAnimationFrame(_sbInitAll)">
             <summary>
               <div class="cfg-header">Autoflask</div>
