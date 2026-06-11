@@ -6313,6 +6313,9 @@
     // the area (pushed live from AHK in hkBindings.chestTypes), plus a Custom…
     // option that reveals a free-text substring field for anything else.
     function hkTitle(s) { return String(s).replace(/(^|[\/_ ])([a-z])/g, (m,p,c)=>p+c.toUpperCase()); }
+    // Pretty buff label: snake_case → Title Case (matches the Skills & Buffs tab's display),
+    // so the buff-condition dropdown shows "Arcane Surge" instead of "arcane_surge".
+    function hkBuffLabel(s) { return String(s == null ? '' : s).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
     function hkChestTypeField(a, gi, hi, ai) {
       const live = Array.isArray(hkBindings.chestTypes) ? hkBindings.chestTypes : [];
       const cur = a.chestType || '';
@@ -8221,7 +8224,7 @@
         const iv = (b && b.in) ? String(b.in) : ((b && (b.n || b.name)) ? String(b.n || b.name) : '');
         if (!iv) continue;
         if (!(iv in hkSeenBuffs)) {
-          hkSeenBuffs[iv] = (b.n || b.name) ? String(b.n || b.name) : iv;
+          hkSeenBuffs[iv] = hkBuffLabel((b.n || b.name) ? (b.n || b.name) : iv);
           _buffGrew = true;
         }
       }
