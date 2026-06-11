@@ -221,11 +221,14 @@ HoverTrackerProbeRun()
 
     ; Scan two candidate regions for entity-like pointers. Keys are "<tag>+0xNNN":
     ; T = the hover-tracker struct (uiRoot+FromUiRoot), U = the UI-root struct.
+    ; The world-object slot sits at tracker+0x648; the cursor-hovered MONSTER is a
+    ; separate slot we have not pinned yet, so scan the WHOLE tracker struct (well
+    ; past 0x648) and the full UI-root struct rather than the narrow original windows.
     cur := Map()
     if g_reader.IsProbablyValidPointer(tracker)
-        _HPP_ScanEntityPtrs(g_reader, tracker, 0x000, 0x740, "T", cur)
+        _HPP_ScanEntityPtrs(g_reader, tracker, 0x000, 0x1800, "T", cur)
     if g_reader.IsProbablyValidPointer(uiRoot)
-        _HPP_ScanEntityPtrs(g_reader, uiRoot, 0x600, 0xA00, "U", cur)
+        _HPP_ScanEntityPtrs(g_reader, uiRoot, 0x000, 0x1800, "U", cur)
 
     rpt .= "entity-like slots found this run: " cur.Count nl
     for key, h in cur
