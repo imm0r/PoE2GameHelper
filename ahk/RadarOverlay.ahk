@@ -1509,18 +1509,49 @@ class RadarOverlay extends GdiOverlayBase
                 cx := 0, cy := 0
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&cx, &cy)
-                this._DrawPixelCircle(cx - this._lastX, cy - this._lastY,
-                    rec["circleCursorPx"], COL_CUR)
+                ccx := cx - this._lastX, ccy := cy - this._lastY
+                r := rec["circleCursorPx"]
+                this._DrawPixelCircle(ccx, ccy, r, COL_CUR)
+                this._DrawCircleLabel(ccx, ccy, r, rec)
             }
             ; Player pixel circle (player projected to screen → client coords).
             if (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
             {
                 ps := this._PlayerScreenPos()
                 if (ps)
-                    this._DrawPixelCircle(ps["x"] - this._lastX, ps["y"] - this._lastY,
-                        rec["circlePlayerPx"], COL_CUR)
+                {
+                    pcx := ps["x"] - this._lastX, pcy := ps["y"] - this._lastY
+                    r := rec["circlePlayerPx"]
+                    this._DrawPixelCircle(pcx, pcy, r, COL_CUR)
+                    this._DrawCircleLabel(pcx, pcy, r, rec)
+                }
             }
         }
+    }
+
+    ; Draws a range-debug record's text (label + lines, e.g. monster counts) next to
+    ; its circle, anchored at the lower-right of the ring (~4 o'clock / 120° clockwise
+    ; from the top). cx,cy = ring centre in client coords, r = ring radius (px). This is
+    ; the spatial counterpart to the DebugOverlay's "HOTKEYS" panel, which skips these
+    ; range-based records precisely because their text lives here at the circle.
+    _DrawCircleLabel(cx, cy, r, rec)
+    {
+        ax := Round(cx + r * 0.866) + 6   ; cos(30°)·r outward to the right, small pad
+        ay := Round(cy + r * 0.5)         ; sin(30°)·r downward → lower-right edge
+        font := this._GetFont(-13, 600, "Segoe UI")
+        oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
+        pitch := 15
+        this._DrawText(ax, ay, rec.Has("label") ? rec["label"] : "?", 0x55FFFF)
+        ay += pitch
+        if (rec.Has("lines") && rec["lines"] is Array)
+        {
+            for _, ln in rec["lines"]
+            {
+                this._DrawText(ax, ay, ln, 0xB8DCE8)
+                ay += pitch
+            }
+        }
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldFont)
     }
 
     ; Draws the Atlas overlay from the global g_atlasRender snapshot (built by the

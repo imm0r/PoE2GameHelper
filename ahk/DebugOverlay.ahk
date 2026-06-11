@@ -201,18 +201,30 @@ class DebugOverlay extends GdiOverlayBase
         ; ── Hotkeys ──────────────────────────────────────────────────────────
         ; Per-action debug records (label + condition values + fired key) for every
         ; hotkey action whose debug flag is on, built each tick by the hotkey engine
-        ; (g_hkDebugItems). This block is where the radar's old hotkey text moved to.
+        ; (g_hkDebugItems). Range-based records (monsterCount / aim — those carrying a
+        ; circle) are intentionally skipped here: their text is drawn next to the range
+        ; circle on the radar (RadarOverlay._DrawCircleLabel). Only the non-spatial
+        ; conditions (vitals / buff / charges) show in this panel.
         if (IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
         {
-            lines.Push(["HOTKEYS", DebugOverlay.COL_GOLD_HI])
+            hkLines := []
             for _, rec in g_hkDebugItems
             {
                 if !(rec is Map)
                     continue
-                lines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
+                if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
+                    || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0))
+                    continue   ; range-based → drawn at the circle on the radar
+                hkLines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
                 if (rec.Has("lines") && rec["lines"] is Array)
                     for _, ln in rec["lines"]
-                        lines.Push(["    " ln, DebugOverlay.COL_IVORY])
+                        hkLines.Push(["    " ln, DebugOverlay.COL_IVORY])
+            }
+            if (hkLines.Length)
+            {
+                lines.Push(["HOTKEYS", DebugOverlay.COL_GOLD_HI])
+                for _, l in hkLines
+                    lines.Push(l)
             }
         }
 
