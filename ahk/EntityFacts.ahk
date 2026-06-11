@@ -18,6 +18,18 @@ ExtractMetaGroup(path)
     return ""
 }
 
+; Returns the top-level metadata category — the segment right after "Metadata/"
+; (e.g. "Monsters", "NPC", "Chests"). Original case is preserved so it reads as the
+; game intends ("NPC", not "npc"). Returns "" if the path is not a metadata path.
+ExtractMetaCategory(path)
+{
+    if (path = "")
+        return ""
+    if RegExMatch(path, "i)metadata/([^/]+)", &m)
+        return m[1]
+    return ""
+}
+
 ; Reads the entity rarity id robustly. The radar/fast decode stores it flat as
 ; decoded["rarityId"]; the full decode stores it nested under mods /
 ; objectmagicproperties. We take the max found so a flat 0 cannot mask a nested

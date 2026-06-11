@@ -195,9 +195,9 @@ BuildFocusLines(reader, snap)
     mo := _FocusResolveMouseOverEntity(reader, snap)
     if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
     {
-        lines.Push("MOUSEOVER: " _FocusLeaf(mo["path"]))
+        lines.Push("MOUSEOVER: " ResolveMonsterDisplayName(mo["path"], _FocusLeaf(mo["path"])))
         dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map") ? mo["decodedComponents"] : 0
-        mg := ExtractMetaGroup(mo["path"])
+        mg := ExtractMetaCategory(mo["path"])
         rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
         if (mg != "" || rarity != "")
             lines.Push("  type: " (mg != "" ? mg : "?") (rarity != "" ? "   rarity: " rarity : ""))
