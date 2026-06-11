@@ -30,6 +30,18 @@ ExtractMetaCategory(path)
     return ""
 }
 
+; Parses the optional "@NN" level suffix from an entity path leaf, e.g.
+; ".../TujenJourneysEndSummon@51" -> "51". The game appends the entity's level there.
+; Returns the level digits as a string, or "" when the path has no @level suffix.
+ExtractEntityLevel(path)
+{
+    if (path = "")
+        return ""
+    if RegExMatch(path, "@(\d+)\s*$", &m)
+        return m[1]
+    return ""
+}
+
 ; Reads the entity rarity id robustly. The radar/fast decode stores it flat as
 ; decoded["rarityId"]; the full decode stores it nested under mods /
 ; objectmagicproperties. We take the max found so a flat 0 cannot mask a nested
