@@ -127,8 +127,40 @@ _FocusResolveHovered(reader, snap)
     return path != "" ? Map("ptr", hov, "path", path) : 0
 }
 
-; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life) and
-; the hovered world object (name/type). Returns an array of strings.
+; Resolves the entity currently UNDER THE CURSOR via the game-state MouseOver chain
+; (verified against the trusted Cheat-Engine screenToWorldPtrMouseOverEntityPtr table):
+;   [[[ inGameState + 0x300 ] + 0x3F0 ] + 0xA8 ]  -> Entity*  (0 = nothing hovered)
+; Unlike _FocusResolveHovered (tracker+0x648, world objects only), this DOES resolve
+; hovered monsters. Returns Map("ptr","path","id") or 0. Params: reader, snap.
+_FocusResolveMouseOverEntity(reader, snap)
+{
+    inGs := (IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
+    inGsAddr := (IsObject(inGs) && inGs.Has("address")) ? inGs["address"] : 0
+    if !(inGsAddr && reader.IsProbablyValidPointer(inGsAddr))
+        return 0
+    host := reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.MouseOver["HostFromInGameState"])
+    if !reader.IsProbablyValidPointer(host)
+        return 0
+    sub := reader.Mem.ReadPtr(host + PoE2Offsets.MouseOver["SubFromHost"])
+    if !reader.IsProbablyValidPointer(sub)
+        return 0
+    ent := reader.Mem.ReadPtr(sub + PoE2Offsets.MouseOver["EntityFromSub"])
+    if !(ent && reader.IsPlausibleEntityPointer(ent))
+        return 0
+    path := ""
+    try {
+        e := reader.ReadEntityBasic(ent)
+        if (IsObject(e) && e.Has("path"))
+            path := e["path"]
+    }
+    id := 0
+    try id := reader.Mem.ReadUInt(ent + PoE2Offsets.Entity["Id"])
+    return path != "" ? Map("ptr", ent, "path", path, "id", id) : 0
+}
+
+; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life), the
+; entity under the cursor (MouseOver chain), and the hovered world object. Returns an
+; array of strings.
 BuildFocusLines(reader, snap)
 {
     lines := []
@@ -148,6 +180,15 @@ BuildFocusLines(reader, snap)
     }
     else
         lines.Push("TARGET: (none)")
+
+    mo := _FocusResolveMouseOverEntity(reader, snap)
+    if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
+    {
+        lines.Push("MOUSEOVER: " _FocusLeaf(mo["path"]))
+        mg := ExtractMetaGroup(mo["path"])
+        if (mg != "")
+            lines.Push("  type: " mg)
+    }
 
     hov := _FocusResolveHovered(reader, snap)
     if (hov && Type(hov) = "Map" && hov.Has("path") && hov["path"] != "")
