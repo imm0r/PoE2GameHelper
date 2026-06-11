@@ -149,14 +149,24 @@ _FocusResolveMouseOverEntity(reader, snap)
     ent := reader.Mem.ReadPtr(sub + PoE2Offsets.MouseOver["EntityFromSub"])
     if !(ent && reader.IsPlausibleEntityPointer(ent))
         return 0
-    e := 0
-    try e := reader.ReadEntityBasic(ent)
-    if !(IsObject(e) && e.Has("path") && e["path"] != "")
+    ; Identity (path/id) + a FRESH component decode off the live pointer. Use the RADAR
+    ; decoder explicitly rather than ReadEntityBasic — ReadEntityBasic's decode path
+    ; depends on the transient _radarMode flag, and its non-radar branch misreads chest
+    ; rarity as Normal. DecodeSampleEntityComponentsRadar reads ObjectMagicProperties/Mods
+    ; rarity correctly (Magic) AND fresh life, matching exactly what the snapshot showed.
+    ident := 0
+    try ident := reader.ReadEntityIdentityBasic(ent)
+    if !(IsObject(ident) && ident.Has("path") && ident["path"] != "")
         return 0
+    dc := 0
+    try {
+        components := reader.ReadEntityComponentLookupBasic(ent, 64)
+        dc := reader.DecodeSampleEntityComponentsRadar(components)
+    }
     return Map("ptr", ent,
-        "path", e["path"],
-        "id", e.Has("entityId") ? e["entityId"] : 0,
-        "decodedComponents", e.Has("decodedComponents") ? e["decodedComponents"] : 0)
+        "path", ident["path"],
+        "id", ident.Has("entityId") ? ident["entityId"] : 0,
+        "decodedComponents", (IsObject(dc) && Type(dc) = "Map") ? dc : 0)
 }
 
 ; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life), the
