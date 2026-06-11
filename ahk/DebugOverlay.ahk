@@ -240,7 +240,11 @@ class DebugOverlay extends GdiOverlayBase
                 if (life != "")
                     lines.Push(["  life: " life, DebugOverlay.COL_GOLD])
 
-                lines.Push(["  id: " (mo.Has("id") ? mo["id"] : "?"), DebugOverlay.COL_DIM])
+                lvl := ExtractEntityLevel(mo["path"])
+                idLine := "  id: " (mo.Has("id") ? mo["id"] : "?")
+                if (lvl != "")
+                    idLine .= "   level: " lvl
+                lines.Push([idLine, DebugOverlay.COL_DIM])
             }
         }
 
