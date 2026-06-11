@@ -47,8 +47,8 @@ class RadarOverlay extends GdiOverlayBase
     ; paint the maphack outline (and dots) over that HUD. The whole large-map layer is clipped
     ; above a bottom strip of this height, scaled by gameWindowHeight/1600 at render time.
     ; 0 disables the clip. Tune in-game: raise if a sliver still shows over the bar, lower if
-    ; it hides visible map between the orbs.
-    static MAP_BOTTOM_HUD_DESIGN_H := 100
+    ; it hides visible map above it. 30 ≈ the XP/skill bar's own height measured in-game.
+    static MAP_BOTTOM_HUD_DESIGN_H := 30
 
     ; Dot colors (GDI expects BGR, not RGB)
     static COLOR_ENEMY_NORMAL := 0x0000FF   ; red    (normal enemies)
