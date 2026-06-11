@@ -1561,10 +1561,14 @@ class RadarOverlay extends GdiOverlayBase
                  , "z", pwp.Has("z") ? pwp["z"] : 0)
     }
 
-    ; Draws an isometric ground ring of world-radius <worldR> around the world point
-    ; (cx,cy,cz) by projecting ~48 ring points through the live W2S matrix, then labels it
-    ; at the lower-right of its screen footprint. Used by the monsterCount "range" modes
-    ; (centre = player, or the cursor's world point for the experimental cursor variant).
+    ; Draws the world-radius <worldR> range as an isometric ground ellipse around the
+    ; world point (cx,cy,cz), then labels it at the lower-right of its screen footprint.
+    ; Used by the monsterCount "range" modes (centre = player, or the cursor's world point
+    ; for the experimental cursor variant). Rather than projecting many far ring points
+    ; (which blow up toward the horizon where the projection's w → 0), it measures the
+    ; projection's local affine with two SMALL world-axis probes at the centre — always in
+    ; front of the camera — and scales that screen-space basis up to worldR. The world
+    ; circle's image under a near-orthographic ground projection is exactly this ellipse.
     _DrawWorldRing(cx, cy, cz, worldR, colorBGR, rec)
     {
         global g_radarLastSnap
@@ -1581,31 +1585,42 @@ class RadarOverlay extends GdiOverlayBase
         rect := NavClientRect(gameHwnd)
         if !rect
             return
+        ; "In front of camera" sign at the centre, so the probe projections aren't
+        ; point-mirrored.
+        cr4 := mat[4] * cx + mat[8] * cy + mat[12] * cz + mat[16]
+        visSign := (cr4 >= 0) ? 1 : -1
+        ; Centre + two small (50-unit) world-axis probes → the local screen-space basis,
+        ; scaled to worldR. Probes stay next to the centre, so they never reach the horizon.
+        d := 50.0
+        p  := NavProject(cx, cy, cz, mat, rect, visSign)
+        qx := NavProject(cx + d, cy, cz, mat, rect, visSign)
+        qy := NavProject(cx, cy + d, cz, mat, rect, visSign)
+        if !(p && qx && qy)
+            return
+        sc  := worldR / d
+        axx := (qx["x"] - p["x"]) * sc, axy := (qx["y"] - p["y"]) * sc   ; world +x → screen
+        bxx := (qy["x"] - p["x"]) * sc, bxy := (qy["y"] - p["y"]) * sc   ; world +y → screen
+        ox  := p["x"] - this._lastX,    oy  := p["y"] - this._lastY
         segs := 48
+        step := 6.2831853 / segs
         pts := Buffer((segs + 1) * 8, 0)
-        cnt := 0
         maxX := -2147483647, maxY := -2147483647
         Loop (segs + 1)
         {
-            ang := (A_Index - 1) * 6.2831853 / segs
-            sp := NavProject(cx + worldR * Cos(ang), cy + worldR * Sin(ang), cz, mat, rect, 0)
-            if !sp
-                continue
-            sx := sp["x"] - this._lastX, sy := sp["y"] - this._lastY
-            NumPut("Int", sx, pts, cnt * 8), NumPut("Int", sy, pts, cnt * 8 + 4)
-            cnt += 1
+            t  := (A_Index - 1) * step
+            sx := Round(ox + Cos(t) * axx + Sin(t) * bxx)
+            sy := Round(oy + Cos(t) * axy + Sin(t) * bxy)
+            NumPut("Int", sx, pts, (A_Index - 1) * 8), NumPut("Int", sy, pts, (A_Index - 1) * 8 + 4)
             if (sx > maxX)
                 maxX := sx
             if (sy > maxY)
                 maxY := sy
         }
-        if (cnt < 3)
-            return
         pen := this._GetPen(colorBGR, 2)
         oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
-        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", cnt)
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", segs + 1)
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
-        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ring's footprint
+        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ellipse footprint
     }
 
     ; Draws a range-debug record's text (label + lines, e.g. monster counts) anchored at
