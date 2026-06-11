@@ -1631,7 +1631,9 @@ class RadarOverlay extends GdiOverlayBase
         {
             for _, ln in rec["lines"]
             {
-                this._DrawText(ax, ay, ln, 0xB8DCE8)
+                ; Lines are usually strings; tolerate [text, tag] pairs (buff/charge
+                ; lists) although those records carry no circle and never reach here.
+                this._DrawText(ax, ay, (ln is Array) ? (ln.Length >= 1 ? ln[1] : "") : ln, 0xB8DCE8)
                 ay += pitch
             }
         }

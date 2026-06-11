@@ -574,19 +574,20 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     {
         type := a.Has("chargeType") ? a["chargeType"] : "power"
         nameMap := Map("power", "power_charge", "frenzy", "frenzy_charge", "endurance", "endurance_charge", "charged_staff", "charged_staff_stack")
-        eff := _HotkeysFindBuff(snap, nameMap.Has(type) ? nameMap[type] : type)
-        n := (eff && eff.Has("charges")) ? (eff["charges"] + 0) : 0
-        rec["charges"] := n
-        rec["lines"].Push(type " charges: " n)
+        buffName := nameMap.Has(type) ? nameMap[type] : type
+        op  := a.Has("op") ? a["op"] : ">="
+        val := a.Has("value") ? a["value"] : 0
+        rec["lines"].Push(type " charges " op " " val " - active buffs:")
+        for _, ln in _HotkeysBuffListLines(snap, buffName)
+            rec["lines"].Push(ln)
     }
     else if (t = "buff")
     {
-        nm := a.Has("buffName") ? a["buffName"] : ""
-        eff := (nm != "") ? _HotkeysFindBuff(snap, nm) : 0
-        if (eff)
-            rec["lines"].Push("buff '" nm "' x" (eff.Has("charges") ? eff["charges"] : 0) " " (eff.Has("timeLeft") ? Round(eff["timeLeft"]) "ms" : ""))
-        else
-            rec["lines"].Push("buff '" nm "' absent")
+        nm   := a.Has("buffName") ? a["buffName"] : ""
+        mode := a.Has("mode") ? a["mode"] : "present"
+        rec["lines"].Push("buff '" nm "' (" mode ") - active buffs:")
+        for _, ln in _HotkeysBuffListLines(snap, nm)
+            rec["lines"].Push(ln)
     }
     else if (t = "vitals")
     {
@@ -1044,6 +1045,57 @@ _HotkeysFindBuff(snap, name)
             return eff
     }
     return 0
+}
+
+; Reads the full list of active player buff effects (on demand, via the snapshot's
+; local-player pointer), or 0 when unavailable. Each effect is a Map with name /
+; charges / timeLeft. Used by the buff & charges debug readout.
+_HotkeysReadBuffs(snap)
+{
+    global g_reader
+    if !snap
+        return 0
+    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    lpPtr := (area && area.Has("localPlayerPtr")) ? area["localPlayerPtr"] : 0
+    if !lpPtr
+        return 0
+    buffs := 0
+    try buffs := g_reader.ReadPlayerBuffsComponent(lpPtr)
+    if !(buffs && buffs is Map && buffs.Has("effects"))
+        return 0
+    return buffs["effects"]
+}
+
+; Builds the debug lines listing every active buff (name + stacks + time-left). The
+; buff whose name contains <needle> (case-insensitive — the one the condition checks)
+; is returned as a [text, "green"] pair so the overlay highlights it; the rest are
+; plain strings. Returns an Array (with a "(no active buffs)" entry when none).
+_HotkeysBuffListLines(snap, needle)
+{
+    out := []
+    effects := _HotkeysReadBuffs(snap)
+    if !(effects && effects is Array && effects.Length)
+    {
+        out.Push("  (no active buffs)")
+        return out
+    }
+    nlow := StrLower(needle)
+    for eff in effects
+    {
+        if !(eff is Map)
+            continue
+        bn := eff.Has("name") ? eff["name"] : ""
+        if (bn = "")
+            continue
+        ch := eff.Has("charges")  ? (eff["charges"] + 0) : 0
+        tl := eff.Has("timeLeft") ? Round(eff["timeLeft"]) : 0
+        txt := "  " bn (ch > 1 ? " x" ch : "") (tl > 0 ? " " tl "ms" : "")
+        out.Push((nlow != "" && InStr(StrLower(bn), nlow)) ? [txt, "green"] : txt)
+    }
+    if (out.Length = 0)
+        out.Push("  (no active buffs)")
+    return out
 }
 
 ; Builds the screen-projection origin for a pixel-radius test. originMode

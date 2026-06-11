@@ -27,6 +27,7 @@ class DebugOverlay extends GdiOverlayBase
     static COL_DIM      := 0x648A9C   ; #9c8a64 — dim text for "off" / sub-info
     static COL_BLOOD    := 0x4848C5   ; #c54848 — blood red for combat
     static COL_AMBER    := 0x43A0D4   ; #d4a043 — burnished bronze for active
+    static COL_GREEN    := 0x6AC45E   ; #5ec46a — healthy green (matched buff/charge highlight)
     ; Layout
     static PAD_X        := 12
     static PAD_Y        := 10
@@ -220,7 +221,15 @@ class DebugOverlay extends GdiOverlayBase
                 hkLines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
                 if (rec.Has("lines") && rec["lines"] is Array)
                     for _, ln in rec["lines"]
-                        hkLines.Push(["    " ln, DebugOverlay.COL_IVORY])
+                    {
+                        ; A line is either a plain string (ivory) or a [text, tag] pair —
+                        ; tag "green" highlights the buff/charge the condition checks.
+                        if (ln is Array)
+                            hkLines.Push(["    " (ln.Length >= 1 ? ln[1] : "")
+                                , (ln.Length >= 2 && ln[2] = "green") ? DebugOverlay.COL_GREEN : DebugOverlay.COL_IVORY])
+                        else
+                            hkLines.Push(["    " ln, DebugOverlay.COL_IVORY])
+                    }
             }
             if (hkLines.Length)
             {
