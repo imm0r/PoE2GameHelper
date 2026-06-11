@@ -180,6 +180,7 @@ class RadarOverlay extends GdiOverlayBase
         ; blitted in a distinct fill colour. Lets you compare our memory
         ; walkable grid against what the game actually shows.
         this._walkGridEnabled     := false ; toggle from config (off by default — diagnostic)
+        this._mapHackMaskDebug    := false ; red outlines of the HUD clip masks (off — debug)
         this._mapWalkColorDC      := 0     ; memory DC holding the solid fill-colour source bitmap
         this._mapWalkColorBmp     := 0     ; source bitmap handle (solid walkable fill colour)
         this._mapWalkMask         := 0     ; monochrome mask bitmap (1=walkable cell, stippled)
@@ -210,7 +211,7 @@ class RadarOverlay extends GdiOverlayBase
         global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss
         global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
         global g_debugMode, g_zoneNavEnabled, g_mapHackEnabled, g_rangeCirclesEnabled
-        global g_radarAlpha, g_highlightedEntityPath, g_walkGridEnabled
+        global g_radarAlpha, g_highlightedEntityPath, g_walkGridEnabled, g_maphackMaskDebug
 
         this.ShowEnemyNormal := g_radarShowEnemyNormal
         this.ShowEnemyRare   := g_radarShowEnemyRare
@@ -222,6 +223,7 @@ class RadarOverlay extends GdiOverlayBase
         this._navEnabled     := g_zoneNavEnabled
         this._mapHackEnabled := g_mapHackEnabled
         this._walkGridEnabled := IsSet(g_walkGridEnabled) ? g_walkGridEnabled : false
+        this._mapHackMaskDebug := IsSet(g_maphackMaskDebug) ? g_maphackMaskDebug : false
         this._rangeCirclesEnabled := IsSet(g_rangeCirclesEnabled) ? g_rangeCirclesEnabled : true
         if (IsSet(g_radarAlpha) && this._alpha != g_radarAlpha)
             this.SetAlpha(g_radarAlpha)
@@ -710,23 +712,11 @@ class RadarOverlay extends GdiOverlayBase
         {
             for _, mask in RadarOverlay.MAP_HUD_MASKS
             {
-                mh := Round(mask["h"] * scaleFactorY)
-                if (mh <= 0)
+                r := this._HudMaskRect(mask, gameWindowWidth, gameWindowHeight, scaleFactorY)
+                if !r
                     continue
-                if (mask["anchor"] = "bottom")
-                {
-                    mx := 0, my := gameWindowHeight - mh, mw := gameWindowWidth
-                }
-                else
-                {
-                    mw := Round(mask["w"] * scaleFactorY)
-                    if (mw <= 0)
-                        continue
-                    mx := (mask["anchor"] = "br" || mask["anchor"] = "tr") ? gameWindowWidth - mw : 0
-                    my := (mask["anchor"] = "bl" || mask["anchor"] = "br") ? gameWindowHeight - mh : 0
-                }
                 DllCall("ExcludeClipRect", "Ptr", this.memDC,
-                    "Int", mx, "Int", my, "Int", mx + mw, "Int", my + mh)
+                    "Int", r[1], "Int", r[2], "Int", r[1] + r[3], "Int", r[2] + r[4])
             }
         }
 
@@ -1190,9 +1180,39 @@ class RadarOverlay extends GdiOverlayBase
             }
         }
 
-        ; Release any clip region set above (bottom-HUD strip) so it never affects a later
-        ; draw into the back-buffer. SelectClipRgn(NULL) is a harmless no-op when none was set.
+        ; Release any clip region set above (HUD masks) so it never affects a later draw into
+        ; the back-buffer. SelectClipRgn(NULL) is a harmless no-op when none was set.
         DllCall("SelectClipRgn", "Ptr", this.memDC, "Ptr", 0)
+
+        ; Debug: outline every HUD clip mask in red (unclipped, on top of the maphack) so the
+        ; user can see exactly where MAP_HUD_MASKS clips while tuning the values. Large map only.
+        if (isLargeMap && this._mapHackMaskDebug)
+        {
+            for _, mask in RadarOverlay.MAP_HUD_MASKS
+            {
+                r := this._HudMaskRect(mask, gameWindowWidth, gameWindowHeight, scaleFactorY)
+                if r
+                    this._DrawRectOutline(r[1], r[2], r[3], r[4], 0x0000FF, 2)   ; red (BGR)
+            }
+        }
+    }
+
+    ; Computes the on-screen rectangle for one HUD clip mask: design px scaled uniformly by
+    ; gameWindowHeight/1600 (sY) and pinned to its anchor corner/edge. Returns [x, y, w, h] in
+    ; window pixels, or 0 when the mask has no area. Shared by the clip loop and the debug outline.
+    _HudMaskRect(mask, gw, gh, sY)
+    {
+        mh := Round(mask["h"] * sY)
+        if (mh <= 0)
+            return 0
+        if (mask["anchor"] = "bottom")
+            return [0, gh - mh, gw, mh]
+        mw := Round(mask["w"] * sY)
+        if (mw <= 0)
+            return 0
+        mx := (mask["anchor"] = "br" || mask["anchor"] = "tr") ? gw - mw : 0
+        my := (mask["anchor"] = "bl" || mask["anchor"] = "br") ? gh - mh : 0
+        return [mx, my, mw, mh]
     }
 
     ; Returns cached path classification flags used by the hot render loop.
