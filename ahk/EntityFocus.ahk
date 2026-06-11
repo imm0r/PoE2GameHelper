@@ -158,6 +158,31 @@ _FocusResolveMouseOverEntity(reader, snap)
     return path != "" ? Map("ptr", ent, "path", path, "id", id) : 0
 }
 
+; Finds the snapshot awake-entity 'entity' Map whose address matches ptr, so a raw
+; hovered-entity pointer (from the MouseOver chain) can be enriched with the
+; already-decoded components (rarity, life). Returns the entity Map or 0.
+; Params: snap (radar snapshot), ptr (entity pointer to match).
+_FocusFindSnapEntityByPtr(snap, ptr)
+{
+    if !(ptr && IsObject(snap) && snap.Has("inGameState"))
+        return 0
+    inGs := snap["inGameState"]
+    area := (IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+    awake := (IsObject(area) && area.Has("awakeEntities")) ? area["awakeEntities"] : 0
+    sample := (IsObject(awake) && awake.Has("sample")) ? awake["sample"] : 0
+    if !(IsObject(sample) && Type(sample) = "Array")
+        return 0
+    for _, en in sample
+    {
+        if !(en && Type(en) = "Map" && en.Has("entity"))
+            continue
+        entity := en["entity"]
+        if (entity && Type(entity) = "Map" && entity.Has("address") && entity["address"] = ptr)
+            return entity
+    }
+    return 0
+}
+
 ; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life), the
 ; entity under the cursor (MouseOver chain), and the hovered world object. Returns an
 ; array of strings.

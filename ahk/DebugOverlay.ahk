@@ -60,7 +60,7 @@ class DebugOverlay extends GdiOverlayBase
     ; Docked to the outer right edge; width follows the longest line.
     Layout(ctx)
     {
-        lines := this._BuildLines()
+        lines := this._BuildLines(ctx)
         this._lines := lines
         font := this._GetFont(DebugOverlay.FONT_HEIGHT, 400, DebugOverlay.FONT_FACE)
         maxW := 120
@@ -98,8 +98,9 @@ class DebugOverlay extends GdiOverlayBase
     ; ── Content ─────────────────────────────────────────────────────────────
     ; Builds the [text, colorBGR] line list. Same information the radar status
     ; block used to show, plus the current exploration target (coordinates and
-    ; straight-line distance) and the running build version.
-    _BuildLines()
+    ; straight-line distance), the entity under the cursor, and the build version.
+    ; Param: ctx - the overlay tick context (carries reader + snapshot).
+    _BuildLines(ctx := 0)
     {
         global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
         global g_combatState, g_combatLastReason
@@ -198,6 +199,46 @@ class DebugOverlay extends GdiOverlayBase
 
         if (g_autoFlaskEnabled && g_autoFlaskLastReason != "" && g_autoFlaskLastReason != "idle")
             lines.Push(["FLASK  " g_autoFlaskLastReason, DebugOverlay.COL_GOLD])
+
+        ; ── MouseOver entity ─────────────────────────────────────────────────
+        ; The entity currently under the cursor, resolved via the game-state MouseOver
+        ; chain (monsters INCLUDED, unlike the world-object HoverTracker). When the
+        ; hovered entity is found in the radar snapshot, the rarity and life come from
+        ; its already-decoded components — otherwise just the name/type/id are shown.
+        if (IsObject(ctx))
+        {
+            reader := 0, snap := 0
+            try reader := ctx.reader
+            try snap   := ctx.snapshot
+            mo := 0
+            if (IsObject(reader) && IsObject(snap))
+                try mo := _FocusResolveMouseOverEntity(reader, snap)
+            if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
+            {
+                lines.Push(["MOUSEOVER", DebugOverlay.COL_GOLD_HI])
+                lines.Push(["  " _FocusLeaf(mo["path"]), DebugOverlay.COL_IVORY])
+
+                snapEnt := _FocusFindSnapEntityByPtr(snap, mo.Has("ptr") ? mo["ptr"] : 0)
+                dc := (snapEnt && Type(snapEnt) = "Map" && snapEnt.Has("decodedComponents"))
+                    ? snapEnt["decodedComponents"] : 0
+
+                typ := ExtractMetaGroup(mo["path"])
+                rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
+                info := ""
+                if (typ != "")
+                    info .= "type: " typ
+                if (rarity != "")
+                    info .= (info != "" ? "   " : "") "rarity: " rarity
+                if (info != "")
+                    lines.Push(["  " info, DebugOverlay.COL_DIM])
+
+                life := dc ? _FocusLifeStr(dc) : ""
+                if (life != "")
+                    lines.Push(["  life: " life, DebugOverlay.COL_GOLD])
+
+                lines.Push(["  id: " (mo.Has("id") ? mo["id"] : "?"), DebugOverlay.COL_DIM])
+            }
+        }
 
         ; ── Hotkeys ──────────────────────────────────────────────────────────
         ; Per-action debug records (label + condition values + fired key) for every
