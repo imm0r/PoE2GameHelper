@@ -273,7 +273,8 @@ class RadarOverlay extends GdiOverlayBase
             if !(rec is Map)
                 continue
             if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
-                || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0))
+                || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
+                || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0))
                 return true
         }
         return false
@@ -1526,18 +1527,80 @@ class RadarOverlay extends GdiOverlayBase
                     this._DrawCircleLabel(pcx, pcy, r, rec)
                 }
             }
+            ; Player WORLD-radius ground ring (zoom-independent) — an isometric ring of
+            ; world points around the player, projected to screen.
+            if (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
+                this._DrawWorldRing(rec["circlePlayerWorld"], COL_CUR, rec)
         }
     }
 
-    ; Draws a range-debug record's text (label + lines, e.g. monster counts) next to
-    ; its circle, anchored at the lower-right of the ring (~4 o'clock / 120° clockwise
-    ; from the top). cx,cy = ring centre in client coords, r = ring radius (px). This is
-    ; the spatial counterpart to the DebugOverlay's "HOTKEYS" panel, which skips these
-    ; range-based records precisely because their text lives here at the circle.
+    ; Draws an isometric ground ring of world-radius <worldR> around the player by
+    ; projecting ~48 world points (at the player's Z) through the live W2S matrix, then
+    ; labels it at the lower-right of its screen footprint. Used for monsterCount's
+    ; "around player (range)" mode, where the radius is in world units, not pixels.
+    _DrawWorldRing(worldR, colorBGR, rec)
+    {
+        global g_radarLastSnap
+        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
+        if !snap
+            return
+        gameHwnd := ResolvePoEWindow()
+        if !gameHwnd
+            return
+        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
+        mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
+        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
+        prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
+        pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+        if !(mat is Array && mat.Length = 16 && pwp && pwp is Map)
+            return          ; world ring needs the real projection matrix
+        rect := NavClientRect(gameHwnd)
+        if !rect
+            return
+        px := pwp.Has("x") ? pwp["x"] : 0
+        py := pwp.Has("y") ? pwp["y"] : 0
+        pz := pwp.Has("z") ? pwp["z"] : 0
+        segs := 48
+        pts := Buffer((segs + 1) * 8, 0)
+        cnt := 0
+        maxX := -2147483647, maxY := -2147483647
+        Loop (segs + 1)
+        {
+            ang := (A_Index - 1) * 6.2831853 / segs
+            sp := NavProject(px + worldR * Cos(ang), py + worldR * Sin(ang), pz, mat, rect, 0)
+            if !sp
+                continue
+            sx := sp["x"] - this._lastX, sy := sp["y"] - this._lastY
+            NumPut("Int", sx, pts, cnt * 8), NumPut("Int", sy, pts, cnt * 8 + 4)
+            cnt += 1
+            if (sx > maxX)
+                maxX := sx
+            if (sy > maxY)
+                maxY := sy
+        }
+        if (cnt < 3)
+            return
+        pen := this._GetPen(colorBGR, 2)
+        oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", cnt)
+        DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
+        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ring's footprint
+    }
+
+    ; Draws a range-debug record's text (label + lines, e.g. monster counts) anchored at
+    ; the lower-right of a pixel ring (~4 o'clock / 120° clockwise from the top).
+    ; cx,cy = ring centre (client coords), r = ring radius (px).
     _DrawCircleLabel(cx, cy, r, rec)
     {
-        ax := Round(cx + r * 0.866) + 6   ; cos(30°)·r outward to the right, small pad
-        ay := Round(cy + r * 0.5)         ; sin(30°)·r downward → lower-right edge
+        this._DrawCircleLabelAt(Round(cx + r * 0.866) + 6, Round(cy + r * 0.5), rec)
+    }
+
+    ; Draws a range-debug record's text (label + lines) starting at (ax,ay) in client
+    ; coords. Shared by the pixel-ring and world-ring labels. This is the spatial
+    ; counterpart to the DebugOverlay's "HOTKEYS" panel, which skips range-based records
+    ; precisely because their text lives here at the circle.
+    _DrawCircleLabelAt(ax, ay, rec)
+    {
         font := this._GetFont(-13, 600, "Segoe UI")
         oldFont := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", font, "Ptr")
         pitch := 15

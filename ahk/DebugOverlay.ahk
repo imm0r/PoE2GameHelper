@@ -213,8 +213,9 @@ class DebugOverlay extends GdiOverlayBase
                 if !(rec is Map)
                     continue
                 if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
-                    || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0))
-                    continue   ; range-based → drawn at the circle on the radar
+                    || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0)
+                    || (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0))
+                    continue   ; range-based → drawn at the circle/ring on the radar
                 hkLines.Push(["  " (rec.Has("label") ? rec["label"] : "?"), DebugOverlay.COL_GOLD])
                 if (rec.Has("lines") && rec["lines"] is Array)
                     for _, ln in rec["lines"]

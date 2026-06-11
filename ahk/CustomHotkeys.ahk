@@ -530,13 +530,25 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
 
     if (t = "monsterCount" || t = "monsterCountCursor")
     {
-        px := a.Has("radius") ? (a["radius"] + 0) : 120
         ; Legacy "monsterCountCursor" is always cursor-origin.
-        mode := (t = "monsterCountCursor" || (a.Has("radiusMode") && a["radiusMode"] = "cursor")) ? "cursor" : "player"
-        rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
-        counts := _HotkeysCountByRarity(snap, px, mode)
-        rec["counts"] := counts
-        rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        mode := (t = "monsterCountCursor") ? "cursor"
+            : (a.Has("radiusMode") ? a["radiusMode"] : "player")
+        if (mode = "world")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            rec["circlePlayerWorld"] := wr   ; isometric world-radius ground ring around the player
+            counts := _HotkeysCountByRarity(snap, wr, "world")
+            rec["counts"] := counts
+            rec["lines"].Push("@range(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
+        else
+        {
+            px := a.Has("radius") ? (a["radius"] + 0) : 120
+            rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
+            counts := _HotkeysCountByRarity(snap, px, mode)
+            rec["counts"] := counts
+            rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+        }
     }
     else if (t = "aim")
     {
@@ -1010,57 +1022,27 @@ _HotkeysPxDist(octx, wx, wy, wz)
     return Sqrt(ddx * ddx + ddy * ddy)
 }
 
-; Monster-count gate: counts hostile (targetable) entities within a screen-pixel
-; radius of the chosen origin (cursor or the player's on-screen position),
-; optionally filtered by rarity, and compares to the threshold.
-; action: Map("radius", px, "radiusMode","cursor"|"player",
-;             "rarity","any"|"normal"|"magic"|"rare"|"unique", "op",">=",
-;             "value", n, "worldRadius", maxWorldDist)
-;   worldRadius pre-filters far entities before projection (default 4000).
+; Monster-count gate: counts hostile (targetable) entities, optionally filtered by
+; rarity, within the configured radius, and compares to the threshold. radiusMode
+; "cursor"/"player" use a screen-pixel radius (action "radius"); "world" uses a
+; zoom-independent world-unit radius around the player (action "worldRadius").
+; action: Map("radius", px, "worldRadius", units,
+;             "radiusMode","cursor"|"player"|"world",
+;             "rarity","any"|"normal"|"magic"|"rare"|"unique", "op",">=", "value", n)
+; Delegates the actual counting to _HotkeysCountByRarity, then picks the rarity bucket.
 _HotkeysCheckMonsterCount(a, snap)
 {
     if !snap
         return false
-    pxRadius := a.Has("radius") ? (a["radius"] + 0) : 120
-    worldRadius := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 4000
+    mode := a.Has("radiusMode") ? a["radiusMode"] : "player"
+    radiusVal := (mode = "world")
+        ? (a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000)
+        : (a.Has("radius") ? (a["radius"] + 0) : 120)
+    counts := _HotkeysCountByRarity(snap, radiusVal, mode)
     rarity := a.Has("rarity") ? a["rarity"] : "any"
-    rarMap := Map("normal", 0, "magic", 1, "rare", 2, "unique", 3)
-    wantRar := rarMap.Has(rarity) ? rarMap[rarity] : -1
-    originMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
-    octx := _HotkeysPxOrigin(snap, originMode)
-    if !octx
-        return false
-
-    count := 0
-    for entry in _HotkeysAwakeSample(snap)
-    {
-        entity := entry.Has("entity") ? entry["entity"] : 0
-        if !(entity && entity is Map)
-            continue
-        dist := entry.Has("distance") ? entry["distance"] : -1
-        if (dist < 0 || dist > worldRadius)
-            continue
-        dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
-        if !(dc && dc is Map)
-            continue
-        if !_HotkeysIsTargetable(dc)
-            continue
-        if (wantRar >= 0)
-        {
-            rid := dc.Has("rarityId") ? dc["rarityId"] : -1
-            if (rid != wantRar)
-                continue
-        }
-        render := dc.Has("render") ? dc["render"] : 0
-        wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
-        if !(wp && wp is Map)
-            continue
-        d := _HotkeysPxDist(octx, wp.Has("x") ? wp["x"] : 0, wp.Has("y") ? wp["y"] : 0, wp.Has("z") ? wp["z"] : 0)
-        if (d < 0 || d > pxRadius)
-            continue
-        count += 1
-    }
-    return _HotkeysCompare(count, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
+    n := (rarity = "any") ? counts["total"]
+                          : (counts.Has(rarity) ? counts[rarity] : 0)
+    return _HotkeysCompare(n, a.Has("op") ? a["op"] : ">=", a.Has("value") ? (a["value"] + 0) : 1)
 }
 
 ; Legacy alias: the old "monsterCountCursor" action is now just a monster-count

@@ -6406,15 +6406,21 @@
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai)} `
                + `${hkNum(a, 'value', 1, gi, hi, ai)}`;
           break;
-        case 'monsterCount':
-          // Counts targetable monsters inside a screen-pixel radius measured
-          // either from the mouse cursor or from the player's on-screen position.
+        case 'monsterCount': {
+          // Counts targetable monsters within a radius. cursor/player measure a
+          // screen-pixel radius; "around player (range)" measures a zoom-independent
+          // world-unit radius around the player (field swaps px ↔ range accordingly).
+          const mcWorld = (a.radiusMode || 'player') === 'world';
+          const mcRadiusField = mcWorld
+            ? `Range ${hkNum(a, 'worldRadius', 1000, gi, hi, ai, 'Radius in world units around the player (zoom-independent — matches the actual game distance)')} `
+            : `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `;
           body = `Rarity ${hkSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, ai, 'Only count monsters of this rarity (Any = all)')} `
-               + `Radius(px) ${hkNum(a, 'radius', 120, gi, hi, ai, 'Radius in screen pixels within which monsters are counted')} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
+               + mcRadiusField
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)']], gi, hi, ai, 'Pixel radius around the cursor / player, or a world-unit range around the player')} `
                + `${hkSel(a, 'op', HK_OPS, gi, hi, ai, 'Comparison operator for the monster count')} `
                + `${hkNum(a, 'value', 1, gi, hi, ai, 'Monster-count threshold to compare against')}`;
           break;
+        }
         case 'aim': {
           // "Scan all" lives at the bottom of the Target dropdown as
           // "any (debug)": it ignores the target type & sub-filter and aims at
