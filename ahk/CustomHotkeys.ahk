@@ -528,6 +528,14 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     rec["key"] := key
     rec["lines"].Push("key: " (key != "" ? key : "(unbound)"))
 
+    ; When this hotkey last actually fired its key (any path), and which key.
+    rt := _HotkeysRuntime(hk["id"])
+    if (rt.Has("lastFireTick") && rt["lastFireTick"] > 0)
+        rec["lines"].Push("last fired: " (rt.Has("lastFireKey") && rt["lastFireKey"] != "" ? rt["lastFireKey"] : "?")
+            " (" Round((A_TickCount - rt["lastFireTick"]) / 1000.0, 1) "s ago)")
+    else
+        rec["lines"].Push("last fired: never")
+
     if (t = "monsterCount" || t = "monsterCountCursor")
     {
         ; Legacy "monsterCountCursor" is always cursor-origin.
@@ -751,7 +759,8 @@ _HotkeysRuntime(id)
 {
     global g_hkRuntime
     if !g_hkRuntime.Has(id)
-        g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0)
+        g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0
+                             , "lastFireTick", 0, "lastFireKey", "")
     return g_hkRuntime[id]
 }
 
@@ -925,7 +934,7 @@ _HotkeysRunActions(hk, context, depth)
                 _HotkeysDoKey(hk, a)
                 hadEffect := true
             case "press":
-                _HotkeysSendKey(_HotkeysResolveKey(hk))
+                _HotkeysFireOutput(hk)
                 hadEffect := true
             case "repeat":
                 _HotkeysDoRepeat(hk, a)
@@ -943,7 +952,7 @@ _HotkeysRunActions(hk, context, depth)
     }
     ; Conditions-only hotkey: no effect action ran, so fire the bound output once.
     if !hadEffect
-        _HotkeysSendKey(_HotkeysResolveKey(hk))
+        _HotkeysFireOutput(hk)
 }
 
 ; ── Condition evaluators ───────────────────────────────────────────────────
@@ -1241,6 +1250,28 @@ _HotkeysSendKey(key)
     try _SendSkillKey(key, gameHwnd)
 }
 
+; Records that hotkey <hk> just fired <key> into its runtime state
+; (lastFireTick / lastFireKey), for the debug overlay's "last fired" line.
+; Empty keys are ignored (no real trigger happened).
+_HotkeysMarkFired(hk, key)
+{
+    if (Trim(key) = "")
+        return
+    rt := _HotkeysRuntime(hk["id"])
+    rt["lastFireTick"] := A_TickCount
+    rt["lastFireKey"]  := key
+}
+
+; Resolves the hotkey's output key, sends it once, and records the fire. The single
+; "send the bound output once" path, so every site that does so also updates the
+; last-fired bookkeeping.
+_HotkeysFireOutput(hk)
+{
+    key := _HotkeysResolveKey(hk)
+    _HotkeysSendKey(key)
+    _HotkeysMarkFired(hk, key)
+}
+
 ; Merged key action: dispatches on "mode" to the press / hold / loop behaviour.
 ; action: Map("mode","press"|"hold"|"loop", ...mode-specific fields)
 _HotkeysDoKey(hk, a)
@@ -1251,7 +1282,7 @@ _HotkeysDoKey(hk, a)
     else if (mode = "loop")
         _HotkeysDoRepeat(hk, a)
     else
-        _HotkeysSendKey(_HotkeysResolveKey(hk))
+        _HotkeysFireOutput(hk)
 }
 
 ; Repeat action: presses the output key repeatedly.
@@ -1295,7 +1326,7 @@ _HotkeysSendKeyIfReady(hk)
     rdy := _HotkeysOutputReadiness(hk)
     if !rdy["ready"]
         return
-    _HotkeysSendKey(_HotkeysResolveKey(hk))
+    _HotkeysFireOutput(hk)
 }
 
 ; Schedules <count> key presses spaced <interval> ms apart via a self-cancelling
@@ -1311,7 +1342,7 @@ _HotkeysScheduleBurst(hk, count, interval)
         rdy := _HotkeysOutputReadiness(hk)
         if rdy["ready"]
         {
-            _HotkeysSendKey(_HotkeysResolveKey(hk))
+            _HotkeysFireOutput(hk)
             state["left"] -= 1
         }
         state["ticksLeft"] -= 1
@@ -1332,6 +1363,7 @@ _HotkeysDoHold(hk, a)
     dur := a.Has("durationMs") ? Max(10, a["durationMs"] + 0) : 200
     if !_HotkeysKeyDown(key)
         return
+    _HotkeysMarkFired(hk, key)
     SetTimer(() => _HotkeysKeyUp(key), -dur)
 }
 
@@ -1400,10 +1432,16 @@ _HotkeysDoAim(hk, a, snap)
         {
             key := Trim(outKey)
             if (key != "" && _HotkeysKeyDown(key))
+            {
+                _HotkeysMarkFired(hk, key)
                 SetTimer(() => _HotkeysKeyUp(key), -holdMs)
+            }
         }
         else
+        {
             _HotkeysSendKey(outKey)
+            _HotkeysMarkFired(hk, outKey)
+        }
     }
 }
 
