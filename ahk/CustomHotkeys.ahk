@@ -717,6 +717,8 @@ _HotkeysCountByRarity(snap, radius, mode)
 ; Returns Map("x","y","z") or 0 when matrix/window/player are unavailable or degenerate.
 _HotkeysCursorWorldPos(snap)
 {
+    if !(snap && snap is Map)
+        return 0
     inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
     mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
     if !(mat is Array && mat.Length = 16)
