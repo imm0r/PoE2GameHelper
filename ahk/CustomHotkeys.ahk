@@ -552,12 +552,12 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         else if (mode = "worldCursor")
         {
             wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
-            cwp := _HotkeysCursorWorldPos(snap)   ; ground ring around the cursor's world point
+            rec["circleCursorWorld"] := wr   ; isometric ring drawn around the mouse position
+            ; (kept for any consumer that wants the unprojected cursor ground point — the
+            ; ring itself no longer needs it, but the count below still does)
+            cwp := _HotkeysCursorWorldPos(snap)
             if (cwp)
-            {
-                rec["circleCursorWorld"] := wr
                 rec["cursorWx"] := cwp["x"], rec["cursorWy"] := cwp["y"], rec["cursorWz"] := cwp["z"]
-            }
             counts := _HotkeysCountByRarity(snap, wr, "worldCursor")
             rec["counts"] := counts
             rec["lines"].Push("@cursorRange(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
