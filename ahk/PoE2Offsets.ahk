@@ -539,8 +539,9 @@ class PoE2Offsets
     ; -> id 170 Metadata/Chests/MossyChest26; ground-item hover -> Metadata/
     ; MiscellaneousObjects/WorldItem. NOTE: this does NOT track MONSTERS — a
     ; monster hover leaves tracker+0x648 at 0 (monster targeting is a different
-    ; mechanism). For the hovered/targeted monster use Targetable.IsTargetedByPlayer
-    ; (0x6B) on the entity list instead.
+    ; mechanism). For the hovered MONSTER, prefer the MouseOver chain below (the
+    ; true entity-under-cursor pointer, monsters included); Targetable.IsTargetedByPlayer
+    ; (0x6B) on the entity list only flips for the actively targeted/attacked monster.
     ; Sikaka/POE2Radar's offsets are correct, but WorldTracker is an EMBEDDED
     ; sub-struct (vtable at tracker+0x630), NOT a pointer to dereference. Chain:
     ;   uiRoot  = ReadPtr(InGameState + UiRootStructPtr 0x2F0)
@@ -552,6 +553,21 @@ class PoE2Offsets
         "WorldTracker", 0x630,                ; embedded sub-struct offset — do NOT deref
         "HoveredEntity", 0x18,                ; within the embedded WorldTracker sub-struct
         "HoveredEntityFromTracker", 0x648     ; convenience: WorldTracker + HoveredEntity
+    )
+
+    ; MouseOver entity — the TRUE entity currently under the cursor (monsters INCLUDED,
+    ; unlike the HoverTracker world-object slot). Verified in-game against the trusted
+    ; Cheat-Engine "screenToWorldPtrMouseOverEntityPtr" table. The CE chain anchors on the
+    ; static "Game State bptr"; the live probe proved its 2nd hop equals our InGameState,
+    ; so we anchor on InGameState (already resolved + cached) and drop the first two hops:
+    ;   host = ReadPtr(InGameState + HostFromInGameState 0x300)
+    ;   sub  = ReadPtr(host        + SubFromHost        0x3F0)
+    ;   ent  = ReadPtr(sub         + EntityFromSub      0xA8)   ; 0 when nothing is hovered
+    ; Confirmed: hovering KelpDregCrossbowIceShot resolved id 1273 / Metadata/Monsters/...
+    static MouseOver := Map(
+        "HostFromInGameState", 0x300,
+        "SubFromHost", 0x3F0,
+        "EntityFromSub", 0xA8
     )
 
 }
