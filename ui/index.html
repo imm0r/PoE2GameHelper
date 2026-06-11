@@ -3956,7 +3956,7 @@
   </div>
 
   <!-- ── CATEGORY BAR (top-level navigation) ── -->
-  <div id="cat-bar">
+  <div id="cat-bar" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
     <div id="cat-bar-left">
       <div class="cat active" data-cat="game" onclick="switchCategory('game')"><svg viewBox="0 0 24 24">
           <rect x="2" y="6" width="20" height="12" rx="6" />
@@ -3998,7 +3998,7 @@
   </div>
 
   <!-- ── SUB-TAB BAR (one row per category, only the active row is visible) ── -->
-  <div id="tab-bar">
+  <div id="tab-bar" onmousedown="headerDragStart(event)" ondblclick="headerDblClick(event)">
 
     <!-- GAME — entities / skills / inventory / watchlist -->
     <div class="subtab-row active" data-cat="game">
@@ -9337,7 +9337,7 @@
     // ═══════════════════════════════════════════════════════════════════
     function headerDragStart(e) {
       if (e.button !== 0) return;
-      if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+      if (e.target.closest('button,a,input,select,.pill,.tab,.cat,.cat-btn,.wm-btn')) return;
       // Don't start a window drag when the press lands on a scrollbar (e.g.
       // the narrow pill row's horizontal scrollbar). clientWidth/Height
       // exclude the scrollbar gutter, so an offset past them means the
@@ -9349,7 +9349,7 @@
     }
 
     function headerDblClick(e) {
-      if (e.target.closest('button,a,input,select,.pill,.tab,.wm-btn')) return;
+      if (e.target.closest('button,a,input,select,.pill,.tab,.cat,.cat-btn,.wm-btn')) return;
       ahkCall('WinMaximize');
     }
 
