@@ -248,7 +248,35 @@ class RadarOverlay extends GdiOverlayBase
     ShouldShow(ctx)
     {
         global g_radarEnabled
-        return ctx.gate["allowed"] && (IsSet(g_radarEnabled) ? g_radarEnabled : true)
+        radarOn := (IsSet(g_radarEnabled) ? g_radarEnabled : true)
+        if !radarOn
+            return false
+        if ctx.gate["allowed"]
+            return true
+        ; Also render on the play area (foreground only) when a debug-enabled hotkey
+        ; wants a range circle, so the combat/aim radius shows even with the large map
+        ; closed. The map layers stay gated on ctx.gate["allowed"] (see Draw), so this
+        ; only adds the circle, never the maphack/dots.
+        return (ctx.gameActive || ctx.keepWhenBackground) && this._HasHotkeyDebugCircle()
+    }
+
+    ; True if any debug-enabled hotkey action currently requests a screen-space range
+    ; circle (monsterCount / aim). Keeps the radar alive for that circle even when the
+    ; play-overlay gate (large map) is closed.
+    _HasHotkeyDebugCircle()
+    {
+        global g_hkDebugItems
+        if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array)
+            return false
+        for _, rec in g_hkDebugItems
+        {
+            if !(rec is Map)
+                continue
+            if ((rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
+                || (rec.Has("circlePlayerPx") && rec["circlePlayerPx"] > 0))
+                return true
+        }
+        return false
     }
 
     ; Layout: the radar draws across the whole game window.
@@ -425,7 +453,12 @@ class RadarOverlay extends GdiOverlayBase
                 this._lastMiniMapDiagonal := Sqrt(mmW * mmW + mmH * mmH)
         }
 
-        if (miniMapData && miniMapData["isVisible"])
+        ; Map layers only render under the full play-overlay gate. When ShouldShow let
+        ; the radar through purely for a hotkey-debug circle (gate closed, map shut),
+        ; mapAllowed is false so we skip the maphack/dots and draw only the circle below.
+        mapAllowed := (ctx.gate is Map && ctx.gate.Has("allowed")) ? ctx.gate["allowed"] : true
+
+        if (mapAllowed && miniMapData && miniMapData["isVisible"])
         {
             Profiler.Begin("radar.mini")
             try this._RenderMapLayer(miniMapData, playerWorldX, playerWorldY, playerTerrainHeight,
@@ -435,7 +468,7 @@ class RadarOverlay extends GdiOverlayBase
             Profiler.End("radar.mini")
         }
 
-        if (largeMapData && largeMapData["isVisible"])
+        if (mapAllowed && largeMapData && largeMapData["isVisible"])
         {
             Profiler.Begin("radar.large")
             try this._RenderMapLayer(largeMapData, playerWorldX, playerWorldY, playerTerrainHeight,
@@ -579,6 +612,10 @@ class RadarOverlay extends GdiOverlayBase
         }
 
         this._FinishFrame(gameWindowWidth, gameWindowHeight)
+
+        ; Hotkey-debug range circles (monsterCount / aim) — drawn last so they sit on
+        ; top, on the play area, regardless of map state (see ShouldShow's circle gate).
+        this._RenderHotkeyCircles()
     }
 
     ; Finishes the frame on the back-buffer: atlas overlay, flush of all queued
@@ -758,9 +795,9 @@ class RadarOverlay extends GdiOverlayBase
             }
         }
 
-        ; ── Hotkey action debug (per-action debug flag in the Hotkeys tab) ──
-        this._RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin,
-            gameWindowWidth, gameWindowHeight)
+        ; (Hotkey-debug range circles are drawn once per frame from Draw() via
+        ; _RenderHotkeyCircles — independent of the map layers, so they show even
+        ; when the large map is closed.)
 
         ; ── Draw entities ────────────────────────────────────────────────────────────────
         awakeEntities   := (areaInstance && areaInstance.Has("awakeEntities"))    ? areaInstance["awakeEntities"]    : 0
@@ -1449,30 +1486,23 @@ class RadarOverlay extends GdiOverlayBase
             this._DrawText(topSX - StrLen(label) * 3, topSY - 14, label, colorBGR)
     }
 
-    ; Renders per-action debug overlays for hotkey actions whose debug flag is on.
-    ; Reads g_hkDebugItems (built each tick by the hotkey engine) and draws ONLY the
-    ; map-bound spatial overlays per item: a world range circle around the player or a
-    ; cursor/player pixel circle. The textual debug block (label + condition values +
-    ; key) moved to the standalone DebugOverlay (its "HOTKEYS" section); a circle can't
-    ; live in a text box, so the spatial parts stay here on the radar.
-    _RenderHotkeyDebug(mapCenterX, mapCenterY, projectionCos, projectionSin, gw, gh)
+    ; Draws the screen-space range circle(s) requested by debug-enabled hotkey actions
+    ; (monsterCount / aim): a ring at the cursor or at the player's projected screen
+    ; position, read from g_hkDebugItems. Called once per frame from Draw(), independent
+    ; of the map layers, so the combat/aim radius shows even with the large map closed.
+    ; The matching debug TEXT lives in the DebugOverlay's "HOTKEYS" section.
+    _RenderHotkeyCircles()
     {
         global g_hkDebugItems
         if !(IsSet(g_hkDebugItems) && g_hkDebugItems is Array && g_hkDebugItems.Length)
             return
 
-        COL := 0x55FFFF        ; debug yellow (BGR) — range-circle label
-        COL_CUR := 0xC0A8FF    ; cursor / player pixel circle (pinkish)
+        COL_CUR := 0xC0A8FF    ; cursor / player range circle (pinkish, BGR)
 
         for _, rec in g_hkDebugItems
         {
             if !(rec is Map)
                 continue
-            ; World range circle around the player.
-            if (rec.Has("circleWorld") && rec["circleWorld"] > 0)
-                this._DrawRangeCircle(rec["circleWorld"], mapCenterX, mapCenterY,
-                    projectionCos, projectionSin, COL,
-                    rec.Has("label") ? rec["label"] : "")
             ; Cursor pixel circle (screen cursor → client coords).
             if (rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
             {
