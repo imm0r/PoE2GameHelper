@@ -4,7 +4,7 @@
 
 **A modern AutoHotkey v2 toolset for *Path of Exile 2* — overlays, automation, reverse-engineering workbench, and GGPK-level map reveal in one place.**
 
-![Version](https://img.shields.io/badge/version-v0.45.12.29-blue)
+![Version](https://img.shields.io/badge/version-v0.45.12.30-blue)
 ![Build](https://img.shields.io/badge/build-stable-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 ![Language](https://img.shields.io/badge/language-AutoHotkey%20v2-orange)
@@ -55,13 +55,13 @@
 
 🧪 **Entity Inspector** — every entity in range surfaced with its address, full property block, and a per-component tree. Filter by Id / Path / Type / State, expand any component for inline decoded fields, lazy-fetch on demand for the heavy ones the radar pass skips.
 
-📜 **Arcane Codex UI** — leather-bound grimoire aesthetic, with a full-height logo rail anchoring three stacked navigation rows, a sliding gold underline that glides between active tabs, and a header pill vocabulary that pulses copper when paused and crimson when disconnected.
+📜 **Arcane Codex UI** — leather-bound grimoire aesthetic, with a full-height logo rail anchoring three stacked navigation rows, a sliding gold underline that glides between active tabs, and a header pill vocabulary that pulses green when connected, copper when paused and crimson when disconnected.
 
 ⌨️ **Custom Hotkeys** — a full macro editor (Groups → Hotkeys → Actions) whose output binds to your real in-game flask/skill slots. Manual or condition-driven *automated* triggers, a merged key action (press / hold / loop), chaining, gameplay conditions (vitals / buffs / charges / monster count), and a pixel-radius **auto-aim** around the cursor or the player.
 
 🛰 **Radar overlay** — high-performance GDI render with full-zone reveal, entity icons, A\* path drawing.
 
-💧 **AutoFlask** — life/mana threshold automation with cooldown-aware fallbacks.
+💧 **Flask presets** — life & mana flasks auto-fire via default **Custom Hotkey** presets (vitals threshold → charge-gated flask slot), seeded once on first run — replacing the old standalone AutoFlask.
 
 🔌 **Automatic executable detection** — attaches to PoE2 whether it's the Steam or standalone client (32-/64-bit), no configuration needed.
 
@@ -79,7 +79,7 @@ The priority chain is *combat > loot > explore*; each stage claims a tick by ret
 - **Click safety (`AvoidZones`)** — shared registry of screen-coordinate keep-out rects covering HUD elements (life globe, skill bar, minimap) + interactable world entities (transitions, waypoints, portals, NPCs). Combat and loot both consult it before any click.
 - **Loot Pickup** — see below.
 
-**AutoFlask** — configurable life/mana % thresholds, cooldown-aware, with ControlSend + PostMessage fallbacks for elevated-game scenarios.
+**Flask automation (via Custom Hotkeys)** — life/mana flask use now lives in the hotkey engine. A default **Flasks** group is seeded on first run — *Life Flask* (slot 1, ≤ 55 % life) and *Mana Flask* (slot 2, ≤ 35 % mana), each an automated vitals condition firing a charge-gated flask output. The old standalone AutoFlask is retired.
 
 <div align="center">
   <img src="assets/configuration1.png" width="800" alt="AutoPilot configuration">
@@ -100,9 +100,11 @@ Every hotkey's **output is bound to a real in-game bind** picked from a dropdown
 - **Triggers** — *manual* (fires on the physical key press) or *automated* (auto-fires from the evaluation tick whenever the hotkey's conditions are met). An optional **one-shot per tick** guard limits automated firing to the highest-priority hotkey in list order.
 - **Key action** — a single action with a **Mode** selector: *press once*, *hold* (configurable duration), or *loop / repeat* (finite count + interval, or an infinite toggle). Repeats are cooldown-aware so a skill isn't spammed during its cooldown.
 - **Chain** — trigger another hotkey by id (with a delay and a user/program trigger filter) to compose multi-step macros.
-- **Conditions** — gate an action on live game state: **vitals** (life/ES/mana %), **buff** present/absent with min stacks & time-left, **charges** (power/frenzy/endurance/charged-staff), and **monster count** within a screen-pixel radius measured *around the cursor* or *around the player*.
+- **Conditions** — gate an action on live game state: **vitals** (life/ES/mana %), **buff** present/absent with min stacks & time-left, **charges** (power/frenzy/endurance/charged-staff), and **monster count** within a radius — a screen-pixel radius *around the cursor* / *around the player*, or a zoom-independent **world-unit range** around the player (plus an experimental world-range around the cursor).
+- **Auto-fire output** — a hotkey with conditions but no explicit key action simply presses its bound output once when the conditions pass, so "flask slot 2 + mana < 35 %" works on its own.
+- **Charge-aware flask output** — when the output is a flask slot, it fires only while that flask holds a full charge and its buff isn't already active (the behaviour the retired AutoFlask had).
 - **Auto-aim** — moves the cursor to the nearest matching entity inside a pixel radius (around cursor or player). Target type is chosen from a dropdown — *monster* (with rarity filter), *chest* (with a live dropdown of the chest types actually present in the area), *player/NPC*, *custom metadata path*, or *any (debug)* to scan everything — with an optional key press / hold after aiming.
-- **Per-action debug overlay** — a 🐞 toggle draws the action's range circle (cursor- or player-centred), live monster counts by rarity, cooldown and charge readouts right on the game overlay.
+- **Per-action debug** — a 🐞 toggle surfaces live diagnostics in the standalone **Debug Overlay** (Config → Overlay): the fired key, when it **last fired**, the vitals condition's live value & percent, **flask charge** readiness, and the **full active-buff list** with the checked buff / charge highlighted green. The matching **range circle** is drawn on the radar — a pixel ring at the cursor / player, or an isometric world-radius ground ring — with monster counts by rarity beside it.
 
 <div align="center">
   <img src="assets/hotkeys2.png" width="800" alt="Hotkeys tab — action editor with conditions and auto-aim">
@@ -124,7 +126,7 @@ Filter ground drops by rarity (Normal · Magic · Rare · Unique · Currency) an
 
 ### 🗺 Overlays
 
-**Radar** — high-performance GDI overlay with minimap + large-map modes, full-zone reveal, entity icons (NPCs, Bosses, Waypoints, Chests), distance indicators, and isometric projection.
+**Radar** — high-performance GDI overlay with minimap + large-map modes, full-zone reveal, entity icons (NPCs, Bosses, Waypoints, Chests), distance indicators, and isometric projection. The large-map maphack is **source-clipped** to the on-screen viewport (it transforms only the visible slice of the terrain bitmap, not the whole ~1 MPixel image) and **HUD-masked** so its outline never paints over the game's orbs, skill / flask / XP bars or the area / quest panel — tunable clip rectangles, with a debug toggle to outline them.
 
 <div align="center">
   <img src="assets/radar_overlay.png" width="900" alt="Radar overlay">
@@ -138,7 +140,7 @@ Filter ground drops by rarity (Normal · Magic · Rare · Unique · Currency) an
 - **Per-bar visibility rules** — each bar carries a prioritised condition list (drag & drop to reorder, add/remove, import/export). Conditions include **On Low Vital** (ES / Life / Mana threshold), **In Combat**, and per-condition **True / False** booleans, combined with Match All / Any and a Show / Hide outcome.
 - **Combat without the bot** — the **In Combat** condition is driven by a lightweight, proximity-only combat detector, so a bar can appear/disappear based on nearby hostiles even when AutoPilot is switched off (and it costs nothing when no bar uses it).
 
-**Unified overlay manager** — radar, vitals, focus and notification overlays all run through one manager with a shared per-tick context and a single visibility policy: they're hidden from the taskbar (`+ToolWindow`), hide when you alt-tab away from PoE, and no longer flicker on transient memory-read gaps.
+**Unified overlay manager** — radar, vitals, focus and notification overlays all run through one manager with a shared per-tick context and a single visibility policy: they're hidden from the taskbar (`+ToolWindow`), hide when you alt-tab away from PoE, no longer flicker on transient memory-read gaps, and self-heal if the OS hides or de-promotes the overlay window after a long alt-tab (the window state is verified against `IsWindowVisible` each tick, with a periodic top-most re-assert).
 
 <div align="center">
   <img src="assets/vitals.png" width="800" alt="Vitals overlay configuration — per-bar size, position, colours, opacity and visibility rules">
@@ -249,7 +251,7 @@ The interface is intentionally framed as a leather-bound grimoire of relics — 
 - **Typography** — [Cinzel](https://fonts.google.com/specimen/Cinzel) for illuminated chapter headings, [EB Garamond](https://fonts.google.com/specimen/EB+Garamond) for body text and item names, [IM Fell English SC](https://fonts.google.com/specimen/IM+Fell+English+SC) for engraved numerals. Windows-native serif fallbacks (Constantia / Palatino / Georgia) keep the aesthetic intact when offline.
 - **Palette** — warm dark browns and aged ivory for the parchment; antique gold for active states and rules; blood crimson reserved for urgent combat warnings; cool steel-blue retained for "info" highlights to keep them distinct from automation gold.
 - **Header pill vocabulary** — each pill carries state colour AND animation, so a glance is enough during combat:
-  - *Live / connected* — quiet gold.
+  - *Connected* — healthy green slow pulse (2.4 s), the positive pendant to the disconnected crimson.
   - *Paused* — copper-amber slow pulse (2.4 s). Halts updates can't masquerade as "off" pills.
   - *Disconnected* — blood crimson at the same pulse rhythm, so the two read as one "attention required" family with the cause encoded only in colour.
   - *AutoPilot — combat* — fast crimson pulse (1.4 s), a deliberate urgency over the paused/disconnected calm.
@@ -269,7 +271,7 @@ The top of the app is a single visual frame around three stacked rows on the rig
 
 | Row | Contents |
 |---|---|
-| Pills row | State pills (Connect · Pause · Debug · AutoFlask · AutoPilot · Radar · HUD · Map · FPS) + `↺ Snap` / `▶ PoE2` dual button + window controls (min / max / close) |
+| Pills row | State pills (Connect · Pause · Debug · AutoPilot · Radar · HUD · Map · ⏱ Benchmark) + `↺ Snap` / `▶ PoE2` dual button + window controls (min / max / close) |
 | Category bar | `GAME` · `RE` · `DATA` · `HOTKEYS` · `CONFIG` + the **📌 Always-on-Top** pin (next to Config, tilted -25° when off, upright + gilded when on; state persisted to the config INI) |
 | Sub-tab bar | Sub-tabs of the active category — sliding underline marker glides between selections |
 
@@ -322,14 +324,15 @@ The AHK side shells out to the resulting `.exe`s — rebuild whenever you pull u
 |---|---|
 | `F10` | Toggle **AutoPilot** (combat + loot + explore) |
 | `F3` | One-shot debug dump (TreeView + game-window screenshot + radar entity TSV) |
-| Click pill | Toggle the corresponding feature (Pause, Debug, AutoFlask, AutoPilot, Radar, HUD) |
+| Click pill | Toggle the corresponding feature (Pause, Debug, AutoPilot, Radar, HUD) |
+| Click ⏱ pill | Start / stop the performance benchmark (shows fps when idle, "● REC" while measuring); hover it for the per-marker timing table |
 | Click 📌 (next to Config) | Toggle Always-on-Top — visual state tilts/straightens, persisted to the config INI |
 | Click `↺ Snap` / `▶ PoE2` | Refresh the tree (game running) OR launch the game via Steam (game not running) |
 | Click logo | Open the GitHub repo in your default browser |
-| Drag header | Move the window — bound to the pills row, doesn't trigger on buttons |
+| Drag header | Move the window — bound to the pills row and the category / sub-tab bars, doesn't trigger on pills, tabs or buttons |
 | Double-click header | Maximise / restore |
 
-Most other toggles live in the **Config** tab (split into six sub-tabs — General · Automation · Overlay · GGPK · Filters · Debug) — AutoPilot tuning, AutoFlask thresholds, radar entity filters, loot rarity filter, GGPK maphack apply/revert + colour pickers, and per-skill slot configuration.
+Most other toggles live in the **Config** tab (split into six sub-tabs — General · Automation · Overlay · GGPK · Filters · Debug) — AutoPilot tuning, radar entity filters, loot rarity filter, GGPK maphack apply/revert + colour pickers, and per-skill slot configuration. (Flask thresholds now live in the default flask **Custom Hotkeys** instead.)
 
 User-defined macros live in their own **Hotkeys** category (see [Custom Hotkeys](#-custom-hotkeys)) — define a trigger key there and its output is bound to one of your in-game flask/skill slots.
 
@@ -351,7 +354,7 @@ InGameStateMonitor.ahk          ─ main entry / WebView host (the only .ahk in 
 │   ├── LootPickup.ahk          ─ ground-item cache + fit-check pickup
 │   ├── AvoidZones.ahk          ─ shared screen-rect keep-out registry
 │   ├── ItemSizeRegistry.ahk    ─ base-item dimensions (loads data/base_item_sizes.tsv)
-│   └── AutoFlask.ahk           ─ life/mana threshold flask automation
+│   └── AutoFlask.ahk           ─ legacy flask automation (retired; flasks now via hotkey presets)
 │
 ├── Custom Hotkeys
 │   ├── CustomHotkeys.ahk          ─ macro engine: groups/hotkeys/actions, conditions, auto-aim
