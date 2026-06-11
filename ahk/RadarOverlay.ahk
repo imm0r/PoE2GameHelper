@@ -42,6 +42,14 @@ class RadarOverlay extends GdiOverlayBase
     ; Conversion factor WorldPosition → GridPosition (from Radar.cs: ratio = 10.86957)
     static WORLD_TO_GRID_RATIO := 10.86957
 
+    ; Bottom-HUD clip height in DESIGN pixels (2560×1600 reference). The game draws its
+    ; skill/flask/XP bar on top of the large map; our always-on-top overlay would otherwise
+    ; paint the maphack outline (and dots) over that HUD. The whole large-map layer is clipped
+    ; above a bottom strip of this height, scaled by gameWindowHeight/1600 at render time.
+    ; 0 disables the clip. Tune in-game: raise if a sliver still shows over the bar, lower if
+    ; it hides visible map between the orbs.
+    static MAP_BOTTOM_HUD_DESIGN_H := 100
+
     ; Dot colors (GDI expects BGR, not RGB)
     static COLOR_ENEMY_NORMAL := 0x0000FF   ; red    (normal enemies)
     static COLOR_ENEMY_RARE   := 0xFF00FF   ; magenta (rare enemies)
@@ -684,6 +692,20 @@ class RadarOverlay extends GdiOverlayBase
         projectionCos := mapDiagonal * RadarOverlay.CAMERA_COS / baseMapScale
         projectionSin := mapDiagonal * RadarOverlay.CAMERA_SIN / baseMapScale
 
+        ; ── Bottom-HUD clip (large map only) ─────────────────────────────────────────────
+        ; Exclude a fixed bottom strip so the maphack outline / dots never paint over the
+        ; game's skill/flask/XP bar (the game renders that HUD on top of its map; our overlay
+        ; is always-on-top). GDI clips PlgBlt and every dot/line below to this region for the
+        ; rest of the method; it is cleared unconditionally at the end (cannot leak a frame).
+        if (isLargeMap && RadarOverlay.MAP_BOTTOM_HUD_DESIGN_H > 0)
+        {
+            hudStripH := Round(RadarOverlay.MAP_BOTTOM_HUD_DESIGN_H * scaleFactorY)
+            if (hudStripH > 0 && hudStripH < gameWindowHeight)
+                DllCall("ExcludeClipRect", "Ptr", this.memDC,
+                    "Int", 0, "Int", gameWindowHeight - hudStripH,
+                    "Int", gameWindowWidth, "Int", gameWindowHeight)
+        }
+
         ; ── Maphack / walkable-grid overlays (large map only, before entities) ──
         ; Walkable fill goes first so the wall-border outline draws on top.
         if (isLargeMap && this._walkGridEnabled && this._mapWalkColorDC && this._mapWalkMask)
@@ -1143,6 +1165,10 @@ class RadarOverlay extends GdiOverlayBase
                     . " pre=" preFlt " post=" postFlt
             }
         }
+
+        ; Release any clip region set above (bottom-HUD strip) so it never affects a later
+        ; draw into the back-buffer. SelectClipRgn(NULL) is a harmless no-op when none was set.
+        DllCall("SelectClipRgn", "Ptr", this.memDC, "Ptr", 0)
     }
 
     ; Returns cached path classification flags used by the hot render loop.
