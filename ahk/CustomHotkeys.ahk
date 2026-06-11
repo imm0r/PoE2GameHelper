@@ -588,12 +588,19 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             rec["lines"].Push("vitals " res " " op " " thr "% (no data)")
     }
 
-    ; Output skill cooldown / readiness (applies to any debugged action).
+    ; Output readiness (applies to any debugged action). Flask outputs always show
+    ; their live charge count; skills show cooldown only when not ready. Guard the
+    ; flask charge keys: the lenient "unreadable" readiness omits them.
     rdy := _HotkeysOutputReadiness(hk)
     rk := rdy.Has("kind") ? rdy["kind"] : ""
     if (rk = "flask")
-        rec["lines"].Push("flask charges " rdy["charges"] "/" rdy["perUse"]
-            (rdy["active"] ? " (buff active)" : "") " -> " (rdy["ready"] ? "READY" : "NOT READY"))
+    {
+        if (rdy.Has("charges"))
+            rec["lines"].Push("flask charges " rdy["charges"] "/" rdy["perUse"]
+                ((rdy.Has("active") && rdy["active"]) ? " (buff active)" : "") " -> " (rdy["ready"] ? "READY" : "NOT READY"))
+        else
+            rec["lines"].Push("flask charges n/a (unread) -> " (rdy["ready"] ? "READY" : "NOT READY"))
+    }
     else if (rdy["cooldownMs"] > 0 || !rdy["ready"])
         rec["lines"].Push("skill " (rdy["ready"] ? "READY" : "on CD") (rdy["cooldownMs"] > 0 ? " (" rdy["cooldownMs"] "ms)" : ""))
     return rec
