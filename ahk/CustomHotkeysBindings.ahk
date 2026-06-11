@@ -190,8 +190,10 @@ _CollectChestTypes()
     return out
 }
 
-; Reads the player's currently active skills and returns a sorted array of their
-; display names (deduplicated). Returns [] if unavailable.
+; Reads the player's currently active skills and returns an array of their display
+; names (deduplicated). Internal/engine skills (Move, Interaction, [DNT-UNUSED]…) are
+; filtered out via hasRealName, so only real, translated skill names remain — the skill
+; cooldown-gate dropdown only makes sense for those. Returns [] if unavailable.
 _CollectActiveSkillNames()
 {
     global g_reader, g_radarLastSnap
@@ -212,6 +214,11 @@ _CollectActiveSkillNames()
     for sk in skillsData["skills"]
     {
         if !(sk is Map)
+            continue
+        ; Skip internal/engine skills (Move, Interaction, [DNT-UNUSED]…). hasRealName marks
+        ; skills resolved to a real DisplayedName — the same flag the Skills & Buffs tab uses
+        ; for its "internal skills" toggle. The cooldown gate only makes sense for real skills.
+        if !(sk.Has("hasRealName") && sk["hasRealName"])
             continue
         nm := sk.Has("displayName") && sk["displayName"] != "" ? sk["displayName"]
             : (sk.Has("name") ? sk["name"] : "")

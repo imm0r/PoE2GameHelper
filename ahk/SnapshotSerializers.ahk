@@ -124,9 +124,14 @@ _BuildBuffsJson(snapshot)
             ic := StrReplace(ic, "\",  "\\")
             ic := StrReplace(ic, '"',  '\"')
 
+            ; Internal (untranslated) buff name — the hotkey buff condition substring-matches
+            ; against this, so the self-filling dropdown stores it as the option value.
+            inEsc := StrReplace(name,  "\",  "\\")
+            inEsc := StrReplace(inEsc, '"',  '\"')
+
             if (en = "")
                 continue
-            rows .= (first ? "" : ",") '{"n":"' en '","s":' charges ',"t":' tLeftJson ',"tt":' tTotalJson ',"ic":"' ic '"}'
+            rows .= (first ? "" : ",") '{"n":"' en '","in":"' inEsc '","s":' charges ',"t":' tLeftJson ',"tt":' tTotalJson ',"ic":"' ic '"}'
             first := false
         }
         return rows . "]"

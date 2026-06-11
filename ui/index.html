@@ -6054,6 +6054,9 @@
     let hkOneShot = false;  // global one-shot-per-tick toggle (mirrors AHK)
     // In-game binds pushed from AHK: { flaskSlots:[{slot,key}], skillSlots:[{slot,key}], skillNames:[..] }
     let hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [], chestTypes: [] };
+    // Buffs seen on the player this session (internal name → display name), accumulated from
+    // the live updateBuffs feed so the buff-condition dropdown fills itself automatically.
+    let hkSeenBuffs = {};
     // Called by AHK with the resolved in-game key bindings + active skill names.
     function updateHotkeyBindings(jsonStr) {
       try { hkBindings = JSON.parse(jsonStr); } catch (e) { return; }
@@ -6328,6 +6331,21 @@
       hkChanged();
     }
 
+    // Buff-condition picker: a dropdown that fills itself from the buffs seen on the player
+    // (hkSeenBuffs, accumulated from the live Skills & Buffs feed) — no hand-maintained field.
+    // The option VALUE is the internal buff name the engine substring-matches; the label is
+    // the translated display name. A saved value stays selectable even when that buff isn't
+    // currently active.
+    function hkBuffField(a, gi, hi, ai) {
+      const cur = a.buffName != null ? String(a.buffName) : '';
+      const entries = Object.keys(hkSeenBuffs).sort((x, y) => hkSeenBuffs[x].localeCompare(hkSeenBuffs[y]));
+      let opts = `<option value="" ${cur === '' ? 'selected' : ''}>— pick a buff —</option>`;
+      opts += entries.map(iv => `<option value="${hkEsc(iv)}" ${cur === iv ? 'selected' : ''}>${hkEsc(hkSeenBuffs[iv])}</option>`).join('');
+      if (cur !== '' && !(cur in hkSeenBuffs))
+        opts += `<option value="${hkEsc(cur)}" selected>${hkEsc(cur)} (not active)</option>`;
+      return `<select title="Fills itself from the player's active buffs (Game › Skills & Buffs)" onchange="hkSetAct(${gi},${hi},${ai},'buffName',this.value)">${opts}</select>`;
+    }
+
     // Aim target picker: the synthetic "__all__" option maps to scanAll (aim at
     // the nearest targetable entity); any real value clears scanAll and sets the
     // concrete target type.
@@ -6395,7 +6413,7 @@
                + `${hkNum(a, 'value', 50, gi, hi, ai)} %`;
           break;
         case 'buff':
-          body = `Name ${hkTxt(a, 'buffName', 'buff name / substring', gi, hi, ai)} `
+          body = `Buff ${hkBuffField(a, gi, hi, ai)} `
                + `${hkSel(a, 'mode', [['present', 'Present'], ['absent', 'Absent']], gi, hi, ai)} `
                + `Min stacks ${hkNum(a, 'minStacks', 0, gi, hi, ai)} `
                + `Min time left(ms) ${hkNum(a, 'minTimeLeftMs', 0, gi, hi, ai)}`;
@@ -8195,6 +8213,19 @@
       try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; }
       catch (e) { el.innerHTML = '<div class="buff-empty">⚠ Parse error: ' + escHtml(String(e)) + '</div>'; return; }
       if (!Array.isArray(data) || data.length === 0) { el.innerHTML = '<div class="buff-empty">No active buffs</div>'; return; }
+      // Accumulate every seen buff for the hotkey buff-condition dropdown (value = internal
+      // name the engine matches, label = translated display name). Re-render the hotkeys list
+      // only when a genuinely new buff appears, so the dropdown fills itself live.
+      let _buffGrew = false;
+      for (const b of data) {
+        const iv = (b && b.in) ? String(b.in) : ((b && (b.n || b.name)) ? String(b.n || b.name) : '');
+        if (!iv) continue;
+        if (!(iv in hkSeenBuffs)) {
+          hkSeenBuffs[iv] = (b.n || b.name) ? String(b.n || b.name) : iv;
+          _buffGrew = true;
+        }
+      }
+      if (_buffGrew && typeof hkRender === 'function') hkRender();
       const filtered = data.filter(b => !_blacklist.has(b.n || b.name || ''));
       if (filtered.length === 0) { el.innerHTML = '<div class="buff-empty">All buffs blacklisted</div>'; return; }
       const toTitle = s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
