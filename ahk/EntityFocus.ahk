@@ -131,7 +131,9 @@ _FocusResolveHovered(reader, snap)
 ; (verified against the trusted Cheat-Engine screenToWorldPtrMouseOverEntityPtr table):
 ;   [[[ inGameState + 0x300 ] + 0x3F0 ] + 0xA8 ]  -> Entity*  (0 = nothing hovered)
 ; Unlike _FocusResolveHovered (tracker+0x648, world objects only), this DOES resolve
-; hovered monsters. Returns Map("ptr","path","id") or 0. Params: reader, snap.
+; hovered monsters. The hovered entity is decoded FRESH off its own pointer (never the
+; cached snapshot — that produced stale life and recycled-pointer rarity mismatches).
+; Returns Map("ptr","path","id","decodedComponents") or 0. Params: reader, snap.
 _FocusResolveMouseOverEntity(reader, snap)
 {
     inGs := (IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
@@ -147,40 +149,14 @@ _FocusResolveMouseOverEntity(reader, snap)
     ent := reader.Mem.ReadPtr(sub + PoE2Offsets.MouseOver["EntityFromSub"])
     if !(ent && reader.IsPlausibleEntityPointer(ent))
         return 0
-    path := ""
-    try {
-        e := reader.ReadEntityBasic(ent)
-        if (IsObject(e) && e.Has("path"))
-            path := e["path"]
-    }
-    id := 0
-    try id := reader.Mem.ReadUInt(ent + PoE2Offsets.Entity["Id"])
-    return path != "" ? Map("ptr", ent, "path", path, "id", id) : 0
-}
-
-; Finds the snapshot awake-entity 'entity' Map whose address matches ptr, so a raw
-; hovered-entity pointer (from the MouseOver chain) can be enriched with the
-; already-decoded components (rarity, life). Returns the entity Map or 0.
-; Params: snap (radar snapshot), ptr (entity pointer to match).
-_FocusFindSnapEntityByPtr(snap, ptr)
-{
-    if !(ptr && IsObject(snap) && snap.Has("inGameState"))
+    e := 0
+    try e := reader.ReadEntityBasic(ent)
+    if !(IsObject(e) && e.Has("path") && e["path"] != "")
         return 0
-    inGs := snap["inGameState"]
-    area := (IsObject(inGs) && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-    awake := (IsObject(area) && area.Has("awakeEntities")) ? area["awakeEntities"] : 0
-    sample := (IsObject(awake) && awake.Has("sample")) ? awake["sample"] : 0
-    if !(IsObject(sample) && Type(sample) = "Array")
-        return 0
-    for _, en in sample
-    {
-        if !(en && Type(en) = "Map" && en.Has("entity"))
-            continue
-        entity := en["entity"]
-        if (entity && Type(entity) = "Map" && entity.Has("address") && entity["address"] = ptr)
-            return entity
-    }
-    return 0
+    return Map("ptr", ent,
+        "path", e["path"],
+        "id", e.Has("entityId") ? e["entityId"] : 0,
+        "decodedComponents", e.Has("decodedComponents") ? e["decodedComponents"] : 0)
 }
 
 ; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life), the
@@ -210,9 +186,14 @@ BuildFocusLines(reader, snap)
     if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
     {
         lines.Push("MOUSEOVER: " _FocusLeaf(mo["path"]))
+        dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map") ? mo["decodedComponents"] : 0
         mg := ExtractMetaGroup(mo["path"])
-        if (mg != "")
-            lines.Push("  type: " mg)
+        rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
+        if (mg != "" || rarity != "")
+            lines.Push("  type: " (mg != "" ? mg : "?") (rarity != "" ? "   rarity: " rarity : ""))
+        moLife := dc ? _FocusLifeStr(dc) : ""
+        if (moLife != "")
+            lines.Push("  life: " moLife)
     }
 
     hov := _FocusResolveHovered(reader, snap)
