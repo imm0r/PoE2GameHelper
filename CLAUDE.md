@@ -1,7 +1,7 @@
 # Project conventions for Claude
 
 Path of Exile 2 memory-reading / overlay assistant. AutoHotkey v2 + a WebView2 UI.
-Reimplementation of the original C# project (see Reference). Version `0.45.12.38`.
+Reimplementation of the original C# project (see Reference). Version `0.45.12.39`.
 
 ## Language
 

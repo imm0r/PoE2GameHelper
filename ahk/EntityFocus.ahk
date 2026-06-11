@@ -101,6 +101,24 @@ _FocusLifeStr(dc)
     return s
 }
 
+; Like _FocusLifeStr but formatted "cur / max (pct%)" (spaced slash, no "HP"), for the
+; DebugOverlay MouseOver layout. Returns "" when the entity has no Life component.
+MouseOverLifeLine(dc)
+{
+    if !(dc && Type(dc) = "Map" && dc.Has("life") && Type(dc["life"]) = "Map")
+        return ""
+    lf := dc["life"]
+    ls := (lf.Has("life") && Type(lf["life"]) = "Map") ? lf["life"] : 0
+    if !ls
+        return ""
+    cur := ls.Has("current") ? ls["current"] : "?"
+    max := ls.Has("max") ? ls["max"] : "?"
+    s := cur " / " max
+    if (IsInteger(cur) && IsInteger(max) && max > 0)
+        s .= " (" Round(cur * 100 / max) "%)"
+    return s
+}
+
 ; Resolves the hovered WORLD OBJECT via the HoverTracker chain (tracker+0x648).
 ; Returns Map("ptr","path") or 0. Monsters are NOT tracked here.
 _FocusResolveHovered(reader, snap)
