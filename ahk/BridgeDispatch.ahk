@@ -724,9 +724,6 @@ _DispatchBridgeCall(method, args)
         case "PathfindingProbeRun":
             ; TEMP diagnostic: verify Pathfinding Flying/BaseSpeed offsets.
             SetTimer(() => PathfindingProbeRun(), -1)
-        case "HoverTrackerProbeRun":
-            ; TEMP diagnostic: verify the HoverTracker resolve chain (Ctrl+Alt+H).
-            SetTimer(() => HoverTrackerProbeRun(), -1)
         case "ToggleFocusOverlay":
             ; Toggle the focused-entity test overlay (targeted monster + hovered object).
             SetTimer(() => ToggleFocusOverlay(), -1)

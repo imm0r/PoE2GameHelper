@@ -228,13 +228,14 @@ class DebugOverlay extends GdiOverlayBase
                 lvl := ExtractEntityLevel(path)
                 idStr := mo.Has("id") ? mo["id"] : "?"
                 cat := ExtractMetaCategory(path)
+                rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
                 grp := RegExMatch(path, "i)metadata/[^/]+/([^/]+)", &gm) ? gm[1] : ""
 
                 ; Line 1: Name / Level / ID — left-justified columns keep them aligned.
                 line1 := "Name: " Format("{:-16s}", nm) "Level: " Format("{:-6s}", (lvl != "" ? lvl : "-")) "ID: " idStr
                 lines.Push([line1, DebugOverlay.COL_GOLD_HI])
-                ; Line 2: Type / Group.
-                line2 := "Type: " Format("{:-16s}", (cat != "" ? cat : "?")) "Group: " (grp != "" ? grp : "-")
+                ; Line 2: Type / Rarity / Group (Rarity column aligns under Level).
+                line2 := "Type: " Format("{:-16s}", (cat != "" ? cat : "?")) "Rarity: " Format("{:-10s}", (rarity != "" ? rarity : "-")) "Group: " (grp != "" ? grp : "-")
                 lines.Push([line2, DebugOverlay.COL_IVORY])
                 ; Line 3: Life "cur / max (pct%)" (omitted when the entity has no Life).
                 lifeLine := MouseOverLifeLine(dc)
