@@ -121,15 +121,68 @@ AtlasReadNodes(reader, panelPtr, maxNodes := 2000)
         }
         out.Push(Map("gridX", gx, "gridY", gy, "uiElemPtr", c,
             "flags", status, "status", status, "biomeId", biome,
-            "mapData", mapData, "mapId", name, "name", _AtlasPrettifyName(name)))
+            "mapData", mapData, "mapId", name, "name", ResolveWorldAreaName(name)))
     }
     return out
+}
+
+; Lazily loads data/world_area_name_map.tsv (key<TAB>display_name, '#'/';' comment
+; lines) into a cached Map(key -> name). Mirrors GetMonsterNameMap. Re-reads when
+; the file's size/mtime change. Returns the Map (empty if the file is absent).
+GetWorldAreaNameMap()
+{
+    static cachedMap := 0
+    static cachedSig := ""
+    mapPath := A_ScriptDir "\data\world_area_name_map.tsv"
+    if !FileExist(mapPath)
+        return Map()
+    sig := FileGetSize(mapPath) "|" FileGetTime(mapPath, "M")
+    if (cachedMap && cachedSig = sig)
+        return cachedMap
+    loaded := Map()
+    Loop Read, mapPath
+    {
+        line := Trim(A_LoopReadLine)
+        if (line = "")
+            continue
+        first := SubStr(line, 1, 1)
+        if (first = "#" || first = ";")
+            continue
+        parts := StrSplit(line, "`t")
+        if (parts.Length < 2)
+            continue
+        k := Trim(parts[1]), v := Trim(parts[2])
+        if (k != "" && v != "" && !loaded.Has(k))
+            loaded[k] := v
+    }
+    cachedMap := loaded
+    cachedSig := sig
+    return cachedMap
+}
+
+; Resolves an internal atlas MapId ("MapSevenWaters", or a full metadata path) to
+; a display name via world_area_name_map.tsv, trying the id as-is and its basename
+; (after the last '/'). Falls back to the camelCase prettifier when the id isn't in
+; the table (or the table is absent). Returns the display name.
+ResolveWorldAreaName(mapId)
+{
+    if (mapId = "")
+        return ""
+    m := GetWorldAreaNameMap()
+    if (m.Count)
+    {
+        if m.Has(mapId)
+            return m[mapId]
+        if (RegExMatch(mapId, ".*/([^/]+)$", &mm) && m.Has(mm[1]))
+            return m[mm[1]]
+    }
+    return _AtlasPrettifyName(mapId)
 }
 
 ; Turns an internal atlas MapId ("MapSevenWaters", "MapUniqueUntaintedParadise")
 ; into a readable label ("Seven Waters", "Untainted Paradise") by stripping the
 ; Map/Unique prefixes and splitting camelCase. Returns the prettified string.
-; (Exact display names — "Savannah", "The Assembly" — need a maps.json table.)
+; Fallback for ids missing from world_area_name_map.tsv.
 _AtlasPrettifyName(id)
 {
     if (id = "")
