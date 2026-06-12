@@ -1128,6 +1128,49 @@ RegisterCombatHotkey()
     }
 }
 
+; ── World-to-screen scale live-tuning hotkeys ─────────────────────────────
+; Ctrl + Plus / Ctrl + Minus nudge g_combatW2SScale — the isometric world→screen
+; scale shared by the auto-aim, the range rings and the monster-count gate — up
+; or down by 0.01, so it can be calibrated in-game against the visible ring.
+; Bound on both the main +/- keys (VK_OEM_PLUS/MINUS, layout-independent) and the
+; numpad +/-. Active ONLY while the PoE2 window is focused, so they don't hijack
+; Ctrl+Plus/Minus (browser zoom etc.) in other apps. Call once at startup.
+RegisterW2STuneHotkeys()
+{
+    try
+    {
+        HotIf(_W2STuneActive)
+        for hk in ["^vkBB", "^NumpadAdd"]
+            try Hotkey(hk, (*) => _AdjustW2SScale(0.01), "On")
+        for hk in ["^vkBD", "^NumpadSub"]
+            try Hotkey(hk, (*) => _AdjustW2SScale(-0.01), "On")
+        HotIf()   ; reset context so later Hotkey() calls stay global
+    }
+    catch as ex
+    {
+        LogError("RegisterW2STuneHotkeys", ex)
+    }
+}
+
+; HotIf context for the tune hotkeys: true only when PoE2 is the active window.
+_W2STuneActive(*)
+{
+    h := ResolvePoEWindow()
+    return (h && WinActive("ahk_id " h)) ? true : false
+}
+
+; Nudges g_combatW2SScale by delta, clamped to [0.05, 1.0], then persists,
+; refreshes the UI slider, and flashes the new value as an in-game tooltip.
+_AdjustW2SScale(delta)
+{
+    global g_combatW2SScale
+    g_combatW2SScale := Max(0.05, Min(1.0, Round(g_combatW2SScale + delta, 3)))
+    SetTimer(() => SaveCombatAutoConfig(), -100)
+    try PushHeaderToWebView()
+    ToolTip("World→Screen scale: " Format("{:.2f}", g_combatW2SScale))
+    SetTimer(() => ToolTip(), -1200)
+}
+
 ; F10 (configurable) now toggles AutoPilot — combat+loot+explore as one unit.
 ; Previous behaviour toggled only combat; that toggle is gone since AutoPilot
 ; subsumed combat under a single user-facing switch.

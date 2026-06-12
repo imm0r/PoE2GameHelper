@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.69"
+POEFORMANCE_VERSION := "0.45.12.70"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -347,6 +347,7 @@ SetTimer(() => GgpkToolBridge.MaybeAutoRefresh(), -8000)
 g_combatAutoEnabled := g_autoPilotEnabled
 g_exploreEnabled := g_autoPilotEnabled
 RegisterCombatHotkey()
+RegisterW2STuneHotkeys()   ; Ctrl +/- tune g_combatW2SScale in-game (only while PoE2 is focused)
 _AIP_RegisterProbeHotkeys()   ; TEMP: Ctrl+Alt+Shift+T triggers the Targetable probe in-game
 
 ; Custom hotkeys: bind user-defined hotkeys and start the condition evaluator.
