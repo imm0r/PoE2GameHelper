@@ -1192,8 +1192,11 @@ _HotkeysRunActions(hk, context, depth)
                 _HotkeysDoChain(a, context, depth)
                 hadEffect := true
             case "aim":
-                _HotkeysDoAim(hk, a, snap)
-                hadEffect := true
+                ; Aim only counts as "the effect" when it pressed the output
+                ; itself (press=on). A move-only aim leaves hadEffect false so the
+                ; bound output still auto-fires below — i.e. aim + cast.
+                if _HotkeysDoAim(hk, a, snap)
+                    hadEffect := true
         }
     }
     ; Conditions-only hotkey: no effect action ran, so fire the bound output once.
@@ -1625,17 +1628,21 @@ _HotkeysDoChain(a, context, depth)
 ;             "rarity", "...", "chestType", "...", "name", "...",
 ;             "metadataPath", "...", "radius", r, "holdMs", ms,
 ;             "press", 0|1, "scanAll", 0|1)
+; Returns true only when it actually PRESSED the output key (press=on + a target
+; was found), so the caller knows whether the bound output still needs to fire.
+; A move-only aim (press off) returns false → the hotkey's auto-output still
+; fires afterwards, so "aim at the monster + cast" works without a Press toggle.
 _HotkeysDoAim(hk, a, snap)
 {
     if !snap
-        return
+        return false
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
-        return
+        return false
 
     target := _HotkeysSelectAimTarget(a, snap)
     if !target
-        return
+        return false
 
     ; Project the target to the screen with the SAME player-relative isometric
     ; projection the radar dots, the range rings and the monster-count gate use
@@ -1647,7 +1654,7 @@ _HotkeysDoAim(hk, a, snap)
     ; "world-to-screen scale" slider (g_combatW2SScale), matching the visible ring.
     octx := _HotkeysIsoOrigin(snap)
     if !octx
-        return
+        return false
     dx := target["x"] - octx["px"]
     dy := target["y"] - octx["py"]
     screenX := Round(octx["psx"] + (dx - dy) * octx["sx"])
@@ -1663,25 +1670,27 @@ _HotkeysDoAim(hk, a, snap)
     }
     _MoveMouseToTarget(Map("x", screenX, "y", screenY))
 
-    if (a.Has("press") && a["press"])
+    ; Move-only aim: report false so the caller still auto-fires the bound output
+    ; (cursor is now on the monster, so the output casts there).
+    if !(a.Has("press") && a["press"])
+        return false
+
+    holdMs := a.Has("holdMs") ? (a["holdMs"] + 0) : 0
+    outKey := _HotkeysResolveKey(hk)
+    if (holdMs > 0)
     {
-        holdMs := a.Has("holdMs") ? (a["holdMs"] + 0) : 0
-        outKey := _HotkeysResolveKey(hk)
-        if (holdMs > 0)
+        key := Trim(outKey)
+        if (key != "" && _HotkeysKeyDown(key))
         {
-            key := Trim(outKey)
-            if (key != "" && _HotkeysKeyDown(key))
-            {
-                _HotkeysMarkFired(hk, key)
-                SetTimer(() => _HotkeysKeyUp(key), -holdMs)
-            }
+            _HotkeysMarkFired(hk, key)
+            SetTimer(() => _HotkeysKeyUp(key), -holdMs)
+            return true
         }
-        else
-        {
-            _HotkeysSendKey(outKey)
-            _HotkeysMarkFired(hk, outKey)
-        }
+        return false
     }
+    _HotkeysSendKey(outKey)
+    _HotkeysMarkFired(hk, outKey)
+    return true
 }
 
 ; Selects the nearest entity matching the aim filter within a screen-pixel
