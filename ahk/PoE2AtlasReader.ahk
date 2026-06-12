@@ -297,6 +297,49 @@ AtlasDumpDebug(reader, snap)
             i += 1
         }
 
+        ; Locate the atlas panel the way the rest of the codebase does — by its
+        ; FIXED offset in the root UI struct (cf. MapParent @ 0x748), not by name.
+        ; Walk the parent chains of the largest visible containers up to the root,
+        ; then report which root offset stores each chain pointer. The shallowest
+        ; match (the child-of-root) is the stable AtlasPanel anchor to read.
+        wanted := Map()
+        topN := Min(cand.Length, 4)
+        ti := 1
+        while (ti <= topN)
+        {
+            cur := cand[ti]["ptr"], hops := 0
+            while (reader.IsProbablyValidPointer(cur) && hops < 12)
+            {
+                wanted[cur] := Format("cand#{} hop{} {}x{}", ti, hops, Round(cand[ti]["w"]), Round(cand[ti]["h"]))
+                p := reader.Mem.ReadPtr(cur + PoE2Offsets.UiElementBase["ParentPtr"])
+                if (p = root || !reader.IsProbablyValidPointer(p))
+                    break
+                cur := p
+                hops += 1
+            }
+            ti += 1
+        }
+        txt .= "`n--- root-struct offsets holding the atlas container chain ---`n"
+        buf := reader.Mem.ReadBytes(root, 0x1600)
+        if !buf
+            txt .= "  (could not read root struct)`n"
+        else
+        {
+            off := 0, found := 0
+            while (off < 0x1600)
+            {
+                v := NumGet(buf.Ptr, off, "Int64")
+                if wanted.Has(v)
+                {
+                    txt .= Format("  root+0x{:04X} -> 0x{:X}  ({})`n", off, v, wanted[v])
+                    found += 1
+                }
+                off += 8
+            }
+            if !found
+                txt .= "  (no chain pointer in root+0..0x1600 — panel attaches deeper)`n"
+        }
+
         FileAppend(txt, outPath, "UTF-8")
         return outPath
     }
