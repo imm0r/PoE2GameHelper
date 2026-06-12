@@ -194,7 +194,7 @@ AtlasDumpDebug(reader, snap)
     if !root
         return ""
 
-    panel := AtlasFindPanel(reader, root, ["worldpanel", "atlas"])
+    panel := AtlasFindPanel(reader, root, ["worldpanel", "atlas", "worldmap", "atlasmap"])
     outDir := A_ScriptDir "\debug"
     if !DirExist(outDir)
         DirCreate(outDir)
@@ -204,9 +204,46 @@ AtlasDumpDebug(reader, snap)
     txt .= "root UI ptr: " Format("0x{:X}", root) "`n"
     if !panel
     {
-        txt .= "`n!! Atlas/World panel NOT found by StringId (worldpanel/atlas).`n"
-        txt .= "   Open the Atlas/World map first, then dump again. If it is open,`n"
-        txt .= "   the StringId differs — widen the search list in AtlasDumpDebug().`n"
+        txt .= "`n!! Atlas/World panel NOT found by StringId (worldpanel/atlas/worldmap/atlasmap).`n"
+        txt .= "   Enumerating UI elements under the root so the real panel StringId`n"
+        txt .= "   can be identified. Make sure the Atlas was open, then send this file.`n"
+
+        ids := _AtlasEnumStringIds(reader, root, 8000)
+
+        ; Visible, panel-sized candidates (large + on screen), area-sorted desc.
+        cand := []
+        for _, r in ids
+            if (r["vis"] && r["w"] >= 200 && r["h"] >= 150)
+                cand.Push(r)
+        Loop cand.Length - 1                      ; selection sort by area desc
+        {
+            mi := A_Index
+            j := A_Index + 1
+            while (j <= cand.Length)
+            {
+                if (cand[j]["w"] * cand[j]["h"] > cand[mi]["w"] * cand[mi]["h"])
+                    mi := j
+                j += 1
+            }
+            if (mi != A_Index)
+            {
+                tmp := cand[A_Index], cand[A_Index] := cand[mi], cand[mi] := tmp
+            }
+        }
+        txt .= Format("`n--- visible panel-sized elements ({} of {} named) ---`n", cand.Length, ids.Length)
+        txt .= "  depth  w      h     stringId`n"
+        for _, r in cand
+            txt .= Format("  {:5}  {:5}  {:5}  {}`n", r["depth"], Round(r["w"]), Round(r["h"]), r["sid"])
+
+        ; Targeted substring hits (atlas/world/map) across ALL named elements.
+        txt .= "`n--- StringIds containing atlas/world/map ---`n"
+        for _, r in ids
+        {
+            low := StrLower(r["sid"])
+            if (InStr(low, "atlas") || InStr(low, "world") || InStr(low, "map"))
+                txt .= Format("  vis={:1} {:5}x{:<5} {}`n", r["vis"], Round(r["w"]), Round(r["h"]), r["sid"])
+        }
+
         FileAppend(txt, outPath, "UTF-8")
         return outPath
     }
@@ -241,6 +278,67 @@ AtlasDumpDebug(reader, snap)
 
     FileAppend(txt, outPath, "UTF-8")
     return outPath
+}
+
+; BFS the UI tree from rootPtr, collecting every UiElement that has a non-empty
+; StringId. Each record is Map("ptr","sid","vis","w","h","depth"). Walks at most
+; maxVisit elements. Used by the Atlas dump to reveal the real panel StringId when
+; the expected ids don't match (mirrors AtlasFindPanel's traversal).
+_AtlasEnumStringIds(reader, rootPtr, maxVisit := 8000)
+{
+    out := []
+    if !(IsObject(reader) && reader.IsProbablyValidPointer(rootPtr))
+        return out
+    ub := PoE2Offsets.UiElementBase
+    childFirstOff := ub["ChildrenFirst"]
+    childLastOff := childFirstOff + 0x08
+    sidOff := ub["StringIdPtr"]
+    flagsOff := ub["Flags"]
+    sizeOff := ub["UnscaledSize"]
+
+    queue := [rootPtr]
+    depths := [0]
+    visited := 0
+    while (queue.Length > 0 && visited < maxVisit)
+    {
+        el := queue.RemoveAt(1)
+        dep := depths.RemoveAt(1)
+        if !reader.IsProbablyValidPointer(el)
+            continue
+        visited += 1
+
+        sid := ""
+        try sid := reader.ReadStdWStringAt(el + sidOff, 64)
+        if (sid != "")
+        {
+            flags := reader.Mem.ReadUInt(el + flagsOff)
+            out.Push(Map("ptr", el, "sid", sid,
+                "vis", ((flags >> 11) & 1) ? 1 : 0,
+                "w", reader.Mem.ReadFloat(el + sizeOff),
+                "h", reader.Mem.ReadFloat(el + sizeOff + 4),
+                "depth", dep))
+        }
+
+        cFirst := reader.Mem.ReadInt64(el + childFirstOff)
+        cLast := reader.Mem.ReadInt64(el + childLastOff)
+        if (cFirst <= 0 || cLast <= cFirst)
+            continue
+        n := (cLast - cFirst) // 8
+        if (n <= 0 || n > 10000)
+            continue
+        i := 0
+        while (i < n)
+        {
+            child := reader.Mem.ReadPtr(cFirst + i * 8)
+            if reader.IsProbablyValidPointer(child)
+            {
+                queue.Push(child)
+                depths.Push(dep + 1)
+            }
+            i += 1
+        }
+    }
+    return out
 }
 
 ; Resolves the active UI-root UiElement (KB/M, else controller) from a snapshot —
