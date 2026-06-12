@@ -5355,7 +5355,9 @@
            one shared line-height, and the borderless name inputs carry no extra vertical
            padding (so their text box hugs the line instead of sitting taller/lower). */
         #panel-hotkeys .hk-row > *, #panel-hotkeys .hk-action > * { line-height: 1.25; }
-        #panel-hotkeys .hk-card-name, #panel-hotkeys .hk-group-name { padding-top: 0; padding-bottom: 0; }
+        /* The name fields use a calligraphic serif whose glyphs sit a hair high vs the
+           mono-serif neighbours; nudge them down 1px so the text shares one optical line. */
+        #panel-hotkeys .hk-card-name, #panel-hotkeys .hk-group-name { padding-top: 0; padding-bottom: 0; position: relative; top: 1px; }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
