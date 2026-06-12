@@ -247,7 +247,16 @@ class RadarOverlay extends GdiOverlayBase
     ; radar on/off toggle (g_radarEnabled).
     ShouldShow(ctx)
     {
-        global g_radarEnabled
+        global g_radarEnabled, g_atlasOverlayEnabled, g_atlasRender
+        ; Atlas overlay: the world-atlas is a fullscreen panel, so the shared play
+        ; gate is closed while it's open — but we still want to draw the node graph
+        ; over it. Show (foreground only) whenever the atlas snapshot is populated.
+        ; The map layers stay gated on ctx.gate["allowed"] in Draw, so only the
+        ; atlas layer (_FinishFrame -> _RenderAtlas) renders here.
+        if (IsSet(g_atlasOverlayEnabled) && g_atlasOverlayEnabled
+            && IsSet(g_atlasRender) && (g_atlasRender is Map)
+            && (ctx.gameActive || ctx.keepWhenBackground))
+            return true
         radarOn := (IsSet(g_radarEnabled) ? g_radarEnabled : true)
         if !radarOn
             return false
