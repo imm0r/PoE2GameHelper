@@ -5355,12 +5355,13 @@
         .hk-add-toggle {
           cursor: pointer; user-select: none;
           display: inline-flex; align-items: center; justify-content: center;
-          width: 22px; height: 22px; box-sizing: border-box;
-          color: var(--codex-gold); font-size: 17px; line-height: 1; font-weight: bold;
+          width: 28px; height: 28px; box-sizing: border-box;
+          color: var(--codex-gold);
           border: 1px solid var(--codex-rule); border-radius: 2px;
           background: linear-gradient(180deg, var(--codex-edge), var(--codex-parchment));
           transition: color .15s, border-color .15s, transform .15s, box-shadow .15s;
         }
+        .hk-add-toggle .hk-ico { width: 18px; height: 18px; display: block; }
         .hk-add-toggle:hover { color: var(--codex-gold-hi); border-color: var(--codex-gold); box-shadow: 0 2px 6px -2px rgba(200,168,90,0.45); }
         .hk-add-toggle.open { transform: rotate(45deg); }
         .hk-adv-toggle:hover { color: var(--codex-gold); }
@@ -5519,7 +5520,9 @@
         .hk-act-tools .hk-btn { height: 20px; box-sizing: border-box; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; }
         .hk-act-tools > .hk-cap { height: 20px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 24px; text-align: center; font-family: var(--codex-serif); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }
-        .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
+        .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-ico-caret { width: 16px; height: 16px; display: block; transition: transform .12s; }
+        .hk-ico-caret.closed { transform: rotate(-90deg); }
         .hk-caret:hover { color: var(--codex-gold-hi); }
         .hk-grip { cursor: grab; color: var(--codex-text-dim); padding: 0 5px; user-select: none; font-size: 14px; line-height: 1; }
         .hk-grip:hover { color: var(--codex-gold); }
@@ -6211,7 +6214,7 @@
       return `
         <div class="hk-group" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'group',${gi},0,0)">
           <div class="hk-group-head${hkBool(g.enabled) ? '' : ' hk-off'}">
-            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${hkCaretIco(open)}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder group"
                   ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
             <label class="toggle hk-always" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
@@ -6242,6 +6245,16 @@
     function hkToggleAdd(key) {
       if (hkAddOpen.has(key)) hkAddOpen.delete(key); else hkAddOpen.add(key);
       hkRender();
+    }
+    // Collapse/expand caret as a crisp SVG chevron (down when open, rotated to
+    // point right when closed). Shared by group / hotkey / action carets.
+    function hkCaretIco(open) {
+      return `<svg class="hk-ico-caret${open ? '' : ' closed'}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    // Plus glyph (SVG) for the add toggles — rotates 45° into an × when its
+    // .hk-add-toggle wrapper has .open.
+    function hkPlusIco() {
+      return `<svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>`;
     }
     // Custom-cooldown field — only meaningful for a Raw key output (a Skill
     // output gates on its own detected cooldown, a flask on charges). Uses the
@@ -6346,7 +6359,7 @@
           <div class="hk-conds-title" style="margin-top:6px" title="Run when the conditions above pass. No effect = the bound output fires once.">Effects</div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <span class="hk-add-toggle${actAddOpen ? ' open' : ''}" title="Add an effect action (key / chain / auto-aim)" onclick="hkToggleAdd('a:${hk.id}')">+</span>
+            <span class="hk-add-toggle${actAddOpen ? ' open' : ''}" title="Add an effect action (key / chain / auto-aim)" onclick="hkToggleAdd('a:${hk.id}')">${hkPlusIco()}</span>
             ${actAddOpen ? `<select id="hk-addact-${gi}-${hi}" title="Pick which effect action to add, then click + Action. (Conditions are added in the Conditions box above.)">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
@@ -6358,7 +6371,7 @@
       return `
         <div class="hk-card${hkBool(hk.enabled) ? '' : ' hk-off'}" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
           <div class="hk-row">
-            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${hkCaretIco(open)}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
                   ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
             <label class="toggle hk-always" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
@@ -6666,7 +6679,7 @@
           body = `<span style="color:var(--subtext)">unknown action</span>`;
       }
       return `<div class="hk-action" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'action',${gi},${hi},${ai})">
-                <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${open ? '▾' : '▸'}</span>
+                <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${hkCaretIco(open)}</span>
                 <span class="hk-grip" draggable="true" title="Drag to reorder action"
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
@@ -7000,7 +7013,7 @@
         <div class="hk-cgroup-head"><span class="hk-cgroup-lbl">Match ${modeSel} of:</span>${del}</div>
         <div class="hk-cgroup-body">${childHtml}</div>
         <div class="hk-cgroup-add">
-          <span class="hk-add-toggle${addOpen ? ' open' : ''}" title="Add a condition or a nested group (bracket)" onclick="hkToggleAdd('c:${cid}')">+</span>
+          <span class="hk-add-toggle${addOpen ? ' open' : ''}" title="Add a condition or a nested group (bracket)" onclick="hkToggleAdd('c:${cid}')">${hkPlusIco()}</span>
           ${addCtrls}
         </div>
       </div>`;
