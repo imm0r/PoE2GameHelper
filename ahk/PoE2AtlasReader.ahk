@@ -413,6 +413,11 @@ AtlasDumpDebug(reader, snap)
     if (shown = 0)
         txt .= "  (none populated — visible nodes unrevealed, or mapData offset needs a revealed node)`n"
 
+    ; Field scan: locate the drifted biome/status/mapData offsets by their value
+    ; signature across all nodes (grid @ 0x320 is the known anchor in this window).
+    txt .= "`n--- node field scan (window 0x2A0..0x340, find biome/status/mapData) ---`n"
+    txt .= _AtlasFieldScan(reader, nodes, 0x2A0, 0x340)
+
     ; Connections: panel-level vector of edges (src grid + dst grid as ints, 16B each).
     cvOff := g_atlasOff["PanelConnVecOffset"]
     cvf := reader.Mem.ReadInt64(panel + cvOff)
@@ -604,6 +609,78 @@ _AtlasResolveUiRoot(reader, snap)
     return reader.IsProbablyValidPointer(root) ? root : 0
 }
 
+; Scans a byte-offset window across ALL node elements to locate fields whose
+; GameHelper2 offsets have drifted. Reports byte offsets that behave like a small
+; enum (few distinct small values incl. nonzero — biome is inherent & varied, so
+; it surfaces here; status shows 0/1/2) and qword offsets that look like an
+; optional pointer (a mix of valid heap ptrs and nulls — mapData). Returns text.
+_AtlasFieldScan(reader, nodes, loOff, hiOff)
+{
+    span := hiOff - loOff
+    bufs := []
+    for _, nd in nodes
+    {
+        c := nd["uiElemPtr"]
+        if reader.IsProbablyValidPointer(c)
+        {
+            b := reader.Mem.ReadBytes(c + loOff, span)
+            if b
+                bufs.Push(b)
+        }
+    }
+    out := Format("  scanned {} node structs, window 0x{:X}..0x{:X}`n", bufs.Length, loOff, hiOff)
+    if !bufs.Length
+        return out
+
+    out .= "  enum-like byte fields (offset: value×count):`n"
+    o := 0
+    while (o < span)
+    {
+        vals := Map()
+        for _, b in bufs
+        {
+            v := NumGet(b.Ptr, o, "UChar")
+            vals[v] := (vals.Has(v) ? vals[v] : 0) + 1
+        }
+        if (vals.Count >= 2 && vals.Count <= 16)
+        {
+            mx := 0
+            for v, _ in vals
+                if (v > mx)
+                    mx := v
+            if (mx > 0 && mx <= 64)
+            {
+                lst := ""
+                for v, cnt in vals
+                    lst .= Format("{}×{} ", v, cnt)
+                out .= Format("    +0x{:03X}: {}`n", loOff + o, lst)
+            }
+        }
+        o += 1
+    }
+
+    out .= "  optional-pointer qwords (offset: valid/null):`n"
+    o := 0
+    while (o + 8 <= span)
+    {
+        valid := 0, zero := 0, other := 0
+        for _, b in bufs
+        {
+            v := NumGet(b.Ptr, o, "Int64")
+            if (v = 0)
+                zero += 1
+            else if (reader.IsProbablyValidPointer(v) && v < 0x7FF000000000)
+                valid += 1
+            else
+                other += 1
+        }
+        if (valid >= 1 && zero >= 1 && other = 0 && (loOff + o) != 0x320)
+            out .= Format("    +0x{:03X}: valid={} null={}`n", loOff + o, valid, zero)
+        o += 8
+    }
+    return out
+}
+
 ; Reads the GameHelper2 atlas-node fields from a panel's first children to verify
 ; which candidate panel is the real endgame Atlas and that the offsets resolve to
 ; sane values. Offsets (GameHelper2 ImportantUiElements.cs): mapData 0x2A0,
@@ -771,7 +848,7 @@ _AtlasElemScreenPos(reader, elemPtr, rect)
 ; offsets are confirmed via AtlasDumpDebug.
 TryBuildAtlasRender(snap)
 {
-    global g_reader, g_atlasRender, g_atlasBuildTick, g_atlasOverlayEnabled
+    global g_reader, g_atlasRender, g_atlasBuildTick, g_atlasOverlayEnabled, g_atlasOff
     if !(IsSet(g_atlasOverlayEnabled) && g_atlasOverlayEnabled)
         return
     if !(IsObject(g_reader) && snap && snap.Has("inGameState"))
@@ -795,8 +872,9 @@ TryBuildAtlasRender(snap)
         g_atlasRender := 0
         return
     }
-    nodes := AtlasReadNodes(g_reader, panel, 2000)
+    nodes := AtlasReadNodes(g_reader, panel, 5000)
     outNodes := []
+    gridMap := Map()                       ; "gx,gy" -> rendered node (for edges)
     for nd in nodes
     {
         if !g_reader.IsProbablyValidPointer(nd["uiElemPtr"])
@@ -808,11 +886,48 @@ TryBuildAtlasRender(snap)
         if (sp["x"] < rect["x"] - 300 || sp["x"] > rect["x"] + rect["w"] + 300
             || sp["y"] < rect["y"] - 300 || sp["y"] > rect["y"] + rect["h"] + 300)
             continue
-        outNodes.Push(Map("x", sp["x"], "y", sp["y"],
+        outNd := Map("x", sp["x"], "y", sp["y"], "gridX", nd["gridX"], "gridY", nd["gridY"],
             "name", nd["name"], "biomeId", nd["biomeId"],
-            "status", nd.Has("status") ? nd["status"] : 0))
+            "status", nd.Has("status") ? nd["status"] : 0)
+        outNodes.Push(outNd)
+        gridMap[nd["gridX"] "," nd["gridY"]] := outNd
     }
-    g_atlasRender := outNodes.Length ? Map("nodes", outNodes) : 0
+    if !outNodes.Length
+    {
+        g_atlasRender := 0
+        return
+    }
+
+    ; Connections: panel-level edge vector (src grid + dst grid as ints, 16B each).
+    ; Map each edge's endpoints to on-screen node positions via gridMap; edges to
+    ; off-screen nodes are skipped. Confirmed offset (GameHelper2): 0x5A8.
+    conns := []
+    cvOff := g_atlasOff["PanelConnVecOffset"]
+    cvf := g_reader.Mem.ReadInt64(panel + cvOff)
+    cvl := g_reader.Mem.ReadInt64(panel + cvOff + 8)
+    edgeCount := (cvf > 0 && cvl > cvf && (cvl - cvf) < 0x100000) ? (cvl - cvf) // 16 : 0
+    if (edgeCount > 0 && edgeCount <= 8000)
+    {
+        eb := g_reader.Mem.ReadBytes(cvf, edgeCount * 16)
+        if eb
+        {
+            e := 0
+            while (e < edgeCount)
+            {
+                base := e * 16
+                e += 1
+                sk := NumGet(eb.Ptr, base, "Int") "," NumGet(eb.Ptr, base + 4, "Int")
+                dk := NumGet(eb.Ptr, base + 8, "Int") "," NumGet(eb.Ptr, base + 12, "Int")
+                if (gridMap.Has(sk) && gridMap.Has(dk))
+                {
+                    a := gridMap[sk], b := gridMap[dk]
+                    conns.Push(Map("x1", a["x"], "y1", a["y"], "x2", b["x"], "y2", b["y"]))
+                }
+            }
+        }
+    }
+
+    g_atlasRender := Map("nodes", outNodes, "connections", conns)
 }
 
 ; Bridge handler: triggered from the UI ("Dump Atlas" button / ahkCall).
