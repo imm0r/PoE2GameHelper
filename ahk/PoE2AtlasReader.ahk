@@ -235,13 +235,66 @@ AtlasDumpDebug(reader, snap)
         for _, r in cand
             txt .= Format("  {:5}  {:5}  {:5}  {}`n", r["depth"], Round(r["w"]), Round(r["h"]), r["sid"])
 
-        ; Targeted substring hits (atlas/world/map) across ALL named elements.
-        txt .= "`n--- StringIds containing atlas/world/map ---`n"
+        ; Full unique StringId vocabulary (deduped), sorted by max element area —
+        ; the atlas container surfaces near the top even with a generic name.
+        uni := Map()
         for _, r in ids
         {
-            low := StrLower(r["sid"])
-            if (InStr(low, "atlas") || InStr(low, "world") || InStr(low, "map"))
-                txt .= Format("  vis={:1} {:5}x{:<5} {}`n", r["vis"], Round(r["w"]), Round(r["h"]), r["sid"])
+            key := StrLower(r["sid"])
+            if !uni.Has(key)
+                uni[key] := Map("sid", r["sid"], "count", 0, "maxW", 0, "maxH", 0, "anyVis", 0, "minDepth", 999)
+            u := uni[key]
+            u["count"] += 1
+            if (r["w"] > u["maxW"])
+                u["maxW"] := r["w"]
+            if (r["h"] > u["maxH"])
+                u["maxH"] := r["h"]
+            if (r["vis"])
+                u["anyVis"] := 1
+            if (r["depth"] < u["minDepth"])
+                u["minDepth"] := r["depth"]
+        }
+        arr := []
+        for _, u in uni
+            arr.Push(u)
+        Loop arr.Length - 1                       ; selection sort by max area desc
+        {
+            mi := A_Index, j := A_Index + 1
+            while (j <= arr.Length)
+            {
+                if (arr[j]["maxW"] * arr[j]["maxH"] > arr[mi]["maxW"] * arr[mi]["maxH"])
+                    mi := j
+                j += 1
+            }
+            if (mi != A_Index)
+                tmp := arr[A_Index], arr[A_Index] := arr[mi], arr[mi] := tmp
+        }
+        txt .= Format("`n--- all {} unique StringIds (by max area) ---`n", arr.Length)
+        txt .= "  cnt  vis  depth  maxW   maxH   stringId`n"
+        for _, u in arr
+            txt .= Format("  {:3}  {:3}  {:5}  {:5}  {:5}  {}`n",
+                u["count"], u["anyVis"], u["minDepth"], Round(u["maxW"]), Round(u["maxH"]), u["sid"])
+
+        ; WString-offset scan on the largest visible elements — verifies whether
+        ; StringIdPtr (0x0F8) is still right this patch and reveals any better-named
+        ; field (Normal/Large/NormalSC look font/style-like, not panel ids).
+        scanN := Min(cand.Length, 3)
+        i := 1
+        while (i <= scanN)
+        {
+            ep := cand[i]["ptr"]
+            txt .= Format("`n--- WString scan @ 0x{:X} (w={} h={} depth={}) ---`n",
+                ep, Round(cand[i]["w"]), Round(cand[i]["h"]), cand[i]["depth"])
+            off := 0xB0
+            while (off <= 0x168)
+            {
+                s := ""
+                try s := reader.ReadStdWStringAt(ep + off, 48)
+                if (s != "" && _AtlasPrintable(s))
+                    txt .= Format("  +0x{:03X}: {}`n", off, s)
+                off += 8
+            }
+            i += 1
         }
 
         FileAppend(txt, outPath, "UTF-8")
@@ -278,6 +331,21 @@ AtlasDumpDebug(reader, snap)
 
     FileAppend(txt, outPath, "UTF-8")
     return outPath
+}
+
+; True if s is a short, fully printable-ASCII string — filters WString-offset
+; scan hits (real identifiers) from random heap garbage. Returns true/false.
+_AtlasPrintable(s)
+{
+    if (StrLen(s) < 2 || StrLen(s) > 40)
+        return false
+    Loop Parse, s
+    {
+        c := Ord(A_LoopField)
+        if (c < 0x20 || c > 0x7E)
+            return false
+    }
+    return true
 }
 
 ; BFS the UI tree from rootPtr, collecting every UiElement that has a non-empty
