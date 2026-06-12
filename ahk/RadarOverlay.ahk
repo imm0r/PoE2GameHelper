@@ -1668,10 +1668,10 @@ class RadarOverlay extends GdiOverlayBase
             sx := Round(nd["x"] - ox), sy := Round(nd["y"] - oy)
 
             ; Always-on node marker, colored by atlas state so every node is
-            ; visible even when unrevealed (no biome/name yet). 0 None (grey),
-            ; 1 AccessibleNow (green), 2 CompletedBase (blue).
+            ; visible. Status byte bits: bit1 = completed (blue), bit0 = accessible
+            ; (green), otherwise locked (grey).
             st := nd.Has("status") ? nd["status"] : 0
-            mkCol := (st = 1) ? 0x40E0A0 : (st = 2) ? 0xE0A040 : 0x808080
+            mkCol := (st & 0x02) ? 0xE0A040 : (st & 0x01) ? 0x40E0A0 : 0x808080
             this._DrawPixelCircle(sx, sy, 4, mkCol)
 
             bi := AtlasBiome(nd.Has("biomeId") ? nd["biomeId"] : -1)

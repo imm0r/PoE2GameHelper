@@ -28,12 +28,13 @@ LoadAtlasOffsets()
 {
     global g_atlasOff
     g_atlasOff := Map(
-        "PanelChildPath",     [22, 0, 6],  ; GameUi -> child 22 -> 0 -> 6
-        "NodeMapDataOffset",  0x2A0,       ; ptr to map data (null on unrevealed nodes)
-        "NodeBiomeOffset",    0x2CE,       ; byte biome id
-        "NodeStatusOffset",   0x2CF,       ; byte state: 0 None / 1 AccessibleNow / 2 CompletedBase
-        "NodeGridOffset",     0x320,       ; StdTuple2D<int> grid position (confirmed live)
-        "PanelConnVecOffset", 0x5A8)       ; panel-level StdVector of edges (src+dst grid ints)
+        "PanelChildPath",      [22, 0, 6],  ; GameUi -> child 22 -> 0 -> 6
+        "NodeGridOffset",      0x320,       ; StdTuple2D<int> grid position (on the node element)
+        "NodeDataBlockOffset", 0x20,        ; B = *(A + 0x20), where A = *(node + 0x10)
+        "NodeMapDataOffset",   0x2A0,       ; C = *(B + 0x2A0): EndgameMaps row (map data)
+        "NodeBiomeOffset",     0x2CE,       ; byte biome id (on B)
+        "NodeStatusOffset",    0x2CF,       ; byte state on B: bit0 accessible, bit1 completed
+        "PanelConnVecOffset",  0x5A8)       ; panel-level StdVector of edges (src+dst grid ints)
 }
 
 ; Locates the endgame Atlas panel from the UI root via the GameHelper2 child path
@@ -56,18 +57,20 @@ AtlasFindPanel(reader, rootPtr, wantList := "", maxVisit := 8000)
     return (n >= 8) ? panel : 0
 }
 
-; Reads the atlas nodes: each direct CHILD of the atlas panel is a node element.
-; Per node we read gridPosition (0x320), biomeId (0x2CE), status (0x2CF) and the
-; mapData ptr (0x2A0, null on unrevealed nodes). uiElemPtr is the child itself
-; (used for the live screen projection). Returns an array of Map(...), capped at
-; maxNodes. The display name is resolved later from mapData (stage 2).
+; Reads the atlas nodes (model: yokkenUA/Atlas GameStructures.cs). Each direct
+; CHILD of the atlas panel is a node element; its gridPosition is at +0x320. The
+; biome/status/map-data live in a sub-allocation chain off the node:
+;   A = *(node+0x10), B = *(A+0x20), C = *(B+0x2A0).
+; biome=byte(B+0x2CE), status=byte(B+0x2CF, bit0 accessible / bit1 completed),
+; name = wide string at *(*(C+0)+0). uiElemPtr (the child) drives screen position.
+; Returns an array of node Maps, capped at maxNodes.
 AtlasReadNodes(reader, panelPtr, maxNodes := 2000)
 {
     global g_atlasOff
     out := []
     if !(IsObject(reader) && reader.IsProbablyValidPointer(panelPtr))
         return out
-    cfOff := PoE2Offsets.UiElementBase["ChildrenFirst"]
+    cfOff := PoE2Offsets.UiElementBase["ChildrenFirst"]   ; 0x10
     cFirst := reader.Mem.ReadInt64(panelPtr + cfOff)
     cLast := reader.Mem.ReadInt64(panelPtr + cfOff + 8)
     n := (cFirst > 0 && cLast > cFirst) ? (cLast - cFirst) // 8 : 0
@@ -75,9 +78,10 @@ AtlasReadNodes(reader, panelPtr, maxNodes := 2000)
         return out
 
     gridOff := g_atlasOff["NodeGridOffset"]
+    dataBlkOff := g_atlasOff["NodeDataBlockOffset"]
+    mapDataOff := g_atlasOff["NodeMapDataOffset"]
     biomeOff := g_atlasOff["NodeBiomeOffset"]
     statusOff := g_atlasOff["NodeStatusOffset"]
-    mapDataOff := g_atlasOff["NodeMapDataOffset"]
 
     i := 0
     while (i < n && out.Length < maxNodes)
@@ -91,12 +95,33 @@ AtlasReadNodes(reader, panelPtr, maxNodes := 2000)
             continue
         gx := NumGet(gp.Ptr, 0, "Int")
         gy := NumGet(gp.Ptr, 4, "Int")
-        biome := reader.Mem.ReadUChar(c + biomeOff)
-        status := reader.Mem.ReadUChar(c + statusOff)
-        mapData := reader.Mem.ReadPtr(c + mapDataOff)
+
+        biome := 0, status := 0, mapData := 0, name := ""
+        aPtr := reader.Mem.ReadPtr(c + cfOff)             ; A = *(node + 0x10)
+        if reader.IsProbablyValidPointer(aPtr)
+        {
+            bPtr := reader.Mem.ReadPtr(aPtr + dataBlkOff) ; B = *(A + 0x20)
+            if reader.IsProbablyValidPointer(bPtr)
+            {
+                biome := reader.Mem.ReadUChar(bPtr + biomeOff)
+                status := reader.Mem.ReadUChar(bPtr + statusOff)
+                cPtr := reader.Mem.ReadPtr(bPtr + mapDataOff)   ; C = *(B + 0x2A0)
+                if reader.IsProbablyValidPointer(cPtr)
+                {
+                    mapData := cPtr
+                    hdr := reader.Mem.ReadPtr(cPtr)             ; *(C + 0)
+                    if reader.IsProbablyValidPointer(hdr)
+                    {
+                        buf := reader.Mem.ReadPtr(hdr)         ; *(hdr + 0) -> UTF-16 buffer
+                        if reader.IsProbablyValidPointer(buf)
+                            name := _AtlasReadWide(reader, buf, 64)
+                    }
+                }
+            }
+        }
         out.Push(Map("gridX", gx, "gridY", gy, "uiElemPtr", c,
             "flags", status, "status", status, "biomeId", biome,
-            "mapData", reader.IsProbablyValidPointer(mapData) ? mapData : 0, "name", ""))
+            "mapData", mapData, "name", name))
     }
     return out
 }
@@ -385,15 +410,14 @@ AtlasDumpDebug(reader, snap)
     txt .= Format("nodes={} | withMapData={} biome>0={} status>0={}`n",
         nodes.Length, withMap, withBiome, withStatus)
 
-    txt .= "`nfirst 20 nodes (grid / biome / status / mapData):`n"
+    txt .= "`nfirst 24 nodes (grid / biome / status / name):`n"
     shown := 0
     for _, nd in nodes
     {
-        if (shown >= 20)
+        if (shown >= 24)
             break
-        txt .= Format("  ({:4},{:4})  b={:3} st={} mapData={}`n",
-            nd["gridX"], nd["gridY"], nd["biomeId"], nd["status"],
-            nd["mapData"] ? Format("0x{:X}", nd["mapData"]) : "-")
+        txt .= Format("  ({:4},{:4})  b={:3} st=0x{:02X}  {}`n",
+            nd["gridX"], nd["gridY"], nd["biomeId"], nd["status"], nd["name"])
         shown += 1
     }
 
@@ -412,11 +436,6 @@ AtlasDumpDebug(reader, snap)
     }
     if (shown = 0)
         txt .= "  (none populated — visible nodes unrevealed, or mapData offset needs a revealed node)`n"
-
-    ; Field scan: locate the drifted biome/status/mapData offsets by their value
-    ; signature across all nodes (grid @ 0x320 is the known anchor in this window).
-    txt .= "`n--- node field scan (window 0x2A0..0x340, find biome/status/mapData) ---`n"
-    txt .= _AtlasFieldScan(reader, nodes, 0x2A0, 0x340)
 
     ; Connections: panel-level vector of edges (src grid + dst grid as ints, 16B each).
     cvOff := g_atlasOff["PanelConnVecOffset"]
