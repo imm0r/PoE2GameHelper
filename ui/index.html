@@ -5448,6 +5448,33 @@
           letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; min-width: 168px;
         }
 
+        /* ── Condition tree (nested AND/OR groups; nesting = brackets) ───────── */
+        .hk-conds { margin-top: 4px; }
+        .hk-conds-title {
+          color: var(--codex-gold); font-family: var(--codex-display);
+          letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; margin-bottom: 3px;
+        }
+        /* A group is a bracket: a boxed, indented region with its own ALL/ANY. */
+        .hk-cgroup {
+          border: 1px solid var(--codex-rule); border-left: 3px solid var(--codex-gold);
+          border-radius: 2px; padding: 4px 6px; margin: 4px 0;
+          background: rgba(120,90,40,0.06);
+        }
+        .hk-cgroup-any { border-left-color: var(--codex-blood-hi); }
+        .hk-cgroup-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .hk-cgroup-lbl {
+          color: var(--codex-text-dim); font-family: var(--codex-display);
+          letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px;
+        }
+        .hk-cmode { font-weight: bold; }
+        .hk-cgroup-body { padding-left: 8px; }
+        .hk-cgroup-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+        .hk-cgroup-head .hk-btn.danger { margin-left: auto; height: 20px; box-sizing: border-box; padding: 0 9px; display: inline-flex; align-items: center; }
+        /* A leaf is one condition row — same flex layout as an effect action row. */
+        .hk-cleaf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 3px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
+        .hk-cleaf:last-child { border-bottom: none; }
+        .hk-cleaf .hk-act-type { min-width: 132px; }
+
         /* Buttons — gilded two-tone, Cinzel small-caps (like the inv toolbar). */
         .hk-btn {
           font-family: var(--codex-display); letter-spacing: 0.1em; text-transform: uppercase; font-size: 11px;
@@ -6233,12 +6260,23 @@
       }
       return '';
     }
-    // Full collapsed line: bound output + the conditions that gate it, in plain words.
+    // Describes a condition tree node as a parenthesized boolean expression.
+    function hkDescribeCondNode(node) {
+      if (!node) return '';
+      if (node.kind === 'group') {
+        const parts = (node.children || []).map(hkDescribeCondNode).filter(Boolean);
+        if (!parts.length) return '';
+        if (parts.length === 1) return parts[0];
+        return '(' + parts.join(node.mode === 'any' ? ' or ' : ' and ') + ')';
+      }
+      return hkDescribeAction(node);
+    }
+    // Full collapsed line: bound output + the boolean condition that gates it.
     function hkDescribeHotkey(hk) {
-      const acts = Array.isArray(hk.actions) ? hk.actions : [];
-      const conds = acts.map(hkDescribeAction).filter(Boolean);
       const out = hkDescribeOutput(hk.output);
-      if (conds.length) return `${out} — if ${conds.join(' and ')}`;
+      let cond = hkDescribeCondNode(hk.conditions);
+      if (cond.startsWith('(') && cond.endsWith(')')) cond = cond.slice(1, -1); // drop root parens
+      if (cond) return `${out} — if ${cond}`;
       return hk.trigger === 'automated' ? `${out} — always` : out;
     }
 
@@ -6265,18 +6303,16 @@
             </span>` : ''}
             <span class="hk-adv-toggle" title="Focus / safe-zone / pass-through options (rarely changed)" onclick="hkToggleAdv(${hk.id})">${advOpen ? '▾' : '▸'} Advanced</span>
           </div>
+          ${hkRenderConditions(hk, gi, hi)}
+          <div class="hk-conds-title" style="margin-top:6px" title="Run when the conditions above pass. No effect = the bound output fires once.">Effects</div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
+            <select id="hk-addact-${gi}-${hi}" title="Pick which effect action to add, then click + Action. (Conditions are added in the Conditions box above.)">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
-              <option value="vitals">Condition: Vitals</option>
-              <option value="buff">Condition: Buff</option>
-              <option value="charges">Condition: Charges</option>
-              <option value="monsterCount">Condition: Monster count</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
-            <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+            <button class="hk-btn" title="Add the selected effect action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
           </div>` : `<div class="hk-summary" title="Click to expand" onclick="hkToggle('h:${hk.id}')">${hkEsc(hkDescribeHotkey(hk))}</div>`;
       return `
@@ -6751,11 +6787,221 @@
       if (a.type === 'monsterCount' && !a.radiusMode) a.radiusMode = 'player';
       return a;
     }
+    // ── Condition tree (boolean AND/OR groups with nesting = brackets) ─────────
+    // A hotkey gates on hk.conditions = a root group node:
+    //   { kind:'group', mode:'all'|'any', cid, children:[ <node>... ] }
+    //   leaf = a condition action ({type:'vitals'|'buff'|'charges'|'monsterCount', ...})
+    // cid is a UI-only stable handle for addressing a node in onchange handlers.
+    const HK_COND_TYPES = ['vitals', 'buff', 'charges', 'monsterCount', 'monsterCountCursor'];
+    function hkIsCondType(t) { return HK_COND_TYPES.includes(t); }
+    let hkCidSeq = 1;
+    function hkNewCid() { return hkCidSeq++; }
+    function hkEmptyCondRoot() { return { kind: 'group', mode: 'all', cid: hkNewCid(), children: [] }; }
+
+    // Recursively normalizes a node: assigns missing cids, enforces group shape,
+    // drops invalid leaves. Returns the node, or null if it should be dropped.
+    function hkNormCondNode(node) {
+      if (!node || typeof node !== 'object') return null;
+      if (node.kind === 'group') {
+        if (!node.cid) node.cid = hkNewCid();
+        node.mode = (node.mode === 'any') ? 'any' : 'all';
+        node.children = (Array.isArray(node.children) ? node.children : [])
+          .map(hkNormCondNode).filter(Boolean);
+        return node;
+      }
+      if (!hkIsCondType(node.type)) return null;
+      hkMigrateAction(node);
+      if (!node.cid) node.cid = hkNewCid();
+      return node;
+    }
+
+    function hkMaxCid(node) {
+      if (!node || typeof node !== 'object') return 0;
+      let m = node.cid || 0;
+      (node.children || []).forEach(ch => { m = Math.max(m, hkMaxCid(ch)); });
+      return m;
+    }
     function hkMigrateConfig(cfg) {
+      // Push the cid sequence past every existing cid first, so newly assigned
+      // cids never collide with preserved ones. (The AHK round-trip keeps leaf
+      // cids but rebuilds group nodes without them.)
+      let maxCid = 0;
       (cfg || []).forEach(g => (g.hotkeys || []).forEach(hk => {
-        hk.actions = (hk.actions || []).map(hkMigrateAction);
+        if (hk.conditions) maxCid = Math.max(maxCid, hkMaxCid(hk.conditions));
+      }));
+      if (maxCid >= hkCidSeq) hkCidSeq = maxCid + 1;
+      (cfg || []).forEach(g => (g.hotkeys || []).forEach(hk => {
+        const acts = (hk.actions || []).map(hkMigrateAction);
+        // Effects stay in actions; legacy inline conditions move into the tree.
+        const legacy = acts.filter(a => a && hkIsCondType(a.type));
+        hk.actions = acts.filter(a => a && !hkIsCondType(a.type));
+        let root = (hk.conditions && typeof hk.conditions === 'object' && hk.conditions.kind === 'group')
+          ? hk.conditions : hkEmptyCondRoot();
+        if (legacy.length) root.children = (root.children || []).concat(legacy);
+        hk.conditions = hkNormCondNode(root) || hkEmptyCondRoot();
       }));
       return cfg;
+    }
+
+    // Finds a node by cid in a hotkey's condition tree.
+    // Returns { node, parent, index } (parent/index null/-1 for the root), or null.
+    function hkFindCond(hk, cid) {
+      function walk(group, parent, idx) {
+        if (group.cid === cid) return { node: group, parent, index: idx };
+        const kids = group.children || [];
+        for (let i = 0; i < kids.length; i++) {
+          const ch = kids[i];
+          if (ch.cid === cid) return { node: ch, parent: group, index: i };
+          if (ch.kind === 'group') { const r = walk(ch, group, i); if (r) return r; }
+        }
+        return null;
+      }
+      return (hk && hk.conditions) ? walk(hk.conditions, null, -1) : null;
+    }
+    function hkCondHk(gi, hi) { return hkConfig[gi].hotkeys[hi]; }
+    function hkSetCond(gi, hi, cid, k, v) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f) return;
+      const isText = (k === 'buffName' || k === 'metadataPath' || k === 'chestType'
+              || k === 'op' || k === 'resource' || k === 'mode' || k === 'chargeType'
+              || k === 'rarity' || k === 'radiusMode' || k === 'circleColor');
+      let val = isText ? v : (isNaN(+v) ? v : +v);
+      if (!isText && typeof val === 'number' && val < 0) val = 0;
+      f.node[k] = val;
+      hkChanged();
+    }
+    function hkSetCondMode(gi, hi, cid, mode) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      f.node.mode = (mode === 'any') ? 'any' : 'all';
+      hkChanged();
+    }
+    function hkAddCond(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      const sel = document.getElementById('hk-addcond-' + cid);
+      const leaf = hkActionDefaults(sel ? sel.value : 'vitals');
+      leaf.cid = hkNewCid();
+      f.node.children.push(leaf);
+      hkChanged();
+    }
+    function hkAddCondGroup(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      f.node.children.push({ kind: 'group', mode: 'any', cid: hkNewCid(), children: [] });
+      hkChanged();
+    }
+    function hkDelCond(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || !f.parent) return; // root not deletable
+      f.parent.children.splice(f.index, 1);
+      hkChanged();
+    }
+    function hkOpenCondCircleColor(gi, hi, cid, el) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f) return;
+      openColorPicker("hkCircle", {
+        title: "Range circle color",
+        hex: f.node.circleColor || "#FFA8C0",
+        swatchEl: el,
+        onConfirm: hex => hkSetCond(gi, hi, cid, 'circleColor', "#" + hex.slice(0, 6))
+      });
+    }
+
+    // ── Condition field helpers (mirror hkSel/hkNum/hkChk/hkTxt but address a
+    // tree node by cid via hkSetCond) ─────────────────────────────────────────
+    function hkCNum(a, k, def, gi, hi, title = '') {
+      const v = a[k] != null ? hkEsc(a[k]) : def;
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      return `<span class="hk-num"${tt}><input type="number" min="0" value="${v}" onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">`
+           + `<span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span>`;
+    }
+    function hkCSel(a, k, opts, gi, hi, title = '') {
+      const cur = a[k] != null ? String(a[k]) : '';
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      const o = opts.map(([v, lbl]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`).join('');
+      return `<select${tt} onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">${o}</select>`;
+    }
+    function hkCTxt(a, k, ph, gi, hi) {
+      return `<input type="text" placeholder="${ph}" value="${hkEsc(a[k] || '')}" onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">`;
+    }
+    function hkCBuffField(a, gi, hi) {
+      const cur = a.buffName != null ? String(a.buffName) : '';
+      const entries = Object.keys(hkSeenBuffs).sort((x, y) => hkSeenBuffs[x].localeCompare(hkSeenBuffs[y]));
+      let opts = `<option value="" ${cur === '' ? 'selected' : ''}>— pick a buff —</option>`;
+      opts += entries.map(iv => `<option value="${hkEsc(iv)}" ${cur === iv ? 'selected' : ''}>${hkEsc(hkSeenBuffs[iv])}</option>`).join('');
+      if (cur !== '' && !(cur in hkSeenBuffs)) opts += `<option value="${hkEsc(cur)}" selected>${hkEsc(cur)} (not active)</option>`;
+      return `<select title="Fills itself from the player's active buffs (Game › Skills & Buffs)" onchange="hkSetCond(${gi},${hi},${a.cid},'buffName',this.value)">${opts}</select>`;
+    }
+
+    // Renders the condition gate for a hotkey (root group, no delete on root).
+    function hkRenderConditions(hk, gi, hi) {
+      if (!hk.conditions) return '';
+      return `<div class="hk-conds"><div class="hk-conds-title" title="The hotkey fires only when this boolean expression is true. ALL = AND, ANY = OR, nested group = bracket.">Conditions</div>`
+           + hkRenderCondGroup(hk.conditions, gi, hi, true) + `</div>`;
+    }
+    // One group box: an ALL/ANY selector + its children + add buttons.
+    function hkRenderCondGroup(g, gi, hi, isRoot) {
+      const cid = g.cid;
+      const mode = (g.mode === 'any') ? 'any' : 'all';
+      const kids = (g.children || []).map(ch =>
+        (ch.kind === 'group') ? hkRenderCondGroup(ch, gi, hi, false) : hkRenderCondLeaf(ch, gi, hi)
+      ).join('');
+      const childHtml = kids || `<div class="hk-empty" style="padding:3px 6px;font-size:12px">No conditions — always passes.</div>`;
+      const modeSel = `<select class="hk-cmode" title="ALL = every entry must match (AND). ANY = at least one must match (OR)." onchange="hkSetCondMode(${gi},${hi},${cid},this.value)">`
+          + `<option value="all" ${mode === 'all' ? 'selected' : ''}>ALL (and)</option>`
+          + `<option value="any" ${mode === 'any' ? 'selected' : ''}>ANY (or)</option></select>`;
+      const del = isRoot ? '' : `<button class="hk-btn danger" title="Remove this group and everything in it" onclick="hkDelCond(${gi},${hi},${cid})">✕ group</button>`;
+      return `<div class="hk-cgroup${mode === 'any' ? ' hk-cgroup-any' : ''}">
+        <div class="hk-cgroup-head"><span class="hk-cgroup-lbl">Match ${modeSel} of:</span>${del}</div>
+        <div class="hk-cgroup-body">${childHtml}</div>
+        <div class="hk-cgroup-add">
+          <select id="hk-addcond-${cid}" title="Pick a condition type to add">
+            <option value="vitals">Vitals</option><option value="buff">Buff</option>
+            <option value="charges">Charges</option><option value="monsterCount">Monster count</option>
+          </select>
+          <button class="hk-btn" title="Add a condition to this group" onclick="hkAddCond(${gi},${hi},${cid})">+ Condition</button>
+          <button class="hk-btn" title="Add a nested group — a bracket — with its own ALL/ANY" onclick="hkAddCondGroup(${gi},${hi},${cid})">+ Group ( )</button>
+        </div>
+      </div>`;
+    }
+    // One condition leaf: the per-type editor body + tools (debug, circle, delete).
+    function hkRenderCondLeaf(a, gi, hi) {
+      const cid = a.cid, t = a.type || '';
+      let body = '';
+      switch (t) {
+        case 'vitals':
+          body = `Resource ${hkCSel(a, 'resource', [['hp', 'Life'], ['es', 'Energy Shield'], ['mana', 'Mana']], gi, hi)} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi)} ${hkCNum(a, 'value', 50, gi, hi)} %`;
+          break;
+        case 'buff':
+          body = `Buff ${hkCBuffField(a, gi, hi)} ${hkCSel(a, 'mode', [['present', 'Present'], ['absent', 'Absent']], gi, hi)} `
+               + `Min stacks ${hkCNum(a, 'minStacks', 0, gi, hi)} Min time left(ms) ${hkCNum(a, 'minTimeLeftMs', 0, gi, hi)}`;
+          break;
+        case 'charges':
+          body = `Type ${hkCSel(a, 'chargeType', [['power', 'Power'], ['frenzy', 'Frenzy'], ['endurance', 'Endurance'], ['charged_staff', 'Charged Staff']], gi, hi)} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi)} ${hkCNum(a, 'value', 1, gi, hi)}`;
+          break;
+        case 'monsterCount': {
+          const mcMode = a.radiusMode || 'player';
+          const mcWorld = (mcMode === 'world' || mcMode === 'worldCursor');
+          const mcRadiusField = mcWorld
+            ? `Range ${hkCNum(a, 'worldRadius', 1000, gi, hi, 'Radius in world units (zoom-independent — matches the actual game distance)')} `
+            : `Radius(px) ${hkCNum(a, 'radius', 120, gi, hi, 'Radius in screen pixels within which monsters are counted')} `;
+          body = `Rarity ${hkCSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, 'Only count monsters of this rarity (Any = all)')} `
+               + mcRadiusField
+               + `${hkCSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)'], ['worldCursor', 'around cursor (range) ⚠ experimental']], gi, hi, 'Pixel radius (cursor/player), world-unit range around the player, or experimental world-unit range around the cursor')} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi, 'Comparison operator for the monster count')} ${hkCNum(a, 'value', 1, gi, hi, 'Monster-count threshold')}`;
+          break;
+        }
+        default: body = `<span style="color:var(--subtext)">unknown condition</span>`;
+      }
+      const swatch = (t === 'monsterCount' && hkBool(a.debug))
+        ? `<span class="cp-swatch" style="--swatch-color:${hkEsc(a.circleColor || '#FFA8C0')}" title="Range circle color" onclick="hkOpenCondCircleColor(${gi},${hi},${cid},this)"></span>` : '';
+      return `<div class="hk-cleaf">
+        <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
+        ${body}
+        <span class="hk-act-tools">
+          <span class="hk-cap" title="Show this condition's debug info on the game overlay (range circle, monster counts, etc.)"><label class="toggle"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetCond(${gi},${hi},${cid},'debug',this.checked?1:0)"><span class="toggle-slider"></span></label>🐞</span>
+          ${swatch}
+          <button class="hk-btn danger" title="Remove this condition" onclick="hkDelCond(${gi},${hi},${cid})">✕</button>
+        </span>
+      </div>`;
     }
     function hkAddAction(gi, hi) {
       const sel = document.getElementById('hk-addact-' + gi + '-' + hi);

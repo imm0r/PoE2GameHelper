@@ -1,7 +1,15 @@
 ; CustomHotkeys.ahk
 ; Custom hotkey / macro engine. Provides user-defined hotkey groups, each
-; containing hotkeys with global conditions and an ordered list of actions
-; (repeat, hold, chain, vitals/buff/charge/monster-count gates, auto-aim).
+; containing hotkeys with a boolean condition tree (the firing gate) and an
+; ordered list of effect actions (key press/hold/loop, chain, auto-aim).
+;
+; The condition tree combines the per-type gates (vitals/buff/charge/
+; monster-count) with AND/OR and nesting (= brackets):
+;   conditions := Map("kind","group", "mode","all"|"any", "children", [ <node>... ])
+;   node       := a group (above) OR a leaf condition Map("type","vitals", ...)
+;   mode "all" = AND (every child passes), "any" = OR (one child passes).
+; Legacy configs carried conditions inline in "actions"; _HotkeysNormalizeHotkey
+; migrates those into a root "all" group on load.
 ;
 ; Data model (also the on-disk shape in hotkeys.json):
 ;   g_hotkeyGroups := [
@@ -9,7 +17,8 @@
 ;       Map("id", 1, "name", "...", "enabled", 1,
 ;           "focusOnly", 1, "safeZoneDisabled", 1,
 ;           "key", "1", "mods", Map("ctrl",0,"shift",0,"alt",0,"gamepadLT",0),
-;           "actions", [ Map("type","vitals", ...), ... ])
+;           "conditions", Map("kind","group","mode","all","children",[ ... ]),
+;           "actions", [ Map("type","key", ...), ... ])
 ;     ])
 ;   ]
 ;
@@ -112,11 +121,33 @@ _HotkeysNormalizeHotkey(hk)
         "alt",       _HkBool(modsRaw, "alt", 0),
         "gamepadLT", _HkBool(modsRaw, "gamepadLT", 0)
     )
+    ; Split the raw action list into EFFECTS (kept in "actions") and CONDITION
+    ; gates. Conditions live in a boolean tree under "conditions" (groups with
+    ; mode "all"=AND / "any"=OR, nestable for brackets). Legacy configs carried
+    ; conditions inline in the action list, so migrate those into a root AND
+    ; group; a new-shape config supplies "conditions" directly.
     actions := []
+    condLegacy := []
     actRaw := (hk.Has("actions") && hk["actions"] is Array) ? hk["actions"] : []
     for a in actRaw
-        if (a is Map)
+    {
+        if !(a is Map)
+            continue
+        if _HotkeysIsCondType(a.Has("type") ? a["type"] : "")
+            condLegacy.Push(a)
+        else
             actions.Push(a)
+    }
+    if (hk.Has("conditions") && hk["conditions"] is Map)
+    {
+        conditions := _HotkeysNormalizeCondTree(hk["conditions"])
+        ; Fold any stray inline condition actions (e.g. an imported legacy
+        ; action) into the root group so none are silently lost.
+        for c in condLegacy
+            conditions["children"].Push(c)
+    }
+    else
+        conditions := Map("kind", "group", "mode", "all", "children", condLegacy)
     ; Output binding: where the macro's key comes from.
     ;   kind "flask"  -> slot (1-5), key resolved live from g_flaskKeyBySlot
     ;   kind "skill"  -> slot (skill-bar slot), key from g_skillKeyBySlot, plus
@@ -131,17 +162,8 @@ _HotkeysNormalizeHotkey(hk)
     )
     ; Trigger mode: "manual" fires only on a physical key press; "automated"
     ; auto-fires from the eval tick whenever the hotkey's conditions are met.
-    ; Default for legacy configs: automated if it has a condition action.
-    hasCond := false
-    for a in actions
-    {
-        if (a is Map && a.Has("type"))
-        {
-            ct := a["type"]
-            if (ct = "vitals" || ct = "buff" || ct = "charges" || ct = "monsterCount" || ct = "monsterCountCursor")
-                hasCond := true
-        }
-    }
+    ; Default for legacy configs: automated if it has any condition.
+    hasCond := (_HotkeysCountLeaves(conditions) > 0)
     trigger := hk.Has("trigger") ? hk["trigger"] : (hasCond ? "automated" : "manual")
     if (trigger != "automated" && trigger != "manual")
         trigger := "manual"
@@ -156,8 +178,38 @@ _HotkeysNormalizeHotkey(hk)
         "key", hk.Has("key") ? hk["key"] : "",
         "output", output,
         "mods", mods,
-        "actions", actions
+        "actions", actions,
+        "conditions", conditions
     )
+}
+
+; Sanitizes a condition tree node parsed from JSON: enforces the group shape
+; (kind/mode/children), keeps only valid condition leaves, recurses into nested
+; sub-groups (= brackets). A non-group leaf passed at the root is wrapped in an
+; AND group. Returns a normalized root group Map.
+_HotkeysNormalizeCondTree(node)
+{
+    if !(node is Map)
+        return Map("kind", "group", "mode", "all", "children", [])
+    if (node.Has("kind") && node["kind"] = "group")
+    {
+        mode := (node.Has("mode") && node["mode"] = "any") ? "any" : "all"
+        out := []
+        chRaw := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+        for ch in chRaw
+        {
+            if !(ch is Map)
+                continue
+            if (ch.Has("kind") && ch["kind"] = "group")
+                out.Push(_HotkeysNormalizeCondTree(ch))
+            else if (ch.Has("type") && _HotkeysIsCondType(ch["type"]))
+                out.Push(ch)
+        }
+        return Map("kind", "group", "mode", mode, "children", out)
+    }
+    if (node.Has("type") && _HotkeysIsCondType(node["type"]))
+        return Map("kind", "group", "mode", "all", "children", [node])
+    return Map("kind", "group", "mode", "all", "children", [])
 }
 
 ; Resolves the actual AHK send-key for a hotkey's output binding (live, so
@@ -506,9 +558,31 @@ _HotkeysCollectDebug()
                     continue
                 items.Push(_HotkeysBuildDebugRecord(hk, a, ai, snap))
             }
+            ; Condition leaves (monsterCount/vitals/buff/charges) carry their own
+            ; debug flags + range-circle colors, so walk the tree too.
+            root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+            if root
+                _HotkeysCollectCondDebug(root, hk, snap, items)
         }
     }
     g_hkDebugItems := items
+}
+
+; Recursively pushes a debug record for every condition leaf (with its debug
+; flag set) under a tree node into the items array.
+_HotkeysCollectCondDebug(node, hk, snap, items)
+{
+    if !(node is Map)
+        return
+    if (node.Has("kind") && node["kind"] = "group")
+    {
+        children := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+        for ch in children
+            _HotkeysCollectCondDebug(ch, hk, snap, items)
+        return
+    }
+    if (node.Has("debug") && node["debug"])
+        items.Push(_HotkeysBuildDebugRecord(hk, node, 0, snap))
 }
 
 ; Builds a single debug record Map for one action. Fields are kept generic so
@@ -794,16 +868,32 @@ _HotkeysRuntime(id)
     return g_hkRuntime[id]
 }
 
-; True if the hotkey has at least one condition-type action.
+; True if t names a condition (gate) type rather than an effect type.
+_HotkeysIsCondType(t)
+{
+    return (t = "vitals" || t = "buff" || t = "charges" || t = "monsterCount" || t = "monsterCountCursor")
+}
+
+; Counts the condition leaves under a tree node (a leaf counts as 1; a group
+; sums its children). Used for "has any condition" and the auto-trigger gate.
+_HotkeysCountLeaves(node)
+{
+    if !(node is Map)
+        return 0
+    if !(node.Has("kind") && node["kind"] = "group")
+        return 1
+    n := 0
+    children := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+    for ch in children
+        n += _HotkeysCountLeaves(ch)
+    return n
+}
+
+; True if the hotkey's condition tree holds at least one condition leaf.
 _HotkeysHasConditionAction(hk)
 {
-    for a in hk["actions"]
-    {
-        t := a.Has("type") ? a["type"] : ""
-        if (t = "vitals" || t = "buff" || t = "charges" || t = "monsterCount" || t = "monsterCountCursor")
-            return true
-    }
-    return false
+    root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+    return root ? (_HotkeysCountLeaves(root) > 0) : false
 }
 
 ; Derives the auto re-fire gap (ms) for a condition-triggered hotkey.
@@ -825,32 +915,59 @@ _HotkeysReFireGap(hk)
     return gap
 }
 
-; Dry-run of the condition gates only (no side effects), used by the evaluator
-; to decide whether a program-triggered hotkey should fire.
+; Evaluates the hotkey's boolean condition tree against the live snapshot.
+; An absent/empty tree is a neutral pass (true). Used both by the eval tick to
+; decide whether a program-triggered hotkey should fire and as the gate inside
+; _HotkeysRunActions.
 _HotkeysActionsWouldRun(hk)
 {
     snap := _HotkeysSnap()
-    for a in hk["actions"]
+    root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+    return root ? _HotkeysEvalNode(root, snap) : true
+}
+
+; Evaluates one condition tree node: recurses into groups, defers leaves to the
+; per-type evaluators. Returns true/false.
+_HotkeysEvalNode(node, snap)
+{
+    if !(node is Map)
+        return true
+    if (node.Has("kind") && node["kind"] = "group")
+        return _HotkeysEvalGroup(node, snap)
+    return _HotkeysEvalLeaf(node, snap)
+}
+
+; Combines a group's children by its mode: "any" = OR (one passing child wins),
+; otherwise "all" = AND. An empty group is neutral (passes).
+_HotkeysEvalGroup(group, snap)
+{
+    children := (group.Has("children") && group["children"] is Array) ? group["children"] : []
+    if (children.Length = 0)
+        return true
+    if (group.Has("mode") && group["mode"] = "any")
     {
-        t := a.Has("type") ? a["type"] : ""
-        switch t
-        {
-            case "vitals":
-                if !_HotkeysCheckVitals(a, snap)
-                    return false
-            case "buff":
-                if !_HotkeysCheckBuff(a, snap)
-                    return false
-            case "charges":
-                if !_HotkeysCheckCharges(a, snap)
-                    return false
-            case "monsterCount":
-                if !_HotkeysCheckMonsterCount(a, snap)
-                    return false
-            case "monsterCountCursor":
-                if !_HotkeysCheckMonsterCountCursor(a, snap)
-                    return false
-        }
+        for ch in children
+            if _HotkeysEvalNode(ch, snap)
+                return true
+        return false
+    }
+    for ch in children
+        if !_HotkeysEvalNode(ch, snap)
+            return false
+    return true
+}
+
+; Evaluates a single condition leaf via the matching per-type checker.
+; Unknown leaf types don't block (return true).
+_HotkeysEvalLeaf(a, snap)
+{
+    switch (a.Has("type") ? a["type"] : "")
+    {
+        case "vitals":             return _HotkeysCheckVitals(a, snap)
+        case "buff":               return _HotkeysCheckBuff(a, snap)
+        case "charges":            return _HotkeysCheckCharges(a, snap)
+        case "monsterCount":       return _HotkeysCheckMonsterCount(a, snap)
+        case "monsterCountCursor": return _HotkeysCheckMonsterCountCursor(a, snap)
     }
     return true
 }
@@ -938,6 +1055,11 @@ _HotkeysPassesGuards(hk)
 ; needing a redundant "Key press" action.
 _HotkeysRunActions(hk, context, depth)
 {
+    ; Condition gate: the whole boolean condition tree must pass before any
+    ; effect runs (or the bound output auto-fires). Applies to manual presses
+    ; and automated firing alike.
+    if !_HotkeysActionsWouldRun(hk)
+        return
     snap := _HotkeysSnap()
     hadEffect := false
     for a in hk["actions"]
@@ -945,21 +1067,6 @@ _HotkeysRunActions(hk, context, depth)
         t := a.Has("type") ? a["type"] : ""
         switch t
         {
-            case "vitals":
-                if !_HotkeysCheckVitals(a, snap)
-                    return
-            case "buff":
-                if !_HotkeysCheckBuff(a, snap)
-                    return
-            case "charges":
-                if !_HotkeysCheckCharges(a, snap)
-                    return
-            case "monsterCount":
-                if !_HotkeysCheckMonsterCount(a, snap)
-                    return
-            case "monsterCountCursor":
-                if !_HotkeysCheckMonsterCountCursor(a, snap)
-                    return
             case "key":
                 _HotkeysDoKey(hk, a)
                 hadEffect := true
