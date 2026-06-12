@@ -5553,6 +5553,18 @@
           <div style="color:var(--subtext);font-size:12px;">Esc to cancel</div>
         </div>
       </div>
+      <!-- Delete confirmation for groups / hotkeys (with an optional export-first). -->
+      <div id="hk-confirm" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;align-items:center;justify-content:center;" onclick="if(event.target===this)hkConfirmCancel()">
+        <div style="background:var(--surface);border:1px solid var(--codex-rule);border-radius:6px;padding:22px 26px;max-width:440px;color:var(--text);box-shadow:0 10px 34px rgba(0,0,0,.55);">
+          <div style="font-family:var(--codex-display);letter-spacing:.06em;text-transform:uppercase;color:var(--codex-blood-hi);font-size:14px;margin-bottom:8px;">Confirm deletion</div>
+          <div id="hk-confirm-msg" style="font-family:var(--codex-serif);font-size:13px;color:var(--codex-text);margin-bottom:18px;line-height:1.45;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+            <button class="hk-btn" title="Keep it — close without deleting" onclick="hkConfirmCancel()">Cancel</button>
+            <button class="hk-btn" id="hk-confirm-export" title="Save a JSON backup to hotkeys_export/ before deleting" onclick="hkConfirmExport()">⤓ Export first</button>
+            <button class="hk-btn danger" title="Permanently delete" onclick="hkConfirmDo()">✕ Delete</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /content -->
@@ -6225,7 +6237,7 @@
             <span class="hk-spacer"></span>
             <button class="hk-btn hk-icon-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
             <button class="hk-btn hk-icon-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <button class="hk-btn hk-icon-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+            <button class="hk-btn hk-icon-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkAskDelete('group',${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
           </div>
           ${body}
         </div>`;
@@ -6396,7 +6408,7 @@
             <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)"><span class="toggle-slider"></span></label>LT</span>`}
             <span class="hk-spacer"></span>
-            <button class="hk-btn danger hk-always" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
+            <button class="hk-btn danger hk-always" title="Delete this hotkey" onclick="hkAskDelete('hotkey',${gi},${hi})">✕</button>
           </div>
           ${body}
         </div>`;
@@ -6581,6 +6593,55 @@
     function hkExportAction(gi, hi, ai) {
       const a = hkConfig[gi].hotkeys[hi].actions[ai];
       if (a) ahkCall('ExportHotkeysItem', 'action', a.type || 'action', JSON.stringify(a, null, 2));
+    }
+    // Exports a single hotkey wrapped in a one-hotkey group, so it re-imports via
+    // the "⤒ Import group" button (there is no standalone hotkey importer).
+    function hkExportHotkey(gi, hi) {
+      const hk = hkConfig[gi] && hkConfig[gi].hotkeys[hi];
+      if (!hk) return;
+      const grp = { name: hk.name || 'hotkey', enabled: 1, hotkeys: [hk] };
+      ahkCall('ExportHotkeysItem', 'group', hk.name || 'hotkey', JSON.stringify(grp, null, 2));
+    }
+
+    // ── Delete confirmation (groups / hotkeys) ─────────────────────────────────
+    // Clicking a group/hotkey ✕ opens a modal (warn + optional export) instead of
+    // deleting immediately. The pending target is captured by index; nothing
+    // re-renders until the user confirms, so the indices stay valid.
+    let hkConfirmTarget = null;
+    function hkAskDelete(kind, gi, hi) {
+      hkConfirmTarget = { kind, gi, hi };
+      const msgEl = document.getElementById('hk-confirm-msg');
+      const expBtn = document.getElementById('hk-confirm-export');
+      if (expBtn) expBtn.textContent = '⤓ Export first';
+      if (kind === 'group') {
+        const g = hkConfig[gi]; const n = (g && g.hotkeys ? g.hotkeys.length : 0);
+        msgEl.innerHTML = `Delete the group <b>“${hkEsc(g ? g.name : '')}”</b> and its `
+          + `<b>${n}</b> hotkey${n === 1 ? '' : 's'}? This cannot be undone.`;
+      } else {
+        const hk = hkConfig[gi] && hkConfig[gi].hotkeys[hi];
+        msgEl.innerHTML = `Delete the hotkey <b>“${hkEsc(hk ? hk.name : '')}”</b>? This cannot be undone.`;
+      }
+      document.getElementById('hk-confirm').style.display = 'flex';
+    }
+    function hkConfirmCancel() {
+      hkConfirmTarget = null;
+      document.getElementById('hk-confirm').style.display = 'none';
+    }
+    // Export the pending target (group or hotkey) but keep the dialog open so the
+    // user can still confirm or cancel afterwards.
+    function hkConfirmExport() {
+      if (!hkConfirmTarget) return;
+      const t = hkConfirmTarget;
+      if (t.kind === 'group') hkExportGroup(t.gi); else hkExportHotkey(t.gi, t.hi);
+      const expBtn = document.getElementById('hk-confirm-export');
+      if (expBtn) { expBtn.textContent = '⤓ Exported ✓'; setTimeout(() => { if (expBtn) expBtn.textContent = '⤓ Export first'; }, 2000); }
+    }
+    function hkConfirmDo() {
+      if (!hkConfirmTarget) return;
+      const t = hkConfirmTarget;
+      hkConfirmTarget = null;
+      document.getElementById('hk-confirm').style.display = 'none';
+      if (t.kind === 'group') hkDelGroup(t.gi); else hkDelHk(t.gi, t.hi);
     }
 
     function hkRenderAction(a, gi, hi, ai) {
