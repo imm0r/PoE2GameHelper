@@ -6584,7 +6584,12 @@
       hkChanged();
     }
     function hkDelGroup(gi) { hkConfig.splice(gi, 1); hkChanged(); }
-    function hkSetGroup(gi, k, v) { hkConfig[gi][k] = v; hkChanged(); }
+    function hkSetGroup(gi, k, v) {
+      hkConfig[gi][k] = v;
+      // Disabling a group also collapses it (keeps the list tidy).
+      if (k === 'enabled' && !v) hkCollapsed.add('g:' + gi);
+      hkChanged();
+    }
 
     function hkAddHotkey(gi) {
       hkConfig[gi].hotkeys.push({
@@ -6595,7 +6600,15 @@
       hkChanged();   // AHK assigns the real id on normalize and echoes it back
     }
     function hkDelHk(gi, hi) { hkConfig[gi].hotkeys.splice(hi, 1); hkChanged(); }
-    function hkSetHk(gi, hi, k, v) { hkConfig[gi].hotkeys[hi][k] = v; hkChanged(); }
+    function hkSetHk(gi, hi, k, v) {
+      hkConfig[gi].hotkeys[hi][k] = v;
+      // Disabling a hotkey also collapses it (keyed by its stable id).
+      if (k === 'enabled' && !v) {
+        const hk = hkConfig[gi].hotkeys[hi];
+        if (hk && hk.id != null) hkCollapsed.add('h:' + hk.id);
+      }
+      hkChanged();
+    }
     function hkSetMod(gi, hi, k, v) {
       const hk = hkConfig[gi].hotkeys[hi];
       if (!hk.mods) hk.mods = {};
