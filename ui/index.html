@@ -6349,6 +6349,19 @@
       return `<select title="Fills itself from the player's active buffs (Game › Skills & Buffs)" onchange="hkSetAct(${gi},${hi},${ai},'buffName',this.value)">${opts}</select>`;
     }
 
+    // Opens the shared color picker for a monsterCount action's range circle, writing the
+    // chosen RGB (alpha dropped) back into the action as circleColor (used by the radar).
+    function hkOpenCircleColor(gi, hi, ai, el) {
+      const a = hkConfig[gi] && hkConfig[gi].hotkeys[hi] && hkConfig[gi].hotkeys[hi].actions[ai];
+      if (!a) return;
+      openColorPicker("hkCircle", {
+        title: "Range circle color",
+        hex: a.circleColor || "#FFA8C0",
+        swatchEl: el,
+        onConfirm: hex => hkSetAct(gi, hi, ai, 'circleColor', "#" + hex.slice(0, 6))
+      });
+    }
+
     // Aim target picker: the synthetic "__all__" option maps to scanAll (aim at
     // the nearest targetable entity); any real value clears scanAll and sets the
     // concrete target type.
@@ -6486,6 +6499,7 @@
                 ${open ? body : ''}
                 <span class="hk-act-tools">
                   <span class="hk-cap" title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><label class="toggle"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)"><span class="toggle-slider"></span></label>🐞</span>
+                  ${(t === 'monsterCount' && hkBool(a.debug)) ? `<span class="cp-swatch" style="--swatch-color:${hkEsc(a.circleColor || '#FFA8C0')}" title="Range circle color" onclick="hkOpenCircleColor(${gi},${hi},${ai},this)"></span>` : ''}
                   <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                   <button class="hk-btn danger" title="Remove this action" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
                 </span>

@@ -523,6 +523,11 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         "lines", []
     )
 
+    ; Per-action range-circle color from the UI color picker (#RRGGBB → BGR).
+    ; 0 = none set → the radar falls back to its default circle color.
+    rec["color"] := (a.Has("circleColor") && a["circleColor"] != "")
+        ? GroupColorToBgr(a["circleColor"]) : 0
+
     ; The output key this hotkey fires — always shown in the debug readout.
     key := _HotkeysResolveKey(hk)
     rec["key"] := key

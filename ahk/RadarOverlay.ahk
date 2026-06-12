@@ -1505,6 +1505,8 @@ class RadarOverlay extends GdiOverlayBase
         {
             if !(rec is Map)
                 continue
+            ; Per-action circle color from the UI picker (BGR); 0 → the default.
+            col := (rec.Has("color") && rec["color"]) ? rec["color"] : COL_CUR
             ; Cursor pixel circle (screen cursor → client coords).
             if (rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
             {
@@ -1513,7 +1515,7 @@ class RadarOverlay extends GdiOverlayBase
                 MouseGetPos(&cx, &cy)
                 ccx := cx - this._lastX, ccy := cy - this._lastY
                 r := rec["circleCursorPx"]
-                this._DrawPixelCircle(ccx, ccy, r, COL_CUR)
+                this._DrawPixelCircle(ccx, ccy, r, col)
                 this._DrawCircleLabel(ccx, ccy, r, rec)
             }
             ; Player pixel circle (player projected to screen → client coords).
@@ -1524,7 +1526,7 @@ class RadarOverlay extends GdiOverlayBase
                 {
                     pcx := ps["x"] - this._lastX, pcy := ps["y"] - this._lastY
                     r := rec["circlePlayerPx"]
-                    this._DrawPixelCircle(pcx, pcy, r, COL_CUR)
+                    this._DrawPixelCircle(pcx, pcy, r, col)
                     this._DrawCircleLabel(pcx, pcy, r, rec)
                 }
             }
@@ -1537,7 +1539,7 @@ class RadarOverlay extends GdiOverlayBase
                 ps := this._PlayerScreenPos()
                 if (ps)
                     this._DrawWorldRing(ps["x"] - this._lastX, ps["y"] - this._lastY,
-                        rec["circlePlayerWorld"], COL_CUR, rec)
+                        rec["circlePlayerWorld"], col, rec)
             }
             if (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0)
             {
@@ -1545,7 +1547,7 @@ class RadarOverlay extends GdiOverlayBase
                 CoordMode("Mouse", "Screen")
                 MouseGetPos(&mcx, &mcy)
                 this._DrawWorldRing(mcx - this._lastX, mcy - this._lastY,
-                    rec["circleCursorWorld"], COL_CUR, rec)
+                    rec["circleCursorWorld"], col, rec)
             }
         }
     }
