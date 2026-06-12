@@ -121,9 +121,25 @@ AtlasReadNodes(reader, panelPtr, maxNodes := 2000)
         }
         out.Push(Map("gridX", gx, "gridY", gy, "uiElemPtr", c,
             "flags", status, "status", status, "biomeId", biome,
-            "mapData", mapData, "name", name))
+            "mapData", mapData, "mapId", name, "name", _AtlasPrettifyName(name)))
     }
     return out
+}
+
+; Turns an internal atlas MapId ("MapSevenWaters", "MapUniqueUntaintedParadise")
+; into a readable label ("Seven Waters", "Untainted Paradise") by stripping the
+; Map/Unique prefixes and splitting camelCase. Returns the prettified string.
+; (Exact display names — "Savannah", "The Assembly" — need a maps.json table.)
+_AtlasPrettifyName(id)
+{
+    if (id = "")
+        return ""
+    s := id
+    if (SubStr(s, 1, 3) = "Map")
+        s := SubStr(s, 4)
+    if (SubStr(s, 1, 6) = "Unique")
+        s := SubStr(s, 7)
+    return RegExReplace(s, "(?<=[a-z0-9])(?=[A-Z])", " ")
 }
 
 ; Reads up to maxChars UTF-16 chars from a raw buffer pointer (not a StdWString).

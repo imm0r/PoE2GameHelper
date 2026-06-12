@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.86"
+POEFORMANCE_VERSION := "0.45.12.87"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -122,7 +122,7 @@ g_vitalsNeedsCombat := false   ; true when a vitals bar uses an "In Combat" cond
 g_notifyOverlay := 0   ; reference to the manager-owned NotificationOverlay (set in LoadOverlaySystem)
 g_focusOverlay := 0   ; reference to the manager-owned FocusOverlay (set in LoadOverlaySystem)
 g_focusOverlayEnabled := true   ; whether the focused-entity test overlay is active
-g_atlasOverlayEnabled := false  ; Atlas map overlay (opt-in; offsets still being verified)
+g_atlasOverlayEnabled := false  ; Atlas map overlay (opt-in; node graph + names + biomes)
 g_atlasBuildTick := 0           ; throttle stamp for TryBuildAtlasRender
 g_atlasRender := 0              ; Atlas render snapshot (built by TryBuildAtlasRender)
 g_localApiEnabled := false   ; local HTTP API (MCP backend) — opt-in; seeded by LoadLocalApiConfig()
