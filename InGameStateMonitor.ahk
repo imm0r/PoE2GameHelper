@@ -46,7 +46,7 @@ When you create new functions, always add a 2-3 line comment beforehand: what th
 When you create new variables, always name them meaningfully and follow the existing general style.
 */
 
-POEFORMANCE_VERSION := "0.45.12.83"
+POEFORMANCE_VERSION := "0.45.12.84"
 
 ; ── WebView2Loader.dll bundling (compiled .exe only) ──────────────────────
 ; Lib/WebView2.ahk loads WebView2Loader.dll via DllCall, with a fallback that
@@ -326,6 +326,7 @@ LoadOverlaySystem()       ; build the OverlayManager + all overlays; wire legacy
 InitProfiler()            ; QPC profiler singleton (disabled until Shift+F3 enables it)
 ItemSizeRegistry.Load()   ; ~4000-entry path→(w,h) map used by loot fit-check
 AtlasData_Load()          ; Atlas biome/content lookup tables for the map overlay
+LoadAtlasOffsets()        ; confirmed GameHelper2 atlas node offsets (init gotcha)
 try g_atlasOverlayEnabled := (IniRead(A_ScriptDir "\poeformance_config.ini", "Atlas", "overlayEnabled", "0") = "1")
 
 ; Custom hotkey / macro engine — init defaults then load persisted hotkeys.json
