@@ -5294,7 +5294,7 @@
           box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.5);
         }
         .hk-group-head {
-          display: flex; gap: 8px; align-items: center; padding: 6px 12px;
+          display: flex; gap: 8px; align-items: center; padding: 3px 12px;
           border-bottom: 1px solid var(--codex-rule);
           background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.05));
         }
@@ -5309,11 +5309,11 @@
         /* Hotkey card — a parchment slip inside the chapter. */
         .hk-card {
           border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
-          padding: 5px 10px; margin-bottom: 5px;
+          padding: 3px 10px; margin-bottom: 4px;
           background: linear-gradient(180deg, rgba(20,12,6,0.55), rgba(10,6,4,0.6));
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
-        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 3px; }
+        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 2px; }
         /* The per-hotkey option checkboxes ride on the Output row when wide, but
            wrap to the next line together (never split) when space runs short. */
         .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
@@ -5334,13 +5334,15 @@
         #panel-hotkeys input[type=number] { width: 74px; }
         /* Compact controls so each row/box packs tightly (the row height tracks its
            tallest control). Scoped to the Hotkeys tab so other tabs are untouched. */
+        #panel-hotkeys .hk-row, #panel-hotkeys .hk-group-head { line-height: 1.1; }
         #panel-hotkeys input[type="text"]:not(.no-codex),
         #panel-hotkeys input[type="number"]:not(.no-codex),
-        #panel-hotkeys select:not(.no-codex) { padding-top: 2px; padding-bottom: 2px; }
-        #panel-hotkeys .hk-btn { padding-top: 3px; padding-bottom: 3px; }
-        #panel-hotkeys .toggle { height: 18px; width: 34px; }
-        #panel-hotkeys .toggle-slider::before { width: 12px; height: 12px; }
-        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateX(16px); }
+        #panel-hotkeys select:not(.no-codex) { padding-top: 1px; padding-bottom: 1px; font-size: 11px; line-height: 1.1; }
+        #panel-hotkeys .hk-btn { padding-top: 2px; padding-bottom: 2px; font-size: 10px; line-height: 1.1; }
+        #panel-hotkeys .hk-group-name { font-size: 14px; }
+        #panel-hotkeys .toggle { height: 16px; width: 30px; }
+        #panel-hotkeys .toggle-slider::before { width: 11px; height: 11px; bottom: 2px; }
+        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateX(14px); }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
@@ -5453,8 +5455,8 @@
         /* Give the export/remove buttons a shared fixed height and center their
            glyphs, and match the debug checkbox label height so the bug icon
            lines up vertically with the buttons. */
-        .hk-act-tools .hk-btn { height: 22px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
-        .hk-act-tools > .hk-cap { height: 22px; margin: 0; display: inline-flex; align-items: center; }
+        .hk-act-tools .hk-btn { height: 20px; box-sizing: border-box; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-act-tools > .hk-cap { height: 20px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 24px; text-align: center; font-family: var(--codex-serif); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }
         .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
         .hk-caret:hover { color: var(--codex-gold-hi); }
