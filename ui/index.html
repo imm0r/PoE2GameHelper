@@ -6203,7 +6203,9 @@
       const kind = o.kind || 'flask';
       if (kind === 'skill') {
         const s = (hkBindings.skillSlots || []).find(x => +x.slot === +o.slot);
-        return `Skill ${o.slot || 1}${s && s.key ? ` (${s.key})` : ''}`;
+        const key = o.key || (s ? s.key : '');
+        const nm = o.skillName || 'skill';
+        return key ? `${nm} (${key})` : nm;
       }
       if (kind === 'key') return o.key ? `key ${o.key}` : 'no key';
       const f = (hkBindings.flaskSlots || []).find(x => +x.slot === +o.slot);
@@ -6318,7 +6320,7 @@
       const o = hk.output || { kind: 'flask', slot: 1, skillName: '', key: '' };
       const kind = o.kind || 'flask';
       const kindSel = `<select onchange="hkSetOutput(${gi},${hi},'kind',this.value)">`
-        + [['flask', 'Flask slot'], ['skill', 'Skill slot'], ['key', 'Raw key']]
+        + [['flask', 'Flask slot'], ['skill', 'Skill'], ['key', 'Raw key']]
             .map(([v, l]) => `<option value="${v}" ${kind === v ? 'selected' : ''}>${l}</option>`).join('')
         + `</select>`;
       let detail = '';
@@ -6328,15 +6330,18 @@
           : [1,2].map(s => `<option value="${s}" ${+o.slot === s ? 'selected' : ''}>Flask ${s}</option>`).join('');
         detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${opts}</select>`;
       } else if (kind === 'skill') {
-        const slotOpts = (hkBindings.skillSlots || []).length
-          ? hkBindings.skillSlots.map(s => `<option value="${s.slot}" ${+o.slot === +s.slot ? 'selected' : ''}>Slot ${s.slot} → ${hkEsc(s.key)}</option>`).join('')
-          : `<option value="${o.slot || 1}">(no skill binds read from config)</option>`;
+        // One dropdown picks the skill (the real, in-game-named list) — it both gates on
+        // that skill's cooldown AND labels the output. The key it presses is captured
+        // directly (skill->slot/key isn't readable from memory); old configs fall back to
+        // their slot's config key.
         const names = hkBindings.skillNames || [];
-        const nameOpts = `<option value="">— skill (for cooldown gate) —</option>`
+        const nameOpts = `<option value="">— pick a skill —</option>`
           + names.map(n => `<option value="${hkEsc(n)}" ${o.skillName === n ? 'selected' : ''}>${hkEsc(n)}</option>`).join('')
           + (o.skillName && !names.includes(o.skillName) ? `<option value="${hkEsc(o.skillName)}" selected>${hkEsc(o.skillName)} (not active)</option>` : '');
-        detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${slotOpts}</select> `
-               + `<select title="Skill whose cooldown gates this hotkey" onchange="hkSetOutput(${gi},${hi},'skillName',this.value)">${nameOpts}</select>`;
+        const slotKey = (hkBindings.skillSlots || []).find(s => +s.slot === +o.slot);
+        const keyTxt = o.key || (slotKey ? slotKey.key : '') || 'Set key';
+        detail = `<select title="Which skill this fires (also gates on its cooldown)" onchange="hkSetOutput(${gi},${hi},'skillName',this.value)">${nameOpts}</select> `
+               + `<button class="hk-btn hk-key-btn" title="Output key this skill is bound to in-game" onclick="hkCaptureSkillKey(${gi},${hi})">${hkEsc(keyTxt)}</button>`;
       } else {
         detail = `<button class="hk-btn hk-key-btn" title="Literal output key" onclick="hkCaptureOutputKey(${gi},${hi})">${o.key ? hkEsc(o.key) : 'Set key'}</button>`;
       }
@@ -6780,12 +6785,22 @@
       hkCapture = { gi, hi, target: 'output' };
       document.getElementById('hk-capture').style.display = 'flex';
     }
+    // Like hkCaptureOutputKey, but for a Skill-slot output: set only the key and KEEP
+    // kind 'skill' (so the skill dropdown / cooldown gate stay intact).
+    function hkCaptureSkillKey(gi, hi) {
+      hkCapture = { gi, hi, target: 'skillKey' };
+      document.getElementById('hk-capture').style.display = 'flex';
+    }
     function hkFinishCapture(keyName, mods) {
       if (!hkCapture) return;
       const hk = hkConfig[hkCapture.gi].hotkeys[hkCapture.hi];
       if (hkCapture.target === 'output') {
         if (!hk.output) hk.output = { kind: 'key', slot: 1, skillName: '', key: '' };
         hk.output.kind = 'key';
+        hk.output.key = keyName;
+      } else if (hkCapture.target === 'skillKey') {
+        if (!hk.output) hk.output = { kind: 'skill', slot: 1, skillName: '', key: '' };
+        hk.output.kind = 'skill';
         hk.output.key = keyName;
       } else {
         hk.key = keyName;

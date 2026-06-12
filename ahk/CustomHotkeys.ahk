@@ -174,7 +174,8 @@ _HotkeysResolveKey(hk)
     if (kind = "flask")
         return (g_flaskKeyBySlot.Has(slot)) ? g_flaskKeyBySlot[slot] : ""
     if (kind = "skill")
-        return (g_skillKeyBySlot.Has(slot)) ? g_skillKeyBySlot[slot] : (out.Has("key") ? out["key"] : "")
+        return (out.Has("key") && out["key"] != "") ? out["key"]
+             : (g_skillKeyBySlot.Has(slot) ? g_skillKeyBySlot[slot] : "")
     return out.Has("key") ? out["key"] : (hk.Has("key") ? hk["key"] : "")
 }
 
