@@ -91,6 +91,9 @@ UpdateRadarFast()
         Profiler.Begin("tick.alerts")
         TryEntityAlerts(radarSnap)
         Profiler.End("tick.alerts")
+
+        ; ── Atlas overlay snapshot (self-gated on g_atlasOverlayEnabled, throttled) ──
+        TryBuildAtlasRender(radarSnap)
         if !IsObject(g_overlayManager)
             return
 

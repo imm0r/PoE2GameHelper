@@ -40,7 +40,7 @@ PushHeaderToWebView()
     global g_radarShowEnemyNormal, g_radarShowEnemyRare, g_radarShowEnemyBoss
     global g_radarShowMinions, g_radarShowNpcs, g_radarShowChests
     global g_autoFlaskLastReason, g_flaskKeyBySlot, g_reader, g_radarEnabled, g_webGui
-    global g_playerHudEnabled
+    global g_playerHudEnabled, g_atlasOverlayEnabled
     global POEFORMANCE_VERSION
     global g_entityShowPlayer, g_entityShowMinion, g_entityShowEnemy
     global g_entityShowNPC, g_entityShowChest, g_entityShowWorldItem, g_entityShowOther
@@ -124,6 +124,7 @@ PushHeaderToWebView()
         . '"invChainDump":' (g_inventoryChainDumpEnabled ? "true" : "false") ","
         . '"overlayStatusText":' (g_overlayStatusTextEnabled ? "true" : "false") "," . '"localApi":' (g_localApiEnabled ? "true" : "false") "," . '"localApiPort":' g_localApiPort ","
         . '"overlayPoeOnly":' (g_overlayPoeOnly ? "true" : "false") ","
+        . '"atlasOverlay":' ((IsSet(g_atlasOverlayEnabled) && g_atlasOverlayEnabled) ? "true" : "false") ","
         . '"combatAuto":' (g_combatAutoEnabled ? "true" : "false") ","
         . '"combatHotkey":' _JsStr(g_combatToggleHotkey) ","
         . '"combatState":' _JsStr(g_combatState) ","

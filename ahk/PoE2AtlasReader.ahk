@@ -190,16 +190,7 @@ AtlasDumpDebug(reader, snap)
 {
     if !(IsObject(reader) && snap && snap.Has("inGameState"))
         return ""
-    inGs := snap["inGameState"]
-    root := 0
-    for _, k in ["activeGameUiPtr", "gameUiPtr", "uiRootPtr"]
-    {
-        if (inGs.Has(k) && reader.IsProbablyValidPointer(inGs[k]))
-        {
-            root := inGs[k]
-            break
-        }
-    }
+    root := _AtlasResolveUiRoot(reader, snap)
     if !root
         return ""
 
@@ -250,6 +241,140 @@ AtlasDumpDebug(reader, snap)
 
     FileAppend(txt, outPath, "UTF-8")
     return outPath
+}
+
+; Resolves the active UI-root UiElement (KB/M, else controller) from a snapshot —
+; the BFS starting point for the Atlas panel search. Derives it live from the
+; InGameState address so it never depends on what the radar snapshot happened to
+; cache. Returns a pointer, or 0.
+_AtlasResolveUiRoot(reader, snap)
+{
+    if !(IsObject(reader) && snap && snap.Has("inGameState"))
+        return 0
+    inGs := snap["inGameState"]
+    if !(inGs is Map && inGs.Has("address") && reader.IsProbablyValidPointer(inGs["address"]))
+        return 0
+    addr := inGs["address"]
+    root := reader.Mem.ReadPtr(addr + PoE2Offsets.InGameState["UiRootStructPtr"])
+    if reader.IsProbablyValidPointer(root)
+        return root
+    root := reader.Mem.ReadPtr(addr + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
+    return reader.IsProbablyValidPointer(root) ? root : 0
+}
+
+; Computes the ABSOLUTE screen position of a UI element by walking its parent
+; chain (accumulating RelativePosition, plus the parent's PositionModifier when
+; the child's ShouldModifyPos flag is set) and applying GameWindowScale — the
+; same math ReadMapUiElementData / the radar use for the map element. rect is the
+; client rect (NavClientRect: x,y,w,h). Returns Map("x","y") or 0.
+; NOTE: the GameWindowScale branch (esp. scaleIdx 3) is a tuning point to verify
+; in-game once the node offsets are confirmed.
+_AtlasElemScreenPos(reader, elemPtr, rect)
+{
+    if !(reader.IsProbablyValidPointer(elemPtr) && rect)
+        return 0
+    ub := PoE2Offsets.UiElementBase
+    relOff := ub["RelativePosition"]
+    chain := []
+    cur := elemPtr
+    Loop 12
+    {
+        if !reader.IsProbablyValidPointer(cur)
+            break
+        chain.Push(Map(
+            "relX", reader.Mem.ReadFloat(cur + relOff),
+            "relY", reader.Mem.ReadFloat(cur + relOff + 4),
+            "flags", reader.Mem.ReadUInt(cur + ub["Flags"]),
+            "pmX", reader.Mem.ReadFloat(cur + ub["PositionModifier"]),
+            "pmY", reader.Mem.ReadFloat(cur + ub["PositionModifier"] + 4)))
+        parent := reader.Mem.ReadPtr(cur + ub["ParentPtr"])
+        if !reader.IsProbablyValidPointer(parent)
+            break
+        cur := parent
+    }
+    N := chain.Length
+    if (N = 0)
+        return 0
+    accX := chain[N]["relX"], accY := chain[N]["relY"]
+    Loop N - 1
+    {
+        ci := N - A_Index            ; walk root-1 … element
+        ch := chain[ci], pa := chain[ci + 1]
+        if (ch["flags"] >> 10) & 1   ; ShouldModifyPos = bit 10
+        {
+            accX += pa["pmX"]
+            accY += pa["pmY"]
+        }
+        accX += ch["relX"]
+        accY += ch["relY"]
+    }
+    sfX := rect["w"] / 2560.0        ; UI design reference is 2560×1600
+    sfY := rect["h"] / 1600.0
+    si := reader.Mem.ReadUChar(elemPtr + ub["ScaleIndex"])
+    lm := reader.Mem.ReadFloat(elemPtr + ub["LocalScaleMultiplier"])
+    if (lm <= 0)
+        lm := 1.0
+    if (si = 1)
+        usX := lm * sfX, usY := lm * sfX
+    else if (si = 2)
+        usX := lm * sfY, usY := lm * sfY
+    else if (si = 3)
+        usX := lm * sfX, usY := lm * sfY
+    else
+        usX := lm, usY := lm
+    return Map("x", rect["x"] + accX * usX, "y", rect["y"] + accY * usY)
+}
+
+; Per-tick (throttled, self-gated) builder that bridges the reader to the radar's
+; _RenderAtlas: resolve the Atlas panel, read its nodes, project each to absolute
+; screen coords via its UiElement, and publish g_atlasRender. Clears g_atlasRender
+; (nothing drawn) when the overlay is off or the Atlas panel isn't open. Reads run
+; on the main thread, so this is throttled to ~300 ms (the BFS + node walk isn't
+; cheap). Connections / content tags / routing come in a later phase once the node
+; offsets are confirmed via AtlasDumpDebug.
+TryBuildAtlasRender(snap)
+{
+    global g_reader, g_atlasRender, g_atlasBuildTick, g_atlasOverlayEnabled
+    if !(IsSet(g_atlasOverlayEnabled) && g_atlasOverlayEnabled)
+        return
+    if !(IsObject(g_reader) && snap && snap.Has("inGameState"))
+        return
+    now := A_TickCount
+    if (IsSet(g_atlasBuildTick) && (now - g_atlasBuildTick) < 300)
+        return
+    g_atlasBuildTick := now
+
+    root := _AtlasResolveUiRoot(g_reader, snap)
+    panel := root ? AtlasFindPanel(g_reader, root, ["worldpanel", "atlas"]) : 0
+    if !panel
+    {
+        g_atlasRender := 0       ; atlas not open / not found
+        return
+    }
+    gameHwnd := ResolvePoEWindow()
+    rect := gameHwnd ? NavClientRect(gameHwnd) : 0
+    if !rect
+    {
+        g_atlasRender := 0
+        return
+    }
+    nodes := AtlasReadNodes(g_reader, panel, 2000)
+    outNodes := []
+    for nd in nodes
+    {
+        if !g_reader.IsProbablyValidPointer(nd["uiElemPtr"])
+            continue
+        sp := _AtlasElemScreenPos(g_reader, nd["uiElemPtr"], rect)
+        if !sp
+            continue
+        ; Reject nodes that project well outside the window (off-screen / garbage).
+        if (sp["x"] < rect["x"] - 300 || sp["x"] > rect["x"] + rect["w"] + 300
+            || sp["y"] < rect["y"] - 300 || sp["y"] > rect["y"] + rect["h"] + 300)
+            continue
+        outNodes.Push(Map("x", sp["x"], "y", sp["y"],
+            "name", nd["name"], "biomeId", nd["biomeId"], "flags", nd["flags"]))
+    }
+    g_atlasRender := outNodes.Length ? Map("nodes", outNodes) : 0
 }
 
 ; Bridge handler: triggered from the UI ("Dump Atlas" button / ahkCall).

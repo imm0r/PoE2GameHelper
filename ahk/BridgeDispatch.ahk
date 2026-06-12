@@ -115,6 +115,13 @@ _DispatchBridgeCall(method, args)
             SetTimer(OnDumpEntitiesClicked, -1)
         case "DumpAtlas":
             SetTimer(OnDumpAtlasClicked, -1)
+        case "SetAtlasOverlay":
+            global g_atlasOverlayEnabled, g_atlasRender
+            av := (args.Length >= 1) ? args[1] : 0
+            g_atlasOverlayEnabled := (av = "true" || av = true || av = 1) ? true : false
+            if !g_atlasOverlayEnabled
+                g_atlasRender := 0   ; stop drawing immediately
+            try IniWrite(g_atlasOverlayEnabled ? "1" : "0", A_ScriptDir "\poeformance_config.ini", "Atlas", "overlayEnabled")
         case "HighlightEntity":
             g_highlightedEntityPath := (args.Length >= 1) ? args[1] : ""
         case "ClearEntityHighlight":

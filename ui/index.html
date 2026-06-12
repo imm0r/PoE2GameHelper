@@ -4397,6 +4397,7 @@
               <button class="cfg-btn" onclick="ahkCall('ToggleTreePane')">🌲 Toggle Tree Pane</button>
               <button class="cfg-btn" onclick="ahkCall('DumpEntities')">💾 Dump Entities</button>
               <button class="cfg-btn" title="Atlas RE: open the Atlas/World map, then dump node data + raw hex to debug\atlas_debug_*.txt" onclick="ahkCall('DumpAtlas')">🗺 Dump Atlas</button>
+              <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--codex-text);cursor:pointer;" title="Draw the Atlas map overlay (node names + biome rings). The node memory offsets are still being verified — run 🗺 Dump Atlas on the open Atlas to confirm/correct them."><input type="checkbox" id="atlas-overlay-chk" onchange="ahkCall('SetAtlasOverlay', this.checked)"> 🗺 Atlas overlay</label>
             </div>
           </details>
         </div>
@@ -7969,6 +7970,7 @@
       if (d.vitals) vitalsSyncFromHeader(d.vitals);
       setChk('tog-overlay-status', d.overlayStatusText !== undefined ? d.overlayStatusText : true);
       setChk('tog-localapi', d.localApi !== undefined ? d.localApi : false);
+      setChk('atlas-overlay-chk', d.atlasOverlay !== undefined ? d.atlasOverlay : false);
       if (d.localApiPort !== undefined) { const lp = document.getElementById('localapi-port'); if (lp) lp.textContent = d.localApiPort; }
 
       const radarFilters = document.getElementById('radar-filters');
