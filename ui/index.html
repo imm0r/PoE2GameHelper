@@ -5294,7 +5294,7 @@
           box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.5);
         }
         .hk-group-head {
-          display: flex; gap: 8px; align-items: center; padding: 3px 12px;
+          display: flex; gap: 8px; align-items: center; padding: 5px 12px;
           border-bottom: 1px solid var(--codex-rule);
           background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.05));
         }
@@ -5309,7 +5309,7 @@
         /* Hotkey card — a parchment slip inside the chapter. */
         .hk-card {
           border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
-          padding: 3px 10px; margin-bottom: 8px;
+          padding: 5px 10px; margin-bottom: 8px;
           background: linear-gradient(180deg, rgba(20,12,6,0.55), rgba(10,6,4,0.6));
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
@@ -5332,19 +5332,25 @@
         /* Inputs / selects inherit the shared codex theme (see the generic
            input/select rule). Only the hotkeys-specific layout is kept here. */
         #panel-hotkeys input[type=number] { width: 74px; }
-        /* Compact controls so each row/box packs tightly (the row height tracks its
-           tallest control). Scoped to the Hotkeys tab so other tabs are untouched. */
-        #panel-hotkeys .hk-row, #panel-hotkeys .hk-group-head { line-height: 1.1; }
+        /* Compact-but-comfortable controls (the row height tracks its tallest control).
+           Scoped to the Hotkeys tab so other tabs are untouched. */
+        #panel-hotkeys .hk-row, #panel-hotkeys .hk-group-head { line-height: 1.25; }
         #panel-hotkeys input[type="text"]:not(.no-codex),
         #panel-hotkeys input[type="number"]:not(.no-codex),
-        #panel-hotkeys select:not(.no-codex) { padding-top: 1px; padding-bottom: 1px; font-size: 11px; line-height: 1.1; }
-        #panel-hotkeys .hk-btn { padding-top: 2px; padding-bottom: 2px; font-size: 10px; line-height: 1.1; }
-        #panel-hotkeys .hk-group-name { font-size: 14px; }
-        #panel-hotkeys .toggle { height: 16px; width: 30px; }
-        /* Center the knob vertically regardless of the reduced height (top:50% +
-           translateY), and keep the checked travel horizontally symmetric. */
-        #panel-hotkeys .toggle-slider::before { width: 11px; height: 11px; top: 50%; bottom: auto; transform: translateY(-50%); }
-        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateY(-50%) translateX(11px); }
+        #panel-hotkeys select:not(.no-codex) { padding-top: 2px; padding-bottom: 2px; font-size: 12px; }
+        #panel-hotkeys .hk-btn { padding-top: 3px; padding-bottom: 3px; font-size: 11px; }
+        #panel-hotkeys .hk-group-name { font-size: 15px; }
+        #panel-hotkeys .toggle { height: 18px; width: 34px; }
+        /* Center the knob vertically regardless of height (top:50% + translateY), and keep
+           the checked travel horizontally symmetric. */
+        #panel-hotkeys .toggle-slider::before { width: 12px; height: 12px; top: 50%; bottom: auto; transform: translateY(-50%); }
+        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateY(-50%) translateX(14px); }
+        /* Collapsed-hotkey plain-language summary + the Advanced disclosure. */
+        .hk-summary { margin: 1px 0 1px 30px; padding: 1px 0; font-family: var(--codex-serif); font-size: 12.5px; font-style: italic; color: #cbb88a; cursor: pointer; }
+        .hk-summary:hover { color: var(--codex-gold-hi); }
+        .hk-adv-toggle { cursor: pointer; color: var(--codex-text-dim); font-size: 11px; font-family: var(--codex-display); letter-spacing: 0.08em; text-transform: uppercase; user-select: none; white-space: nowrap; }
+        .hk-adv-toggle:hover { color: var(--codex-gold); }
+        .hk-adv { margin-top: 2px; }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
@@ -6169,17 +6175,78 @@
         </div>`;
     }
 
+    // Advanced-options open state per hotkey id (default closed — Focus / Safe zone /
+    // Pass-through are rarely changed). A Set of hotkey ids that are expanded.
+    let hkAdvOpen = new Set();
+    function hkToggleAdv(id) {
+      if (hkAdvOpen.has(id)) hkAdvOpen.delete(id); else hkAdvOpen.add(id);
+      hkRender();
+    }
+
+    // ── Plain-language summaries (Hotkeys overview) ──────────────────────────
+    // Readable one-liners so a collapsed hotkey reads at a glance instead of as a
+    // row of raw fields. Used by the collapsed hotkey view.
+    const HK_OP_TXT = { '<': '<', '<=': '≤', '>': '>', '>=': '≥', '=': '=', '!=': '≠' };
+    function hkOpTxt(op) { return HK_OP_TXT[op] || op || '≥'; }
+    // "Skill 3 (RButton)" / "Flask 1 (Q)" / "key X" — the bound output in short form.
+    function hkDescribeOutput(o) {
+      o = o || {};
+      const kind = o.kind || 'flask';
+      if (kind === 'skill') {
+        const s = (hkBindings.skillSlots || []).find(x => +x.slot === +o.slot);
+        return `Skill ${o.slot || 1}${s && s.key ? ` (${s.key})` : ''}`;
+      }
+      if (kind === 'key') return o.key ? `key ${o.key}` : 'no key';
+      const f = (hkBindings.flaskSlots || []).find(x => +x.slot === +o.slot);
+      return `Flask ${o.slot || 1}${f && f.key ? ` (${f.key})` : ''}`;
+    }
+    // One condition action in plain words, or '' for non-condition actions.
+    function hkDescribeAction(a) {
+      if (!a) return '';
+      switch (a.type) {
+        case 'vitals':
+          return `${a.resource || 'life'} ${hkOpTxt(a.op)} ${a.value != null ? a.value : 0}%`;
+        case 'buff':
+          return `${a.buffName ? hkBuffLabel(a.buffName) : 'any buff'} ${a.mode === 'absent' ? 'absent' : 'present'}`;
+        case 'charges':
+          return `${a.chargeType || 'power'} charges ${hkOpTxt(a.op)} ${a.value != null ? a.value : 0}`;
+        case 'monsterCount': {
+          const mode = a.radiusMode || 'player';
+          const isWorld = (mode === 'world' || mode === 'worldCursor');
+          const r = isWorld ? (a.worldRadius != null ? a.worldRadius : 1000) : (a.radius != null ? a.radius : 120);
+          const where = (mode === 'cursor' || mode === 'worldCursor') ? 'cursor' : 'player';
+          const rar = (a.rarity && a.rarity !== 'any') ? `${a.rarity} ` : '';
+          const n = a.value != null ? a.value : 1;
+          return `${hkOpTxt(a.op)}${n} ${rar}monster${+n === 1 ? '' : 's'} within ${r} ${isWorld ? 'range' : 'px'} of ${where}`;
+        }
+      }
+      return '';
+    }
+    // Full collapsed line: bound output + the conditions that gate it, in plain words.
+    function hkDescribeHotkey(hk) {
+      const acts = Array.isArray(hk.actions) ? hk.actions : [];
+      const conds = acts.map(hkDescribeAction).filter(Boolean);
+      const out = hkDescribeOutput(hk.output);
+      if (conds.length) return `${out} — if ${conds.join(' and ')}`;
+      return hk.trigger === 'automated' ? `${out} — always` : out;
+    }
+
     function hkRenderHotkey(hk, gi, hi) {
       const mods = hk.mods || {};
       const keyLabel = hk.key ? hkEsc(hk.key) : 'Set key';
       const acts = Array.isArray(hk.actions) ? hk.actions : [];
       const open = !hkCollapsed.has('h:' + hk.id);
+      const advOpen = hkAdvOpen.has(hk.id);
       const actHtml = acts.length
         ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
+            <span class="hk-spacer"></span>
+            <span class="hk-adv-toggle" title="Focus / safe-zone / pass-through options (rarely changed)" onclick="hkToggleAdv(${hk.id})">${advOpen ? '▾' : '▸'} Advanced</span>
+          </div>
+          ${advOpen ? `<div class="hk-row hk-adv">
             <span class="hk-chk-group">
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)"><span class="toggle-slider"></span></label>Focus (game foreground only)</span>
@@ -6188,7 +6255,7 @@
               <span class="hk-cap" title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><label class="toggle"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)"><span class="toggle-slider"></span></label>Pass through native key</span>
             </span>
-          </div>
+          </div>` : ''}
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
             <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
@@ -6202,7 +6269,7 @@
             </select>
             <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
-          </div>` : '';
+          </div>` : `<div class="hk-summary" title="Click to expand" onclick="hkToggle('h:${hk.id}')">${hkEsc(hkDescribeHotkey(hk))}</div>`;
       return `
         <div class="hk-card${hkBool(hk.enabled) ? '' : ' hk-off'}" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
           <div class="hk-row">
@@ -6231,7 +6298,6 @@
             <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)"><span class="toggle-slider"></span></label>LT</span>`}
             <span class="hk-spacer"></span>
-            ${!open ? `<span class="hk-id" style="margin-right:4px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>` : ''}
             <button class="hk-btn danger hk-always" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           ${body}
