@@ -389,6 +389,19 @@ AtlasDumpDebug(reader, snap)
             txt .= _AtlasScanVectors(reader, p, 0x800)
         }
 
+        ; ── Decisive check: read GameHelper2 node fields from each candidate panel.
+        ; The atlas is whichever panel's children have valid mapData/biome/grid.
+        txt .= "`n=== atlas node-field probe (mapData 0x2A0 / biome 0x2CE / status 0x2CF / grid 0x320 / conn 0x5A8) ===`n"
+        txt .= "Atlas [22,0,6]:`n"
+        txt .= at ? _AtlasProbeNodeFields(reader, at, 8) : "  (path unresolved)`n"
+        pj := 1
+        while (pj <= Min(cand.Length, 5))
+        {
+            txt .= Format("cand#{} {}x{}:`n", pj, Round(cand[pj]["w"]), Round(cand[pj]["h"]))
+            txt .= _AtlasProbeNodeFields(reader, cand[pj]["ptr"], 6)
+            pj += 1
+        }
+
         FileAppend(txt, outPath, "UTF-8")
         return outPath
     }
@@ -587,6 +600,47 @@ _AtlasResolveUiRoot(reader, snap)
         return root
     root := reader.Mem.ReadPtr(addr + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
     return reader.IsProbablyValidPointer(root) ? root : 0
+}
+
+; Reads the GameHelper2 atlas-node fields from a panel's first children to verify
+; which candidate panel is the real endgame Atlas and that the offsets resolve to
+; sane values. Offsets (GameHelper2 ImportantUiElements.cs): mapData 0x2A0,
+; biomeId 0x2CE, status 0x2CF, gridPosition 0x320 (int,int), connections vec 0x5A8.
+; A real node has a valid mapData ptr, a small biome byte and plausible grid ints.
+_AtlasProbeNodeFields(reader, panelPtr, maxN := 8)
+{
+    ub := PoE2Offsets.UiElementBase
+    if !reader.IsProbablyValidPointer(panelPtr)
+        return "  (invalid panel)`n"
+    cf := reader.Mem.ReadInt64(panelPtr + ub["ChildrenFirst"])
+    cl := reader.Mem.ReadInt64(panelPtr + ub["ChildrenFirst"] + 8)
+    n := (cf > 0 && cl > cf) ? (cl - cf) // 8 : 0
+    out := Format("  panel 0x{:X}  children={}`n", panelPtr, n)
+    i := 0
+    while (i < n && i < maxN)
+    {
+        c := reader.Mem.ReadPtr(cf + i * 8)
+        if reader.IsProbablyValidPointer(c)
+        {
+            mapData := reader.Mem.ReadPtr(c + 0x2A0)
+            biome := reader.Mem.ReadUChar(c + 0x2CE)
+            status := reader.Mem.ReadUChar(c + 0x2CF)
+            gp := reader.Mem.ReadBytes(c + 0x320, 8)
+            gx := gp ? NumGet(gp.Ptr, 0, "Int") : 0
+            gy := gp ? NumGet(gp.Ptr, 4, "Int") : 0
+            cvf := reader.Mem.ReadInt64(c + 0x5A8)
+            cvl := reader.Mem.ReadInt64(c + 0x5A8 + 8)
+            connBytes := (cvf > 0 && cvl > cvf && (cvl - cvf) < 0x10000) ? (cvl - cvf) : 0
+            w := reader.Mem.ReadFloat(c + ub["UnscaledSize"])
+            h := reader.Mem.ReadFloat(c + ub["UnscaledSize"] + 4)
+            out .= Format("  [{:2}] 0x{:X} sz={}x{} mapData={} biome={} st={} grid=({},{}) conn={}`n",
+                i, c, Round(w), Round(h),
+                (reader.IsProbablyValidPointer(mapData) ? Format("0x{:X}", mapData) : "-"),
+                biome, status, gx, gy, connBytes)
+        }
+        i += 1
+    }
+    return out
 }
 
 ; Walks a UiElement child-index path (e.g. [22,0,6]) from base via the children
