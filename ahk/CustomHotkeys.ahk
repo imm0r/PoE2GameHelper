@@ -669,10 +669,25 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
     }
     else if (t = "aim")
     {
-        px := a.Has("radius") ? (a["radius"] + 0) : 150
-        mode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
-        rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
-        rec["lines"].Push("aim radius " px "px @" mode)
+        mode := a.Has("radiusMode") ? a["radiusMode"] : "player"
+        if (mode = "world")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            rec["circlePlayerWorld"] := wr
+            rec["lines"].Push("aim @range(" wr ")")
+        }
+        else if (mode = "worldCursor")
+        {
+            wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
+            rec["circleCursorWorld"] := wr
+            rec["lines"].Push("aim @cursorRange(" wr ")")
+        }
+        else
+        {
+            px := a.Has("radius") ? (a["radius"] + 0) : 150
+            rec[(mode = "cursor") ? "circleCursorPx" : "circlePlayerPx"] := px
+            rec["lines"].Push("aim radius " px "px @" mode)
+        }
     }
     else if (t = "charges")
     {
@@ -1693,22 +1708,38 @@ _HotkeysDoAim(hk, a, snap)
     return true
 }
 
-; Selects the nearest entity matching the aim filter within a screen-pixel
-; radius of the chosen origin (mouse cursor or the player's on-screen position).
+; Selects the nearest entity matching the aim filter within the configured
+; radius of the chosen origin. Mirrors the monster-count radius modes:
+;   "cursor"/"player" → screen-pixel radius (iso projection, action "radius");
+;   "world"           → world-unit distance to the PLAYER (action "worldRadius");
+;   "worldCursor"     → world-unit distance to the cursor's ground point (exp.).
 ; Returns Map("x","y","z") of the target world position, or 0.
 _HotkeysSelectAimTarget(a, snap)
 {
-    radius := a.Has("radius") ? (a["radius"] + 0) : 150
     scanAll := a.Has("scanAll") && a["scanAll"]
     targetType := a.Has("targetType") ? a["targetType"] : "monster"
-    ; Radius origin: pixel distance measured either from the cursor or from the
-    ; player's projected screen position (both in screen pixels).
-    originMode := (a.Has("radiusMode") && a["radiusMode"] = "cursor") ? "cursor" : "player"
-    worldPre := 4000   ; cheap world pre-filter before projecting
+    mode := a.Has("radiusMode") ? a["radiusMode"] : "player"
+    isWorld := (mode = "world" || mode = "worldCursor")
+    radius := isWorld
+        ? (a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000)
+        : (a.Has("radius") ? (a["radius"] + 0) : 150)
+    worldPre := 4000   ; cheap world pre-filter before measuring
 
-    octx := _HotkeysPxOrigin(snap, originMode)
-    if !octx
-        return 0
+    ; Distance origin per mode: iso px-origin (cursor/player) or the cursor's
+    ; unprojected ground point (worldCursor); "world" uses entry["distance"].
+    octx := 0, cwp := 0
+    if (mode = "worldCursor")
+    {
+        cwp := _HotkeysCursorWorldPos(snap)
+        if !cwp
+            return 0
+    }
+    else if (mode != "world")
+    {
+        octx := _HotkeysPxOrigin(snap, (mode = "cursor") ? "cursor" : "player")
+        if !octx
+            return 0
+    }
 
     bestDist := radius + 1
     best := 0
@@ -1731,7 +1762,15 @@ _HotkeysSelectAimTarget(a, snap)
         wy := wp.Has("y") ? wp["y"] : 0
         wz := wp.Has("z") ? wp["z"] : 0
 
-        metric := _HotkeysPxDist(octx, wx, wy, wz)
+        if (mode = "world")
+            metric := dist
+        else if (mode = "worldCursor")
+        {
+            ddx := wx - cwp["x"], ddy := wy - cwp["y"]
+            metric := Sqrt(ddx * ddx + ddy * ddy)
+        }
+        else
+            metric := _HotkeysPxDist(octx, wx, wy, wz)
         if (metric < 0 || metric > radius)
             continue
         if (metric < bestDist)

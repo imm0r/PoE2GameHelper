@@ -6668,10 +6668,16 @@
           const pressed = !!a.press;
           const holdBlock = `<span class="${pressed ? '' : 'hk-disabled'}" title="${pressed ? 'How long to hold the output key down after aiming, in milliseconds' : 'Enable "Press key" to use Hold(ms)'}">`
                + `Hold(ms) ${hkNum(a, 'holdMs', 0, gi, hi, ai, 'How long to hold the output key down after aiming, in milliseconds')}</span>`;
+          // Radius field swaps px ↔ world range with the mode, like monster count.
+          const aimMode = a.radiusMode || 'player';
+          const aimWorld = (aimMode === 'world' || aimMode === 'worldCursor');
+          const aimRadiusField = aimWorld
+            ? `Range ${hkNum(a, 'worldRadius', 1000, gi, hi, ai, 'Search radius in world units (zoom-independent — matches the actual game distance; no scale tuning needed)')} `
+            : `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai, 'Search radius in screen pixels (depends on the world-to-screen scale)')} `;
           body = `Target ${targetSel} ${filt}`
-               + `Radius(px) ${hkNum(a, 'radius', 150, gi, hi, ai, 'Radius in screen pixels to search for an aim target')} `
-               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player']], gi, hi, ai, 'Measure the radius around the mouse cursor or around the player')} `
-               + `${hkChk(a, 'press', 'Press key', gi, hi, ai, 'After aiming, also press the output key (enables Hold(ms))')} `
+               + aimRadiusField
+               + `${hkSel(a, 'radiusMode', [['cursor', 'around cursor (px)'], ['player', 'around player (px)'], ['world', 'around player (range)'], ['worldCursor', 'around cursor (range) ⚠ experimental']], gi, hi, ai, 'Pixel radius (cursor/player) or a zoom-independent world-unit range around the player (or — experimental — around the cursor)')} `
+               + `${hkChk(a, 'press', 'Press key', gi, hi, ai, 'After aiming, also press the output key (enables Hold(ms)). Off = the cursor just moves and the bound output still fires once.')} `
                + holdBlock;
           break;
         }
@@ -6823,7 +6829,7 @@
         case 'buff':         return { type, buffName: '', mode: 'present', minStacks: 0, minTimeLeftMs: 0 };
         case 'charges':      return { type, chargeType: 'power', op: '>=', value: 1 };
         case 'monsterCount': return { type, rarity: 'any', radiusMode: 'player', radius: 120, op: '>=', value: 1 };
-        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 150, radiusMode: 'cursor', chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
+        case 'aim':          return { type, targetType: 'monster', rarity: 'any', radius: 150, worldRadius: 1000, radiusMode: 'cursor', chestType: '', chestTypeCustom: 0, name: '', metadataPath: '', press: 1, holdMs: 0, scanAll: 0 };
         default:             return { type: 'key', mode: 'press' };
       }
     }
