@@ -6274,10 +6274,11 @@
     // Full collapsed line: bound output + the boolean condition that gates it.
     function hkDescribeHotkey(hk) {
       const out = hkDescribeOutput(hk.output);
+      const cd = (hk.cooldownMs > 0) ? ` · cd ${hk.cooldownMs}ms` : '';
       let cond = hkDescribeCondNode(hk.conditions);
       if (cond.startsWith('(') && cond.endsWith(')')) cond = cond.slice(1, -1); // drop root parens
-      if (cond) return `${out} — if ${cond}`;
-      return hk.trigger === 'automated' ? `${out} — always` : out;
+      if (cond) return `${out} — if ${cond}${cd}`;
+      return (hk.trigger === 'automated' ? `${out} — always` : out) + cd;
     }
 
     function hkRenderHotkey(hk, gi, hi) {
@@ -6292,6 +6293,7 @@
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
+            <span class="hk-cap" title="Custom cooldown: minimum time (ms) between firings. Use this when the output's real cooldown can't be detected — a Raw key, or a skill the reader doesn't recognise (e.g. Orb of Storms). 0 = auto (a Skill output uses its own cooldown; otherwise just the default throttle).">Cooldown(ms) <input type="number" min="0" style="width:64px" value="${hk.cooldownMs != null ? hkEsc(hk.cooldownMs) : 0}" onchange="hkSetHk(${gi},${hi},'cooldownMs',Math.max(0,+this.value||0))"></span>
             <span class="hk-spacer"></span>
             ${advOpen ? `<span class="hk-chk-group hk-adv">
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}

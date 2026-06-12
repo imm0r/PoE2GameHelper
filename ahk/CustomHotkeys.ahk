@@ -167,6 +167,13 @@ _HotkeysNormalizeHotkey(hk)
     trigger := hk.Has("trigger") ? hk["trigger"] : (hasCond ? "automated" : "manual")
     if (trigger != "automated" && trigger != "manual")
         trigger := "manual"
+    ; Custom cooldown (ms): minimum time between firings. 0 = off (a skill output
+    ; still uses its own detected cooldown; raw keys / undetected skills use only
+    ; the default throttle). Lets the user gate outputs whose real cooldown the
+    ; reader can't see (e.g. Orb of Storms on a raw key).
+    cooldownMs := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+    if (cooldownMs < 0)
+        cooldownMs := 0
     return Map(
         "id", id,
         "name", hk.Has("name") ? hk["name"] : ("Hotkey #" id),
@@ -178,6 +185,7 @@ _HotkeysNormalizeHotkey(hk)
         "key", hk.Has("key") ? hk["key"] : "",
         "output", output,
         "mods", mods,
+        "cooldownMs", cooldownMs,
         "actions", actions,
         "conditions", conditions
     )
@@ -513,6 +521,11 @@ HotkeysEvaluateTick()
             rdy := _HotkeysOutputReadiness(hk)
             if (rdy["cooldownMs"] > minGap)
                 minGap := rdy["cooldownMs"]
+            ; User-set custom cooldown raises the gap too (authoritative for
+            ; outputs whose real cooldown can't be detected).
+            cd := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+            if (cd > minGap)
+                minGap := cd
             if ((A_TickCount - rt["lastAutoFire"]) < minGap)
                 continue
 
@@ -864,7 +877,7 @@ _HotkeysRuntime(id)
     global g_hkRuntime
     if !g_hkRuntime.Has(id)
         g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0
-                             , "lastFireTick", 0, "lastFireKey", "")
+                             , "lastFireTick", 0, "lastFireKey", "", "lastCooldownFire", 0)
     return g_hkRuntime[id]
 }
 
@@ -1060,6 +1073,19 @@ _HotkeysRunActions(hk, context, depth)
     ; and automated firing alike.
     if !_HotkeysActionsWouldRun(hk)
         return
+    ; Custom cooldown gate: once the conditions pass, never run the effects more
+    ; than once per cooldownMs (user-set; 0 = off). This is the single choke
+    ; point for every firing path — manual key, automated tick, and chains — so
+    ; an output with no detectable cooldown (raw key / unrecognised skill) can
+    ; still be rate-limited by the user.
+    cd := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+    if (cd > 0)
+    {
+        rt := _HotkeysRuntime(hk["id"])
+        if ((A_TickCount - rt["lastCooldownFire"]) < cd)
+            return
+        rt["lastCooldownFire"] := A_TickCount
+    }
     snap := _HotkeysSnap()
     hadEffect := false
     for a in hk["actions"]
