@@ -5350,7 +5350,12 @@
         .hk-summary:hover { color: var(--codex-gold-hi); }
         .hk-adv-toggle { cursor: pointer; color: var(--codex-text-dim); font-size: 11px; font-family: var(--codex-display); letter-spacing: 0.08em; text-transform: uppercase; user-select: none; white-space: nowrap; }
         .hk-adv-toggle:hover { color: var(--codex-gold); }
-        .hk-adv { margin-top: 2px; }
+        .hk-adv { margin-right: 6px; }
+        /* Keep names / condition labels on the same optical line as their neighbours:
+           one shared line-height, and the borderless name inputs carry no extra vertical
+           padding (so their text box hugs the line instead of sitting taller/lower). */
+        #panel-hotkeys .hk-row > *, #panel-hotkeys .hk-action > * { line-height: 1.25; }
+        #panel-hotkeys .hk-card-name, #panel-hotkeys .hk-group-name { padding-top: 0; padding-bottom: 0; }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
@@ -6244,18 +6249,16 @@
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
             <span class="hk-spacer"></span>
-            <span class="hk-adv-toggle" title="Focus / safe-zone / pass-through options (rarely changed)" onclick="hkToggleAdv(${hk.id})">${advOpen ? '▾' : '▸'} Advanced</span>
-          </div>
-          ${advOpen ? `<div class="hk-row hk-adv">
-            <span class="hk-chk-group">
+            ${advOpen ? `<span class="hk-chk-group hk-adv">
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)"><span class="toggle-slider"></span></label>Focus (game foreground only)</span>
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)"><span class="toggle-slider"></span></label>Disable in safe zone</span>
               <span class="hk-cap" title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><label class="toggle"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)"><span class="toggle-slider"></span></label>Pass through native key</span>
-            </span>
-          </div>` : ''}
+            </span>` : ''}
+            <span class="hk-adv-toggle" title="Focus / safe-zone / pass-through options (rarely changed)" onclick="hkToggleAdv(${hk.id})">${advOpen ? '▾' : '▸'} Advanced</span>
+          </div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
             <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
