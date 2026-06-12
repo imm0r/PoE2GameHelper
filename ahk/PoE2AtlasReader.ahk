@@ -924,7 +924,13 @@ _AtlasElemScreenPos(reader, elemPtr, rect)
         usX := lm * sfX, usY := lm * sfY
     else
         usX := lm, usY := lm
-    return Map("x", rect["x"] + accX * usX, "y", rect["y"] + accY * usY)
+    ; Use the element CENTRE (top-left + half size), matching the plugin's
+    ; GetClientRect().Center, so markers sit on the node icons rather than their
+    ; top-left corner.
+    sizeW := reader.Mem.ReadFloat(elemPtr + ub["UnscaledSize"])
+    sizeH := reader.Mem.ReadFloat(elemPtr + ub["UnscaledSize"] + 4)
+    return Map("x", rect["x"] + (accX + sizeW * 0.5) * usX,
+               "y", rect["y"] + (accY + sizeH * 0.5) * usY)
 }
 
 ; Per-tick (throttled, self-gated) builder that bridges the reader to the radar's
