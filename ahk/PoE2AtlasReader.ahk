@@ -402,6 +402,36 @@ AtlasDumpDebug(reader, snap)
     return outPath
 }
 
+; Peeks the first element of a candidate vector to classify it (address-
+; independent). For an 8-byte (pointer) stride it derefs entry[0] and reports
+; whether it looks like a UiElement (valid parent ptr) plus its size and any
+; style/string at 0xF8; for wider strides it shows the inline element's leading
+; int64 / float fields (e.g. grid or world coordinates). Returns a short label.
+_AtlasPeekEntry(reader, first, stride)
+{
+    ub := PoE2Offsets.UiElementBase
+    if (stride = 8)
+    {
+        p := reader.Mem.ReadPtr(first)
+        if !reader.IsProbablyValidPointer(p)
+            return Format("[0]=0x{:X} (non-ptr)", p)
+        par := reader.Mem.ReadPtr(p + ub["ParentPtr"])
+        sid := ""
+        try sid := reader.ReadStdWStringAt(p + ub["StringIdPtr"], 32)
+        kind := reader.IsProbablyValidPointer(par) ? "elem" : "obj "
+        w := reader.Mem.ReadFloat(p + ub["UnscaledSize"])
+        h := reader.Mem.ReadFloat(p + ub["UnscaledSize"] + 4)
+        return Format("[0]->0x{:X} {} sz={}x{} sid='{}'", p, kind, Round(w), Round(h), sid)
+    }
+    b := reader.Mem.ReadBytes(first, 0x20)
+    if !b
+        return "[0]=read-fail"
+    return Format("[0] i64=0x{:X},0x{:X} f=[{:.1f},{:.1f},{:.1f},{:.1f}]",
+        NumGet(b.Ptr, 0, "Int64"), NumGet(b.Ptr, 8, "Int64"),
+        NumGet(b.Ptr, 0, "Float"), NumGet(b.Ptr, 4, "Float"),
+        NumGet(b.Ptr, 8, "Float"), NumGet(b.Ptr, 12, "Float"))
+}
+
 ; Scans a struct for StdVector-like (first,last) pointer pairs: both heap ptrs,
 ; last > first, span divisible by a plausible element stride with a sane element
 ; count. Returns formatted lines — used to locate the atlas node array inside a
@@ -429,8 +459,8 @@ _AtlasScanVectors(reader, base, range := 0x800)
                     cnt := span // st
                     if (cnt >= 4 && cnt <= 8000)
                     {
-                        out .= Format("  +0x{:03X}: first=0x{:X} last=0x{:X} span=0x{:X} stride=0x{:02X} count={}`n",
-                            off, v0, v1, span, st, cnt)
+                        out .= Format("  +0x{:03X}: first=0x{:X} stride=0x{:02X} count={:5}  {}`n",
+                            off, v0, st, cnt, _AtlasPeekEntry(reader, v0, st))
                         break
                     }
                 }
