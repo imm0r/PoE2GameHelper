@@ -669,6 +669,12 @@ _HotkeysCountByRarity(snap, radius, mode)
         entity := entry.Has("entity") ? entry["entity"] : 0
         if !(entity && entity is Map)
             continue
+        ; Only count actual monsters — not portals, checkpoints, NPCs, chests, decals or
+        ; effects (which can also be "targetable"). Mirrors the aim "monster" classifier:
+        ; the entity path must live under metadata/monsters/.
+        pathLower := entity.Has("path") ? StrLower(entity["path"]) : ""
+        if !InStr(pathLower, "metadata/monsters/")
+            continue
         dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
         if !(dc && dc is Map) || !_HotkeysIsTargetable(dc)
             continue
