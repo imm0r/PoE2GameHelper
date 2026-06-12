@@ -515,6 +515,36 @@ AtlasDumpDebug(reader, snap)
         cvOff, cvBytes, cvBytes // 16)
     if (cvBytes >= 16)
     {
+        ; Coverage check: how many edges reference grids that exist in the read node
+        ; set. bothPresent should be drawable; missing endpoints mean the vector
+        ; references non-instantiated nodes (off the loaded region).
+        gridSet := Map()
+        for _, nd in nodes
+            gridSet[nd["gridX"] "," nd["gridY"]] := 1
+        eAll := reader.Mem.ReadBytes(cvf, Min(cvBytes, 16 * 4000))
+        both := 0, srcMiss := 0, dstMiss := 0, total := 0
+        if eAll
+        {
+            e := 0, lim := Min(cvBytes // 16, 4000)
+            while (e < lim)
+            {
+                sk := NumGet(eAll.Ptr, e*16+0, "Int") "," NumGet(eAll.Ptr, e*16+4, "Int")
+                dk := NumGet(eAll.Ptr, e*16+8, "Int") "," NumGet(eAll.Ptr, e*16+12, "Int")
+                hasS := gridSet.Has(sk), hasD := gridSet.Has(dk)
+                if (hasS && hasD)
+                    both += 1
+                else if (!hasS && !hasD)
+                    srcMiss += 1, dstMiss += 1
+                else if (!hasS)
+                    srcMiss += 1
+                else
+                    dstMiss += 1
+                total += 1
+                e += 1
+            }
+        }
+        txt .= Format("edge coverage (vs {} read nodes): both={} srcMiss={} dstMiss={} of {}`n",
+            nodes.Length, both, srcMiss, dstMiss, total)
         eb := reader.Mem.ReadBytes(cvf, Min(cvBytes, 16 * 6))
         if eb
         {
@@ -976,9 +1006,11 @@ TryBuildAtlasRender(snap)
         sp := _AtlasElemScreenPos(g_reader, nd["uiElemPtr"], rect)
         if !sp
             continue
-        ; Reject nodes that project well outside the window (off-screen / garbage).
-        if (sp["x"] < rect["x"] - 300 || sp["x"] > rect["x"] + rect["w"] + 300
-            || sp["y"] < rect["y"] - 300 || sp["y"] > rect["y"] + rect["h"] + 300)
+        ; Keep nodes within a generous margin (one full window beyond each edge) so
+        ; connection lines to just-off-screen neighbours still draw (clipped to the
+        ; window). Only truly absurd projections are rejected as garbage.
+        if (sp["x"] < rect["x"] - rect["w"] || sp["x"] > rect["x"] + 2 * rect["w"]
+            || sp["y"] < rect["y"] - rect["h"] || sp["y"] > rect["y"] + 2 * rect["h"])
             continue
         outNd := Map("x", sp["x"], "y", sp["y"], "gridX", nd["gridX"], "gridY", nd["gridY"],
             "name", nd["name"], "biomeId", nd["biomeId"],
