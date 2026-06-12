@@ -5349,6 +5349,11 @@
         .hk-summary { margin: 1px 0 1px 30px; padding: 1px 0; font-family: var(--codex-serif); font-size: 12.5px; font-style: italic; color: #cbb88a; cursor: pointer; }
         .hk-summary:hover { color: var(--codex-gold-hi); }
         .hk-adv-toggle { cursor: pointer; color: var(--codex-text-dim); font-size: 11px; font-family: var(--codex-display); letter-spacing: 0.08em; text-transform: uppercase; user-select: none; white-space: nowrap; }
+        .hk-adv-toggle:hover { color: var(--codex-gold-hi); }
+        /* "+ Add ..." pickers collapse behind this toggle (like Advanced). Give it
+           a faint gilded border so it reads as a button. */
+        .hk-add-toggle { color: var(--codex-gold); border: 1px solid var(--codex-rule); border-radius: 1px; padding: 4px 9px; }
+        .hk-add-toggle:hover { border-color: var(--codex-gold); }
         .hk-adv-toggle:hover { color: var(--codex-gold); }
         .hk-adv { margin-right: 6px; }
         /* Keep names / condition labels on the same optical line as their neighbours:
@@ -6218,6 +6223,25 @@
       if (hkAdvOpen.has(id)) hkAdvOpen.delete(id); else hkAdvOpen.add(id);
       hkRender();
     }
+    // Collapsed-by-default "add" rows (condition / effect pickers). Keyed by
+    // 'c:'+groupCid (condition add row) or 'a:'+hotkeyId (effect add row); they
+    // auto-collapse again once an item is added (see hkAddCond/Group/Action).
+    let hkAddOpen = new Set();
+    function hkToggleAdd(key) {
+      if (hkAddOpen.has(key)) hkAddOpen.delete(key); else hkAddOpen.add(key);
+      hkRender();
+    }
+    // Custom-cooldown field — only meaningful for a Raw key output (a Skill
+    // output gates on its own detected cooldown, a flask on charges). Uses the
+    // themed ▲▼ stepper so it matches the other number fields.
+    function hkCooldownField(hk, gi, hi) {
+      if (!hk.output || hk.output.kind !== 'key') return '';
+      const v = hk.cooldownMs != null ? hkEsc(hk.cooldownMs) : 0;
+      return `<span class="hk-cap" title="Custom cooldown: minimum time (ms) between firings for this raw key (e.g. Orb of Storms, whose cooldown the reader can't detect). 0 = just the default throttle.">Cooldown(ms) `
+           + `<span class="hk-num"><input type="number" min="0" value="${v}" onchange="hkSetHk(${gi},${hi},'cooldownMs',Math.max(0,+this.value||0))">`
+           + `<span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span></span>`;
+    }
 
     // ── Plain-language summaries (Hotkeys overview) ──────────────────────────
     // Readable one-liners so a collapsed hotkey reads at a glance instead of as a
@@ -6287,13 +6311,14 @@
       const acts = Array.isArray(hk.actions) ? hk.actions : [];
       const open = !hkCollapsed.has('h:' + hk.id);
       const advOpen = hkAdvOpen.has(hk.id);
+      const actAddOpen = hkAddOpen.has('a:' + hk.id);
       const actHtml = acts.length
         ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
-            <span class="hk-cap" title="Custom cooldown: minimum time (ms) between firings. Use this when the output's real cooldown can't be detected — a Raw key, or a skill the reader doesn't recognise (e.g. Orb of Storms). 0 = auto (a Skill output uses its own cooldown; otherwise just the default throttle).">Cooldown(ms) <input type="number" min="0" style="width:64px" value="${hk.cooldownMs != null ? hkEsc(hk.cooldownMs) : 0}" onchange="hkSetHk(${gi},${hi},'cooldownMs',Math.max(0,+this.value||0))"></span>
+            ${hkCooldownField(hk, gi, hi)}
             <span class="hk-spacer"></span>
             ${advOpen ? `<span class="hk-chk-group hk-adv">
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
@@ -6309,13 +6334,14 @@
           <div class="hk-conds-title" style="margin-top:6px" title="Run when the conditions above pass. No effect = the bound output fires once.">Effects</div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <select id="hk-addact-${gi}-${hi}" title="Pick which effect action to add, then click + Action. (Conditions are added in the Conditions box above.)">
+            <span class="hk-adv-toggle hk-add-toggle" title="Add an effect action (key / chain / auto-aim)" onclick="hkToggleAdd('a:${hk.id}')">${actAddOpen ? '▾' : '＋'} Add action</span>
+            ${actAddOpen ? `<select id="hk-addact-${gi}-${hi}" title="Pick which effect action to add, then click + Action. (Conditions are added in the Conditions box above.)">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
             <button class="hk-btn" title="Add the selected effect action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
-            <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
+            <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>` : ''}
           </div>` : `<div class="hk-summary" title="Click to expand" onclick="hkToggle('h:${hk.id}')">${hkEsc(hkDescribeHotkey(hk))}</div>`;
       return `
         <div class="hk-card${hkBool(hk.enabled) ? '' : ' hk-off'}" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
@@ -6882,11 +6908,13 @@
       const leaf = hkActionDefaults(sel ? sel.value : 'vitals');
       leaf.cid = hkNewCid();
       f.node.children.push(leaf);
+      hkAddOpen.delete('c:' + cid);   // collapse the add row again
       hkChanged();
     }
     function hkAddCondGroup(gi, hi, cid) {
       const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
       f.node.children.push({ kind: 'group', mode: 'any', cid: hkNewCid(), children: [] });
+      hkAddOpen.delete('c:' + cid);   // collapse the add row again
       hkChanged();
     }
     function hkDelCond(gi, hi, cid) {
@@ -6949,16 +6977,19 @@
           + `<option value="all" ${mode === 'all' ? 'selected' : ''}>ALL (and)</option>`
           + `<option value="any" ${mode === 'any' ? 'selected' : ''}>ANY (or)</option></select>`;
       const del = isRoot ? '' : `<button class="hk-btn danger" title="Remove this group and everything in it" onclick="hkDelCond(${gi},${hi},${cid})">✕ group</button>`;
+      const addOpen = hkAddOpen.has('c:' + cid);
+      const addCtrls = addOpen ? `<select id="hk-addcond-${cid}" title="Pick a condition type to add">
+            <option value="vitals">Vitals</option><option value="buff">Buff</option>
+            <option value="charges">Charges</option><option value="monsterCount">Monster count</option>
+          </select>
+          <button class="hk-btn" title="Add the selected condition to this group" onclick="hkAddCond(${gi},${hi},${cid})">+ Condition</button>
+          <button class="hk-btn" title="Add a nested group — a bracket — with its own ALL/ANY" onclick="hkAddCondGroup(${gi},${hi},${cid})">+ Group ( )</button>` : '';
       return `<div class="hk-cgroup${mode === 'any' ? ' hk-cgroup-any' : ''}">
         <div class="hk-cgroup-head"><span class="hk-cgroup-lbl">Match ${modeSel} of:</span>${del}</div>
         <div class="hk-cgroup-body">${childHtml}</div>
         <div class="hk-cgroup-add">
-          <select id="hk-addcond-${cid}" title="Pick a condition type to add">
-            <option value="vitals">Vitals</option><option value="buff">Buff</option>
-            <option value="charges">Charges</option><option value="monsterCount">Monster count</option>
-          </select>
-          <button class="hk-btn" title="Add a condition to this group" onclick="hkAddCond(${gi},${hi},${cid})">+ Condition</button>
-          <button class="hk-btn" title="Add a nested group — a bracket — with its own ALL/ANY" onclick="hkAddCondGroup(${gi},${hi},${cid})">+ Group ( )</button>
+          <span class="hk-adv-toggle hk-add-toggle" title="Add a condition or a nested group (bracket)" onclick="hkToggleAdd('c:${cid}')">${addOpen ? '▾' : '＋'} Add condition</span>
+          ${addCtrls}
         </div>
       </div>`;
     }
@@ -7009,6 +7040,7 @@
       const sel = document.getElementById('hk-addact-' + gi + '-' + hi);
       const type = sel ? sel.value : 'key';
       hkConfig[gi].hotkeys[hi].actions.push(hkActionDefaults(type));
+      hkAddOpen.delete('a:' + hkConfig[gi].hotkeys[hi].id);   // collapse the add row again
       hkChanged();
     }
     function hkDelAction(gi, hi, ai) { hkConfig[gi].hotkeys[hi].actions.splice(ai, 1); hkChanged(); }
