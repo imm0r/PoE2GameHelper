@@ -320,6 +320,7 @@ AtlasDumpDebug(reader, snap)
             ti += 1
         }
         txt .= "`n--- root-struct offsets holding the atlas container chain ---`n"
+        rootHits := []
         buf := reader.Mem.ReadBytes(root, 0x1600)
         if !buf
             txt .= "  (could not read root struct)`n"
@@ -332,12 +333,37 @@ AtlasDumpDebug(reader, snap)
                 if wanted.Has(v)
                 {
                     txt .= Format("  root+0x{:04X} -> 0x{:X}  ({})`n", off, v, wanted[v])
+                    rootHits.Push(v)
                     found += 1
                 }
                 off += 8
             }
             if !found
                 txt .= "  (no chain pointer in root+0..0x1600 — panel attaches deeper)`n"
+        }
+
+        ; ── Locate the node array: scan each candidate panel struct for StdVector
+        ; (first,last) pairs, and report its UI-children count. The atlas node DATA
+        ; vector should surface as a vector with a large/plausible element count.
+        probe := []
+        seenP := Map()
+        for _, p in rootHits
+            if (!seenP.Has(p)) {
+                seenP[p] := 1
+                probe.Push(p)
+            }
+        for _, c in [cand.Length >= 1 ? cand[1]["ptr"] : 0, cand.Length >= 2 ? cand[2]["ptr"] : 0]
+            if (c && !seenP.Has(c)) {
+                seenP[c] := 1
+                probe.Push(c)
+            }
+        for _, p in probe
+        {
+            cf := reader.Mem.ReadInt64(p + 0x10)
+            cl := reader.Mem.ReadInt64(p + 0x18)
+            childN := (cf > 0 && cl > cf) ? (cl - cf) // 8 : 0
+            txt .= Format("`n--- vector scan @ 0x{:X} (uiChildren={}) ---`n", p, childN)
+            txt .= _AtlasScanVectors(reader, p, 0x800)
         }
 
         FileAppend(txt, outPath, "UTF-8")
@@ -374,6 +400,45 @@ AtlasDumpDebug(reader, snap)
 
     FileAppend(txt, outPath, "UTF-8")
     return outPath
+}
+
+; Scans a struct for StdVector-like (first,last) pointer pairs: both heap ptrs,
+; last > first, span divisible by a plausible element stride with a sane element
+; count. Returns formatted lines — used to locate the atlas node array inside a
+; panel struct without knowing the exact field offset. base/range define the scan.
+_AtlasScanVectors(reader, base, range := 0x800)
+{
+    buf := reader.Mem.ReadBytes(base, range + 16)
+    if !buf
+        return "  (read fail)`n"
+    strides := [8, 16, 0x18, 0x20, 0x28, 0x30, 0x38, 0x40, 0x48, 0x50]
+    out := ""
+    off := 0
+    while (off < range)
+    {
+        v0 := NumGet(buf.Ptr, off, "Int64")
+        v1 := NumGet(buf.Ptr, off + 8, "Int64")
+        if (reader.IsProbablyValidPointer(v0) && reader.IsProbablyValidPointer(v1)
+            && v1 > v0 && (v1 - v0) < 0x400000)
+        {
+            span := v1 - v0
+            for _, st in strides
+            {
+                if (Mod(span, st) = 0)
+                {
+                    cnt := span // st
+                    if (cnt >= 4 && cnt <= 8000)
+                    {
+                        out .= Format("  +0x{:03X}: first=0x{:X} last=0x{:X} span=0x{:X} stride=0x{:02X} count={}`n",
+                            off, v0, v1, span, st, cnt)
+                        break
+                    }
+                }
+            }
+        }
+        off += 8
+    }
+    return (out != "") ? out : "  (no vector-like pairs)`n"
 }
 
 ; True if s is a short, fully printable-ASCII string — filters WString-offset
