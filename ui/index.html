@@ -5505,7 +5505,8 @@
         .hk-btn.danger { color: var(--codex-blood-hi); }
         .hk-btn.danger:hover { border-color: var(--codex-blood-hi); color: #ff8d8d; box-shadow: 0 2px 6px -2px rgba(197,72,72,0.5); }
         /* Compact icon-only button (group header: add / export / delete). */
-        .hk-icon-btn { width: 24px; height: 24px; box-sizing: border-box; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; }
+        .hk-icon-btn { width: 28px; height: 28px; box-sizing: border-box; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-icon-btn .hk-ico { width: 18px; height: 18px; display: block; }
 
         .hk-spacer { margin-left: auto; }
         /* Action row tools (debug / export / remove): always pinned to the right
@@ -6219,9 +6220,9 @@
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
             <span class="hk-spacer"></span>
-            <button class="hk-btn hk-icon-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})">+</button>
-            <button class="hk-btn hk-icon-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">▾</button>
-            <button class="hk-btn hk-icon-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">✕</button>
+            <button class="hk-btn hk-icon-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+            <button class="hk-btn hk-icon-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="hk-btn hk-icon-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
           </div>
           ${body}
         </div>`;
