@@ -641,6 +641,7 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             counts := _HotkeysCountByRarity(snap, wr, "world")
             rec["counts"] := counts
             rec["lines"].Push("@range(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+            _HotkeysPushCountDiag(rec, snap, wr, "world")
         }
         else if (mode = "worldCursor")
         {
@@ -654,6 +655,7 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             counts := _HotkeysCountByRarity(snap, wr, "worldCursor")
             rec["counts"] := counts
             rec["lines"].Push("@cursorRange(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+            _HotkeysPushCountDiag(rec, snap, wr, "worldCursor")
         }
         else
         {
@@ -662,6 +664,7 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
             counts := _HotkeysCountByRarity(snap, px, mode)
             rec["counts"] := counts
             rec["lines"].Push("@" mode " N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
+            _HotkeysPushCountDiag(rec, snap, px, mode)
         }
     }
     else if (t = "aim")
@@ -807,6 +810,86 @@ _HotkeysCountByRarity(snap, radius, mode)
         out["total"] += 1
     }
     return out
+}
+
+; Debug breakdown for a monster-count gate: walks the same sample/filters as
+; _HotkeysCountByRarity but tallies how many entities pass each stage, so the
+; overlay can show WHY a count is 0. Returns Map("sample","mon","tgt","pos",
+; "inR","min") — min = the smallest distance seen (px for cursor/player, world
+; units for world modes), or -1 if none.
+_HotkeysCountDiag(snap, radius, mode)
+{
+    d := Map("sample", 0, "mon", 0, "tgt", 0, "pos", 0, "inR", 0, "min", -1)
+    if !snap
+        return d
+    octx := 0, cwp := 0
+    if (mode = "worldCursor")
+        cwp := _HotkeysCursorWorldPos(snap)
+    else if (mode != "world")
+        octx := _HotkeysPxOrigin(snap, mode)
+    for entry in _HotkeysAwakeSample(snap)
+    {
+        d["sample"] += 1
+        entity := entry.Has("entity") ? entry["entity"] : 0
+        if !(entity && entity is Map)
+            continue
+        if !InStr(entity.Has("path") ? StrLower(entity["path"]) : "", "metadata/monsters/")
+            continue
+        d["mon"] += 1
+        dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
+        if !(dc && dc is Map) || !_HotkeysIsTargetable(dc)
+            continue
+        d["tgt"] += 1
+        if (mode = "world")
+        {
+            dist := entry.Has("distance") ? entry["distance"] : -1
+            if (dist < 0)
+                continue
+            d["pos"] += 1
+            if (d["min"] < 0 || dist < d["min"])
+                d["min"] := Round(dist)
+            if (dist <= radius)
+                d["inR"] += 1
+            continue
+        }
+        render := dc.Has("render") ? dc["render"] : 0
+        wp := (render && render is Map && render.Has("worldPosition")) ? render["worldPosition"] : 0
+        if !(wp && wp is Map)
+            continue
+        d["pos"] += 1
+        if (mode = "worldCursor")
+        {
+            if !cwp
+                continue
+            ddx := (wp.Has("x") ? wp["x"] : 0) - cwp["x"]
+            ddy := (wp.Has("y") ? wp["y"] : 0) - cwp["y"]
+            dd := Sqrt(ddx * ddx + ddy * ddy)
+        }
+        else
+        {
+            if !octx
+                continue
+            dd := _HotkeysPxDist(octx, wp.Has("x") ? wp["x"] : 0, wp.Has("y") ? wp["y"] : 0, wp.Has("z") ? wp["z"] : 0)
+        }
+        if (d["min"] < 0 || dd < d["min"])
+            d["min"] := Round(dd)
+        if (dd <= radius)
+            d["inR"] += 1
+    }
+    return d
+}
+
+; Formats _HotkeysCountDiag into a readable overlay line and pushes it onto a
+; debug record. Reads: sample = entities scanned; mon = under metadata/monsters/;
+; tgt = also targetable; pos = also have a world position to project; inR = within
+; the radius; min = nearest distance seen (px for cursor/player, world units else).
+_HotkeysPushCountDiag(rec, snap, radius, mode)
+{
+    unit := (mode = "world" || mode = "worldCursor") ? "" : "px"
+    d := _HotkeysCountDiag(snap, radius, mode)
+    rec["lines"].Push("diag sample=" d["sample"] " mon=" d["mon"] " tgt=" d["tgt"]
+        . " pos=" d["pos"] " inR=" d["inR"] " min=" (d["min"] < 0 ? "-" : d["min"] unit)
+        . " (r=" radius unit ")")
 }
 
 ; Shared isometric projection origin for the radar-style ground projection used BOTH by the
