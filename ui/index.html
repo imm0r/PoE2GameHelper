@@ -6586,8 +6586,11 @@
     function hkDelGroup(gi) { hkConfig.splice(gi, 1); hkChanged(); }
     function hkSetGroup(gi, k, v) {
       hkConfig[gi][k] = v;
-      // Disabling a group also collapses it (keeps the list tidy).
-      if (k === 'enabled' && !v) hkCollapsed.add('g:' + gi);
+      // Disabling a group collapses it; enabling expands it again.
+      if (k === 'enabled') {
+        if (v) hkCollapsed.delete('g:' + gi);
+        else hkCollapsed.add('g:' + gi);
+      }
       hkChanged();
     }
 
@@ -6602,10 +6605,13 @@
     function hkDelHk(gi, hi) { hkConfig[gi].hotkeys.splice(hi, 1); hkChanged(); }
     function hkSetHk(gi, hi, k, v) {
       hkConfig[gi].hotkeys[hi][k] = v;
-      // Disabling a hotkey also collapses it (keyed by its stable id).
-      if (k === 'enabled' && !v) {
+      // Disabling a hotkey collapses it; enabling expands it again (keyed by its stable id).
+      if (k === 'enabled') {
         const hk = hkConfig[gi].hotkeys[hi];
-        if (hk && hk.id != null) hkCollapsed.add('h:' + hk.id);
+        if (hk && hk.id != null) {
+          if (v) hkCollapsed.delete('h:' + hk.id);
+          else hkCollapsed.add('h:' + hk.id);
+        }
       }
       hkChanged();
     }
