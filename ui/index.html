@@ -5285,7 +5285,7 @@
 
         /* Group — a chapter on raised parchment with a gold-on-brown frame. */
         .hk-group {
-          margin: 0 0 18px;
+          margin: 0 0 10px;
           border: 1px solid var(--codex-rule);
           border-radius: 1px;
           background:
@@ -5294,26 +5294,26 @@
           box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.5);
         }
         .hk-group-head {
-          display: flex; gap: 8px; align-items: center; padding: 9px 12px;
+          display: flex; gap: 8px; align-items: center; padding: 6px 12px;
           border-bottom: 1px solid var(--codex-rule);
           background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.05));
         }
         .hk-group-name {
           background: transparent; border: none; color: var(--codex-gold-hi);
           font-family: var(--codex-heading); letter-spacing: 0.02em; text-transform: none;
-          font-size: 18px; min-width: 140px;
+          font-size: 16px; min-width: 140px;
         }
         .hk-group-name:focus { outline: 1px solid var(--codex-gold); }
-        .hk-group-body { padding: 10px 12px; }
+        .hk-group-body { padding: 6px 12px; }
 
         /* Hotkey card — a parchment slip inside the chapter. */
         .hk-card {
           border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
-          padding: 8px 10px; margin-bottom: 8px;
+          padding: 5px 10px; margin-bottom: 5px;
           background: linear-gradient(180deg, rgba(20,12,6,0.55), rgba(10,6,4,0.6));
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
-        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 3px; }
         /* The per-hotkey option checkboxes ride on the Output row when wide, but
            wrap to the next line together (never split) when space runs short. */
         .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
@@ -5412,8 +5412,8 @@
           color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 5px; align-items: center;
         }
 
-        .hk-actions { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
-        .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
+        .hk-actions { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
+        .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 3px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
         .hk-action:last-child { border-bottom: none; }
         .hk-act-type {
           color: var(--codex-gold); font-family: var(--codex-display);
@@ -5455,6 +5455,12 @@
         .hk-dragover { outline: 2px dashed var(--codex-gold); outline-offset: 1px; }
         .hk-dragging { opacity: .45; }
         .hk-disabled { opacity: .4; pointer-events: none; }
+        /* A disabled hotkey card / group head: dim + lock every control, except the
+           ones tagged .hk-always (its enable toggle, collapse caret and delete button)
+           so you can still re-enable, peek at, or remove it. pointer-events is inherited,
+           so re-enabling the marked element also re-enables its inner input/slider. */
+        .hk-off { opacity: .5; pointer-events: none; }
+        .hk-off .hk-always { pointer-events: auto; }
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" title="Add a new hotkey group" onclick="hkAddGroup()">+ Add Group</button>
@@ -6132,11 +6138,11 @@
         : '';
       return `
         <div class="hk-group" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'group',${gi},0,0)">
-          <div class="hk-group-head">
-            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
+          <div class="hk-group-head${hkBool(g.enabled) ? '' : ' hk-off'}">
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder group"
                   ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label class="toggle" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
+            <label class="toggle hk-always" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
                    onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-group-name" value="${hkEsc(g.name)}"
                    onchange="hkSetGroup(${gi},'name',this.value)">
@@ -6144,7 +6150,7 @@
             <span class="hk-spacer"></span>
             <button class="hk-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
             <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
-            <button class="hk-btn danger" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">Delete group</button>
+            <button class="hk-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">Delete group</button>
           </div>
           ${body}
         </div>`;
@@ -6183,14 +6189,14 @@
             </select>
             <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
             <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
-          </div>` : `<span class="hk-id" style="margin-left:30px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>`;
+          </div>` : '';
       return `
-        <div class="hk-card" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
+        <div class="hk-card${hkBool(hk.enabled) ? '' : ' hk-off'}" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
           <div class="hk-row">
-            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
                   ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label class="toggle" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
+            <label class="toggle hk-always" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
@@ -6212,7 +6218,8 @@
             <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)"><span class="toggle-slider"></span></label>LT</span>`}
             <span class="hk-spacer"></span>
-            <button class="hk-btn danger" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
+            ${!open ? `<span class="hk-id" style="margin-right:4px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>` : ''}
+            <button class="hk-btn danger hk-always" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           ${body}
         </div>`;
