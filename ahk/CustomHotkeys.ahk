@@ -1554,46 +1554,31 @@ _HotkeysDoAim(hk, a, snap)
     if !target
         return
 
-    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-    w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-    prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-    pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-    pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
-    pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
-    pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
-
-    ; Aim clicks land in the 3D WORLD, so they MUST go through the live camera
-    ; world-to-screen matrix — the same discipline CombatAutomation uses. The
-    ; isometric fallback inside _WorldToScreen targets the radar/minimap layout
-    ; (player-centred iso), NOT the camera; clicking via it lands where the
-    ; entity shows ON THE MAP instead of on the actual monster. So require a
-    ; trustworthy camera anchor (valid 16-float matrix + the player projecting
-    ; near the screen centre) and skip the whole action when it isn't available
-    ; rather than fire a blind iso-fallback click.
+    ; Project the target to the screen with the SAME player-relative isometric
+    ; projection the radar dots, the range rings and the monster-count gate use
+    ; (_HotkeysIsoOrigin + the ex/ey formula from _HotkeysPxDist). The W2S camera
+    ; matrix proved unreliable for points away from the player (see the note on
+    ; RadarOverlay._DrawWorldRing), so an earlier matrix-based aim landed where
+    ; the entity shows on the map rather than on the monster. This iso projection
+    ; is centred on the player's on-screen position and is tunable via the Combat
+    ; "world-to-screen scale" slider (g_combatW2SScale), matching the visible ring.
+    octx := _HotkeysIsoOrigin(snap)
+    if !octx
+        return
+    dx := target["x"] - octx["px"]
+    dy := target["y"] - octx["py"]
+    screenX := Round(octx["psx"] + (dx - dy) * octx["sx"])
+    screenY := Round(octx["psy"] - (dx + dy) * octx["sy"])
+    ; Safety clamp to the game's client area (margin) so a bad projection can
+    ; never move the cursor onto another window / off-screen.
     rect := NavClientRect(gameHwnd)
-    if !(rect && w2sMatrix && Type(w2sMatrix) = "Array" && w2sMatrix.Length = 16 && pX != 0)
-        return
-    camAnchor := NavAnchor(pX, pY, pZ, w2sMatrix, rect)
-    if !camAnchor["ok"]
-        return
-
-    combatInfo := Map(
-        "nearestWorldX", target["x"],
-        "nearestWorldY", target["y"],
-        "nearestWorldZ", target["z"],
-        "w2sMatrix", w2sMatrix,
-        "playerWorldX", pX,
-        "playerWorldY", pY,
-        "playerWorldZ", pZ
-    )
-
-    ; Pass the anchor so behind-camera targets are rejected (w-sign) and any
-    ; off-screen result is clamped along the player ray, not the iso fallback.
-    screenPos := _WorldToScreen(combatInfo, gameHwnd, camAnchor)
-    if !screenPos
-        return
-    _MoveMouseToTarget(screenPos)
+    if (rect)
+    {
+        m := 4
+        screenX := Max(rect["x"] + m, Min(screenX, rect["x"] + rect["w"] - m))
+        screenY := Max(rect["y"] + m, Min(screenY, rect["y"] + rect["h"] - m))
+    }
+    _MoveMouseToTarget(Map("x", screenX, "y", screenY))
 
     if (a.Has("press") && a["press"])
     {
