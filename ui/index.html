@@ -5637,6 +5637,10 @@
       var m = document.getElementById('patch-modal');
       if (m) m.classList.remove('open');
     }
+    // Suppress the WebView's default right-click context menu everywhere in the
+    // app (it exposes browser actions like reload/save that don't belong here).
+    // Mouse-button capture uses mousedown, not contextmenu, so it still works.
+    window.addEventListener('contextmenu', function (e) { e.preventDefault(); }, true);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         var m = document.getElementById('patch-modal');
