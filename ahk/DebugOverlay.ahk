@@ -60,7 +60,7 @@ class DebugOverlay extends GdiOverlayBase
     ; Docked to the outer right edge; width follows the longest line.
     Layout(ctx)
     {
-        lines := this._BuildLines()
+        lines := this._BuildLines(ctx)
         this._lines := lines
         font := this._GetFont(DebugOverlay.FONT_HEIGHT, 400, DebugOverlay.FONT_FACE)
         maxW := 120
@@ -98,8 +98,9 @@ class DebugOverlay extends GdiOverlayBase
     ; ── Content ─────────────────────────────────────────────────────────────
     ; Builds the [text, colorBGR] line list. Same information the radar status
     ; block used to show, plus the current exploration target (coordinates and
-    ; straight-line distance) and the running build version.
-    _BuildLines()
+    ; straight-line distance), the entity under the cursor, and the build version.
+    ; Param: ctx - the overlay tick context (carries reader + snapshot).
+    _BuildLines(ctx := 0)
     {
         global g_autoPilotEnabled, g_autoPilotState, g_autoPilotReason
         global g_combatState, g_combatLastReason
@@ -198,6 +199,54 @@ class DebugOverlay extends GdiOverlayBase
 
         if (g_autoFlaskEnabled && g_autoFlaskLastReason != "" && g_autoFlaskLastReason != "idle")
             lines.Push(["FLASK  " g_autoFlaskLastReason, DebugOverlay.COL_GOLD])
+
+        ; ── MouseOver entity ─────────────────────────────────────────────────
+        ; The entity currently under the cursor, resolved via the game-state MouseOver
+        ; chain (monsters INCLUDED, unlike the world-object HoverTracker). When the
+        ; hovered entity is found in the radar snapshot, the rarity and life come from
+        ; its already-decoded components — otherwise just the name/type/id are shown.
+        if (IsObject(ctx))
+        {
+            reader := 0, snap := 0
+            try reader := ctx.reader
+            try snap   := ctx.snapshot
+            mo := 0
+            if (IsObject(reader) && IsObject(snap))
+                try mo := _FocusResolveMouseOverEntity(reader, snap)
+            if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
+            {
+                path := mo["path"]
+                ; Rarity/life come from the hovered entity's FRESH decode (see
+                ; _FocusResolveMouseOverEntity) — not the cached snapshot.
+                dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map")
+                    ? mo["decodedComponents"] : 0
+
+                ; Fields: Name resolves via monster_name_map.tsv (fallback: raw leaf);
+                ; Type = top-level category (NPC/Monsters/Chests); Group = the family
+                ; seed (3rd path segment, original case); Level = the @NN path suffix.
+                nm := ResolveMonsterDisplayName(path, _FocusLeaf(path))
+                lvl := ExtractEntityLevel(path)
+                idStr := mo.Has("id") ? mo["id"] : "?"
+                cat := ExtractMetaCategory(path)
+                rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
+                grp := RegExMatch(path, "i)metadata/[^/]+/([^/]+)", &gm) ? gm[1] : ""
+
+                ; Line 1: Name / Level / ID — left-justified columns keep them aligned.
+                line1 := "Name: " Format("{:-16s}", nm) "Level: " Format("{:-6s}", (lvl != "" ? lvl : "-")) "ID: " idStr
+                lines.Push([line1, DebugOverlay.COL_GOLD_HI])
+                ; Line 2: Type / Rarity / Group (Rarity column aligns under Level).
+                line2 := "Type: " Format("{:-16s}", (cat != "" ? cat : "?")) "Rarity: " Format("{:-10s}", (rarity != "" ? rarity : "-")) "Group: " (grp != "" ? grp : "-")
+                lines.Push([line2, DebugOverlay.COL_IVORY])
+                ; Line 3: Life "cur / max (pct%)" (omitted when the entity has no Life).
+                lifeLine := MouseOverLifeLine(dc)
+                if (lifeLine != "")
+                    lines.Push(["Life: " lifeLine, DebugOverlay.COL_GOLD])
+                ; Line 4: full metadata path, "Metadata" prefix + @NN level suffix stripped.
+                metaDisp := RegExReplace(path, "i)^metadata", "")
+                metaDisp := RegExReplace(metaDisp, "@\d+\s*$", "")
+                lines.Push(["Metadata: " metaDisp, DebugOverlay.COL_DIM])
+            }
+        }
 
         ; ── Hotkeys ──────────────────────────────────────────────────────────
         ; Per-action debug records (label + condition values + fired key) for every

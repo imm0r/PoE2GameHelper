@@ -1,7 +1,15 @@
 ; CustomHotkeys.ahk
 ; Custom hotkey / macro engine. Provides user-defined hotkey groups, each
-; containing hotkeys with global conditions and an ordered list of actions
-; (repeat, hold, chain, vitals/buff/charge/monster-count gates, auto-aim).
+; containing hotkeys with a boolean condition tree (the firing gate) and an
+; ordered list of effect actions (key press/hold/loop, chain, auto-aim).
+;
+; The condition tree combines the per-type gates (vitals/buff/charge/
+; monster-count) with AND/OR and nesting (= brackets):
+;   conditions := Map("kind","group", "mode","all"|"any", "children", [ <node>... ])
+;   node       := a group (above) OR a leaf condition Map("type","vitals", ...)
+;   mode "all" = AND (every child passes), "any" = OR (one child passes).
+; Legacy configs carried conditions inline in "actions"; _HotkeysNormalizeHotkey
+; migrates those into a root "all" group on load.
 ;
 ; Data model (also the on-disk shape in hotkeys.json):
 ;   g_hotkeyGroups := [
@@ -9,7 +17,8 @@
 ;       Map("id", 1, "name", "...", "enabled", 1,
 ;           "focusOnly", 1, "safeZoneDisabled", 1,
 ;           "key", "1", "mods", Map("ctrl",0,"shift",0,"alt",0,"gamepadLT",0),
-;           "actions", [ Map("type","vitals", ...), ... ])
+;           "conditions", Map("kind","group","mode","all","children",[ ... ]),
+;           "actions", [ Map("type","key", ...), ... ])
 ;     ])
 ;   ]
 ;
@@ -112,11 +121,33 @@ _HotkeysNormalizeHotkey(hk)
         "alt",       _HkBool(modsRaw, "alt", 0),
         "gamepadLT", _HkBool(modsRaw, "gamepadLT", 0)
     )
+    ; Split the raw action list into EFFECTS (kept in "actions") and CONDITION
+    ; gates. Conditions live in a boolean tree under "conditions" (groups with
+    ; mode "all"=AND / "any"=OR, nestable for brackets). Legacy configs carried
+    ; conditions inline in the action list, so migrate those into a root AND
+    ; group; a new-shape config supplies "conditions" directly.
     actions := []
+    condLegacy := []
     actRaw := (hk.Has("actions") && hk["actions"] is Array) ? hk["actions"] : []
     for a in actRaw
-        if (a is Map)
+    {
+        if !(a is Map)
+            continue
+        if _HotkeysIsCondType(a.Has("type") ? a["type"] : "")
+            condLegacy.Push(a)
+        else
             actions.Push(a)
+    }
+    if (hk.Has("conditions") && hk["conditions"] is Map)
+    {
+        conditions := _HotkeysNormalizeCondTree(hk["conditions"])
+        ; Fold any stray inline condition actions (e.g. an imported legacy
+        ; action) into the root group so none are silently lost.
+        for c in condLegacy
+            conditions["children"].Push(c)
+    }
+    else
+        conditions := Map("kind", "group", "mode", "all", "children", condLegacy)
     ; Output binding: where the macro's key comes from.
     ;   kind "flask"  -> slot (1-5), key resolved live from g_flaskKeyBySlot
     ;   kind "skill"  -> slot (skill-bar slot), key from g_skillKeyBySlot, plus
@@ -131,20 +162,18 @@ _HotkeysNormalizeHotkey(hk)
     )
     ; Trigger mode: "manual" fires only on a physical key press; "automated"
     ; auto-fires from the eval tick whenever the hotkey's conditions are met.
-    ; Default for legacy configs: automated if it has a condition action.
-    hasCond := false
-    for a in actions
-    {
-        if (a is Map && a.Has("type"))
-        {
-            ct := a["type"]
-            if (ct = "vitals" || ct = "buff" || ct = "charges" || ct = "monsterCount" || ct = "monsterCountCursor")
-                hasCond := true
-        }
-    }
+    ; Default for legacy configs: automated if it has any condition.
+    hasCond := (_HotkeysCountLeaves(conditions) > 0)
     trigger := hk.Has("trigger") ? hk["trigger"] : (hasCond ? "automated" : "manual")
     if (trigger != "automated" && trigger != "manual")
         trigger := "manual"
+    ; Custom cooldown (ms): minimum time between firings. 0 = off (a skill output
+    ; still uses its own detected cooldown; raw keys / undetected skills use only
+    ; the default throttle). Lets the user gate outputs whose real cooldown the
+    ; reader can't see (e.g. Orb of Storms on a raw key).
+    cooldownMs := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+    if (cooldownMs < 0)
+        cooldownMs := 0
     return Map(
         "id", id,
         "name", hk.Has("name") ? hk["name"] : ("Hotkey #" id),
@@ -156,8 +185,39 @@ _HotkeysNormalizeHotkey(hk)
         "key", hk.Has("key") ? hk["key"] : "",
         "output", output,
         "mods", mods,
-        "actions", actions
+        "cooldownMs", cooldownMs,
+        "actions", actions,
+        "conditions", conditions
     )
+}
+
+; Sanitizes a condition tree node parsed from JSON: enforces the group shape
+; (kind/mode/children), keeps only valid condition leaves, recurses into nested
+; sub-groups (= brackets). A non-group leaf passed at the root is wrapped in an
+; AND group. Returns a normalized root group Map.
+_HotkeysNormalizeCondTree(node)
+{
+    if !(node is Map)
+        return Map("kind", "group", "mode", "all", "children", [])
+    if (node.Has("kind") && node["kind"] = "group")
+    {
+        mode := (node.Has("mode") && node["mode"] = "any") ? "any" : "all"
+        out := []
+        chRaw := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+        for ch in chRaw
+        {
+            if !(ch is Map)
+                continue
+            if (ch.Has("kind") && ch["kind"] = "group")
+                out.Push(_HotkeysNormalizeCondTree(ch))
+            else if (ch.Has("type") && _HotkeysIsCondType(ch["type"]))
+                out.Push(ch)
+        }
+        return Map("kind", "group", "mode", mode, "children", out)
+    }
+    if (node.Has("type") && _HotkeysIsCondType(node["type"]))
+        return Map("kind", "group", "mode", "all", "children", [node])
+    return Map("kind", "group", "mode", "all", "children", [])
 }
 
 ; Resolves the actual AHK send-key for a hotkey's output binding (live, so
@@ -174,7 +234,8 @@ _HotkeysResolveKey(hk)
     if (kind = "flask")
         return (g_flaskKeyBySlot.Has(slot)) ? g_flaskKeyBySlot[slot] : ""
     if (kind = "skill")
-        return (g_skillKeyBySlot.Has(slot)) ? g_skillKeyBySlot[slot] : (out.Has("key") ? out["key"] : "")
+        return (out.Has("key") && out["key"] != "") ? out["key"]
+             : (g_skillKeyBySlot.Has(slot) ? g_skillKeyBySlot[slot] : "")
     return out.Has("key") ? out["key"] : (hk.Has("key") ? hk["key"] : "")
 }
 
@@ -460,6 +521,11 @@ HotkeysEvaluateTick()
             rdy := _HotkeysOutputReadiness(hk)
             if (rdy["cooldownMs"] > minGap)
                 minGap := rdy["cooldownMs"]
+            ; User-set custom cooldown raises the gap too (authoritative for
+            ; outputs whose real cooldown can't be detected).
+            cd := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+            if (cd > minGap)
+                minGap := cd
             if ((A_TickCount - rt["lastAutoFire"]) < minGap)
                 continue
 
@@ -505,9 +571,31 @@ _HotkeysCollectDebug()
                     continue
                 items.Push(_HotkeysBuildDebugRecord(hk, a, ai, snap))
             }
+            ; Condition leaves (monsterCount/vitals/buff/charges) carry their own
+            ; debug flags + range-circle colors, so walk the tree too.
+            root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+            if root
+                _HotkeysCollectCondDebug(root, hk, snap, items)
         }
     }
     g_hkDebugItems := items
+}
+
+; Recursively pushes a debug record for every condition leaf (with its debug
+; flag set) under a tree node into the items array.
+_HotkeysCollectCondDebug(node, hk, snap, items)
+{
+    if !(node is Map)
+        return
+    if (node.Has("kind") && node["kind"] = "group")
+    {
+        children := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+        for ch in children
+            _HotkeysCollectCondDebug(ch, hk, snap, items)
+        return
+    }
+    if (node.Has("debug") && node["debug"])
+        items.Push(_HotkeysBuildDebugRecord(hk, node, 0, snap))
 }
 
 ; Builds a single debug record Map for one action. Fields are kept generic so
@@ -522,6 +610,11 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         "kind", t,
         "lines", []
     )
+
+    ; Per-action range-circle color from the UI color picker (#RRGGBB → BGR).
+    ; 0 = none set → the radar falls back to its default circle color.
+    rec["color"] := (a.Has("circleColor") && a["circleColor"] != "")
+        ? GroupColorToBgr(a["circleColor"]) : 0
 
     ; The output key this hotkey fires — always shown in the debug readout.
     key := _HotkeysResolveKey(hk)
@@ -552,12 +645,12 @@ _HotkeysBuildDebugRecord(hk, a, ai, snap)
         else if (mode = "worldCursor")
         {
             wr := a.Has("worldRadius") ? (a["worldRadius"] + 0) : 1000
-            cwp := _HotkeysCursorWorldPos(snap)   ; ground ring around the cursor's world point
+            rec["circleCursorWorld"] := wr   ; isometric ring drawn around the mouse position
+            ; (kept for any consumer that wants the unprojected cursor ground point — the
+            ; ring itself no longer needs it, but the count below still does)
+            cwp := _HotkeysCursorWorldPos(snap)
             if (cwp)
-            {
-                rec["circleCursorWorld"] := wr
                 rec["cursorWx"] := cwp["x"], rec["cursorWy"] := cwp["y"], rec["cursorWz"] := cwp["z"]
-            }
             counts := _HotkeysCountByRarity(snap, wr, "worldCursor")
             rec["counts"] := counts
             rec["lines"].Push("@cursorRange(" wr ") N:" counts["normal"] " M:" counts["magic"] " R:" counts["rare"] " U:" counts["unique"] " =" counts["total"])
@@ -669,6 +762,12 @@ _HotkeysCountByRarity(snap, radius, mode)
         entity := entry.Has("entity") ? entry["entity"] : 0
         if !(entity && entity is Map)
             continue
+        ; Only count actual monsters — not portals, checkpoints, NPCs, chests, decals or
+        ; effects (which can also be "targetable"). Mirrors the aim "monster" classifier:
+        ; the entity path must live under metadata/monsters/.
+        pathLower := entity.Has("path") ? StrLower(entity["path"]) : ""
+        if !InStr(pathLower, "metadata/monsters/")
+            continue
         dc := entity.Has("decodedComponents") ? entity["decodedComponents"] : 0
         if !(dc && dc is Map) || !_HotkeysIsTargetable(dc)
             continue
@@ -710,48 +809,66 @@ _HotkeysCountByRarity(snap, radius, mode)
     return out
 }
 
-; Unprojects the current mouse cursor to a world position on the ground plane at the
-; player's Z — a flat-ground approximation (exact on level terrain, off on slopes).
-; Solves M·(wx,wy,pz,1) for (wx,wy) so it projects back to the cursor's NDC (inverse of
-; NavProject with z fixed). Params: snap (radar snapshot, for the W2S matrix + player Z).
-; Returns Map("x","y","z") or 0 when matrix/window/player are unavailable or degenerate.
-_HotkeysCursorWorldPos(snap)
+; Shared isometric projection origin for the radar-style ground projection used BOTH by the
+; range ring (RadarOverlay._DrawWorldRing) and by monster counting, so the count always
+; matches the visible ring. Returns the player world pos, the player's on-screen position
+; (the projection centre, same as the ring's centre), the game window, and the world→screen
+; scale (sx horizontal, sy vertical squash = sin 38.7°). 0 when player/window unavailable.
+_HotkeysIsoOrigin(snap)
 {
+    global g_combatW2SScale
+    if !(snap && snap is Map)
+        return 0
     inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
     mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-    if !(mat is Array && mat.Length = 16)
-        return 0
     area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
     prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
     pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
     if !(pwp && pwp is Map)
         return 0
-    pz := pwp.Has("z") ? pwp["z"] : 0
+    pX := pwp.Has("x") ? pwp["x"] : 0
+    pY := pwp.Has("y") ? pwp["y"] : 0
+    pZ := pwp.Has("z") ? pwp["z"] : 0
     gameHwnd := ResolvePoEWindow()
     if !gameHwnd
         return 0
     rect := NavClientRect(gameHwnd)
     if !rect
         return 0
+    ; Player's on-screen position = the projection centre (the player projects onto the
+    ; camera centre reliably; _WorldToScreen falls back to the window centre if the matrix
+    ; is unavailable). This is the same centre the ring is drawn around (_PlayerScreenPos).
+    ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
+        "w2sMatrix", mat, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
+    psp := _WorldToScreen(ci, gameHwnd)
+    if !psp
+        return 0
+    scale := (IsSet(g_combatW2SScale) && g_combatW2SScale > 0) ? g_combatW2SScale : 0.20
+    sx := scale * (rect["w"] / 1920.0)
+    sy := sx * 0.62470                       ; isometric vertical squash (sin 38.7°)
+    if (sx <= 0 || sy <= 0)
+        return 0
+    return Map("hwnd", gameHwnd, "px", pX, "py", pY, "pz", pZ,
+        "psx", psp["x"], "psy", psp["y"], "sx", sx, "sy", sy)
+}
+
+; Converts the current mouse cursor to a ground-plane world position at the player's Z via
+; the INVERSE of the radar's isometric projection (consistent with how the cursor ring is
+; drawn). The player's screen position is the projection centre; the cursor's screen offset
+; from it maps back to a world (dx,dy) delta. Returns Map("x","y","z") or 0 if unavailable.
+_HotkeysCursorWorldPos(snap)
+{
+    pori := _HotkeysIsoOrigin(snap)
+    if !pori
+        return 0
     cx := 0, cy := 0
     CoordMode("Mouse", "Screen")
     MouseGetPos(&cx, &cy)
-    ; cursor screen → NDC (inverse of NavProject's NDC→pixel mapping)
-    ndcX := (cx - rect["x"]) * 2.0 / rect["w"] - 1.0
-    ndcY := 1.0 - (cy - rect["y"]) * 2.0 / rect["h"]
-    ; r1=ndcX·r4, r2=ndcY·r4 with z=pz fixed → a 2×2 linear system in (wx,wy).
-    K1 := mat[9]  * pz + mat[13]
-    K2 := mat[10] * pz + mat[14]
-    K4 := mat[12] * pz + mat[16]
-    A11 := mat[1] - ndcX * mat[4], A12 := mat[5] - ndcX * mat[8]
-    A21 := mat[2] - ndcY * mat[4], A22 := mat[6] - ndcY * mat[8]
-    B1  := ndcX * K4 - K1,         B2  := ndcY * K4 - K2
-    det := A11 * A22 - A12 * A21
-    if (Abs(det) < 0.0000001)
-        return 0
-    return Map("x", (B1 * A22 - A12 * B2) / det
-             , "y", (A11 * B2 - B1 * A21) / det
-             , "z", pz)
+    u := (cx - pori["psx"]) / pori["sx"]      ; = dx - dy
+    v := -(cy - pori["psy"]) / pori["sy"]     ; = dx + dy
+    return Map("x", pori["px"] + (u + v) / 2
+             , "y", pori["py"] + (v - u) / 2
+             , "z", pori["pz"])
 }
 
 ; Returns the runtime-state Map for a hotkey id, creating it on first use.
@@ -760,20 +877,36 @@ _HotkeysRuntime(id)
     global g_hkRuntime
     if !g_hkRuntime.Has(id)
         g_hkRuntime[id] := Map("lastAutoFire", 0, "repeatActive", 0, "repeatFn", 0
-                             , "lastFireTick", 0, "lastFireKey", "")
+                             , "lastFireTick", 0, "lastFireKey", "", "lastCooldownFire", 0)
     return g_hkRuntime[id]
 }
 
-; True if the hotkey has at least one condition-type action.
+; True if t names a condition (gate) type rather than an effect type.
+_HotkeysIsCondType(t)
+{
+    return (t = "vitals" || t = "buff" || t = "charges" || t = "monsterCount" || t = "monsterCountCursor")
+}
+
+; Counts the condition leaves under a tree node (a leaf counts as 1; a group
+; sums its children). Used for "has any condition" and the auto-trigger gate.
+_HotkeysCountLeaves(node)
+{
+    if !(node is Map)
+        return 0
+    if !(node.Has("kind") && node["kind"] = "group")
+        return 1
+    n := 0
+    children := (node.Has("children") && node["children"] is Array) ? node["children"] : []
+    for ch in children
+        n += _HotkeysCountLeaves(ch)
+    return n
+}
+
+; True if the hotkey's condition tree holds at least one condition leaf.
 _HotkeysHasConditionAction(hk)
 {
-    for a in hk["actions"]
-    {
-        t := a.Has("type") ? a["type"] : ""
-        if (t = "vitals" || t = "buff" || t = "charges" || t = "monsterCount" || t = "monsterCountCursor")
-            return true
-    }
-    return false
+    root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+    return root ? (_HotkeysCountLeaves(root) > 0) : false
 }
 
 ; Derives the auto re-fire gap (ms) for a condition-triggered hotkey.
@@ -795,32 +928,59 @@ _HotkeysReFireGap(hk)
     return gap
 }
 
-; Dry-run of the condition gates only (no side effects), used by the evaluator
-; to decide whether a program-triggered hotkey should fire.
+; Evaluates the hotkey's boolean condition tree against the live snapshot.
+; An absent/empty tree is a neutral pass (true). Used both by the eval tick to
+; decide whether a program-triggered hotkey should fire and as the gate inside
+; _HotkeysRunActions.
 _HotkeysActionsWouldRun(hk)
 {
     snap := _HotkeysSnap()
-    for a in hk["actions"]
+    root := (hk.Has("conditions") && hk["conditions"] is Map) ? hk["conditions"] : 0
+    return root ? _HotkeysEvalNode(root, snap) : true
+}
+
+; Evaluates one condition tree node: recurses into groups, defers leaves to the
+; per-type evaluators. Returns true/false.
+_HotkeysEvalNode(node, snap)
+{
+    if !(node is Map)
+        return true
+    if (node.Has("kind") && node["kind"] = "group")
+        return _HotkeysEvalGroup(node, snap)
+    return _HotkeysEvalLeaf(node, snap)
+}
+
+; Combines a group's children by its mode: "any" = OR (one passing child wins),
+; otherwise "all" = AND. An empty group is neutral (passes).
+_HotkeysEvalGroup(group, snap)
+{
+    children := (group.Has("children") && group["children"] is Array) ? group["children"] : []
+    if (children.Length = 0)
+        return true
+    if (group.Has("mode") && group["mode"] = "any")
     {
-        t := a.Has("type") ? a["type"] : ""
-        switch t
-        {
-            case "vitals":
-                if !_HotkeysCheckVitals(a, snap)
-                    return false
-            case "buff":
-                if !_HotkeysCheckBuff(a, snap)
-                    return false
-            case "charges":
-                if !_HotkeysCheckCharges(a, snap)
-                    return false
-            case "monsterCount":
-                if !_HotkeysCheckMonsterCount(a, snap)
-                    return false
-            case "monsterCountCursor":
-                if !_HotkeysCheckMonsterCountCursor(a, snap)
-                    return false
-        }
+        for ch in children
+            if _HotkeysEvalNode(ch, snap)
+                return true
+        return false
+    }
+    for ch in children
+        if !_HotkeysEvalNode(ch, snap)
+            return false
+    return true
+}
+
+; Evaluates a single condition leaf via the matching per-type checker.
+; Unknown leaf types don't block (return true).
+_HotkeysEvalLeaf(a, snap)
+{
+    switch (a.Has("type") ? a["type"] : "")
+    {
+        case "vitals":             return _HotkeysCheckVitals(a, snap)
+        case "buff":               return _HotkeysCheckBuff(a, snap)
+        case "charges":            return _HotkeysCheckCharges(a, snap)
+        case "monsterCount":       return _HotkeysCheckMonsterCount(a, snap)
+        case "monsterCountCursor": return _HotkeysCheckMonsterCountCursor(a, snap)
     }
     return true
 }
@@ -908,6 +1068,24 @@ _HotkeysPassesGuards(hk)
 ; needing a redundant "Key press" action.
 _HotkeysRunActions(hk, context, depth)
 {
+    ; Condition gate: the whole boolean condition tree must pass before any
+    ; effect runs (or the bound output auto-fires). Applies to manual presses
+    ; and automated firing alike.
+    if !_HotkeysActionsWouldRun(hk)
+        return
+    ; Custom cooldown gate: once the conditions pass, never run the effects more
+    ; than once per cooldownMs (user-set; 0 = off). This is the single choke
+    ; point for every firing path — manual key, automated tick, and chains — so
+    ; an output with no detectable cooldown (raw key / unrecognised skill) can
+    ; still be rate-limited by the user.
+    cd := hk.Has("cooldownMs") ? (hk["cooldownMs"] + 0) : 0
+    if (cd > 0)
+    {
+        rt := _HotkeysRuntime(hk["id"])
+        if ((A_TickCount - rt["lastCooldownFire"]) < cd)
+            return
+        rt["lastCooldownFire"] := A_TickCount
+    }
     snap := _HotkeysSnap()
     hadEffect := false
     for a in hk["actions"]
@@ -915,21 +1093,6 @@ _HotkeysRunActions(hk, context, depth)
         t := a.Has("type") ? a["type"] : ""
         switch t
         {
-            case "vitals":
-                if !_HotkeysCheckVitals(a, snap)
-                    return
-            case "buff":
-                if !_HotkeysCheckBuff(a, snap)
-                    return
-            case "charges":
-                if !_HotkeysCheckCharges(a, snap)
-                    return
-            case "monsterCount":
-                if !_HotkeysCheckMonsterCount(a, snap)
-                    return
-            case "monsterCountCursor":
-                if !_HotkeysCheckMonsterCountCursor(a, snap)
-                    return
             case "key":
                 _HotkeysDoKey(hk, a)
                 hadEffect := true
@@ -1107,54 +1270,42 @@ _HotkeysBuffListLines(snap, needle)
     return out
 }
 
-; Builds the screen-projection origin for a pixel-radius test. originMode
-; "cursor" uses the mouse position; "player" uses the player's own projected
-; screen position. Returns a Map (hwnd, w2sMatrix, player world pos, origin
-; screen point ox/oy) or 0 if the game/window/projection is unavailable.
+; Builds the projection origin for a pixel-radius test. originMode "cursor" measures from the
+; mouse position; "player" from the player's own on-screen position. Reuses the shared
+; isometric origin so the distance metric matches the drawn range ring exactly. Returns the
+; origin Map (adds ox/oy = the radius centre) or 0 if the game/window/player is unavailable.
 _HotkeysPxOrigin(snap, originMode)
 {
-    gameHwnd := ResolvePoEWindow()
-    if !gameHwnd
+    pori := _HotkeysIsoOrigin(snap)
+    if !pori
         return 0
-    inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-    w2sMatrix := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-    area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-    prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-    pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-    pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
-    pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
-    pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
-    ox := 0, oy := 0
     if (originMode = "cursor")
     {
+        ox := 0, oy := 0
         CoordMode("Mouse", "Screen")
         MouseGetPos(&ox, &oy)
     }
     else
     {
-        ci := Map("nearestWorldX", pX, "nearestWorldY", pY, "nearestWorldZ", pZ,
-            "w2sMatrix", w2sMatrix, "playerWorldX", pX, "playerWorldY", pY, "playerWorldZ", pZ)
-        sp := _WorldToScreen(ci, gameHwnd)
-        if !sp
-            return 0
-        ox := sp["x"], oy := sp["y"]
+        ox := pori["psx"], oy := pori["psy"]
     }
-    return Map("hwnd", gameHwnd, "w2sMatrix", w2sMatrix,
-        "px", pX, "py", pY, "pz", pZ, "ox", ox, "oy", oy)
+    pori["ox"] := ox, pori["oy"] := oy
+    return pori
 }
 
-; Screen-pixel distance from a px-origin (see _HotkeysPxOrigin) to a world
-; point projected via the same W2S matrix. Returns -1 if not projectable.
+; Screen-pixel distance from the px-origin (see _HotkeysPxOrigin) to a world point, using the
+; radar's isometric ground projection (so it matches the drawn ring + dots). UNCLAMPED: an
+; off-screen entity keeps its true far offset and falls outside the radius, instead of being
+; clamped to the screen edge and falsely counted (which made monsterCount fire with nothing
+; actually in range). Always >= 0.
 _HotkeysPxDist(octx, wx, wy, wz)
 {
-    ci := Map("nearestWorldX", wx, "nearestWorldY", wy, "nearestWorldZ", wz,
-        "w2sMatrix", octx["w2sMatrix"],
-        "playerWorldX", octx["px"], "playerWorldY", octx["py"], "playerWorldZ", octx["pz"])
-    sp := _WorldToScreen(ci, octx["hwnd"])
-    if !sp
-        return -1
-    ddx := sp["x"] - octx["ox"]
-    ddy := sp["y"] - octx["oy"]
+    dx := wx - octx["px"]
+    dy := wy - octx["py"]
+    ex := octx["psx"] + (dx - dy) * octx["sx"]    ; entity screen pos (isometric)
+    ey := octx["psy"] - (dx + dy) * octx["sy"]
+    ddx := ex - octx["ox"]
+    ddy := ey - octx["oy"]
     return Sqrt(ddx * ddx + ddy * ddy)
 }
 
@@ -1408,18 +1559,38 @@ _HotkeysDoAim(hk, a, snap)
     area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
     prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
     pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+    pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
+    pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
+    pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
+
+    ; Aim clicks land in the 3D WORLD, so they MUST go through the live camera
+    ; world-to-screen matrix — the same discipline CombatAutomation uses. The
+    ; isometric fallback inside _WorldToScreen targets the radar/minimap layout
+    ; (player-centred iso), NOT the camera; clicking via it lands where the
+    ; entity shows ON THE MAP instead of on the actual monster. So require a
+    ; trustworthy camera anchor (valid 16-float matrix + the player projecting
+    ; near the screen centre) and skip the whole action when it isn't available
+    ; rather than fire a blind iso-fallback click.
+    rect := NavClientRect(gameHwnd)
+    if !(rect && w2sMatrix && Type(w2sMatrix) = "Array" && w2sMatrix.Length = 16 && pX != 0)
+        return
+    camAnchor := NavAnchor(pX, pY, pZ, w2sMatrix, rect)
+    if !camAnchor["ok"]
+        return
 
     combatInfo := Map(
         "nearestWorldX", target["x"],
         "nearestWorldY", target["y"],
         "nearestWorldZ", target["z"],
         "w2sMatrix", w2sMatrix,
-        "playerWorldX", (pwp && pwp.Has("x")) ? pwp["x"] : 0,
-        "playerWorldY", (pwp && pwp.Has("y")) ? pwp["y"] : 0,
-        "playerWorldZ", (pwp && pwp.Has("z")) ? pwp["z"] : 0
+        "playerWorldX", pX,
+        "playerWorldY", pY,
+        "playerWorldZ", pZ
     )
 
-    screenPos := _WorldToScreen(combatInfo, gameHwnd)
+    ; Pass the anchor so behind-camera targets are rejected (w-sign) and any
+    ; off-screen result is clamped along the player ray, not the iso fallback.
+    screenPos := _WorldToScreen(combatInfo, gameHwnd, camAnchor)
     if !screenPos
         return
     _MoveMouseToTarget(screenPos)

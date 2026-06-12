@@ -101,6 +101,24 @@ _FocusLifeStr(dc)
     return s
 }
 
+; Like _FocusLifeStr but formatted "cur / max (pct%)" (spaced slash, no "HP"), for the
+; DebugOverlay MouseOver layout. Returns "" when the entity has no Life component.
+MouseOverLifeLine(dc)
+{
+    if !(dc && Type(dc) = "Map" && dc.Has("life") && Type(dc["life"]) = "Map")
+        return ""
+    lf := dc["life"]
+    ls := (lf.Has("life") && Type(lf["life"]) = "Map") ? lf["life"] : 0
+    if !ls
+        return ""
+    cur := ls.Has("current") ? ls["current"] : "?"
+    max := ls.Has("max") ? ls["max"] : "?"
+    s := cur " / " max
+    if (IsInteger(cur) && IsInteger(max) && max > 0)
+        s .= " (" Round(cur * 100 / max) "%)"
+    return s
+}
+
 ; Resolves the hovered WORLD OBJECT via the HoverTracker chain (tracker+0x648).
 ; Returns Map("ptr","path") or 0. Monsters are NOT tracked here.
 _FocusResolveHovered(reader, snap)
@@ -127,8 +145,51 @@ _FocusResolveHovered(reader, snap)
     return path != "" ? Map("ptr", hov, "path", path) : 0
 }
 
-; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life) and
-; the hovered world object (name/type). Returns an array of strings.
+; Resolves the entity currently UNDER THE CURSOR via the game-state MouseOver chain
+; (verified against the trusted Cheat-Engine screenToWorldPtrMouseOverEntityPtr table):
+;   [[[ inGameState + 0x300 ] + 0x3F0 ] + 0xA8 ]  -> Entity*  (0 = nothing hovered)
+; Unlike _FocusResolveHovered (tracker+0x648, world objects only), this DOES resolve
+; hovered monsters. The hovered entity is decoded FRESH off its own pointer (never the
+; cached snapshot — that produced stale life and recycled-pointer rarity mismatches).
+; Returns Map("ptr","path","id","decodedComponents") or 0. Params: reader, snap.
+_FocusResolveMouseOverEntity(reader, snap)
+{
+    inGs := (IsObject(snap) && snap.Has("inGameState")) ? snap["inGameState"] : 0
+    inGsAddr := (IsObject(inGs) && inGs.Has("address")) ? inGs["address"] : 0
+    if !(inGsAddr && reader.IsProbablyValidPointer(inGsAddr))
+        return 0
+    host := reader.Mem.ReadPtr(inGsAddr + PoE2Offsets.MouseOver["HostFromInGameState"])
+    if !reader.IsProbablyValidPointer(host)
+        return 0
+    sub := reader.Mem.ReadPtr(host + PoE2Offsets.MouseOver["SubFromHost"])
+    if !reader.IsProbablyValidPointer(sub)
+        return 0
+    ent := reader.Mem.ReadPtr(sub + PoE2Offsets.MouseOver["EntityFromSub"])
+    if !(ent && reader.IsPlausibleEntityPointer(ent))
+        return 0
+    ; Identity (path/id) + a FRESH component decode off the live pointer. Use the RADAR
+    ; decoder explicitly rather than ReadEntityBasic — ReadEntityBasic's decode path
+    ; depends on the transient _radarMode flag, and its non-radar branch misreads chest
+    ; rarity as Normal. DecodeSampleEntityComponentsRadar reads ObjectMagicProperties/Mods
+    ; rarity correctly (Magic) AND fresh life, matching exactly what the snapshot showed.
+    ident := 0
+    try ident := reader.ReadEntityIdentityBasic(ent)
+    if !(IsObject(ident) && ident.Has("path") && ident["path"] != "")
+        return 0
+    dc := 0
+    try {
+        components := reader.ReadEntityComponentLookupBasic(ent, 64)
+        dc := reader.DecodeSampleEntityComponentsRadar(components)
+    }
+    return Map("ptr", ent,
+        "path", ident["path"],
+        "id", ident.Has("entityId") ? ident["entityId"] : 0,
+        "decodedComponents", (IsObject(dc) && Type(dc) = "Map") ? dc : 0)
+}
+
+; Builds the focus-overlay lines: the targeted monster (name/type/rarity/life), the
+; entity under the cursor (MouseOver chain), and the hovered world object. Returns an
+; array of strings.
 BuildFocusLines(reader, snap)
 {
     lines := []
@@ -148,6 +209,22 @@ BuildFocusLines(reader, snap)
     }
     else
         lines.Push("TARGET: (none)")
+
+    mo := _FocusResolveMouseOverEntity(reader, snap)
+    if (mo && Type(mo) = "Map" && mo.Has("path") && mo["path"] != "")
+    {
+        moLvl := ExtractEntityLevel(mo["path"])
+        lines.Push("MOUSEOVER: " ResolveMonsterDisplayName(mo["path"], _FocusLeaf(mo["path"]))
+            (moLvl != "" ? "  ·  lvl " moLvl : ""))
+        dc := (mo.Has("decodedComponents") && Type(mo["decodedComponents"]) = "Map") ? mo["decodedComponents"] : 0
+        mg := ExtractMetaCategory(mo["path"])
+        rarity := dc ? RarityIdToName(ReadEntityRarityId(dc)) : ""
+        if (mg != "" || rarity != "")
+            lines.Push("  type: " (mg != "" ? mg : "?") (rarity != "" ? "   rarity: " rarity : ""))
+        moLife := dc ? _FocusLifeStr(dc) : ""
+        if (moLife != "")
+            lines.Push("  life: " moLife)
+    }
 
     hov := _FocusResolveHovered(reader, snap)
     if (hov && Type(hov) = "Map" && hov.Has("path") && hov["path"] != "")

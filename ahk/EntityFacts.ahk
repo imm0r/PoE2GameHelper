@@ -3,18 +3,53 @@
 ; Deliberately small: the single entity-type classifier stays _ClassifyEntityType
 ; (SnapshotSerializers.ahk). These helpers add only what was missing and is shared by
 ; the serializer, the path-group engine and the alert engine:
-;   - ExtractMetaGroup : the grouping seed (path segment after metadata/<category>/)
+;   - ExtractMetaGroup    : grouping seed = the family/archetype segment (3rd)
+;   - ExtractMetaCategory : the top-level category segment (2nd)
+;   - ExtractEntityLevel  : the "@NN" level suffix off the path leaf
 ;   - ReadEntityRarityId / RarityIdToName : robust rarity read (flat + nested shapes)
 ; Included via TreeViewWatchlistPanel.ahk.
 
-; Returns the grouping seed for a path: the segment after metadata/<category>/, lowercased.
-; e.g. "Metadata/Monsters/LeagueBreach/BreachHand" -> "leaguebreach". Returns "" if none.
+; Grouping SEED for a path: the FAMILY/ARCHETYPE segment — the 3rd segment, i.e. the
+; one after metadata/<category>/ — lowercased. This is NOT the top-level category
+; (use ExtractMetaCategory for that). It is most meaningful for monsters, where the
+; 3rd segment is the monster family you would group/colour by:
+;   "Metadata/Monsters/LeagueBreach/BreachHand" -> "leaguebreach"   (the real group)
+;   "Metadata/Chests/KedgeBayChests/KedgeBayChestValuable" -> "kedgebaychests"
+;   "Metadata/NPC/Four_Act4/TujenJourneysEndSummon" -> "four_act4"  (an act bucket,
+;       a weak "group" — which is why NPC/world-object readouts prefer the category).
+; Consumers: SnapshotSerializers (JSON "metaGroup"), and EntityGroups, which ORs this
+; seed together with the full path into the group-match haystack, so user group terms
+; match against both the family token and the full path. Returns "" if no match.
 ExtractMetaGroup(path)
 {
     if (path = "")
         return ""
     if RegExMatch(path, "i)metadata/[^/]+/([^/]+)", &m)
         return StrLower(m[1])
+    return ""
+}
+
+; Returns the top-level metadata category — the segment right after "Metadata/"
+; (e.g. "Monsters", "NPC", "Chests"). Original case is preserved so it reads as the
+; game intends ("NPC", not "npc"). Returns "" if the path is not a metadata path.
+ExtractMetaCategory(path)
+{
+    if (path = "")
+        return ""
+    if RegExMatch(path, "i)metadata/([^/]+)", &m)
+        return m[1]
+    return ""
+}
+
+; Parses the optional "@NN" level suffix from an entity path leaf, e.g.
+; ".../TujenJourneysEndSummon@51" -> "51". The game appends the entity's level there.
+; Returns the level digits as a string, or "" when the path has no @level suffix.
+ExtractEntityLevel(path)
+{
+    if (path = "")
+        return ""
+    if RegExMatch(path, "@(\d+)\s*$", &m)
+        return m[1]
     return ""
 }
 

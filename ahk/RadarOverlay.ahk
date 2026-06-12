@@ -1505,6 +1505,8 @@ class RadarOverlay extends GdiOverlayBase
         {
             if !(rec is Map)
                 continue
+            ; Per-action circle color from the UI picker (BGR); 0 → the default.
+            col := (rec.Has("color") && rec["color"]) ? rec["color"] : COL_CUR
             ; Cursor pixel circle (screen cursor → client coords).
             if (rec.Has("circleCursorPx") && rec["circleCursorPx"] > 0)
             {
@@ -1513,7 +1515,7 @@ class RadarOverlay extends GdiOverlayBase
                 MouseGetPos(&cx, &cy)
                 ccx := cx - this._lastX, ccy := cy - this._lastY
                 r := rec["circleCursorPx"]
-                this._DrawPixelCircle(ccx, ccy, r, COL_CUR)
+                this._DrawPixelCircle(ccx, ccy, r, col)
                 this._DrawCircleLabel(ccx, ccy, r, rec)
             }
             ; Player pixel circle (player projected to screen → client coords).
@@ -1524,88 +1526,72 @@ class RadarOverlay extends GdiOverlayBase
                 {
                     pcx := ps["x"] - this._lastX, pcy := ps["y"] - this._lastY
                     r := rec["circlePlayerPx"]
-                    this._DrawPixelCircle(pcx, pcy, r, COL_CUR)
+                    this._DrawPixelCircle(pcx, pcy, r, col)
                     this._DrawCircleLabel(pcx, pcy, r, rec)
                 }
             }
-            ; World-radius ground rings (zoom-independent) — isometric rings of world
-            ; points projected to screen. "circlePlayerWorld" is centred on the player;
-            ; "circleCursorWorld" on the cursor's unprojected world point (experimental).
+            ; World-radius ground rings (zoom-independent) — isometric ground ellipses
+            ; around the player's / cursor's ON-SCREEN position, using the same ground
+            ; projection the radar uses for dots (no W2S matrix). "circlePlayerWorld" is
+            ; centred on the player; "circleCursorWorld" on the mouse cursor (experimental).
             if (rec.Has("circlePlayerWorld") && rec["circlePlayerWorld"] > 0)
             {
-                pw := this._SnapPlayerWorld()
-                if (pw)
-                    this._DrawWorldRing(pw["x"], pw["y"], pw["z"], rec["circlePlayerWorld"], COL_CUR, rec)
+                ps := this._PlayerScreenPos()
+                if (ps)
+                    this._DrawWorldRing(ps["x"] - this._lastX, ps["y"] - this._lastY,
+                        rec["circlePlayerWorld"], col, rec)
             }
             if (rec.Has("circleCursorWorld") && rec["circleCursorWorld"] > 0)
-                this._DrawWorldRing(rec["cursorWx"], rec["cursorWy"], rec["cursorWz"],
-                    rec["circleCursorWorld"], COL_CUR, rec)
+            {
+                mcx := 0, mcy := 0
+                CoordMode("Mouse", "Screen")
+                MouseGetPos(&mcx, &mcy)
+                this._DrawWorldRing(mcx - this._lastX, mcy - this._lastY,
+                    rec["circleCursorWorld"], col, rec)
+            }
         }
     }
 
-    ; Returns the player's world position Map("x","y","z") from the cached radar snapshot,
-    ; or 0 if unavailable. Centre of the "around player (range)" world ring.
-    _SnapPlayerWorld()
-    {
-        global g_radarLastSnap
-        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
-        if !snap
-            return 0
-        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-        area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
-        prc  := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
-        pwp  := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
-        if !(pwp && pwp is Map)
-            return 0
-        return Map("x", pwp.Has("x") ? pwp["x"] : 0, "y", pwp.Has("y") ? pwp["y"] : 0
-                 , "z", pwp.Has("z") ? pwp["z"] : 0)
-    }
 
-    ; Draws an isometric ground ring of world-radius <worldR> around the world point
-    ; (cx,cy,cz) by projecting ~48 ring points through the live W2S matrix, then labels it
-    ; at the lower-right of its screen footprint. Used by the monsterCount "range" modes
-    ; (centre = player, or the cursor's world point for the experimental cursor variant).
-    _DrawWorldRing(cx, cy, cz, worldR, colorBGR, rec)
+    ; Draws the world-radius <worldR> range as an isometric ground ellipse around the
+    ; SCREEN point (centerX, centerY) (client coords), then labels it at the lower-right of
+    ; its footprint. Used by the monsterCount "range" modes (centre = the player's or the
+    ; cursor's on-screen position). It maps the flat ground circle to screen with the SAME
+    ; isometric projection the radar uses for entity dots — camera angle 38.7°, world→screen
+    ; scale = g_combatW2SScale · windowWidth / 1920 — instead of the W2S matrix, which proved
+    ; unreliable for points away from the player (the matrix ring came out invisible, and the
+    ; earlier affine approximation blew up into a starburst). Tune the scale via the Combat
+    ; "world-to-screen scale" slider; it is zoom-independent in world units.
+    _DrawWorldRing(centerX, centerY, worldR, colorBGR, rec)
     {
-        global g_radarLastSnap
-        snap := (IsSet(g_radarLastSnap) && g_radarLastSnap is Map) ? g_radarLastSnap : 0
-        if !snap
+        global g_combatW2SScale
+        scale := (IsSet(g_combatW2SScale) && g_combatW2SScale > 0) ? g_combatW2SScale : 0.20
+        sx := scale * (this._lastW / 1920.0)        ; world ±x/±y → screen-x basis
+        sy := sx * RadarOverlay.CAMERA_SIN          ; isometric vertical squash (sin 38.7°)
+        if (sx <= 0)
             return
-        gameHwnd := ResolvePoEWindow()
-        if !gameHwnd
-            return
-        inGs := snap.Has("inGameState") ? snap["inGameState"] : 0
-        mat  := (inGs && inGs.Has("w2sMatrix")) ? inGs["w2sMatrix"] : 0
-        if !(mat is Array && mat.Length = 16)
-            return          ; world ring needs the real projection matrix
-        rect := NavClientRect(gameHwnd)
-        if !rect
-            return
-        segs := 48
+        segs := 72
+        step := 6.2831853 / segs
         pts := Buffer((segs + 1) * 8, 0)
-        cnt := 0
         maxX := -2147483647, maxY := -2147483647
         Loop (segs + 1)
         {
-            ang := (A_Index - 1) * 6.2831853 / segs
-            sp := NavProject(cx + worldR * Cos(ang), cy + worldR * Sin(ang), cz, mat, rect, 0)
-            if !sp
-                continue
-            sx := sp["x"] - this._lastX, sy := sp["y"] - this._lastY
-            NumPut("Int", sx, pts, cnt * 8), NumPut("Int", sy, pts, cnt * 8 + 4)
-            cnt += 1
-            if (sx > maxX)
-                maxX := sx
-            if (sy > maxY)
-                maxY := sy
+            t  := (A_Index - 1) * step
+            dx := worldR * Cos(t)
+            dy := worldR * Sin(t)
+            px := Round(centerX + (dx - dy) * sx)   ; ground-plane → screen (same as radar dots)
+            py := Round(centerY - (dx + dy) * sy)
+            NumPut("Int", px, pts, (A_Index - 1) * 8), NumPut("Int", py, pts, (A_Index - 1) * 8 + 4)
+            if (px > maxX)
+                maxX := px
+            if (py > maxY)
+                maxY := py
         }
-        if (cnt < 3)
-            return
         pen := this._GetPen(colorBGR, 2)
         oldPen := DllCall("SelectObject", "Ptr", this.memDC, "Ptr", pen, "Ptr")
-        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", cnt)
+        DllCall("Polyline", "Ptr", this.memDC, "Ptr", pts, "Int", segs + 1)
         DllCall("SelectObject", "Ptr", this.memDC, "Ptr", oldPen)
-        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ring's footprint
+        this._DrawCircleLabelAt(maxX + 6, maxY, rec)   ; lower-right of the ellipse footprint
     }
 
     ; Draws a range-debug record's text (label + lines, e.g. monster counts) anchored at

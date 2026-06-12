@@ -5081,7 +5081,6 @@
               <button class="tree-tbtn" onclick="ahkCall('SkillProbeRun')" style="font-size:11px" title="Post-patch diagnostic: trace the player's skill-name DAT chain (Actor->ActiveSkills->GrantedEffectsPerLevel->GrantedEffects->name) to find why skill names fall back to Skill_<hex>. Writes logs\InGameStateMonitor.skill_probe.log">✨ Probe Skills</button>
               <button class="tree-tbtn" onclick="ahkCall('ComponentDumpProbeRun')" style="font-size:11px" title="Diagnostic: dump ALL components + raw field bytes of the currently highlighted entity (highlight one in the tree first). Basis for the systematic component-offset pass. Also Ctrl+Alt+Shift+D. Writes logs\InGameStateMonitor.component_dump.log">🧩 Dump Components</button>
               <button class="tree-tbtn" onclick="ahkCall('PathfindingProbeRun')" style="font-size:11px" title="Diagnostic: enumerate awake monsters, resolve their Pathfinding component and dump the candidate Flying (0xE5) / BaseSpeed (0xEC) fields plus raw hex, to verify the hypothesis offsets cross-referenced from Sikaka/POE2Radar. Stand in a populated area. Writes logs\InGameStateMonitor.pathfinding_probe.log">🏃 Probe Pathfinding</button>
-              <button class="tree-tbtn" onclick="ahkCall('HoverTrackerProbeRun')" style="font-size:11px" title="Diagnostic: scan the hover-tracker/UI-root structs for entity-like pointers and DIFF two runs to find the hovered-entity slot. Use the Ctrl+Alt+H hotkey: press once hovering NOTHING, then hover a monster/chest and press again — the slot under NEW/CHANGED is the hovered entity. Writes logs\InGameStateMonitor.hovertracker_probe.log">🖐️ Probe Hover</button>
               <button class="tree-tbtn" onclick="ahkCall('ToggleFocusOverlay')" style="font-size:11px" title="Toggle the focused-entity TEST overlay (top-left in game): shows the currently targeted monster (name/type/rarity/life via IsTargetedByPlayer 0x6B) and the hovered world object (chest/ground-item via HoverTracker tracker+0x648). On by default.">🎯 Focus Overlay</button>
               <button class="tree-tbtn" onclick="ahkCall('OffsetCompareShowHistory')" style="font-size:11px">🕑 History</button>
               <button class="tree-tbtn" onclick="ahkCall('OffsetComparePredict')" style="font-size:11px">🔮 Predict</button>
@@ -5286,7 +5285,7 @@
 
         /* Group — a chapter on raised parchment with a gold-on-brown frame. */
         .hk-group {
-          margin: 0 0 18px;
+          margin: 0 0 10px;
           border: 1px solid var(--codex-rule);
           border-radius: 1px;
           background:
@@ -5295,33 +5294,33 @@
           box-shadow: inset 0 0 0 1px rgba(200,168,90,0.18), inset 0 0 24px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.5);
         }
         .hk-group-head {
-          display: flex; gap: 8px; align-items: center; padding: 9px 12px;
+          display: flex; gap: 8px; align-items: center; padding: 5px 12px;
           border-bottom: 1px solid var(--codex-rule);
           background: linear-gradient(180deg, rgba(0,0,0,0.3), rgba(0,0,0,0.05));
         }
         .hk-group-name {
           background: transparent; border: none; color: var(--codex-gold-hi);
           font-family: var(--codex-heading); letter-spacing: 0.02em; text-transform: none;
-          font-size: 18px; min-width: 140px;
+          font-size: 16px; min-width: 240px; flex: 1 1 auto;
         }
         .hk-group-name:focus { outline: 1px solid var(--codex-gold); }
-        .hk-group-body { padding: 10px 12px; }
+        .hk-group-body { padding: 6px 12px; }
 
         /* Hotkey card — a parchment slip inside the chapter. */
         .hk-card {
           border: 1px solid rgba(90,62,34,0.6); border-radius: 1px;
-          padding: 8px 10px; margin-bottom: 8px;
+          padding: 5px 10px; margin-bottom: 8px;
           background: linear-gradient(180deg, rgba(20,12,6,0.55), rgba(10,6,4,0.6));
           box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35);
         }
-        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+        .hk-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 2px; }
         /* The per-hotkey option checkboxes ride on the Output row when wide, but
            wrap to the next line together (never split) when space runs short. */
         .hk-chk-group { display: inline-flex; flex-wrap: nowrap; gap: 8px; align-items: center; }
         .hk-chk-group .hk-cap { white-space: nowrap; }
         .hk-card-name {
           background: transparent; border: none; color: var(--codex-text);
-          font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 130px;
+          font-family: var(--codex-serif); font-weight: 600; font-size: 13px; min-width: 220px; flex: 1 1 auto;
         }
         .hk-card-name:focus { outline: 1px solid var(--codex-gold); }
         .hk-id {
@@ -5333,6 +5332,49 @@
         /* Inputs / selects inherit the shared codex theme (see the generic
            input/select rule). Only the hotkeys-specific layout is kept here. */
         #panel-hotkeys input[type=number] { width: 74px; }
+        /* Compact-but-comfortable controls (the row height tracks its tallest control).
+           Scoped to the Hotkeys tab so other tabs are untouched. */
+        #panel-hotkeys .hk-row, #panel-hotkeys .hk-group-head { line-height: 1.25; }
+        #panel-hotkeys input[type="text"]:not(.no-codex),
+        #panel-hotkeys input[type="number"]:not(.no-codex),
+        #panel-hotkeys select:not(.no-codex) { padding-top: 2px; padding-bottom: 2px; font-size: 12px; }
+        #panel-hotkeys .hk-btn { padding-top: 3px; padding-bottom: 3px; font-size: 11px; }
+        #panel-hotkeys .hk-group-name { font-size: 15px; }
+        #panel-hotkeys .toggle { height: 18px; width: 34px; }
+        /* Center the knob vertically regardless of height (top:50% + translateY), and keep
+           the checked travel horizontally symmetric. */
+        #panel-hotkeys .toggle-slider::before { width: 12px; height: 12px; top: 50%; bottom: auto; transform: translateY(-50%); }
+        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateY(-50%) translateX(14px); }
+        /* Collapsed-hotkey plain-language summary + the Advanced disclosure. */
+        .hk-summary { margin: 1px 0 1px 30px; padding: 1px 0; font-family: var(--codex-serif); font-size: 12.5px; font-style: italic; color: #cbb88a; cursor: pointer; }
+        .hk-summary:hover { color: var(--codex-gold-hi); }
+        .hk-adv-toggle { cursor: pointer; color: var(--codex-text-dim); font-size: 11px; font-family: var(--codex-display); letter-spacing: 0.08em; text-transform: uppercase; user-select: none; white-space: nowrap; }
+        .hk-adv-toggle:hover { color: var(--codex-gold-hi); }
+        /* "+" icon button that expands the condition / effect add pickers. Rotates
+           45° into an "×" while open, so it stays a single stylized glyph. */
+        .hk-add-toggle {
+          cursor: pointer; user-select: none;
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 28px; height: 28px; box-sizing: border-box;
+          color: var(--codex-gold);
+          border: 1px solid var(--codex-rule); border-radius: 2px;
+          background: linear-gradient(180deg, var(--codex-edge), var(--codex-parchment));
+          transition: color .15s, border-color .15s, transform .15s, box-shadow .15s;
+        }
+        .hk-add-toggle .hk-ico { width: 18px; height: 18px; display: block; }
+        .hk-add-toggle:hover { color: var(--codex-gold-hi); border-color: var(--codex-gold); box-shadow: 0 2px 6px -2px rgba(200,168,90,0.45); }
+        .hk-add-toggle.open { transform: rotate(45deg); }
+        .hk-adv-toggle:hover { color: var(--codex-gold); }
+        .hk-adv { margin-right: 6px; }
+        /* Keep names / condition labels on the same optical line as their neighbours:
+           one shared line-height, and the borderless name inputs carry no extra vertical
+           padding (so their text box hugs the line instead of sitting taller/lower). */
+        #panel-hotkeys .hk-row > *, #panel-hotkeys .hk-action > * { line-height: 1.25; }
+        /* The name fields (calligraphic serif) and the CONDITION labels (Cinzel display,
+           uppercase) render a hair high vs their plain neighbours; nudge them down 1px so
+           the text shares one optical line. */
+        #panel-hotkeys .hk-card-name, #panel-hotkeys .hk-group-name { padding-top: 0; padding-bottom: 0; }
+        #panel-hotkeys .hk-card-name, #panel-hotkeys .hk-group-name, #panel-hotkeys .hk-act-type { position: relative; top: 1px; }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
@@ -5413,13 +5455,40 @@
           color: var(--codex-text-dim); font-size: 12px; display: inline-flex; gap: 5px; align-items: center;
         }
 
-        .hk-actions { margin-top: 6px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
-        .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
+        .hk-actions { margin-top: 4px; padding-left: 8px; border-left: 2px solid var(--codex-rule); }
+        .hk-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 3px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
         .hk-action:last-child { border-bottom: none; }
         .hk-act-type {
           color: var(--codex-gold); font-family: var(--codex-display);
           letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; min-width: 168px;
         }
+
+        /* ── Condition tree (nested AND/OR groups; nesting = brackets) ───────── */
+        .hk-conds { margin-top: 4px; }
+        .hk-conds-title {
+          color: var(--codex-gold); font-family: var(--codex-display);
+          letter-spacing: 0.08em; text-transform: uppercase; font-size: 11px; margin-bottom: 3px;
+        }
+        /* A group is a bracket: a boxed, indented region with its own ALL/ANY. */
+        .hk-cgroup {
+          border: 1px solid var(--codex-rule); border-left: 3px solid var(--codex-gold);
+          border-radius: 2px; padding: 4px 6px; margin: 4px 0;
+          background: rgba(120,90,40,0.06);
+        }
+        .hk-cgroup-any { border-left-color: var(--codex-blood-hi); }
+        .hk-cgroup-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .hk-cgroup-lbl {
+          color: var(--codex-text-dim); font-family: var(--codex-display);
+          letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px;
+        }
+        .hk-cmode { font-weight: bold; }
+        .hk-cgroup-body { padding-left: 8px; }
+        .hk-cgroup-add { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+        .hk-cgroup-head .hk-btn.danger { margin-left: auto; height: 20px; box-sizing: border-box; padding: 0 9px; display: inline-flex; align-items: center; }
+        /* A leaf is one condition row — same flex layout as an effect action row. */
+        .hk-cleaf { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 3px 0; border-bottom: 1px dashed rgba(90,62,34,0.5); }
+        .hk-cleaf:last-child { border-bottom: none; }
+        .hk-cleaf .hk-act-type { min-width: 132px; }
 
         /* Buttons — gilded two-tone, Cinzel small-caps (like the inv toolbar). */
         .hk-btn {
@@ -5436,6 +5505,9 @@
         }
         .hk-btn.danger { color: var(--codex-blood-hi); }
         .hk-btn.danger:hover { border-color: var(--codex-blood-hi); color: #ff8d8d; box-shadow: 0 2px 6px -2px rgba(197,72,72,0.5); }
+        /* Compact icon-only button (group header: add / export / delete). */
+        .hk-icon-btn { width: 28px; height: 28px; box-sizing: border-box; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-icon-btn .hk-ico { width: 18px; height: 18px; display: block; }
 
         .hk-spacer { margin-left: auto; }
         /* Action row tools (debug / export / remove): always pinned to the right
@@ -5445,10 +5517,12 @@
         /* Give the export/remove buttons a shared fixed height and center their
            glyphs, and match the debug checkbox label height so the bug icon
            lines up vertically with the buttons. */
-        .hk-act-tools .hk-btn { height: 26px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
-        .hk-act-tools > .hk-cap { height: 26px; margin: 0; display: inline-flex; align-items: center; }
+        .hk-act-tools .hk-btn { height: 20px; box-sizing: border-box; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-act-tools > .hk-cap { height: 20px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 24px; text-align: center; font-family: var(--codex-serif); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }
-        .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
+        .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-ico-caret { width: 16px; height: 16px; display: block; transition: transform .12s; }
+        .hk-ico-caret.closed { transform: rotate(-90deg); }
         .hk-caret:hover { color: var(--codex-gold-hi); }
         .hk-grip { cursor: grab; color: var(--codex-text-dim); padding: 0 5px; user-select: none; font-size: 14px; line-height: 1; }
         .hk-grip:hover { color: var(--codex-gold); }
@@ -5456,6 +5530,12 @@
         .hk-dragover { outline: 2px dashed var(--codex-gold); outline-offset: 1px; }
         .hk-dragging { opacity: .45; }
         .hk-disabled { opacity: .4; pointer-events: none; }
+        /* A disabled hotkey card / group head: dim + lock every control, except the
+           ones tagged .hk-always (its enable toggle, collapse caret and delete button)
+           so you can still re-enable, peek at, or remove it. pointer-events is inherited,
+           so re-enabling the marked element also re-enables its inner input/slider. */
+        .hk-off { opacity: .5; pointer-events: none; }
+        .hk-off .hk-always { pointer-events: auto; }
       </style>
       <div class="hk-toolbar">
         <button class="hk-btn" title="Add a new hotkey group" onclick="hkAddGroup()">+ Add Group</button>
@@ -6055,6 +6135,9 @@
     let hkOneShot = false;  // global one-shot-per-tick toggle (mirrors AHK)
     // In-game binds pushed from AHK: { flaskSlots:[{slot,key}], skillSlots:[{slot,key}], skillNames:[..] }
     let hkBindings = { flaskSlots: [], skillSlots: [], skillNames: [], chestTypes: [] };
+    // Buffs seen on the player this session (internal name → display name), accumulated from
+    // the live updateBuffs feed so the buff-condition dropdown fills itself automatically.
+    let hkSeenBuffs = {};
     // Called by AHK with the resolved in-game key bindings + active skill names.
     function updateHotkeyBindings(jsonStr) {
       try { hkBindings = JSON.parse(jsonStr); } catch (e) { return; }
@@ -6130,22 +6213,121 @@
         : '';
       return `
         <div class="hk-group" ondragover="hkDragOver(event,'group')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'group',${gi},0,0)">
-          <div class="hk-group-head">
-            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${open ? '▾' : '▸'}</span>
+          <div class="hk-group-head${hkBool(g.enabled) ? '' : ' hk-off'}">
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('g:${gi}')">${hkCaretIco(open)}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder group"
                   ondragstart="hkDragStart(event,'group',${gi},0,0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label class="toggle" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
+            <label class="toggle hk-always" title="Group enabled"><input type="checkbox" ${hkBool(g.enabled) ? 'checked' : ''}
                    onchange="hkSetGroup(${gi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-group-name" value="${hkEsc(g.name)}"
                    onchange="hkSetGroup(${gi},'name',this.value)">
             <span class="hk-id">${hks.length} hotkey${hks.length === 1 ? '' : 's'}</span>
             <span class="hk-spacer"></span>
-            <button class="hk-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})">+ Hotkey</button>
-            <button class="hk-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})">⤓ Export</button>
-            <button class="hk-btn danger" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})">Delete group</button>
+            <button class="hk-btn hk-icon-btn" title="Add a new hotkey to this group" onclick="hkAddHotkey(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+            <button class="hk-btn hk-icon-btn" title="Export this group to hotkeys_export/" onclick="hkExportGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="hk-btn hk-icon-btn danger hk-always" title="Delete this group and all its hotkeys" onclick="hkDelGroup(${gi})"><svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
           </div>
           ${body}
         </div>`;
+    }
+
+    // Advanced-options open state per hotkey id (default closed — Focus / Safe zone /
+    // Pass-through are rarely changed). A Set of hotkey ids that are expanded.
+    let hkAdvOpen = new Set();
+    function hkToggleAdv(id) {
+      if (hkAdvOpen.has(id)) hkAdvOpen.delete(id); else hkAdvOpen.add(id);
+      hkRender();
+    }
+    // Collapsed-by-default "add" rows (condition / effect pickers). Keyed by
+    // 'c:'+groupCid (condition add row) or 'a:'+hotkeyId (effect add row); they
+    // auto-collapse again once an item is added (see hkAddCond/Group/Action).
+    let hkAddOpen = new Set();
+    function hkToggleAdd(key) {
+      if (hkAddOpen.has(key)) hkAddOpen.delete(key); else hkAddOpen.add(key);
+      hkRender();
+    }
+    // Collapse/expand caret as a crisp SVG chevron (down when open, rotated to
+    // point right when closed). Shared by group / hotkey / action carets.
+    function hkCaretIco(open) {
+      return `<svg class="hk-ico-caret${open ? '' : ' closed'}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    // Plus glyph (SVG) for the add toggles — rotates 45° into an × when its
+    // .hk-add-toggle wrapper has .open.
+    function hkPlusIco() {
+      return `<svg class="hk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>`;
+    }
+    // Custom-cooldown field — only meaningful for a Raw key output (a Skill
+    // output gates on its own detected cooldown, a flask on charges). Uses the
+    // themed ▲▼ stepper so it matches the other number fields.
+    function hkCooldownField(hk, gi, hi) {
+      if (!hk.output || hk.output.kind !== 'key') return '';
+      const v = hk.cooldownMs != null ? hkEsc(hk.cooldownMs) : 0;
+      return `<span class="hk-cap" title="Custom cooldown: minimum time (ms) between firings for this raw key (e.g. Orb of Storms, whose cooldown the reader can't detect). 0 = just the default throttle.">Cooldown(ms) `
+           + `<span class="hk-num"><input type="number" min="0" value="${v}" onchange="hkSetHk(${gi},${hi},'cooldownMs',Math.max(0,+this.value||0))">`
+           + `<span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span></span>`;
+    }
+
+    // ── Plain-language summaries (Hotkeys overview) ──────────────────────────
+    // Readable one-liners so a collapsed hotkey reads at a glance instead of as a
+    // row of raw fields. Used by the collapsed hotkey view.
+    const HK_OP_TXT = { '<': '<', '<=': '≤', '>': '>', '>=': '≥', '=': '=', '!=': '≠' };
+    function hkOpTxt(op) { return HK_OP_TXT[op] || op || '≥'; }
+    // "Skill 3 (RButton)" / "Flask 1 (Q)" / "key X" — the bound output in short form.
+    function hkDescribeOutput(o) {
+      o = o || {};
+      const kind = o.kind || 'flask';
+      if (kind === 'skill') {
+        const s = (hkBindings.skillSlots || []).find(x => +x.slot === +o.slot);
+        const key = o.key || (s ? s.key : '');
+        const nm = o.skillName || 'skill';
+        return key ? `${nm} (${key})` : nm;
+      }
+      if (kind === 'key') return o.key ? `key ${o.key}` : 'no key';
+      const f = (hkBindings.flaskSlots || []).find(x => +x.slot === +o.slot);
+      return `Flask ${o.slot || 1}${f && f.key ? ` (${f.key})` : ''}`;
+    }
+    // One condition action in plain words, or '' for non-condition actions.
+    function hkDescribeAction(a) {
+      if (!a) return '';
+      switch (a.type) {
+        case 'vitals':
+          return `${a.resource || 'life'} ${hkOpTxt(a.op)} ${a.value != null ? a.value : 0}%`;
+        case 'buff':
+          return `${a.buffName ? hkBuffLabel(a.buffName) : 'any buff'} ${a.mode === 'absent' ? 'absent' : 'present'}`;
+        case 'charges':
+          return `${a.chargeType || 'power'} charges ${hkOpTxt(a.op)} ${a.value != null ? a.value : 0}`;
+        case 'monsterCount': {
+          const mode = a.radiusMode || 'player';
+          const isWorld = (mode === 'world' || mode === 'worldCursor');
+          const r = isWorld ? (a.worldRadius != null ? a.worldRadius : 1000) : (a.radius != null ? a.radius : 120);
+          const where = (mode === 'cursor' || mode === 'worldCursor') ? 'cursor' : 'player';
+          const rar = (a.rarity && a.rarity !== 'any') ? `${a.rarity} ` : '';
+          const n = a.value != null ? a.value : 1;
+          return `${hkOpTxt(a.op)}${n} ${rar}monster${+n === 1 ? '' : 's'} within ${r} ${isWorld ? 'range' : 'px'} of ${where}`;
+        }
+      }
+      return '';
+    }
+    // Describes a condition tree node as a parenthesized boolean expression.
+    function hkDescribeCondNode(node) {
+      if (!node) return '';
+      if (node.kind === 'group') {
+        const parts = (node.children || []).map(hkDescribeCondNode).filter(Boolean);
+        if (!parts.length) return '';
+        if (parts.length === 1) return parts[0];
+        return '(' + parts.join(node.mode === 'any' ? ' or ' : ' and ') + ')';
+      }
+      return hkDescribeAction(node);
+    }
+    // Full collapsed line: bound output + the boolean condition that gates it.
+    function hkDescribeHotkey(hk) {
+      const out = hkDescribeOutput(hk.output);
+      const cd = (hk.cooldownMs > 0) ? ` · cd ${hk.cooldownMs}ms` : '';
+      let cond = hkDescribeCondNode(hk.conditions);
+      if (cond.startsWith('(') && cond.endsWith(')')) cond = cond.slice(1, -1); // drop root parens
+      if (cond) return `${out} — if ${cond}${cd}`;
+      return (hk.trigger === 'automated' ? `${out} — always` : out) + cd;
     }
 
     function hkRenderHotkey(hk, gi, hi) {
@@ -6153,42 +6335,46 @@
       const keyLabel = hk.key ? hkEsc(hk.key) : 'Set key';
       const acts = Array.isArray(hk.actions) ? hk.actions : [];
       const open = !hkCollapsed.has('h:' + hk.id);
+      const advOpen = hkAdvOpen.has(hk.id);
+      const actAddOpen = hkAddOpen.has('a:' + hk.id);
       const actHtml = acts.length
         ? acts.map((a, ai) => hkRenderAction(a, gi, hi, ai)).join('')
         : '<div class="hk-empty" style="padding:8px">No actions.</div>';
       const body = open ? `
           <div class="hk-row">
             ${hkRenderOutput(hk, gi, hi)}
-            <span class="hk-chk-group">
+            ${hkCooldownField(hk, gi, hi)}
+            <span class="hk-spacer"></span>
+            ${advOpen ? `<span class="hk-chk-group hk-adv">
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.focusOnly) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'focusOnly',this.checked?1:0)"><span class="toggle-slider"></span></label>Focus (game foreground only)</span>
               <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(hk.safeZoneDisabled) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'safeZoneDisabled',this.checked?1:0)"><span class="toggle-slider"></span></label>Disable in safe zone</span>
               <span class="hk-cap" title="Also let the native trigger key reach the game (off = the macro fully replaces it)"><label class="toggle"><input type="checkbox" ${hkBool(hk.passThrough) ? 'checked' : ''}
                      onchange="hkSetHk(${gi},${hi},'passThrough',this.checked?1:0)"><span class="toggle-slider"></span></label>Pass through native key</span>
-            </span>
+            </span>` : ''}
+            <span class="hk-adv-toggle" title="Focus / safe-zone / pass-through options (rarely changed)" onclick="hkToggleAdv(${hk.id})">${advOpen ? '▾' : '▸'} Advanced</span>
           </div>
+          ${hkRenderConditions(hk, gi, hi)}
+          <div class="hk-conds-title" style="margin-top:6px" title="Run when the conditions above pass. No effect = the bound output fires once.">Effects</div>
           <div class="hk-actions" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDropEnd(event,'action',${gi},${hi})">${actHtml}</div>
           <div class="hk-row" style="margin-top:6px">
-            <select id="hk-addact-${gi}-${hi}" title="Pick which action type to add, then click + Action">
+            <span class="hk-add-toggle${actAddOpen ? ' open' : ''}" title="Add an effect action (key / chain / auto-aim)" onclick="hkToggleAdd('a:${hk.id}')">${hkPlusIco()}</span>
+            ${actAddOpen ? `<select id="hk-addact-${gi}-${hi}" title="Pick which effect action to add, then click + Action. (Conditions are added in the Conditions box above.)">
               <option value="key">Key press / hold / loop</option>
               <option value="chain">Chain (link hotkey)</option>
-              <option value="vitals">Condition: Vitals</option>
-              <option value="buff">Condition: Buff</option>
-              <option value="charges">Condition: Charges</option>
-              <option value="monsterCount">Condition: Monster count</option>
               <option value="aim">Mouse move (auto-aim)</option>
             </select>
-            <button class="hk-btn" title="Add the selected action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
-            <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>
-          </div>` : `<span class="hk-id" style="margin-left:30px">${acts.length} action${acts.length === 1 ? '' : 's'} (collapsed)</span>`;
+            <button class="hk-btn" title="Add the selected effect action to this hotkey" onclick="hkAddAction(${gi},${hi})">+ Action</button>
+            <button class="hk-btn" title="Import an action from hotkeys_export/" onclick="ahkCall('ImportHotkeysAction',${gi},${hi})">⤒ Import action</button>` : ''}
+          </div>` : `<div class="hk-summary" title="Click to expand" onclick="hkToggle('h:${hk.id}')">${hkEsc(hkDescribeHotkey(hk))}</div>`;
       return `
-        <div class="hk-card" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
+        <div class="hk-card${hkBool(hk.enabled) ? '' : ' hk-off'}" ondragover="hkDragOver(event,'hotkey')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'hotkey',${gi},${hi},0)">
           <div class="hk-row">
-            <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${open ? '▾' : '▸'}</span>
+            <span class="hk-caret hk-always" title="Collapse / expand" onclick="hkToggle('h:${hk.id}')">${hkCaretIco(open)}</span>
             <span class="hk-grip" draggable="true" title="Drag to reorder hotkey"
                   ondragstart="hkDragStart(event,'hotkey',${gi},${hi},0)" ondragend="hkDragEnd(event)">⠿</span>
-            <label class="toggle" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
+            <label class="toggle hk-always" title="Hotkey enabled"><input type="checkbox" ${hkBool(hk.enabled) ? 'checked' : ''}
                    onchange="hkSetHk(${gi},${hi},'enabled',this.checked?1:0)"><span class="toggle-slider"></span></label>
             <input class="hk-card-name" value="${hkEsc(hk.name)}"
                    onchange="hkSetHk(${gi},${hi},'name',this.value)">
@@ -6210,7 +6396,7 @@
             <span class="hk-cap"><label class="toggle"><input type="checkbox" ${hkBool(mods.gamepadLT) ? 'checked' : ''}
                    onchange="hkSetMod(${gi},${hi},'gamepadLT',this.checked?1:0)"><span class="toggle-slider"></span></label>LT</span>`}
             <span class="hk-spacer"></span>
-            <button class="hk-btn danger" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
+            <button class="hk-btn danger hk-always" title="Delete this hotkey" onclick="hkDelHk(${gi},${hi})">✕</button>
           </div>
           ${body}
         </div>`;
@@ -6223,7 +6409,7 @@
       const o = hk.output || { kind: 'flask', slot: 1, skillName: '', key: '' };
       const kind = o.kind || 'flask';
       const kindSel = `<select onchange="hkSetOutput(${gi},${hi},'kind',this.value)">`
-        + [['flask', 'Flask slot'], ['skill', 'Skill slot'], ['key', 'Raw key']]
+        + [['flask', 'Flask slot'], ['skill', 'Skill'], ['key', 'Raw key']]
             .map(([v, l]) => `<option value="${v}" ${kind === v ? 'selected' : ''}>${l}</option>`).join('')
         + `</select>`;
       let detail = '';
@@ -6233,15 +6419,18 @@
           : [1,2].map(s => `<option value="${s}" ${+o.slot === s ? 'selected' : ''}>Flask ${s}</option>`).join('');
         detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${opts}</select>`;
       } else if (kind === 'skill') {
-        const slotOpts = (hkBindings.skillSlots || []).length
-          ? hkBindings.skillSlots.map(s => `<option value="${s.slot}" ${+o.slot === +s.slot ? 'selected' : ''}>Slot ${s.slot} → ${hkEsc(s.key)}</option>`).join('')
-          : `<option value="${o.slot || 1}">(no skill binds read from config)</option>`;
+        // One dropdown picks the skill (the real, in-game-named list) — it both gates on
+        // that skill's cooldown AND labels the output. The key it presses is captured
+        // directly (skill->slot/key isn't readable from memory); old configs fall back to
+        // their slot's config key.
         const names = hkBindings.skillNames || [];
-        const nameOpts = `<option value="">— skill (for cooldown gate) —</option>`
+        const nameOpts = `<option value="">— pick a skill —</option>`
           + names.map(n => `<option value="${hkEsc(n)}" ${o.skillName === n ? 'selected' : ''}>${hkEsc(n)}</option>`).join('')
           + (o.skillName && !names.includes(o.skillName) ? `<option value="${hkEsc(o.skillName)}" selected>${hkEsc(o.skillName)} (not active)</option>` : '');
-        detail = `<select onchange="hkSetOutput(${gi},${hi},'slot',this.value)">${slotOpts}</select> `
-               + `<select title="Skill whose cooldown gates this hotkey" onchange="hkSetOutput(${gi},${hi},'skillName',this.value)">${nameOpts}</select>`;
+        const slotKey = (hkBindings.skillSlots || []).find(s => +s.slot === +o.slot);
+        const keyTxt = o.key || (slotKey ? slotKey.key : '') || 'Set key';
+        detail = `<select title="Which skill this fires (also gates on its cooldown)" onchange="hkSetOutput(${gi},${hi},'skillName',this.value)">${nameOpts}</select> `
+               + `<button class="hk-btn hk-key-btn" title="Output key this skill is bound to in-game" onclick="hkCaptureSkillKey(${gi},${hi})">${hkEsc(keyTxt)}</button>`;
       } else {
         detail = `<button class="hk-btn hk-key-btn" title="Literal output key" onclick="hkCaptureOutputKey(${gi},${hi})">${o.key ? hkEsc(o.key) : 'Set key'}</button>`;
       }
@@ -6311,6 +6500,9 @@
     // the area (pushed live from AHK in hkBindings.chestTypes), plus a Custom…
     // option that reveals a free-text substring field for anything else.
     function hkTitle(s) { return String(s).replace(/(^|[\/_ ])([a-z])/g, (m,p,c)=>p+c.toUpperCase()); }
+    // Pretty buff label: snake_case → Title Case (matches the Skills & Buffs tab's display),
+    // so the buff-condition dropdown shows "Arcane Surge" instead of "arcane_surge".
+    function hkBuffLabel(s) { return String(s == null ? '' : s).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
     function hkChestTypeField(a, gi, hi, ai) {
       const live = Array.isArray(hkBindings.chestTypes) ? hkBindings.chestTypes : [];
       const cur = a.chestType || '';
@@ -6327,6 +6519,34 @@
       if (v === '__custom__') { a.chestTypeCustom = 1; }
       else { a.chestTypeCustom = 0; a.chestType = v; }
       hkChanged();
+    }
+
+    // Buff-condition picker: a dropdown that fills itself from the buffs seen on the player
+    // (hkSeenBuffs, accumulated from the live Skills & Buffs feed) — no hand-maintained field.
+    // The option VALUE is the internal buff name the engine substring-matches; the label is
+    // the translated display name. A saved value stays selectable even when that buff isn't
+    // currently active.
+    function hkBuffField(a, gi, hi, ai) {
+      const cur = a.buffName != null ? String(a.buffName) : '';
+      const entries = Object.keys(hkSeenBuffs).sort((x, y) => hkSeenBuffs[x].localeCompare(hkSeenBuffs[y]));
+      let opts = `<option value="" ${cur === '' ? 'selected' : ''}>— pick a buff —</option>`;
+      opts += entries.map(iv => `<option value="${hkEsc(iv)}" ${cur === iv ? 'selected' : ''}>${hkEsc(hkSeenBuffs[iv])}</option>`).join('');
+      if (cur !== '' && !(cur in hkSeenBuffs))
+        opts += `<option value="${hkEsc(cur)}" selected>${hkEsc(cur)} (not active)</option>`;
+      return `<select title="Fills itself from the player's active buffs (Game › Skills & Buffs)" onchange="hkSetAct(${gi},${hi},${ai},'buffName',this.value)">${opts}</select>`;
+    }
+
+    // Opens the shared color picker for a monsterCount action's range circle, writing the
+    // chosen RGB (alpha dropped) back into the action as circleColor (used by the radar).
+    function hkOpenCircleColor(gi, hi, ai, el) {
+      const a = hkConfig[gi] && hkConfig[gi].hotkeys[hi] && hkConfig[gi].hotkeys[hi].actions[ai];
+      if (!a) return;
+      openColorPicker("hkCircle", {
+        title: "Range circle color",
+        hex: a.circleColor || "#FFA8C0",
+        swatchEl: el,
+        onConfirm: hex => hkSetAct(gi, hi, ai, 'circleColor', "#" + hex.slice(0, 6))
+      });
     }
 
     // Aim target picker: the synthetic "__all__" option maps to scanAll (aim at
@@ -6396,7 +6616,7 @@
                + `${hkNum(a, 'value', 50, gi, hi, ai)} %`;
           break;
         case 'buff':
-          body = `Name ${hkTxt(a, 'buffName', 'buff name / substring', gi, hi, ai)} `
+          body = `Buff ${hkBuffField(a, gi, hi, ai)} `
                + `${hkSel(a, 'mode', [['present', 'Present'], ['absent', 'Absent']], gi, hi, ai)} `
                + `Min stacks ${hkNum(a, 'minStacks', 0, gi, hi, ai)} `
                + `Min time left(ms) ${hkNum(a, 'minTimeLeftMs', 0, gi, hi, ai)}`;
@@ -6459,13 +6679,14 @@
           body = `<span style="color:var(--subtext)">unknown action</span>`;
       }
       return `<div class="hk-action" ondragover="hkDragOver(event,'action')" ondragleave="hkDragLeave(event)" ondrop="hkDrop(event,'action',${gi},${hi},${ai})">
-                <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${open ? '▾' : '▸'}</span>
+                <span class="hk-caret" title="Collapse / expand" onclick="hkToggle('${aKey}')">${hkCaretIco(open)}</span>
                 <span class="hk-grip" draggable="true" title="Drag to reorder action"
                       ondragstart="hkDragStart(event,'action',${gi},${hi},${ai})" ondragend="hkDragEnd(event)">⠿</span>
                 <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
                 ${open ? body : ''}
                 <span class="hk-act-tools">
                   <span class="hk-cap" title="Show this action's debug info on the game overlay (name/id, range circle, monster counts, cooldown, charges)"><label class="toggle"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetAct(${gi},${hi},${ai},'debug',this.checked?1:0)"><span class="toggle-slider"></span></label>🐞</span>
+                  ${(t === 'monsterCount' && hkBool(a.debug)) ? `<span class="cp-swatch" style="--swatch-color:${hkEsc(a.circleColor || '#FFA8C0')}" title="Range circle color" onclick="hkOpenCircleColor(${gi},${hi},${ai},this)"></span>` : ''}
                   <button class="hk-btn" title="Export this action to hotkeys_export/" onclick="hkExportAction(${gi},${hi},${ai})">⤓</button>
                   <button class="hk-btn danger" title="Remove this action" onclick="hkDelAction(${gi},${hi},${ai})">✕</button>
                 </span>
@@ -6550,7 +6771,15 @@
       hkChanged();
     }
     function hkDelGroup(gi) { hkConfig.splice(gi, 1); hkChanged(); }
-    function hkSetGroup(gi, k, v) { hkConfig[gi][k] = v; hkChanged(); }
+    function hkSetGroup(gi, k, v) {
+      hkConfig[gi][k] = v;
+      // Disabling a group collapses it; enabling expands it again.
+      if (k === 'enabled') {
+        if (v) hkCollapsed.delete('g:' + gi);
+        else hkCollapsed.add('g:' + gi);
+      }
+      hkChanged();
+    }
 
     function hkAddHotkey(gi) {
       hkConfig[gi].hotkeys.push({
@@ -6561,7 +6790,18 @@
       hkChanged();   // AHK assigns the real id on normalize and echoes it back
     }
     function hkDelHk(gi, hi) { hkConfig[gi].hotkeys.splice(hi, 1); hkChanged(); }
-    function hkSetHk(gi, hi, k, v) { hkConfig[gi].hotkeys[hi][k] = v; hkChanged(); }
+    function hkSetHk(gi, hi, k, v) {
+      hkConfig[gi].hotkeys[hi][k] = v;
+      // Disabling a hotkey collapses it; enabling expands it again (keyed by its stable id).
+      if (k === 'enabled') {
+        const hk = hkConfig[gi].hotkeys[hi];
+        if (hk && hk.id != null) {
+          if (v) hkCollapsed.delete('h:' + hk.id);
+          else hkCollapsed.add('h:' + hk.id);
+        }
+      }
+      hkChanged();
+    }
     function hkSetMod(gi, hi, k, v) {
       const hk = hkConfig[gi].hotkeys[hi];
       if (!hk.mods) hk.mods = {};
@@ -6600,16 +6840,232 @@
       if (a.type === 'monsterCount' && !a.radiusMode) a.radiusMode = 'player';
       return a;
     }
+    // ── Condition tree (boolean AND/OR groups with nesting = brackets) ─────────
+    // A hotkey gates on hk.conditions = a root group node:
+    //   { kind:'group', mode:'all'|'any', cid, children:[ <node>... ] }
+    //   leaf = a condition action ({type:'vitals'|'buff'|'charges'|'monsterCount', ...})
+    // cid is a UI-only stable handle for addressing a node in onchange handlers.
+    const HK_COND_TYPES = ['vitals', 'buff', 'charges', 'monsterCount', 'monsterCountCursor'];
+    function hkIsCondType(t) { return HK_COND_TYPES.includes(t); }
+    let hkCidSeq = 1;
+    function hkNewCid() { return hkCidSeq++; }
+    function hkEmptyCondRoot() { return { kind: 'group', mode: 'all', cid: hkNewCid(), children: [] }; }
+
+    // Recursively normalizes a node: assigns missing cids, enforces group shape,
+    // drops invalid leaves. Returns the node, or null if it should be dropped.
+    function hkNormCondNode(node) {
+      if (!node || typeof node !== 'object') return null;
+      if (node.kind === 'group') {
+        if (!node.cid) node.cid = hkNewCid();
+        node.mode = (node.mode === 'any') ? 'any' : 'all';
+        node.children = (Array.isArray(node.children) ? node.children : [])
+          .map(hkNormCondNode).filter(Boolean);
+        return node;
+      }
+      if (!hkIsCondType(node.type)) return null;
+      hkMigrateAction(node);
+      if (!node.cid) node.cid = hkNewCid();
+      return node;
+    }
+
+    function hkMaxCid(node) {
+      if (!node || typeof node !== 'object') return 0;
+      let m = node.cid || 0;
+      (node.children || []).forEach(ch => { m = Math.max(m, hkMaxCid(ch)); });
+      return m;
+    }
     function hkMigrateConfig(cfg) {
+      // Push the cid sequence past every existing cid first, so newly assigned
+      // cids never collide with preserved ones. (The AHK round-trip keeps leaf
+      // cids but rebuilds group nodes without them.)
+      let maxCid = 0;
       (cfg || []).forEach(g => (g.hotkeys || []).forEach(hk => {
-        hk.actions = (hk.actions || []).map(hkMigrateAction);
+        if (hk.conditions) maxCid = Math.max(maxCid, hkMaxCid(hk.conditions));
+      }));
+      if (maxCid >= hkCidSeq) hkCidSeq = maxCid + 1;
+      (cfg || []).forEach(g => (g.hotkeys || []).forEach(hk => {
+        const acts = (hk.actions || []).map(hkMigrateAction);
+        // Effects stay in actions; legacy inline conditions move into the tree.
+        const legacy = acts.filter(a => a && hkIsCondType(a.type));
+        hk.actions = acts.filter(a => a && !hkIsCondType(a.type));
+        let root = (hk.conditions && typeof hk.conditions === 'object' && hk.conditions.kind === 'group')
+          ? hk.conditions : hkEmptyCondRoot();
+        if (legacy.length) root.children = (root.children || []).concat(legacy);
+        hk.conditions = hkNormCondNode(root) || hkEmptyCondRoot();
       }));
       return cfg;
+    }
+
+    // Finds a node by cid in a hotkey's condition tree.
+    // Returns { node, parent, index } (parent/index null/-1 for the root), or null.
+    function hkFindCond(hk, cid) {
+      function walk(group, parent, idx) {
+        if (group.cid === cid) return { node: group, parent, index: idx };
+        const kids = group.children || [];
+        for (let i = 0; i < kids.length; i++) {
+          const ch = kids[i];
+          if (ch.cid === cid) return { node: ch, parent: group, index: i };
+          if (ch.kind === 'group') { const r = walk(ch, group, i); if (r) return r; }
+        }
+        return null;
+      }
+      return (hk && hk.conditions) ? walk(hk.conditions, null, -1) : null;
+    }
+    function hkCondHk(gi, hi) { return hkConfig[gi].hotkeys[hi]; }
+    function hkSetCond(gi, hi, cid, k, v) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f) return;
+      const isText = (k === 'buffName' || k === 'metadataPath' || k === 'chestType'
+              || k === 'op' || k === 'resource' || k === 'mode' || k === 'chargeType'
+              || k === 'rarity' || k === 'radiusMode' || k === 'circleColor');
+      let val = isText ? v : (isNaN(+v) ? v : +v);
+      if (!isText && typeof val === 'number' && val < 0) val = 0;
+      f.node[k] = val;
+      hkChanged();
+    }
+    function hkSetCondMode(gi, hi, cid, mode) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      f.node.mode = (mode === 'any') ? 'any' : 'all';
+      hkChanged();
+    }
+    function hkAddCond(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      const sel = document.getElementById('hk-addcond-' + cid);
+      const leaf = hkActionDefaults(sel ? sel.value : 'vitals');
+      leaf.cid = hkNewCid();
+      f.node.children.push(leaf);
+      hkAddOpen.delete('c:' + cid);   // collapse the add row again
+      hkChanged();
+    }
+    function hkAddCondGroup(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || f.node.kind !== 'group') return;
+      f.node.children.push({ kind: 'group', mode: 'any', cid: hkNewCid(), children: [] });
+      hkAddOpen.delete('c:' + cid);   // collapse the add row again
+      hkChanged();
+    }
+    function hkDelCond(gi, hi, cid) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f || !f.parent) return; // root not deletable
+      f.parent.children.splice(f.index, 1);
+      hkChanged();
+    }
+    function hkOpenCondCircleColor(gi, hi, cid, el) {
+      const f = hkFindCond(hkCondHk(gi, hi), cid); if (!f) return;
+      openColorPicker("hkCircle", {
+        title: "Range circle color",
+        hex: f.node.circleColor || "#FFA8C0",
+        swatchEl: el,
+        onConfirm: hex => hkSetCond(gi, hi, cid, 'circleColor', "#" + hex.slice(0, 6))
+      });
+    }
+
+    // ── Condition field helpers (mirror hkSel/hkNum/hkChk/hkTxt but address a
+    // tree node by cid via hkSetCond) ─────────────────────────────────────────
+    function hkCNum(a, k, def, gi, hi, title = '') {
+      const v = a[k] != null ? hkEsc(a[k]) : def;
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      return `<span class="hk-num"${tt}><input type="number" min="0" value="${v}" onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">`
+           + `<span class="hk-num-spin"><button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,1)">▲</button>`
+           + `<button type="button" tabindex="-1" class="hk-num-btn" onclick="hkNumStep(this,-1)">▼</button></span></span>`;
+    }
+    function hkCSel(a, k, opts, gi, hi, title = '') {
+      const cur = a[k] != null ? String(a[k]) : '';
+      const tt = title ? ` title="${hkEsc(title)}"` : '';
+      const o = opts.map(([v, lbl]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${lbl}</option>`).join('');
+      return `<select${tt} onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">${o}</select>`;
+    }
+    function hkCTxt(a, k, ph, gi, hi) {
+      return `<input type="text" placeholder="${ph}" value="${hkEsc(a[k] || '')}" onchange="hkSetCond(${gi},${hi},${a.cid},'${k}',this.value)">`;
+    }
+    function hkCBuffField(a, gi, hi) {
+      const cur = a.buffName != null ? String(a.buffName) : '';
+      const entries = Object.keys(hkSeenBuffs).sort((x, y) => hkSeenBuffs[x].localeCompare(hkSeenBuffs[y]));
+      let opts = `<option value="" ${cur === '' ? 'selected' : ''}>— pick a buff —</option>`;
+      opts += entries.map(iv => `<option value="${hkEsc(iv)}" ${cur === iv ? 'selected' : ''}>${hkEsc(hkSeenBuffs[iv])}</option>`).join('');
+      if (cur !== '' && !(cur in hkSeenBuffs)) opts += `<option value="${hkEsc(cur)}" selected>${hkEsc(cur)} (not active)</option>`;
+      return `<select title="Fills itself from the player's active buffs (Game › Skills & Buffs)" onchange="hkSetCond(${gi},${hi},${a.cid},'buffName',this.value)">${opts}</select>`;
+    }
+
+    // Renders the condition gate for a hotkey (root group, no delete on root).
+    function hkRenderConditions(hk, gi, hi) {
+      if (!hk.conditions) return '';
+      return `<div class="hk-conds"><div class="hk-conds-title" title="The hotkey fires only when this boolean expression is true. ALL = AND, ANY = OR, nested group = bracket.">Conditions</div>`
+           + hkRenderCondGroup(hk.conditions, gi, hi, true) + `</div>`;
+    }
+    // One group box: an ALL/ANY selector + its children + add buttons.
+    function hkRenderCondGroup(g, gi, hi, isRoot) {
+      const cid = g.cid;
+      const mode = (g.mode === 'any') ? 'any' : 'all';
+      const kids = (g.children || []).map(ch =>
+        (ch.kind === 'group') ? hkRenderCondGroup(ch, gi, hi, false) : hkRenderCondLeaf(ch, gi, hi)
+      ).join('');
+      const childHtml = kids || `<div class="hk-empty" style="padding:3px 6px;font-size:12px">No conditions — always passes.</div>`;
+      const modeSel = `<select class="hk-cmode" title="ALL = every entry must match (AND). ANY = at least one must match (OR)." onchange="hkSetCondMode(${gi},${hi},${cid},this.value)">`
+          + `<option value="all" ${mode === 'all' ? 'selected' : ''}>ALL (and)</option>`
+          + `<option value="any" ${mode === 'any' ? 'selected' : ''}>ANY (or)</option></select>`;
+      const del = isRoot ? '' : `<button class="hk-btn danger" title="Remove this group and everything in it" onclick="hkDelCond(${gi},${hi},${cid})">✕ group</button>`;
+      const addOpen = hkAddOpen.has('c:' + cid);
+      const addCtrls = addOpen ? `<select id="hk-addcond-${cid}" title="Pick a condition type to add">
+            <option value="vitals">Vitals</option><option value="buff">Buff</option>
+            <option value="charges">Charges</option><option value="monsterCount">Monster count</option>
+          </select>
+          <button class="hk-btn" title="Add the selected condition to this group" onclick="hkAddCond(${gi},${hi},${cid})">+ Condition</button>
+          <button class="hk-btn" title="Add a nested group — a bracket — with its own ALL/ANY" onclick="hkAddCondGroup(${gi},${hi},${cid})">+ Group ( )</button>` : '';
+      return `<div class="hk-cgroup${mode === 'any' ? ' hk-cgroup-any' : ''}">
+        <div class="hk-cgroup-head"><span class="hk-cgroup-lbl">Match ${modeSel} of:</span>${del}</div>
+        <div class="hk-cgroup-body">${childHtml}</div>
+        <div class="hk-cgroup-add">
+          <span class="hk-add-toggle${addOpen ? ' open' : ''}" title="Add a condition or a nested group (bracket)" onclick="hkToggleAdd('c:${cid}')">${hkPlusIco()}</span>
+          ${addCtrls}
+        </div>
+      </div>`;
+    }
+    // One condition leaf: the per-type editor body + tools (debug, circle, delete).
+    function hkRenderCondLeaf(a, gi, hi) {
+      const cid = a.cid, t = a.type || '';
+      let body = '';
+      switch (t) {
+        case 'vitals':
+          body = `Resource ${hkCSel(a, 'resource', [['hp', 'Life'], ['es', 'Energy Shield'], ['mana', 'Mana']], gi, hi)} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi)} ${hkCNum(a, 'value', 50, gi, hi)} %`;
+          break;
+        case 'buff':
+          body = `Buff ${hkCBuffField(a, gi, hi)} ${hkCSel(a, 'mode', [['present', 'Present'], ['absent', 'Absent']], gi, hi)} `
+               + `Min stacks ${hkCNum(a, 'minStacks', 0, gi, hi)} Min time left(ms) ${hkCNum(a, 'minTimeLeftMs', 0, gi, hi)}`;
+          break;
+        case 'charges':
+          body = `Type ${hkCSel(a, 'chargeType', [['power', 'Power'], ['frenzy', 'Frenzy'], ['endurance', 'Endurance'], ['charged_staff', 'Charged Staff']], gi, hi)} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi)} ${hkCNum(a, 'value', 1, gi, hi)}`;
+          break;
+        case 'monsterCount': {
+          const mcMode = a.radiusMode || 'player';
+          const mcWorld = (mcMode === 'world' || mcMode === 'worldCursor');
+          const mcRadiusField = mcWorld
+            ? `Range ${hkCNum(a, 'worldRadius', 1000, gi, hi, 'Radius in world units (zoom-independent — matches the actual game distance)')} `
+            : `Radius(px) ${hkCNum(a, 'radius', 120, gi, hi, 'Radius in screen pixels within which monsters are counted')} `;
+          body = `Rarity ${hkCSel(a, 'rarity', [['any', 'Any'], ['normal', 'Normal'], ['magic', 'Magic'], ['rare', 'Rare'], ['unique', 'Unique']], gi, hi, 'Only count monsters of this rarity (Any = all)')} `
+               + mcRadiusField
+               + `${hkCSel(a, 'radiusMode', [['cursor', 'around cursor'], ['player', 'around player (px)'], ['world', 'around player (range)'], ['worldCursor', 'around cursor (range) ⚠ experimental']], gi, hi, 'Pixel radius (cursor/player), world-unit range around the player, or experimental world-unit range around the cursor')} `
+               + `${hkCSel(a, 'op', HK_OPS, gi, hi, 'Comparison operator for the monster count')} ${hkCNum(a, 'value', 1, gi, hi, 'Monster-count threshold')}`;
+          break;
+        }
+        default: body = `<span style="color:var(--subtext)">unknown condition</span>`;
+      }
+      const swatch = (t === 'monsterCount' && hkBool(a.debug))
+        ? `<span class="cp-swatch" style="--swatch-color:${hkEsc(a.circleColor || '#FFA8C0')}" title="Range circle color" onclick="hkOpenCondCircleColor(${gi},${hi},${cid},this)"></span>` : '';
+      return `<div class="hk-cleaf">
+        <span class="hk-act-type">${hkEsc(HK_ACT_LABELS[t] || t)}</span>
+        ${body}
+        <span class="hk-act-tools">
+          <span class="hk-cap" title="Show this condition's debug info on the game overlay (range circle, monster counts, etc.)"><label class="toggle"><input type="checkbox" ${hkBool(a.debug) ? 'checked' : ''} onchange="hkSetCond(${gi},${hi},${cid},'debug',this.checked?1:0)"><span class="toggle-slider"></span></label>🐞</span>
+          ${swatch}
+          <button class="hk-btn danger" title="Remove this condition" onclick="hkDelCond(${gi},${hi},${cid})">✕</button>
+        </span>
+      </div>`;
     }
     function hkAddAction(gi, hi) {
       const sel = document.getElementById('hk-addact-' + gi + '-' + hi);
       const type = sel ? sel.value : 'key';
       hkConfig[gi].hotkeys[hi].actions.push(hkActionDefaults(type));
+      hkAddOpen.delete('a:' + hkConfig[gi].hotkeys[hi].id);   // collapse the add row again
       hkChanged();
     }
     function hkDelAction(gi, hi, ai) { hkConfig[gi].hotkeys[hi].actions.splice(ai, 1); hkChanged(); }
@@ -6634,12 +7090,22 @@
       hkCapture = { gi, hi, target: 'output' };
       document.getElementById('hk-capture').style.display = 'flex';
     }
+    // Like hkCaptureOutputKey, but for a Skill-slot output: set only the key and KEEP
+    // kind 'skill' (so the skill dropdown / cooldown gate stay intact).
+    function hkCaptureSkillKey(gi, hi) {
+      hkCapture = { gi, hi, target: 'skillKey' };
+      document.getElementById('hk-capture').style.display = 'flex';
+    }
     function hkFinishCapture(keyName, mods) {
       if (!hkCapture) return;
       const hk = hkConfig[hkCapture.gi].hotkeys[hkCapture.hi];
       if (hkCapture.target === 'output') {
         if (!hk.output) hk.output = { kind: 'key', slot: 1, skillName: '', key: '' };
         hk.output.kind = 'key';
+        hk.output.key = keyName;
+      } else if (hkCapture.target === 'skillKey') {
+        if (!hk.output) hk.output = { kind: 'skill', slot: 1, skillName: '', key: '' };
+        hk.output.kind = 'skill';
         hk.output.key = keyName;
       } else {
         hk.key = keyName;
@@ -8196,6 +8662,19 @@
       try { data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr; }
       catch (e) { el.innerHTML = '<div class="buff-empty">⚠ Parse error: ' + escHtml(String(e)) + '</div>'; return; }
       if (!Array.isArray(data) || data.length === 0) { el.innerHTML = '<div class="buff-empty">No active buffs</div>'; return; }
+      // Accumulate every seen buff for the hotkey buff-condition dropdown (value = internal
+      // name the engine matches, label = translated display name). Re-render the hotkeys list
+      // only when a genuinely new buff appears, so the dropdown fills itself live.
+      let _buffGrew = false;
+      for (const b of data) {
+        const iv = (b && b.in) ? String(b.in) : ((b && (b.n || b.name)) ? String(b.n || b.name) : '');
+        if (!iv) continue;
+        if (!(iv in hkSeenBuffs)) {
+          hkSeenBuffs[iv] = hkBuffLabel((b.n || b.name) ? (b.n || b.name) : iv);
+          _buffGrew = true;
+        }
+      }
+      if (_buffGrew && typeof hkRender === 'function') hkRender();
       const filtered = data.filter(b => !_blacklist.has(b.n || b.name || ''));
       if (filtered.length === 0) { el.innerHTML = '<div class="buff-empty">All buffs blacklisted</div>'; return; }
       const toTitle = s => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -8245,7 +8724,7 @@
     // survive re-renders triggered by snapshot pushes.
     window._eiState = window._eiState || {
       items: [],
-      filters: { id: '', path: '', type: 'all', state: 'all', group: 'all' },
+      filters: { id: '', path: '', type: 'all', state: 'all', group: 'all', category: 'all' },
       expanded: new Set(),
       compExpanded: new Set(),  // keys are `<entityAddr>::<componentName>`
       // Lazy-decode cache. Keys are `<entityAddr>::<componentName>`,
@@ -8282,7 +8761,7 @@
       const el = document.getElementById('tab-entities-content');
       if (!el) return;
       const st = window._eiState;
-      const { id: fId, path: fPath, type: fType, state: fState, group: fGroup } = st.filters;
+      const { id: fId, path: fPath, type: fType, state: fState, group: fGroup, category: fCategory = 'all' } = st.filters;
       const lowId = fId.toLowerCase().trim();
       const lowPath = fPath.toLowerCase().trim();
 
@@ -8299,6 +8778,7 @@
         if (lowPath && String(e.path || '').toLowerCase().indexOf(lowPath) === -1) return false;
         if (fType !== 'all' && e.type !== fType) return false;
         if (fGroup && fGroup !== 'all' && e.group !== fGroup) return false;
+        if (fCategory && fCategory !== 'all' && e.metaCategory !== fCategory) return false;
         if (fState === 'awake' && e.sleep === true) return false;
         if (fState === 'sleeping' && e.sleep !== true) return false;
         if (fState === 'dead' && e.alive !== false) return false;
@@ -8310,6 +8790,7 @@
       // only ever offers types the user can actually see right now.
       const typesPresent = [...new Set(st.items.map(e => e.type).filter(Boolean))].sort();
       const groupsPresent = [...new Set(st.items.map(e => e.group).filter(Boolean))].sort();
+      const categoriesPresent = [...new Set(st.items.map(e => e.metaCategory).filter(Boolean))].sort();
 
       const cards = filtered.map(eiCard).join('');
       const body = cards || '<div class="ei-empty">No entities match the current filters.</div>';
@@ -8337,6 +8818,10 @@
               <div class="ei-filter"><label>Group</label><select id="ei-f-group" onchange="eiFilterChange('group', this.value)">
                 <option value="all"${fGroup === 'all' ? ' selected' : ''}>All</option>
                 ${groupsPresent.map(g => `<option value="${escAttr(g)}"${g === fGroup ? ' selected' : ''}>${escHtml(g)}</option>`).join('')}
+              </select></div>
+              <div class="ei-filter"><label>Category</label><select id="ei-f-category" onchange="eiFilterChange('category', this.value)">
+                <option value="all"${fCategory === 'all' ? ' selected' : ''}>All</option>
+                ${categoriesPresent.map(c => `<option value="${escAttr(c)}"${c === fCategory ? ' selected' : ''}>${escHtml(c)}</option>`).join('')}
               </select></div>
             </div>
           </div>
@@ -8382,6 +8867,7 @@
         ['Id',       `<span class="ei-prop-val">${e.id ?? '—'}</span>`],
         ['Path',     `<span class="ei-prop-val">${escHtml(e.path || '—')}</span>`],
         ['Type',     `<span class="ei-prop-val">${escHtml(e.type || '—')}</span>`],
+        ['Category', `<span class="ei-prop-val">${escHtml(e.metaCategory || '—')}${e.metaGroup ? ` <span class="muted">/ ${escHtml(e.metaGroup)}</span>` : ''}</span>`],
         ['State',    `<span class="ei-prop-val">${escHtml(e.state || (e.sleep ? 'Sleeping' : 'Awake'))}</span>`],
         ['Rarity',   `<span class="ei-prop-val">${escHtml(e.rarity || 'Normal')}${e.rarityId !== undefined ? ` <span class="muted">(id=${e.rarityId})</span>` : ''}</span>`],
         ['Alive',    `<span class="ei-prop-val">${e.alive === false ? 'no' : 'yes'}</span>`],
