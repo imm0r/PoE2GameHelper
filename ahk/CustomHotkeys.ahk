@@ -1426,18 +1426,38 @@ _HotkeysDoAim(hk, a, snap)
     area := (inGs && inGs.Has("areaInstance")) ? inGs["areaInstance"] : 0
     prc := (area && area.Has("playerRenderComponent")) ? area["playerRenderComponent"] : 0
     pwp := (prc && prc is Map && prc.Has("worldPosition")) ? prc["worldPosition"] : 0
+    pX := (pwp && pwp.Has("x")) ? pwp["x"] : 0
+    pY := (pwp && pwp.Has("y")) ? pwp["y"] : 0
+    pZ := (pwp && pwp.Has("z")) ? pwp["z"] : 0
+
+    ; Aim clicks land in the 3D WORLD, so they MUST go through the live camera
+    ; world-to-screen matrix — the same discipline CombatAutomation uses. The
+    ; isometric fallback inside _WorldToScreen targets the radar/minimap layout
+    ; (player-centred iso), NOT the camera; clicking via it lands where the
+    ; entity shows ON THE MAP instead of on the actual monster. So require a
+    ; trustworthy camera anchor (valid 16-float matrix + the player projecting
+    ; near the screen centre) and skip the whole action when it isn't available
+    ; rather than fire a blind iso-fallback click.
+    rect := NavClientRect(gameHwnd)
+    if !(rect && w2sMatrix && Type(w2sMatrix) = "Array" && w2sMatrix.Length = 16 && pX != 0)
+        return
+    camAnchor := NavAnchor(pX, pY, pZ, w2sMatrix, rect)
+    if !camAnchor["ok"]
+        return
 
     combatInfo := Map(
         "nearestWorldX", target["x"],
         "nearestWorldY", target["y"],
         "nearestWorldZ", target["z"],
         "w2sMatrix", w2sMatrix,
-        "playerWorldX", (pwp && pwp.Has("x")) ? pwp["x"] : 0,
-        "playerWorldY", (pwp && pwp.Has("y")) ? pwp["y"] : 0,
-        "playerWorldZ", (pwp && pwp.Has("z")) ? pwp["z"] : 0
+        "playerWorldX", pX,
+        "playerWorldY", pY,
+        "playerWorldZ", pZ
     )
 
-    screenPos := _WorldToScreen(combatInfo, gameHwnd)
+    ; Pass the anchor so behind-camera targets are rejected (w-sign) and any
+    ; off-screen result is clamped along the player ray, not the iso fallback.
+    screenPos := _WorldToScreen(combatInfo, gameHwnd, camAnchor)
     if !screenPos
         return
     _MoveMouseToTarget(screenPos)
