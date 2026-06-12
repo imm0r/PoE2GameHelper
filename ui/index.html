@@ -5332,6 +5332,15 @@
         /* Inputs / selects inherit the shared codex theme (see the generic
            input/select rule). Only the hotkeys-specific layout is kept here. */
         #panel-hotkeys input[type=number] { width: 74px; }
+        /* Compact controls so each row/box packs tightly (the row height tracks its
+           tallest control). Scoped to the Hotkeys tab so other tabs are untouched. */
+        #panel-hotkeys input[type="text"]:not(.no-codex),
+        #panel-hotkeys input[type="number"]:not(.no-codex),
+        #panel-hotkeys select:not(.no-codex) { padding-top: 2px; padding-bottom: 2px; }
+        #panel-hotkeys .hk-btn { padding-top: 3px; padding-bottom: 3px; }
+        #panel-hotkeys .toggle { height: 18px; width: 34px; }
+        #panel-hotkeys .toggle-slider::before { width: 12px; height: 12px; }
+        #panel-hotkeys .toggle input:checked~.toggle-slider::before { transform: translateX(16px); }
         /* Themed number stepper — hide the native spin button and overlay our
            own gold ▲▼ controls so editboxes match the codex palette. */
         #panel-hotkeys .hk-num { position: relative; display: inline-flex; vertical-align: middle; }
@@ -5444,8 +5453,8 @@
         /* Give the export/remove buttons a shared fixed height and center their
            glyphs, and match the debug checkbox label height so the bug icon
            lines up vertically with the buttons. */
-        .hk-act-tools .hk-btn { height: 26px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
-        .hk-act-tools > .hk-cap { height: 26px; margin: 0; display: inline-flex; align-items: center; }
+        .hk-act-tools .hk-btn { height: 22px; box-sizing: border-box; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; }
+        .hk-act-tools > .hk-cap { height: 22px; margin: 0; display: inline-flex; align-items: center; }
         .hk-empty { color: var(--codex-text-dim); padding: 24px; text-align: center; font-family: var(--codex-serif); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }
         .hk-caret { cursor: pointer; color: var(--codex-gold); user-select: none; width: 14px; display: inline-block; text-align: center; font-size: 11px; }
         .hk-caret:hover { color: var(--codex-gold-hi); }
