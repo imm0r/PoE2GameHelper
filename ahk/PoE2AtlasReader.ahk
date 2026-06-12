@@ -208,6 +208,29 @@ AtlasDumpDebug(reader, snap)
         txt .= "   Enumerating UI elements under the root so the real panel StringId`n"
         txt .= "   can be identified. Make sure the Atlas was open, then send this file.`n"
 
+        ; ── Reference-based location (GameHelper2 ImportantUiElements.cs) ─────────
+        ; Atlas = GameUi -> child 22 -> child 0 -> child 6;  WorldMap = [22,0].
+        ; The indices drift per patch, so list the root children to confirm which
+        ; index is the world-travel panel for THIS build, then resolve the paths
+        ; and scan the atlas panel for its Descriptions (node) list.
+        txt .= "`n=== reference child-path location (GameHelper2: Atlas = root->22->0->6) ===`n"
+        txt .= "root children (identify the world-map panel index by size/children):`n"
+        txt .= _AtlasDumpChildren(reader, root, 40)
+
+        wm := _AtlasResolveChildPath(reader, root, [22, 0])
+        txt .= Format("`nWorldMap [22,0] -> 0x{:X}`n", wm)
+        if wm
+            txt .= _AtlasDumpChildren(reader, wm, 40)
+
+        at := _AtlasResolveChildPath(reader, root, [22, 0, 6])
+        txt .= Format("`nAtlas [22,0,6] -> 0x{:X}`n", at)
+        if at
+        {
+            txt .= _AtlasDumpChildren(reader, at, 16)
+            txt .= "vector scan @ Atlas panel (look for the Descriptions/node list):`n"
+            txt .= _AtlasScanVectors(reader, at, 0x800)
+        }
+
         ids := _AtlasEnumStringIds(reader, root, 8000)
 
         ; Visible, panel-sized candidates (large + on screen), area-sorted desc.
@@ -564,6 +587,60 @@ _AtlasResolveUiRoot(reader, snap)
         return root
     root := reader.Mem.ReadPtr(addr + PoE2Offsets.InGameState["GamepadUiRootStructPtr"])
     return reader.IsProbablyValidPointer(root) ? root : 0
+}
+
+; Walks a UiElement child-index path (e.g. [22,0,6]) from base via the children
+; vector at ChildrenFirst (0x10). This is how GameHelper2 locates the atlas panel.
+; Returns the resolved element pointer, or 0 if any index is out of range.
+_AtlasResolveChildPath(reader, base, path)
+{
+    cur := base
+    for _, idx in path
+    {
+        if !reader.IsProbablyValidPointer(cur)
+            return 0
+        cf := reader.Mem.ReadInt64(cur + PoE2Offsets.UiElementBase["ChildrenFirst"])
+        cl := reader.Mem.ReadInt64(cur + PoE2Offsets.UiElementBase["ChildrenFirst"] + 8)
+        n := (cf > 0 && cl > cf) ? (cl - cf) // 8 : 0
+        if (idx < 0 || idx >= n)
+            return 0
+        cur := reader.Mem.ReadPtr(cf + idx * 8)
+    }
+    return reader.IsProbablyValidPointer(cur) ? cur : 0
+}
+
+; Lists a UiElement's direct children (index, ptr, visibility, size, grandchild
+; count) — used to identify the world-map / atlas child index for the current
+; patch when the reference indices drift. Returns formatted text.
+_AtlasDumpChildren(reader, elem, maxN := 40)
+{
+    ub := PoE2Offsets.UiElementBase
+    if !reader.IsProbablyValidPointer(elem)
+        return "  (invalid element)`n"
+    cf := reader.Mem.ReadInt64(elem + ub["ChildrenFirst"])
+    cl := reader.Mem.ReadInt64(elem + ub["ChildrenFirst"] + 8)
+    n := (cf > 0 && cl > cf) ? (cl - cf) // 8 : 0
+    out := Format("  ({} children)`n", n)
+    i := 0
+    while (i < n && i < maxN)
+    {
+        c := reader.Mem.ReadPtr(cf + i * 8)
+        if reader.IsProbablyValidPointer(c)
+        {
+            flags := reader.Mem.ReadUInt(c + ub["Flags"])
+            w := reader.Mem.ReadFloat(c + ub["UnscaledSize"])
+            h := reader.Mem.ReadFloat(c + ub["UnscaledSize"] + 4)
+            gcf := reader.Mem.ReadInt64(c + ub["ChildrenFirst"])
+            gcl := reader.Mem.ReadInt64(c + ub["ChildrenFirst"] + 8)
+            gn := (gcf > 0 && gcl > gcf) ? (gcl - gcf) // 8 : 0
+            out .= Format("  [{:2}] 0x{:X} vis={} sz={}x{} children={}`n",
+                i, c, ((flags >> 11) & 1), Round(w), Round(h), gn)
+        }
+        else
+            out .= Format("  [{:2}] 0x{:X} (invalid)`n", i, c)
+        i += 1
+    }
+    return out
 }
 
 ; Computes the ABSOLUTE screen position of a UI element by walking its parent
